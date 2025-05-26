@@ -8,7 +8,7 @@ const Auth: React.FC = () => {
 
   // Only redirect if we have a user and we're not loading
   if (user && !isLoading) {
-    return <Navigate to="/grid" replace />;
+    return <Navigate to="/dashboard" replace />;
   }
 
   return (

@@ -29,6 +29,16 @@ const Navbar: React.FC = () => {
               {user && (
                 <>
                   <Link
+                    to="/dashboard"
+                    className={`px-3 py-2 rounded-md text-sm font-medium ${
+                      location.pathname === '/dashboard'
+                        ? 'bg-night-800 text-white'
+                        : 'text-sand-300 hover:bg-night-800 hover:text-white'
+                    }`}
+                  >
+                    Dashboard
+                  </Link>
+                  <Link
                     to="/grid"
                     className={`px-3 py-2 rounded-md text-sm font-medium ${
                       location.pathname === '/grid'
@@ -135,6 +145,17 @@ const Navbar: React.FC = () => {
           <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
             {user ? (
               <>
+                <Link
+                  to="/dashboard"
+                  className={`block px-3 py-2 rounded-md text-base font-medium ${
+                    location.pathname === '/dashboard'
+                      ? 'bg-night-800 text-white'
+                      : 'text-sand-300 hover:bg-night-800 hover:text-white'
+                  }`}
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  Dashboard
+                </Link>
                 <Link
                   to="/grid"
                   className={`block px-3 py-2 rounded-md text-base font-medium ${

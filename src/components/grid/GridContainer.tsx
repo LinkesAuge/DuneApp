@@ -139,11 +139,26 @@ const GridContainer: React.FC = () => {
   };
 
   const handleGalleryOpen = (square: GridSquareType) => {
-    const index = gridSquares
-      .filter(s => s.screenshot_url)
-      .findIndex(s => s.id === square.id);
-    setGalleryIndex(Math.max(0, index));
-    setShowGallery(true);
+    if (square.screenshot_url) {
+      // Create a temporary POI-like structure for the gallery
+      const tempPoi = {
+        id: `grid-${square.id}`,
+        title: `Grid Square ${square.coordinate}`,
+        description: `Screenshot of grid square ${square.coordinate}`,
+        created_at: square.upload_date || new Date().toISOString(),
+        created_by: square.uploaded_by || '',
+        screenshots: [{
+          id: square.id,
+          url: square.screenshot_url,
+          uploaded_by: square.uploaded_by || '',
+          upload_date: square.upload_date || new Date().toISOString()
+        }]
+      };
+      
+      setSelectedPoi(tempPoi as any);
+      setGalleryIndex(0); // Always start at index 0 for single screenshot
+      setShowGallery(true);
+    }
   };
 
   const handlePoiGalleryOpen = (poi: Poi) => {
@@ -420,7 +435,7 @@ const GridContainer: React.FC = () => {
             // For a new POI added within the modal, onPoiSuccessfullyAdded handles it directly.
             // However, if onUpdate *could* change POI visibility, consider calling fetchPois() here too.
           }}
-          onImageClick={() => selectedSquare && handleGalleryOpen(selectedSquare)}
+          onImageClick={(square) => handleGalleryOpen(square)}
           onPoiGalleryOpen={handlePoiGalleryOpen}
           onPoiSuccessfullyAdded={fetchPoisOnly} // Pass the new callback
         />
@@ -433,10 +448,14 @@ const GridContainer: React.FC = () => {
             screenshot_url: s.url,
             uploaded_by: s.uploaded_by,
             upload_date: s.upload_date,
-            coordinate: selectedSquare?.coordinate || '',
+            coordinate: selectedPoi.id.startsWith('grid-') ? selectedPoi.title.replace('Grid Square ', '') : selectedSquare?.coordinate || '',
+            is_explored: false,
           }))}
           initialIndex={galleryIndex}
-          onClose={() => setShowGallery(false)}
+          onClose={() => {
+            setShowGallery(false);
+            setSelectedPoi(null);
+          }}
           poiInfo={{
             title: selectedPoi.title,
             description: selectedPoi.description,

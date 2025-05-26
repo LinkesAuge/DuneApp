@@ -2,6 +2,8 @@ import React from 'react';
 import { Poi, PoiType } from '../../types';
 import { MapPin, Edit, Trash2, Clock } from 'lucide-react';
 import { useAuth } from '../auth/AuthProvider';
+import CommentsList from '../comments/CommentsList';
+import LikeButton from '../common/LikeButton';
 
 interface PoiCardProps {
   poi: Poi;
@@ -168,6 +170,16 @@ const PoiCard: React.FC<PoiCardProps> = ({
             </div>
           </div>
         )}
+      </div>
+
+      {/* Comments Section */}
+      <div className="border-t border-sand-300">
+        <CommentsList 
+          poiId={poi.id} 
+          showLikeButton={true}
+          likeTargetType="poi"
+          likeTargetId={poi.id}
+        />
       </div>
 
       {/* Footer */}

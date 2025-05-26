@@ -6,12 +6,13 @@ import { Upload, X, Plus, Check, Image, Trash2, Clock, ChevronUp, ChevronDown, C
 import { v4 as uuidv4 } from 'uuid';
 import PoiList from '../poi/PoiList';
 import AddPoiForm from '../poi/AddPoiForm';
+import CommentsList from '../comments/CommentsList';
 
 interface GridSquareModalProps {
   square: GridSquareType;
   onClose: () => void;
   onUpdate: (updatedSquare: GridSquareType) => void;
-  onImageClick: () => void;
+  onImageClick: (square: GridSquareType) => void;
   onPoiGalleryOpen?: (poi: Poi) => void;
   onPoiSuccessfullyAdded?: () => void;
 }
@@ -352,8 +353,8 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
 
   const handleImageClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (onImageClick) {
-      onImageClick();
+    if (onImageClick && currentSquare.screenshot_url) {
+      onImageClick(currentSquare);
     }
   };
 
@@ -435,16 +436,16 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
           
           <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
             {/* Left side - Screenshot */}
-            <div className="lg:w-2/3 p-8 flex flex-col min-h-0">
+            <div className="lg:w-2/3 p-8 flex flex-col min-h-0 bg-sand-200">
               <div className="mb-6 flex justify-between items-center">
-                <h3 className="text-xl font-semibold text-white">Screenshot</h3>
+                <h3 className="text-xl font-semibold text-night-800">Screenshot</h3>
                 <div className="flex items-center gap-3">
                   <button
                     onClick={handleExplorationToggle}
                     className={`flex items-center text-sm px-4 py-2 rounded-full transition-colors ${
                       currentSquare.is_explored 
-                        ? 'bg-green-900/20 text-green-300 hover:bg-green-900/30' 
-                        : 'bg-night-700 text-sand-300 hover:bg-night-600'
+                        ? 'bg-green-600 text-white hover:bg-green-700 shadow-md' 
+                        : 'bg-night-800 text-white hover:bg-night-900 shadow-md'
                     }`}
                   >
                     {currentSquare.is_explored ? (
@@ -461,7 +462,7 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
                     <button
                       onClick={handleScreenshotUpload}
                       disabled={isUploading}
-                      className="btn bg-night-700 text-sand-300 hover:bg-night-600 hover:text-white text-sm border border-night-600"
+                      className="btn bg-spice-600 text-white hover:bg-spice-700 text-sm border border-spice-700 shadow-md"
                     >
                       {isUploading ? (
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
@@ -477,7 +478,7 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
                   {currentSquare.screenshot_url && canDeleteScreenshot && (
                     <button
                       onClick={handleDeleteScreenshot}
-                      className="btn bg-red-900/20 text-red-300 hover:bg-red-900/30 text-sm border border-red-700/30"
+                      className="btn bg-red-600 text-white hover:bg-red-700 text-sm border border-red-700 shadow-md"
                       title="Delete screenshot"
                     >
                       <Trash2 size={16} />
@@ -494,7 +495,7 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
                 </div>
               </div>
               
-              <div className="flex-1 bg-night-950/30 rounded-xl overflow-hidden flex items-center justify-center border border-night-700">
+              <div className="flex-1 bg-sand-100 rounded-xl overflow-hidden flex items-center justify-center border border-sand-300">
                 {currentSquare.screenshot_url ? (
                   <img 
                     src={currentSquare.screenshot_url} 
@@ -504,18 +505,18 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
                   />
                 ) : (
                   <div className="h-full flex flex-col items-center justify-center p-8">
-                    <Image size={64} className="text-night-600 mb-4" />
-                    <p className="text-lg text-sand-400 font-medium">No screenshot uploaded</p>
-                    {!user && <p className="text-sm mt-2 text-sand-500">Sign in to upload screenshots</p>}
+                    <Image size={64} className="text-night-500 mb-4" />
+                    <p className="text-lg text-night-600 font-medium">No screenshot uploaded</p>
+                    {!user && <p className="text-sm mt-2 text-night-500">Sign in to upload screenshots</p>}
                     {user && !canUpdateScreenshot && (
-                      <p className="text-sm mt-2 text-sand-500">You don't have permission to update this screenshot</p>
+                      <p className="text-sm mt-2 text-night-500">You don't have permission to update this screenshot</p>
                     )}
                   </div>
                 )}
               </div>
               
               {currentSquare.uploaded_by && uploaderInfo && (
-                <div className="mt-4 text-sm text-sand-400 flex items-center">
+                <div className="mt-4 text-sm text-night-600 flex items-center">
                   <Clock size={14} className="mr-1.5" />
                   <span>
                     Updated by {uploaderInfo.username} on{' '}
@@ -561,6 +562,11 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
                   onPoiGalleryOpen={onPoiGalleryOpen}
                 />
               )}
+
+              {/* Comments Section */}
+              <div className="mt-8">
+                <CommentsList gridSquareId={currentSquare.id} />
+              </div>
             </div>
           </div>
         </div>

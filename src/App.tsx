@@ -4,6 +4,7 @@ import { AuthProvider } from './components/auth/AuthProvider';
 import Navbar from './components/common/Navbar';
 import Landing from './pages/Landing';
 import Auth from './pages/Auth';
+import Dashboard from './pages/Dashboard';
 import GridContainer from './components/grid/GridContainer';
 import PoisPage from './pages/Pois';
 import AdminPanel from './components/admin/AdminPanel';
@@ -70,6 +71,14 @@ const AppRoutes: React.FC = () => {
     <Routes future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <Route path="/" element={<Landing />} />
       <Route path="/auth" element={<Auth />} />
+      <Route 
+        path="/dashboard" 
+        element={
+          <ProtectedRoute>
+            <Dashboard />
+          </ProtectedRoute>
+        } 
+      />
       <Route 
         path="/grid" 
         element={

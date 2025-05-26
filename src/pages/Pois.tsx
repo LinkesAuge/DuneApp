@@ -695,30 +695,37 @@ const PoisPage: React.FC = () => {
               setSelectedPoi(prevPoi => prevPoi ? { ...prevPoi, grid_square: updatedSquare } : null);
             }
           }}
-          onImageClick={() => {
-            if (selectedPoi && selectedPoi.screenshots && selectedPoi.screenshots.length > 0) {
-              const currentModalScreenshotUrl = selectedGridSquare?.screenshot_url;
-              let initialGalleryIndex = 0;
-              if (currentModalScreenshotUrl) {
-                const idx = selectedPoi.screenshots.findIndex(s => s.url === currentModalScreenshotUrl);
-                if (idx !== -1) {
-                  initialGalleryIndex = idx;
-                }
-              }
-              console.log('[PoisPage] GridSquareModal onImageClick: Attempting to open gallery for selected POI.', {
-                selectedPoiTitle: selectedPoi.title,
-                selectedPoiScreenshotsCount: selectedPoi.screenshots.length,
-                screenshots: selectedPoi.screenshots,
-                currentModalScreenshotUrl,
-                calculatedInitialGalleryIndex: initialGalleryIndex
+          onImageClick={(gridSquare) => {
+            // When clicking the grid square's screenshot in the modal,
+            // we should open a gallery for the grid square's screenshot, not the POI's screenshots
+            if (gridSquare.screenshot_url) {
+              console.log('[PoisPage] GridSquareModal onImageClick: Opening gallery for grid square screenshot.', {
+                gridSquareCoordinate: gridSquare.coordinate,
+                screenshotUrl: gridSquare.screenshot_url
               });
-              setGalleryIndex(initialGalleryIndex);
+              
+              // Create a temporary POI-like structure for the gallery to show the grid square screenshot
+              const tempPoi = {
+                id: `grid-${gridSquare.id}`,
+                title: `Grid Square ${gridSquare.coordinate}`,
+                description: `Screenshot of grid square ${gridSquare.coordinate}`,
+                created_at: gridSquare.upload_date,
+                created_by: gridSquare.uploaded_by || '',
+                grid_square: gridSquare,
+                screenshots: [{
+                  id: gridSquare.id,
+                  url: gridSquare.screenshot_url,
+                  uploaded_by: gridSquare.uploaded_by || '',
+                  upload_date: gridSquare.upload_date
+                }]
+              };
+              
+              setSelectedPoi(tempPoi as any); // Cast to satisfy TypeScript
               setShowGallery(true);
+              setGalleryIndex(0);
             } else {
-              console.warn('[PoisPage] GridSquareModal onImageClick: Gallery not opened for selected POI.', {
-                selectedPoiExists: !!selectedPoi,
-                screenshotsExist: !!selectedPoi?.screenshots,
-                screenshotsCount: selectedPoi?.screenshots?.length ?? 0,
+              console.warn('[PoisPage] GridSquareModal onImageClick: No screenshot available for grid square.', {
+                gridSquareCoordinate: gridSquare.coordinate
               });
             }
           }}
