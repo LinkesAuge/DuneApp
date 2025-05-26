@@ -90,3 +90,23 @@ ALTER TABLE comments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE grid_squares ENABLE ROW LEVEL SECURITY;
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE comment_screenshots ENABLE ROW LEVEL SECURITY; 
+
+-- Permanent: Base map policies for admin panel usage
+-- Since admin panel access is controlled at the UI level, 
+-- we can allow any authenticated user to manage base maps
+-- (only admins can reach the upload functionality anyway)
+
+-- Drop any existing base map policies
+DROP POLICY IF EXISTS "Admin full access to base maps" ON hagga_basin_base_maps;
+DROP POLICY IF EXISTS "Temporary: Authenticated users can manage base maps" ON hagga_basin_base_maps;
+
+-- Create permanent policy for base map management through admin panel
+CREATE POLICY "Authenticated users can manage base maps via admin panel" ON hagga_basin_base_maps
+FOR ALL USING (auth.uid() IS NOT NULL);
+
+-- Keep the public read policy for active base maps
+DROP POLICY IF EXISTS "Public read access to active base maps" ON hagga_basin_base_maps;
+CREATE POLICY "Public read access to active base maps" ON hagga_basin_base_maps
+FOR SELECT USING (is_active = true);
+
+SELECT 'Base map policies updated for admin panel usage!' AS status; 

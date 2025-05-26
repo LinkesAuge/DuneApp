@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
-import { Poi, PoiType, GridSquare, PoiWithGridSquare } from '../types';
+import { Poi, PoiType, GridSquare, PoiWithGridSquare, MapType } from '../types';
 import { Search, Compass, LayoutGrid, List, Edit2, Trash2, ArrowDownUp, SortAsc, SortDesc } from 'lucide-react';
 import GridSquareModal from '../components/grid/GridSquareModal';
 import GridGallery from '../components/grid/GridGallery';
@@ -16,6 +16,7 @@ const PoisPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [selectedType, setSelectedType] = useState<string>('');
+  const [selectedMapType, setSelectedMapType] = useState<MapType | 'all'>('all');
   const [selectedGridSquare, setSelectedGridSquare] = useState<GridSquare | null>(null);
   const [showGallery, setShowGallery] = useState(false);
   const [galleryIndex, setGalleryIndex] = useState(0);
@@ -219,6 +220,11 @@ const PoisPage: React.FC = () => {
         selectedTagPoiTypes.size === 0 || 
         selectedTagPoiTypes.has(poi.poi_type_id);
 
+      // Map Type Filter
+      const matchesMapType = 
+        selectedMapType === 'all' || 
+        poi.map_type === selectedMapType;
+
       return (
         matchesSearchTerm &&
         matchesSearchGrid &&
@@ -226,7 +232,8 @@ const PoisPage: React.FC = () => {
         matchesSearchDate &&
         matchesTagGrid &&
         matchesTagCategory &&
-        matchesTagPoiType
+        matchesTagPoiType &&
+        matchesMapType
       );
     });
 
@@ -282,7 +289,7 @@ const PoisPage: React.FC = () => {
       });
     }
     return processedPois;
-  }, [pois, poiTypes, userInfo, searchTerm, searchGridCoordinate, searchUser, searchDateStart, searchDateEnd, selectedTagGrids, selectedTagCategories, selectedTagPoiTypes, sortField, sortDirection]);
+  }, [pois, poiTypes, userInfo, searchTerm, searchGridCoordinate, searchUser, searchDateStart, searchDateEnd, selectedTagGrids, selectedTagCategories, selectedTagPoiTypes, selectedMapType, sortField, sortDirection]);
 
   const getPoiType = (poiTypeId: string) => {
     return poiTypes.find(type => type.id === poiTypeId);
@@ -314,6 +321,7 @@ const PoisPage: React.FC = () => {
     setSearchUser('');
     setSearchDateStart('');
     setSearchDateEnd('');
+    setSelectedMapType('all');
     setSelectedTagCategories(new Set());
     setSelectedTagPoiTypes(new Set());
     setSelectedTagGrids(new Set());
@@ -352,7 +360,7 @@ const PoisPage: React.FC = () => {
       <div className="mb-4">
         <h1 className="text-3xl font-bold mb-4">Points of Interest</h1>
         <p className="text-night-700">
-          Browse and filter all discovered points of interest in the deep desert.
+          Browse and filter all discovered points of interest across Deep Desert and Hagga Basin regions.
         </p>
       </div>
       
@@ -421,7 +429,7 @@ const PoisPage: React.FC = () => {
       {/* Search and Filters Section - now conditionally rendered without its own button wrapper*/}
       {isSearchBarOpen && (
           <div className="bg-sand-200 rounded-lg shadow-md p-4 border border-sand-300 mb-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
               {/* Search Term */}
               <div className="lg:col-span-1">
                 <label className="label" htmlFor="search">
@@ -440,6 +448,23 @@ const PoisPage: React.FC = () => {
                     className="input pl-10"
                   />
                 </div>
+              </div>
+
+              {/* Search by Map Type */}
+              <div>
+                <label className="label" htmlFor="search-map-type">
+                  Map Region
+                </label>
+                <select
+                  id="search-map-type"
+                  value={selectedMapType}
+                  onChange={(e) => setSelectedMapType(e.target.value as MapType | 'all')}
+                  className="select"
+                >
+                  <option value="all">All Regions</option>
+                  <option value="deep_desert">Deep Desert</option>
+                  <option value="hagga_basin">Hagga Basin</option>
+                </select>
               </div>
 
               {/* Search by Grid Coordinate */}

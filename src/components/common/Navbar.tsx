@@ -46,7 +46,17 @@ const Navbar: React.FC = () => {
                         : 'text-sand-300 hover:bg-night-800 hover:text-white'
                     }`}
                   >
-                    Grid Map
+                    Deep Desert
+                  </Link>
+                  <Link
+                    to="/hagga-basin"
+                    className={`px-3 py-2 rounded-md text-sm font-medium ${
+                      location.pathname === '/hagga-basin'
+                        ? 'bg-night-800 text-white'
+                        : 'text-sand-300 hover:bg-night-800 hover:text-white'
+                    }`}
+                  >
+                    Hagga Basin
                   </Link>
                   <Link
                     to="/pois"
@@ -165,7 +175,18 @@ const Navbar: React.FC = () => {
                   }`}
                   onClick={() => setIsMenuOpen(false)}
                 >
-                  Grid Map
+                  Deep Desert
+                </Link>
+                <Link
+                  to="/hagga-basin"
+                  className={`block px-3 py-2 rounded-md text-base font-medium ${
+                    location.pathname === '/hagga-basin'
+                      ? 'bg-night-800 text-white'
+                      : 'text-sand-300 hover:bg-night-800 hover:text-white'
+                  }`}
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  Hagga Basin
                 </Link>
                 <Link
                   to="/pois"

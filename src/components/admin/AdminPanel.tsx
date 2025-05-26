@@ -5,6 +5,7 @@ import { User, UserRole, PoiType, ScheduledAdminTask } from '../../types';
 import { Shield, Users, Database, Download, Upload, Trash2, AlertTriangle, Map, CalendarClock, Trash, ListChecks, RefreshCw, Pencil } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import PoiTypeManager from './PoiTypeManager';
+import BaseMapUploader from './BaseMapUploader';
 
 interface Profile {
   id: string;
@@ -31,7 +32,7 @@ const AdminPanel: React.FC = () => {
   const [poiTypes, setPoiTypes] = useState<PoiType[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'users' | 'database' | 'poi-types'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'database' | 'poi-types' | 'maps'>('users');
   const [isBackingUp, setIsBackingUp] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
@@ -1095,6 +1096,16 @@ const AdminPanel: React.FC = () => {
             <Database size={18} className="mr-2" />
             Database Management
           </button>
+          <button
+            className={`flex items-center px-6 py-3 ${activeTab === 'maps'
+                ? 'bg-night-50 border-b-2 border-spice-600 text-night-900 font-medium'
+                : 'text-night-600 hover:bg-night-50'
+              }`}
+            onClick={() => setActiveTab('maps')}
+          >
+            <Map size={18} className="mr-2" />
+            Map Management
+          </button>
         </div>
         
         <div className="p-6">
@@ -1157,6 +1168,14 @@ const AdminPanel: React.FC = () => {
               poiTypes={poiTypes}
               onUpdate={setPoiTypes}
             />
+          ) : activeTab === 'maps' ? (
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-2xl font-semibold text-night-700 mb-1">Map Management</h2>
+                <p className="text-sm text-night-500">Upload and manage base maps for different regions.</p>
+              </div>
+              <BaseMapUploader />
+            </div>
           ) : (
             <DatabaseTab />
           )}

@@ -7,6 +7,7 @@ import Auth from './pages/Auth';
 import Dashboard from './pages/Dashboard';
 import GridContainer from './components/grid/GridContainer';
 import PoisPage from './pages/Pois';
+import HaggaBasinPage from './pages/HaggaBasinPage';
 import AdminPanel from './components/admin/AdminPanel';
 import { useAuth } from './components/auth/AuthProvider';
 import { AlertTriangle } from 'lucide-react';
@@ -92,6 +93,14 @@ const AppRoutes: React.FC = () => {
         element={
           <ProtectedRoute>
             <PoisPage />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/hagga-basin" 
+        element={
+          <ProtectedRoute>
+            <HaggaBasinPage />
           </ProtectedRoute>
         } 
       />

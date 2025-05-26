@@ -43,12 +43,16 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ limit = 20 }) => {
       let poisWithDetails = [];
       if (recentPois && !poisError) {
         for (const poi of recentPois) {
-          // Get username
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('username')
-            .eq('id', poi.created_by)
-            .single();
+          // Get username only if created_by is not null
+          let profile = null;
+          if (poi.created_by) {
+            const { data } = await supabase
+              .from('profiles')
+              .select('username')
+              .eq('id', poi.created_by)
+              .single();
+            profile = data;
+          }
 
           // Get coordinate
           const { data: gridSquare } = await supabase
@@ -102,12 +106,16 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ limit = 20 }) => {
       let commentsWithDetails = [];
       if (recentComments && !commentsError) {
         for (const comment of recentComments) {
-          // Get username
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('username')
-            .eq('id', comment.created_by)
-            .single();
+          // Get username only if created_by is not null
+          let profile = null;
+          if (comment.created_by) {
+            const { data } = await supabase
+              .from('profiles')
+              .select('username')
+              .eq('id', comment.created_by)
+              .single();
+            profile = data;
+          }
 
           // Get POI title if poi_id exists
           let poiTitle = null;
@@ -181,12 +189,16 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ limit = 20 }) => {
       let explorationsWithDetails = [];
       if (recentExplorations && !explorationsError) {
         for (const exploration of recentExplorations) {
-          // Get username
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('username')
-            .eq('id', exploration.uploaded_by)
-            .single();
+          // Get username only if uploaded_by is not null
+          let profile = null;
+          if (exploration.uploaded_by) {
+            const { data } = await supabase
+              .from('profiles')
+              .select('username')
+              .eq('id', exploration.uploaded_by)
+              .single();
+            profile = data;
+          }
 
           explorationsWithDetails.push({
             ...exploration,
@@ -198,19 +210,19 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ limit = 20 }) => {
       if (explorationsError) throw explorationsError;
 
       explorationsWithDetails?.forEach(grid => {
-                  activities.push({
-            id: `grid_${grid.id}`,
-            type: 'grid_explored',
-            title: 'Grid Square Explored',
-            description: `Grid square ${grid.coordinate} marked as explored`,
-            user: { username: grid.profiles?.username || 'Unknown User' },
-            timestamp: grid.upload_date,
-            targetId: grid.id,
-            targetType: 'grid_square',
-            metadata: {
-              coordinate: grid.coordinate
-            }
-          });
+        activities.push({
+          id: `grid_${grid.id}`,
+          type: 'grid_explored',
+          title: 'Grid Square Explored',
+          description: `Grid square ${grid.coordinate} marked as explored`,
+          user: { username: grid.profiles?.username || 'Unknown User' },
+          timestamp: grid.upload_date,
+          targetId: grid.id,
+          targetType: 'grid_square',
+          metadata: {
+            coordinate: grid.coordinate
+          }
+        });
       });
 
       // Fetch recent screenshots with manual joins
@@ -230,12 +242,16 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ limit = 20 }) => {
       let screenshotsWithDetails = [];
       if (recentScreenshots && !screenshotsError) {
         for (const screenshot of recentScreenshots) {
-          // Get username
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('username')
-            .eq('id', screenshot.uploaded_by)
-            .single();
+          // Get username only if uploaded_by is not null
+          let profile = null;
+          if (screenshot.uploaded_by) {
+            const { data } = await supabase
+              .from('profiles')
+              .select('username')
+              .eq('id', screenshot.uploaded_by)
+              .single();
+            profile = data;
+          }
 
           // Get comment details
           const { data: comment } = await supabase
@@ -288,32 +304,33 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ limit = 20 }) => {
       if (screenshotsError) throw screenshotsError;
 
       screenshotsWithDetails?.forEach(screenshot => {
-        const comment = screenshot.comments;
-        const target = comment?.pois?.title || comment?.grid_squares?.coordinate || 'Unknown';
+        const target = screenshot.comments?.pois?.title || 
+                      screenshot.comments?.grid_squares?.coordinate || 
+                      'Unknown';
+        const targetType = screenshot.comments?.poi_id ? 'poi' : 'grid_square';
         
         activities.push({
           id: `screenshot_${screenshot.id}`,
           type: 'screenshot_uploaded',
           title: 'Screenshot Uploaded',
-          description: `Added screenshot to ${target}`,
+          description: `New screenshot uploaded for ${target}`,
           user: { username: screenshot.profiles?.username || 'Unknown User' },
           timestamp: screenshot.created_at,
-          targetId: comment?.poi_id || comment?.grid_square_id || '',
-          targetType: comment?.poi_id ? 'poi' : 'grid_square',
+          targetId: screenshot.comments?.poi_id || screenshot.comments?.grid_square_id || '',
+          targetType: targetType,
           metadata: {
-            screenshotUrl: screenshot.url,
-            coordinate: comment?.grid_squares?.coordinate,
-            poiTitle: comment?.pois?.title
+            coordinate: screenshot.comments?.grid_squares?.coordinate,
+            poiTitle: screenshot.comments?.pois?.title,
+            screenshotUrl: screenshot.url
           }
         });
       });
 
-      // Sort all activities by timestamp
+      // Sort all activities by timestamp (most recent first)
       activities.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-
-      // Take only the requested limit
+      
+      // Limit to the requested number of activities
       setActivities(activities.slice(0, limit));
-
     } catch (err: any) {
       console.error('Error fetching activities:', err);
       setError(err.message);
