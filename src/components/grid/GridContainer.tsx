@@ -257,7 +257,7 @@ const GridContainer: React.FC = () => {
           </button>
 
           {isHighlightFilterOpen && (
-            <div id="highlight-filter-section" className="p-4 border-t border-sand-200 space-y-4">
+            <div id="highlight-filter-section" className="bg-sand-50 p-4 border-t border-sand-300 shadow-sm space-y-4">
               <div>
                 <h3 className="text-sm font-semibold text-sand-800 mb-2">Highlight and filter by Category:</h3>
                 <div className="flex flex-wrap gap-2">
@@ -265,12 +265,7 @@ const GridContainer: React.FC = () => {
                     <button
                       key={category}
                       onClick={() => toggleCategory(category)}
-                      className={`px-3 py-1 text-xs rounded-full transition-colors duration-150 ease-in-out 
-                        ${
-                          selectedCategories.has(category)
-                            ? 'bg-spice-600 text-white ring-2 ring-spice-400 ring-offset-1 ring-offset-sand-100' 
-                            : 'bg-sand-200 text-sand-700 hover:bg-sand-300'
-                        }`}
+                      className={`btn text-xs px-2 py-1 ${selectedCategories.has(category) ? 'btn-primary' : 'btn-outline'}`}
                     >
                       {category}
                     </button>
@@ -293,12 +288,7 @@ const GridContainer: React.FC = () => {
                           <button
                             key={type.id}
                             onClick={() => togglePoiType(type.id)}
-                            className={`px-3 py-1 text-xs rounded-full transition-colors duration-150 ease-in-out 
-                              ${
-                                selectedPoiTypeIds.has(type.id)
-                                  ? 'bg-sky-600 text-white ring-2 ring-sky-400 ring-offset-1 ring-offset-sand-100' 
-                                  : 'bg-sand-200 text-sand-700 hover:bg-sand-300'
-                              }`}
+                            className={`btn text-xs px-2 py-1 ${selectedPoiTypeIds.has(type.id) ? 'btn-primary' : 'btn-outline'}`}
                           >
                             {type.name}
                           </button>
@@ -321,12 +311,7 @@ const GridContainer: React.FC = () => {
                           <button
                             key={type.id}
                             onClick={() => togglePoiType(type.id)}
-                            className={`px-3 py-1 text-xs rounded-full transition-colors duration-150 ease-in-out 
-                              ${
-                                selectedPoiTypeIds.has(type.id)
-                                  ? 'bg-sky-600 text-white ring-2 ring-sky-400 ring-offset-1 ring-offset-sand-100' 
-                                  : 'bg-sand-200 text-sand-700 hover:bg-sand-300'
-                              }`}
+                            className={`btn text-xs px-2 py-1 ${selectedPoiTypeIds.has(type.id) ? 'btn-primary' : 'btn-outline'}`}
                           >
                             {type.name}
                           </button>
@@ -338,12 +323,12 @@ const GridContainer: React.FC = () => {
               </div>
               
               {(selectedCategories.size > 0 || selectedPoiTypeIds.size > 0) && (
-                <div className="pt-3 text-right border-t border-sand-200 mt-3">
+                <div className="mt-4 border-t border-sand-200 pt-4">
                     <button 
                         onClick={clearAllFilters}
-                        className="flex items-center justify-center px-3 py-1 text-xs text-night-700 bg-sand-300 hover:bg-sand-400 rounded-full transition-colors duration-150"
+                        className="btn btn-danger text-xs w-full md:w-auto"
                     >
-                        <FilterX size={14} className="mr-1.5" /> Clear Highlights & Filters
+                        <FilterX size={14} /> Clear Highlights & Filters
                     </button>
                 </div>
               )}

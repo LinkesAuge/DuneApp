@@ -161,14 +161,7 @@ const PoisPage: React.FC = () => {
     return Array.from(grids).sort((a, b) => a.localeCompare(b, undefined, {numeric: true, sensitivity: 'base'}));
   }, [pois]);
 
-  const availablePoiTypesForTagging = useMemo(() => {
-    if (selectedTagCategories.size === 0) {
-      return poiTypes.sort((a,b) => a.name.localeCompare(b.name));
-    }
-    return poiTypes
-      .filter(type => selectedTagCategories.has(type.category))
-      .sort((a,b) => a.name.localeCompare(b.name));
-  }, [poiTypes, selectedTagCategories]);
+
 
   // Filter POIs based on search term and selected filters
   const filteredPois = useMemo(() => {
@@ -521,7 +514,7 @@ const PoisPage: React.FC = () => {
           <div className="bg-sand-50 p-4 rounded-lg border border-sand-300 shadow-sm mb-6">
             {/* Grid Coordinate Tags */}
             <div className="mb-4">
-              <h3 className="text-sm font-semibold text-night-800 mb-2">Filter by Grid Tags</h3>
+              <h3 className="text-sm font-semibold text-sand-800 mb-2">Filter by Grid Tags</h3>
               <div className="flex flex-wrap gap-2">
                 {uniqueGridCoordinates.map(grid => (
                   <button
@@ -542,7 +535,7 @@ const PoisPage: React.FC = () => {
 
             {/* Category Tags */}
             <div className="mb-4">
-              <h3 className="text-sm font-semibold text-night-800 mb-2">Filter by Category Tags</h3>
+              <h3 className="text-sm font-semibold text-sand-800 mb-2">Filter by Category Tags</h3>
               <div className="flex flex-wrap gap-2">
                 {categories.map(category => (
                   <button
@@ -562,36 +555,64 @@ const PoisPage: React.FC = () => {
               </div>
             </div>
 
-            {/* POI Type Tags (grouped by category if categories selected) */}
+            {/* POI Type Tags (grouped by category) */}
             <div>
-              <h3 className="text-sm font-semibold text-night-800 mb-2">Filter by Type Tags</h3>
-              {(selectedTagCategories.size > 0 ? Array.from(selectedTagCategories) : ['All Types (or select categories first)']).map(catOrMessage => (
-                (poiTypes.filter(pt => selectedTagCategories.size === 0 || pt.category === catOrMessage)).length > 0 && (
-                  <div key={catOrMessage} className="mb-3">
-                    <h4 className="text-xs font-medium text-night-700 mb-1">
-                      {selectedTagCategories.size > 0 ? catOrMessage : (categories.length > 0 ? 'Available Types' : 'No types available')}
-                    </h4>
+              <h3 className="text-sm font-semibold text-sand-800 mb-2">Filter by Type Tags</h3>
+              {categories.map(category => {
+                const typesInCategory = poiTypes
+                  .filter(pt => pt.category === category)
+                  .sort((a, b) => a.name.localeCompare(b.name));
+                if (typesInCategory.length === 0) return null;
+                return (
+                  <div key={category} className="mb-3">
+                    <h4 className="text-xs font-medium text-sand-600 mb-1">{category}</h4>
                     <div className="flex flex-wrap gap-2">
-                      {availablePoiTypesForTagging
-                        .filter(type => selectedTagCategories.size === 0 || type.category === catOrMessage)
-                        .map(type => (
-                          <button
-                            key={type.id}
-                            onClick={() => {
-                              const newSet = new Set(selectedTagPoiTypes);
-                              if (newSet.has(type.id)) newSet.delete(type.id);
-                              else newSet.add(type.id);
-                              setSelectedTagPoiTypes(newSet);
-                            }}
-                            className={`btn text-xs px-2 py-1 ${selectedTagPoiTypes.has(type.id) ? 'btn-primary' : 'btn-outline'}`}
-                          >
-                            {type.name}
-                          </button>
+                      {typesInCategory.map(type => (
+                        <button
+                          key={type.id}
+                          onClick={() => {
+                            const newSet = new Set(selectedTagPoiTypes);
+                            if (newSet.has(type.id)) newSet.delete(type.id);
+                            else newSet.add(type.id);
+                            setSelectedTagPoiTypes(newSet);
+                          }}
+                          className={`btn text-xs px-2 py-1 ${selectedTagPoiTypes.has(type.id) ? 'btn-primary' : 'btn-outline'}`}
+                        >
+                          {type.name}
+                        </button>
                       ))}
                     </div>
                   </div>
-                )
-              ))}
+                );
+              })}
+              {/* Section for Uncategorized POI Types */}
+              {(() => {
+                const uncategorizedTypes = poiTypes
+                  .filter(pt => !pt.category || pt.category.trim() === '')
+                  .sort((a,b) => a.name.localeCompare(b.name));
+                if (uncategorizedTypes.length === 0) return null;
+                return (
+                  <div key="uncategorized-types" className="mb-3">
+                    <h4 className="text-xs font-medium text-sand-600 mb-1">Uncategorized</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {uncategorizedTypes.map(type => (
+                        <button
+                          key={type.id}
+                          onClick={() => {
+                            const newSet = new Set(selectedTagPoiTypes);
+                            if (newSet.has(type.id)) newSet.delete(type.id);
+                            else newSet.add(type.id);
+                            setSelectedTagPoiTypes(newSet);
+                          }}
+                          className={`btn text-xs px-2 py-1 ${selectedTagPoiTypes.has(type.id) ? 'btn-primary' : 'btn-outline'}`}
+                        >
+                          {type.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()} 
             </div>
             
             <div className="mt-4 border-t border-sand-300 pt-4">
