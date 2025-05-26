@@ -1,0 +1,141 @@
+---
+description: Stores important patterns, preferences, and project intelligence, living document that grows smarter as progress happens
+globs: 
+alwaysApply: true
+---
+# Description: Stores important patterns, preferences, and project intelligence, living document that grows smarter as progress happens.
+
+# Lessons Learned: Dune Awakening Deep Desert Tracker
+
+This document serves as a learning journal for the Dune Awakening Deep Desert Tracker project. It captures important patterns, user preferences, project-specific intelligence, and critical decisions made during development.
+
+## Format for Entries
+
+-   **Date**: YYYY-MM-DD
+-   **Topic/Feature**: The subject of the lesson.
+-   **Observation/Pattern**: What was observed or what pattern emerged.
+-   **Decision/Action Taken**: What was decided or done based on the observation.
+-   **Rationale**: Why this decision/action was taken.
+-   **Impact/Outcome**: The result of the decision/action.
+-   **Future Consideration**: Any related thoughts for future development.
+
+---
+
+### 2023-12-08: Initial Project Setup & Memory System
+-   **Topic/Feature**: Project Onboarding and Memory Initialization.
+-   **Observation/Pattern**: The project was imported with a single `docs/DOCUMENTATION.md`. The standard memory file structure (`memory.mdc`) was not yet in place.
+-   **Decision/Action Taken**: 
+    - Created the `tasks/` directory.
+    - Created and populated core memory files:
+        - `docs/product_requirement_docs.md`
+        - `docs/architecture.md`
+        - `docs/technical.md`
+        - `tasks/tasks_plan.md`
+        - `tasks/active_context.md`
+    - Updated project-specific content for `.cursor/rules/error-documentation.mdc` and `.cursor/rules/lessons-learned.mdc`.
+-   **Rationale**: To establish the standardized memory system required by the `memory.mdc` rule for effective ongoing development and AI collaboration.
+-   **Impact/Outcome**: The project now has a structured set of documentation files that capture requirements, architecture, technical details, plans, and active context. This will facilitate better understanding and more efficient development cycles.
+-   **Future Consideration**: Regularly update these memory files as the project evolves to maintain their accuracy and usefulness.
+
+---
+
+### YYYY-MM-DD: POI Type Icon Management & Styling Refinement
+-   **Topic/Feature**: Admin POI Type Management - Icon Upload, Display, and Styling.
+-   **Observation/Pattern**:
+    1.  Initial attempts to use a dedicated 'poi-icons' Supabase bucket faced persistent "bucket not found or inaccessible" errors, even with correct RLS and public settings. `supabase.storage.listBuckets()` consistently returned `[]` within `PoiTypeManager.tsx`, despite other buckets working.
+    2.  Icon display in `PoiCard.tsx` and `GridSquare.tsx` needed to support both emoji strings and image URLs.
+    3.  A requirement emerged to allow icons to have transparent backgrounds, independent of the `poiType.color`.
+    4.  Styling in `PoiTypeManager.tsx` was inconsistent with the application's theme and had contrast issues. Initial confusion about light/dark mode vs. a single default theme.
+-   **Decision/Action Taken**:
+    1.  Switched to using the existing 'screenshots' bucket with an 'icons/' subfolder for POI icons. Removed problematic `listBuckets()` calls from `PoiTypeManager.tsx`.
+    2.  Implemented `isIconUrl` and `getDisplayImageUrl` helpers in `PoiCard.tsx` and `GridSquare.tsx` to conditionally render `<img>` or `<span>` for icons.
+    3.  Added `icon_has_transparent_background: boolean` to the `PoiType` interface and `poi_types` database table. Updated `PoiTypeManager.tsx` and `PoiCard.tsx`/`GridSquare.tsx` to respect this flag for icon background rendering.
+    4.  Rewritten/refactored `PoiTypeManager.tsx` styling extensively with Tailwind CSS, using the project's defined color palette (sand, night, spice) and ensuring better contrast. Clarified and implemented a single default theme, removing all `dark:` mode specific classes.
+-   **Rationale**:
+    1.  To overcome persistent Supabase Storage issues with a new bucket and simplify the icon upload path.
+    2.  To provide flexible icon support for POI types.
+    3.  To give administrators more control over visual representation of POI icons.
+    4.  To ensure visual consistency and usability of the admin interface, adhering to a single theme.
+-   **Impact/Outcome**:
+    -   POI Type icon uploads are now functional.
+    -   Icons (both image and emoji) display correctly in POI cards and on the grid map.
+    -   Transparent background option for icons works as intended.
+    -   `PoiTypeManager.tsx` is now styled consistently with the application theme and is more user-friendly.
+-   **Future Consideration**:
+    -   When introducing new Supabase buckets, perform thorough client-side and server-side (SQL policies, grants) testing, especially for `listBuckets()` and `getBucket()`.
+    -   Clearly define the theming strategy (single vs. multi-theme) at the start of UI development to avoid rework.
+    -   Regularly review and refactor Tailwind CSS for maintainability and consistency as the application grows.
+
+---
+
+### YYYY-MM-DD: Modal Interaction Refinements & POI Gallery Flow
+-   **Topic/Feature**: POI Display (`PoisPage.tsx`, `GridSquareModal.tsx`), Image Gallery (`GridGallery.tsx`).
+-   **Observation/Pattern**:
+    1.  Clicking the main image within `GridSquareModal` (when opened from `PoisPage.tsx`) did not consistently open the gallery for the selected POI.
+    2.  Opening a POI-specific gallery (`GridGallery`) from within an active `GridSquareModal` (e.g., by clicking a POI thumbnail in the modal's list) and then closing the gallery would also incorrectly close the underlying `GridSquareModal`.
+    3.  The logic for opening POI-specific galleries was becoming divergent between different parts of the application.
+-   **Decision/Action Taken**:
+    1.  **`GridSquareModal` Main Image Click:** Ensured `GridSquareModal.tsx`'s internal `handleImageClick` function (for its main image) correctly calls the `onImageClick` prop passed from `PoisPage.tsx`. This prop in `PoisPage.tsx` is responsible for opening the gallery of the POI that originally opened the modal.
+    2.  **Preventing Premature Modal Closure:** Modified the `handleClickOutside` function in `GridSquareModal.tsx`. It now checks if the `mousedown` event target is part of the `GridGallery` component (by looking for specific CSS classes and z-index associated with the gallery's backdrop: `div[class*="bg-night-950/90"][class*="z-[60"]`). If the click originates from the gallery, the `GridSquareModal` ignores it and does not close. This allows the gallery to be closed independently.
+    3.  **Unified POI Gallery Opening:**
+        -   `PoisPage.tsx` now passes its `handleGalleryOpen` function (which opens a POI-specific gallery) as the `onPoiGalleryOpen` prop to `GridSquareModal`.
+        -   `GridSquareModal.tsx` forwards this `onPoiGalleryOpen` prop to its internal `PoiList` component.
+        -   `PoiList.tsx` already utilized an `onPoiGalleryOpen` prop to trigger gallery opening for individual POIs in the list. This completed the chain for consistent behavior.
+-   **Rationale**:
+    1.  To ensure clicking the modal's main image behaves as expected by triggering the POI gallery contextually.
+    2.  To provide a better user experience by ensuring that closing an overlay (gallery) returns the user to the previous state (the open modal) rather than closing all layers.
+    3.  To centralize and make the POI gallery opening mechanism more robust and maintainable.
+-   **Impact/Outcome**:
+    -   Clicking the main image in `GridSquareModal` (when relevant) now correctly opens the gallery for the associated POI.
+    -   Closing the `GridGallery` no longer closes the underlying `GridSquareModal`; users are correctly returned to the modal view.
+    -   The pathway for opening POI-specific galleries is more consistent across different interaction points.
+-   **Future Consideration**:
+    -   For complex scenarios with multiple stacked overlays, a more robust system (like a global overlay manager or React Context) for managing their interactions and click-outside behavior might be beneficial instead of CSS class-based heuristics for identifying overlays.
+
+---
+
+### YYYY-MM-DD: Scheduled Tasks (`pg_cron`) and Supabase Function Invocation
+-   **Topic/Feature**: Scheduled Admin Tasks (Backup, Reset) via `pg_cron`.
+-   **Observation/Pattern**: Scheduled tasks defined in `pg_cron` that were intended to call Supabase Edge Functions (e.g., `perform-map-backup`) using `net.http_post` were failing. The `cron.job_run_details` table showed an error in the `return_message` column: `ERROR: schema "net" does not exist`.
+-   **Decision/Action Taken**:
+    1.  Identified that the `pg_net` PostgreSQL extension, which provides network access capabilities like `net.http_post`, was not enabled.
+    2.  Enabled the `pg_net` extension by executing `CREATE EXTENSION IF NOT EXISTS pg_net WITH SCHEMA extensions;` in the Supabase SQL Editor.
+-   **Rationale**: `pg_cron` relies on `pg_net` to make outbound HTTP requests necessary to trigger Supabase Edge Functions. Without `pg_net`, these calls fail at the database level before even reaching the function.
+-   **Impact/Outcome**: After enabling `pg_net`, scheduled tasks successfully invoked the target Supabase Edge Functions, allowing features like automated backups to operate correctly.
+-   **Future Consideration**: When setting up projects relying on `pg_cron` to call Supabase Functions (or any HTTP endpoint from the database), ensure `pg_net` is explicitly enabled. Document this as a prerequisite in technical setup guides. Diagnostic steps for failing cron-triggered function calls should include checking `cron.job_run_details` and verifying `pg_net` status.
+
+---
+
+### YYYY-MM-DD: User Deletion and Foreign Key Integrity
+-   **Topic/Feature**: Admin Panel - User Management - Delete User.
+-   **Observation/Pattern**: Attempting to delete a user via `supabase.auth.admin.deleteUser()` resulted in a "Database error deleting user". The root cause was not an issue with the `deleteUser` function itself, but with database foreign key constraints.
+-   **Decision/Action Taken**:
+    1.  Investigated foreign key constraints on `public.profiles` that reference `auth.users.id`.
+    2.  Found `profiles_id_fkey` had `ON DELETE NO ACTION`.
+    3.  Modified `profiles_id_fkey` to `ON DELETE CASCADE` to ensure that deleting a user from `auth.users` automatically deletes their corresponding `public.profiles` entry.
+    4.  Verified that no other tables in `public` schema (like `pois` or `grid_squares`) had foreign keys to `public.profiles(id)` that would further block deletion with `NO ACTION` or `RESTRICT` policies. (In this instance, none were found, but if they were, they would also need to be addressed, likely with `ON DELETE SET NULL` or `ON DELETE CASCADE`).
+-   **Rationale**: To ensure data integrity and allow administrative deletion of users. `ON DELETE NO ACTION` is a restrictive default that prevents deletion if dependent records exist. `ON DELETE CASCADE` is appropriate when the dependent record (profile) has no meaning without the parent record (auth user) and should be removed alongside it.
+-   **Impact/Outcome**: User deletion functionality in the Admin Panel now works correctly. The `delete-user` Edge Function can successfully remove users from `auth.users`, and the database automatically handles the deletion of the associated profile due to the `CASCADE` policy.
+-   **Future Consideration**: Always meticulously check and configure `ON DELETE` actions for all relevant foreign key constraints when implementing deletion features, especially when linking to Supabase's `auth.users` table. Document these relationships and their delete behaviors in `docs/technical.md` or `docs/architecture.md`.
+
+---
+
+### YYYY-MM-DD: Database Backup/Restore Integrity & Edge Function Bulk Deletes
+-   **Topic/Feature**: Database Backup & Restore Integrity / Supabase Edge Function Bulk Deletion.
+-   **Observation/Pattern**:
+    1.  Restoring `grid_squares` data (via `manage-database` function) failed with a foreign key violation (`grid_squares_uploaded_by_fkey`) if an `uploaded_by` user ID from the backup no longer existed in the live `public.profiles` table.
+    2.  The `perform-map-reset` function failed to delete data from `pois` and `grid_squares` tables after a backup because it used a type-incompatible filter (`.neq('id', '0')`) for UUID primary key columns, resulting in an "invalid input syntax for type uuid" error.
+-   **Decision/Action Taken**:
+    1.  Modified the `manage-database` restore logic: It now fetches all existing `public.profiles` IDs before inserting `grid_squares`. If a `grid_square.uploaded_by` ID from the backup is not found in the live profiles, `uploaded_by` is set to `null` for that record before insertion (this requires the `uploaded_by` column to be nullable).
+    2.  Modified the `perform-map-reset` function: Replaced the delete filter `.neq('id', '0')` with `.not('id', 'is', null)` for both `pois` and `grid_squares` tables, ensuring a type-safe condition for deleting all rows.
+-   **Rationale**:
+    1.  To make the database restore process more resilient to missing user profiles (foreign key parent records), prioritizing the retention of `grid_squares` data by nullifying the broken FK reference.
+    2.  To use a type-safe and effective Supabase query filter for deleting all rows from tables with UUID primary keys.
+-   **Impact/Outcome**:
+    1.  Backup restoration is more robust; `grid_squares` data can be restored even if the original uploader has been deleted (uploader info becomes `NULL`).
+    2.  Map reset functionality now correctly performs backups (if requested) and then successfully deletes all map data.
+-   **Future Consideration**:
+    1.  For critical foreign keys where `NULL` is unacceptable during a restore, alternative strategies might include skipping the affected records or linking them to a designated placeholder/archived parent record.
+    2.  Always double-check type compatibility of filter conditions in database queries, especially when dealing with specific data types like UUIDs. For "delete all" scenarios where a filter is used, prefer conditions that are always true for existing data and type-safe (e.g., `isnot null` for a non-nullable primary key).
+
+

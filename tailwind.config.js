@@ -1,0 +1,71 @@
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
+  theme: {
+    extend: {
+      colors: {
+        // Desert-inspired color palette
+        sand: {
+          50: '#faf8f1',
+          100: '#f5f0e0',
+          200: '#eee2c1',
+          300: '#e6d0a0',
+          400: '#debb7b',
+          500: '#d6a256',
+          600: '#c68240',
+          700: '#a46234',
+          800: '#854e30',
+          900: '#6c4129',
+          950: '#3c2113',
+        },
+        spice: {
+          50: '#fcf4f0',
+          100: '#f9e8de',
+          200: '#f3d0bd',
+          300: '#eab192',
+          400: '#e18860',
+          500: '#d76440',
+          600: '#c24c31',
+          700: '#a13729',
+          800: '#832f27',
+          900: '#6c2a23',
+          950: '#3a120f',
+        },
+        sky: {
+          50: '#f0f9ff',
+          100: '#e0f2fe',
+          200: '#b9e6fe',
+          300: '#7cd4fd',
+          400: '#37bcfa',
+          500: '#0ea4e9',
+          600: '#0284c7',
+          700: '#036ba1',
+          800: '#075a85',
+          900: '#0c4a6e',
+          950: '#082f49',
+        },
+        night: {
+          50: '#f2f7fb',
+          100: '#e7f0f8',
+          200: '#d3e2f2',
+          300: '#b2cde8',
+          400: '#8ab1db',
+          500: '#6a95cf',
+          600: '#4f79c0',
+          700: '#4366ae',
+          800: '#3a548f',
+          900: '#324771',
+          950: '#1f2a45',
+        },
+      },
+      fontFamily: {
+        sans: ['Inter', 'sans-serif'],
+        display: ['Orbitron', 'sans-serif'],
+      },
+      backgroundImage: {
+        'sand-pattern': "url('https://images.pexels.com/photos/2098427/pexels-photo-2098427.jpeg?auto=compress&cs=tinysrgb&w=1600')",
+      },
+    },
+  },
+  plugins: [],
+};

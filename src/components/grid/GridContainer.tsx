@@ -1,0 +1,442 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { supabase } from '../../lib/supabase';
+import { GridSquare as GridSquareType, Poi, PoiType } from '../../types';
+import GridSquare from './GridSquare';
+import GridSquareModal from './GridSquareModal';
+import GridGallery from './GridGallery';
+import { Map, ChevronDown, ChevronUp, FilterX } from 'lucide-react';
+
+const GRID_SIZE = 9;
+
+const GridContainer: React.FC = () => {
+  const [gridSquares, setGridSquares] = useState<GridSquareType[]>([]);
+  const [selectedSquare, setSelectedSquare] = useState<GridSquareType | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [showGallery, setShowGallery] = useState(false);
+  const [galleryIndex, setGalleryIndex] = useState(0);
+  const [selectedPoi, setSelectedPoi] = useState<Poi | null>(null);
+  const [pois, setPois] = useState<Poi[]>([]);
+  const [poiTypes, setPoiTypes] = useState<PoiType[]>([]);
+
+  // Updated state for multi-select filters
+  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
+  const [selectedPoiTypeIds, setSelectedPoiTypeIds] = useState<Set<string>>(new Set());
+  const [isHighlightFilterOpen, setIsHighlightFilterOpen] = useState<boolean>(false);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      setIsLoading(true);
+      setError(null);
+      
+      try {
+        // Fetch grid squares, POIs, and POI types in parallel
+        const [gridSquaresResult, poisResult, poiTypesResult] = await Promise.all([
+          supabase
+            .from('grid_squares')
+            .select('*')
+            .order('coordinate', { ascending: true }),
+          supabase
+            .from('pois')
+            .select('*'),
+          supabase
+            .from('poi_types')
+            .select('*')
+        ]);
+
+        if (gridSquaresResult.error) throw gridSquaresResult.error;
+        if (poisResult.error) throw poisResult.error;
+        if (poiTypesResult.error) throw poiTypesResult.error;
+
+        const currentSquares = gridSquaresResult.data || [];
+        setGridSquares(currentSquares);
+        setPois(poisResult.data || []);
+        setPoiTypes(poiTypesResult.data || []);
+
+        // Calculate missing squares
+        const existingCoordinates = new Set(currentSquares.map(square => square.coordinate));
+        const missingSquares: Partial<GridSquareType>[] = [];
+
+        for (let y = 0; y < GRID_SIZE; y++) {
+          for (let x = 0; x < GRID_SIZE; x++) {
+            const letter = String.fromCharCode(65 + (GRID_SIZE - 1 - y));
+            const number = x + 1;
+            const coordinate = `${letter}${number}`;
+
+            if (!existingCoordinates.has(coordinate)) {
+              missingSquares.push({
+                coordinate,
+                is_explored: false,
+                screenshot_url: null,
+              });
+            }
+          }
+        }
+
+        // Insert missing squares if needed
+        if (missingSquares.length > 0) {
+          const { data: newSquares, error: upsertError } = await supabase
+            .from('grid_squares')
+            .upsert(
+              missingSquares,
+              {
+                onConflict: 'coordinate',
+                ignoreDuplicates: true,
+              }
+            )
+            .select();
+
+          if (upsertError) {
+            console.warn('Error upserting grid squares:', upsertError);
+          } else if (newSquares) {
+            setGridSquares(prev => {
+              const updatedSquares = [...prev];
+              newSquares.forEach(newSquare => {
+                const existingIndex = updatedSquares.findIndex(s => s.coordinate === newSquare.coordinate);
+                if (existingIndex === -1) {
+                  updatedSquares.push(newSquare);
+                }
+              });
+              return updatedSquares;
+            });
+          }
+        }
+      } catch (err: any) {
+        console.error('Error fetching data:', err);
+        setError(err.message);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  const handleSquareClick = (square: GridSquareType) => {
+    setSelectedSquare(square);
+  };
+
+  const handleGalleryOpen = (square: GridSquareType) => {
+    const index = gridSquares
+      .filter(s => s.screenshot_url)
+      .findIndex(s => s.id === square.id);
+    setGalleryIndex(Math.max(0, index));
+    setShowGallery(true);
+  };
+
+  const handlePoiGalleryOpen = (poi: Poi) => {
+    if (poi.screenshots?.length) {
+      setSelectedPoi(poi);
+      setGalleryIndex(0);
+      setShowGallery(true);
+    }
+  };
+
+  // Calculate exploration progress
+  const exploredSquares = gridSquares.filter(square => square.is_explored).length;
+  const totalSquares = GRID_SIZE * GRID_SIZE;
+  const explorationProgress = totalSquares > 0 ? (exploredSquares / totalSquares) * 100 : 0;
+
+  // Get all squares with screenshots for the gallery
+  const squaresWithScreenshots = gridSquares.filter(square => square.screenshot_url);
+
+  // Derive POIs to display based on filters and the grid squares to highlight
+  const { poisToDisplayOnMap, highlightedGridSquareIds } = useMemo(() => {
+    if (selectedCategories.size === 0 && selectedPoiTypeIds.size === 0) {
+      return { poisToDisplayOnMap: pois, highlightedGridSquareIds: new Set<string>() };
+    }
+
+    let candidatePois = pois;
+
+    if (selectedCategories.size > 0) {
+      const typesInCategory = new Set<string>();
+      poiTypes.forEach(pt => {
+        if (selectedCategories.has(pt.category)) {
+          typesInCategory.add(pt.id);
+        }
+      });
+      candidatePois = candidatePois.filter(p => typesInCategory.has(p.poi_type_id));
+    }
+
+    if (selectedPoiTypeIds.size > 0) {
+      candidatePois = candidatePois.filter(p => selectedPoiTypeIds.has(p.poi_type_id));
+    }
+
+    const currentHighlightedGridSquareIds = new Set<string>();
+    candidatePois.forEach(p => currentHighlightedGridSquareIds.add(p.grid_square_id));
+
+    return { poisToDisplayOnMap: candidatePois, highlightedGridSquareIds: currentHighlightedGridSquareIds };
+  }, [pois, poiTypes, selectedCategories, selectedPoiTypeIds]);
+
+  const uniqueCategories = Array.from(new Set(poiTypes.map(pt => pt.category))).sort();
+
+  const toggleCategory = (categoryName: string) => {
+    setSelectedCategories(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(categoryName)) {
+        newSet.delete(categoryName);
+      } else {
+        newSet.add(categoryName);
+      }
+      return newSet;
+    });
+    // When a category is toggled, it might be good to clear POI type selections 
+    // if the selected types are no longer relevant, or leave them as is.
+    // For now, let's clear them to ensure relevance.
+    setSelectedPoiTypeIds(new Set()); 
+  };
+
+  const togglePoiType = (typeId: string) => {
+    setSelectedPoiTypeIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(typeId)) {
+        newSet.delete(typeId);
+      } else {
+        newSet.add(typeId);
+      }
+      return newSet;
+    });
+  };
+
+  const clearAllFilters = () => {
+    setSelectedCategories(new Set());
+    setSelectedPoiTypeIds(new Set());
+    // Optionally close the filter section when clearing
+    // setIsHighlightFilterOpen(false);
+  };
+
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold mb-2">Deep Desert Grid Map</h1>
+        <div className="flex items-center mb-4">
+          <Map className="text-spice-600 mr-2" size={20} />
+          <p className="text-night-700">
+            Exploration progress: {exploredSquares} of {totalSquares} squares ({Math.round(explorationProgress)}%)
+          </p>
+        </div>
+        <div className="w-full bg-sand-200 rounded-full h-2.5 mb-6">
+          <div 
+            className="bg-spice-600 h-2.5 rounded-full transition-all duration-500 ease-out" 
+            style={{ width: `${explorationProgress}%` }}
+          ></div>
+        </div>
+
+        {/* Collapsible Highlight and Filter UI */}
+        <div className="mb-6 bg-sand-100 rounded-lg shadow">
+          <button 
+            onClick={() => setIsHighlightFilterOpen(!isHighlightFilterOpen)}
+            className="w-full flex justify-between items-center p-4 text-left text-night-700 hover:bg-sand-200 rounded-t-lg focus:outline-none"
+            aria-expanded={isHighlightFilterOpen}
+            aria-controls="highlight-filter-section"
+          >
+            <span className="font-semibold">Highlight and filter Options</span>
+            {isHighlightFilterOpen ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+          </button>
+
+          {isHighlightFilterOpen && (
+            <div id="highlight-filter-section" className="p-4 border-t border-sand-200 space-y-4">
+              <div>
+                <h3 className="text-sm font-semibold text-sand-800 mb-2">Highlight and filter by Category:</h3>
+                <div className="flex flex-wrap gap-2">
+                  {uniqueCategories.map(category => (
+                    <button
+                      key={category}
+                      onClick={() => toggleCategory(category)}
+                      className={`px-3 py-1 text-xs rounded-full transition-colors duration-150 ease-in-out 
+                        ${
+                          selectedCategories.has(category)
+                            ? 'bg-spice-600 text-white ring-2 ring-spice-400 ring-offset-1 ring-offset-sand-100' 
+                            : 'bg-sand-200 text-sand-700 hover:bg-sand-300'
+                        }`}
+                    >
+                      {category}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-sm font-semibold text-sand-800 mb-2">Highlight and filter by POI Type:</h3>
+                {uniqueCategories.map(category => {
+                  const typesInCategory = poiTypes
+                    .filter(pt => pt.category === category)
+                    .sort((a, b) => a.name.localeCompare(b.name));
+                  if (typesInCategory.length === 0) return null;
+                  return (
+                    <div key={category} className="mb-3">
+                      <h4 className="text-xs font-medium text-sand-600 mb-1 pl-1">{category}</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {typesInCategory.map(type => (
+                          <button
+                            key={type.id}
+                            onClick={() => togglePoiType(type.id)}
+                            className={`px-3 py-1 text-xs rounded-full transition-colors duration-150 ease-in-out 
+                              ${
+                                selectedPoiTypeIds.has(type.id)
+                                  ? 'bg-sky-600 text-white ring-2 ring-sky-400 ring-offset-1 ring-offset-sand-100' 
+                                  : 'bg-sand-200 text-sand-700 hover:bg-sand-300'
+                              }`}
+                          >
+                            {type.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+                {/* Section for Uncategorized POI Types */}
+                {(() => {
+                  const uncategorizedTypes = poiTypes
+                    .filter(pt => !pt.category || pt.category.trim() === '')
+                    .sort((a,b) => a.name.localeCompare(b.name));
+                  if (uncategorizedTypes.length === 0) return null;
+                  return (
+                    <div key="uncategorized-types" className="mb-3">
+                      <h4 className="text-xs font-medium text-sand-600 mb-1 pl-1">Uncategorized</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {uncategorizedTypes.map(type => (
+                          <button
+                            key={type.id}
+                            onClick={() => togglePoiType(type.id)}
+                            className={`px-3 py-1 text-xs rounded-full transition-colors duration-150 ease-in-out 
+                              ${
+                                selectedPoiTypeIds.has(type.id)
+                                  ? 'bg-sky-600 text-white ring-2 ring-sky-400 ring-offset-1 ring-offset-sand-100' 
+                                  : 'bg-sand-200 text-sand-700 hover:bg-sand-300'
+                              }`}
+                          >
+                            {type.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()} 
+              </div>
+              
+              {(selectedCategories.size > 0 || selectedPoiTypeIds.size > 0) && (
+                <div className="pt-3 text-right border-t border-sand-200 mt-3">
+                    <button 
+                        onClick={clearAllFilters}
+                        className="flex items-center justify-center px-3 py-1 text-xs text-night-700 bg-sand-300 hover:bg-sand-400 rounded-full transition-colors duration-150"
+                    >
+                        <FilterX size={14} className="mr-1.5" /> Clear Highlights & Filters
+                    </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {error && (
+        <div className="bg-red-100 text-red-700 p-4 rounded-md mb-6">
+          Error: {error}
+        </div>
+      )}
+
+      {isLoading ? (
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-spice-600"></div>
+        </div>
+      ) : (
+        <div className="relative bg-sand-300 rounded-lg overflow-visible border border-sand-400 shadow-lg">
+          {/* Grid coordinates - top (numbers) */}
+          <div className="flex border-b border-sand-400">
+            <div className="w-10 h-10 bg-sand-400 flex items-center justify-center font-bold text-night-700"></div>
+            {Array.from({ length: GRID_SIZE }, (_, i) => (
+              <div 
+                key={`top-${i + 1}`} 
+                className="w-full h-10 flex-1 flex items-center justify-center font-bold text-night-700 border-l border-sand-400"
+              >
+                {i + 1}
+              </div>
+            ))}
+          </div>
+
+          {/* Grid with side coordinates (letters) */}
+          <div className="grid-container">
+            {Array.from({ length: GRID_SIZE }, (_, y) => (
+              <div key={`row-${y}`} className="flex">
+                {/* Side coordinate (letter) */}
+                <div className="w-10 h-full bg-sand-400 flex items-center justify-center font-bold text-night-700 border-t border-sand-400">
+                  {String.fromCharCode(65 + (GRID_SIZE - 1 - y))}
+                </div>
+
+                {/* Grid squares for this row */}
+                {Array.from({ length: GRID_SIZE }, (_, x) => {
+                  const letter = String.fromCharCode(65 + (GRID_SIZE - 1 - y));
+                  const number = x + 1;
+                  const coordinate = `${letter}${number}`;
+                  const square = gridSquares.find(s => s.coordinate === coordinate);
+                  // const squarePois = square ? pois.filter(p => p.grid_square_id === square.id) : [];
+                  // Filter pois for this specific square based on the global filter
+                  const poisForThisSquare = square 
+                    ? poisToDisplayOnMap.filter(p => p.grid_square_id === square.id) 
+                    : [];
+
+                  return square ? (
+                    <GridSquare 
+                      key={`square-${coordinate}`}
+                      square={square}
+                      poisToDisplay={poisForThisSquare} // Updated prop
+                      poiTypes={poiTypes} // Pass all poiTypes for lookup within GridSquare
+                      isHighlighted={highlightedGridSquareIds.has(square.id)} // New prop
+                      onClick={() => handleSquareClick(square)}
+                      onImageClick={() => square.screenshot_url && handleGalleryOpen(square)}
+                    />
+                  ) : (
+                    <div 
+                      key={`square-${coordinate}`}
+                      className="aspect-square border border-sand-400 bg-sand-200 flex items-center justify-center text-sand-600"
+                    >
+                      {coordinate}
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {selectedSquare && (
+        <GridSquareModal 
+          square={selectedSquare} 
+          onClose={() => setSelectedSquare(null)} 
+          onUpdate={(updatedSquare) => {
+            setGridSquares(squares => 
+              squares.map(s => s.id === updatedSquare.id ? updatedSquare : s)
+            );
+            setSelectedSquare(updatedSquare);
+          }}
+          onImageClick={() => selectedSquare.screenshot_url && handleGalleryOpen(selectedSquare)}
+          onPoiGalleryOpen={handlePoiGalleryOpen}
+        />
+      )}
+
+      {showGallery && selectedPoi?.screenshots && (
+        <GridGallery
+          squares={selectedPoi.screenshots.map(s => ({
+            id: s.id,
+            screenshot_url: s.url,
+            uploaded_by: s.uploaded_by,
+            upload_date: s.upload_date,
+            coordinate: selectedSquare?.coordinate || '',
+          }))}
+          initialIndex={galleryIndex}
+          onClose={() => setShowGallery(false)}
+          poiInfo={{
+            title: selectedPoi.title,
+            description: selectedPoi.description,
+            created_at: selectedPoi.created_at,
+            created_by: selectedPoi.created_by,
+          }}
+        />
+      )}
+    </div>
+  );
+};
+
+export default GridContainer;

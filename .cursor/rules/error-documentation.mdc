@@ -1,0 +1,100 @@
+---
+description: Document major failure points in this project and they were solved.  To be filled by AI.
+globs: 
+alwaysApply: true
+---
+# Error Documentation: Dune Awakening Deep Desert Tracker
+
+This document tracks known issues, their states, context, and resolutions encountered during the development of the Dune Awakening Deep Desert Tracker project.
+
+## Format for Entries
+
+-   **Date**: YYYY-MM-DD
+-   **Error Description**: A clear summary of the error.
+-   **Context/Symptoms**: How and where the error manifested.
+-   **Investigation/Diagnosis**: Steps taken to understand the root cause.
+-   **Solution/Fix**: The implemented solution.
+-   **Files Affected**: List of files changed.
+-   **Lesson Learned**: Key takeaway to prevent recurrence.
+
+--- 
+
+*(No errors documented yet.)*
+
+---
+
+-   **Date**: YYYY-MM-DD <!-- User should replace with current date -->
+-   **Error Description**: Supabase Storage `listBuckets()` returns empty array `[]` and `getBucket('bucket-name')` fails with "Bucket not found" (400 error) for a newly created, public bucket, despite the bucket existing in the Supabase dashboard and client being authenticated.
+-   **Context/Symptoms**: Occurred in `PoiTypeManager.tsx` when attempting to interact with a new 'poi-icons' bucket for icon uploads. Another existing bucket ('screenshots') was working for other functionalities. SQL grants for `SELECT` on `storage.buckets` to `authenticated` and `anon` roles did not resolve the issue. No restrictive RLS policies were found on `storage.buckets` table itself.
+-   **Investigation/Diagnosis**:
+    -   Verified bucket existence and public status in Supabase dashboard.
+    -   Confirmed client-side Supabase initialization and user authentication.
+    -   Ran `supabase.storage.listBuckets()` directly in component, consistently received `[]`.
+    -   Ran `supabase.storage.getBucket('poi-icons')`, received 400 error.
+    -   Applied various SQL `GRANT` statements for `storage.buckets`, `storage.objects`, `storage.migrations` and `USAGE` on `storage` schema to `authenticated` and `anon` roles.
+    -   Checked for RLS policies on `storage.buckets` (none found).
+    -   The exact root cause for `listBuckets()` returning empty for a specific, seemingly correctly configured bucket remained elusive, suggesting potential subtle configuration issues or caching on Supabase's side that weren't immediately apparent.
+-   **Solution/Fix**: 
+    1.  Decided to use an existing, functional bucket ('screenshots') and create a dedicated subfolder ('icons/') within it for POI icons.
+    2.  Refactored `PoiTypeManager.tsx` to upload icons to `screenshots/icons/` and removed direct calls to `listBuckets()` or `getBucket()` that were causing issues, relying on known bucket and path.
+-   **Files Affected**:
+    -   `src/components/admin/PoiTypeManager.tsx` (Primary change to use different bucket/path and remove failing Storage calls)
+    -   Initially, SQL scripts for creating 'poi-icons' bucket and its policies (later made redundant by the workaround).
+-   **Lesson Learned**: When encountering unexplained issues with new Supabase Storage buckets (especially `listBuckets()` or `getBucket()`), and if an existing bucket is functional, consider using a subfolder within the working bucket as a pragmatic workaround to avoid prolonged debugging of potential platform-side intricacies. Always verify RLS policies and grants thoroughly, but be prepared for alternative strategies if issues persist.
+
+---
+
+-   **Date**: YYYY-MM-DD <!-- User should replace with current date -->
+-   **Error Description**: `pg_cron` job fails to trigger Supabase Edge Function; `cron.job_run_details` shows `return_message` like "ERROR: schema \"net\" does not exist".
+-   **Context/Symptoms**: Scheduled tasks (e.g., `perform-map-backup`) that rely on `pg_cron` to call a Supabase Edge Function via `net.http_post` were not executing the function. The cron job itself might appear to run, but the target function logs no invocations.
+-   **Investigation/Diagnosis**:
+    -   Checked `cron.job` for job definition and `cron.job_run_details` for execution status and return messages.
+    -   The error "schema \"net\" does not exist" in `return_message` clearly indicated the `pg_net` PostgreSQL extension was missing or not enabled.
+    -   Verified in Supabase Dashboard under Database > Extensions that `pg_net` was not listed or not enabled.
+-   **Solution/Fix**:
+    1.  Enabled the `pg_net` extension by running the following SQL in the Supabase SQL Editor:
+        ```sql
+        CREATE EXTENSION IF NOT EXISTS pg_net WITH SCHEMA extensions;
+        ```
+-   **Files Affected**: None (Database configuration change).
+-   **Lesson Learned**: `pg_net` is a critical dependency for `pg_cron` to trigger Supabase Edge Functions using `net.http_post`. If scheduled function invocations fail, always check `cron.job_run_details` for errors and ensure `pg_net` is enabled in the database. Add this to `docs/technical.md`.
+
+---
+
+-   **Date**: YYYY-MM-DD <!-- User should replace with current date -->
+-   **Error Description**: User deletion via Supabase Edge Function (`delete-user`) calling `supabase.auth.admin.deleteUser()` failed with the error "Failed to delete user from authentication: Database error deleting user".
+-   **Context/Symptoms**: Occurred in the Admin Panel when attempting to delete a user. The Edge Function logs showed the error originating from the `deleteUser()` call.
+-   **Investigation/Diagnosis**:
+    -   Initial assumption was a direct issue with the `auth.users` table or the `deleteUser` admin function.
+    -   Used SQL to query `pg_constraint` to identify foreign key relationships involving `auth.users`.
+    -   Discovered that `public.profiles.id` had a foreign key constraint (`profiles_id_fkey`) referencing `auth.users(id)` with an `ON DELETE NO ACTION` policy. This prevented the `auth.users` row from being deleted because a dependent row existed in `public.profiles`.
+    -   Further checked for foreign keys referencing `public.profiles(id)` from other tables (e.g., `pois`, `grid_squares`) to ensure no further downstream blocking issues once the `profiles` row was deleted. In this case, no further blocking constraints were found on other public tables.
+-   **Solution/Fix**:
+    1.  Modified the `profiles_id_fkey` constraint on the `public.profiles` table to use `ON DELETE CASCADE`.
+        ```sql
+        -- 1. Drop the existing constraint
+        ALTER TABLE public.profiles
+        DROP CONSTRAINT profiles_id_fkey;
+
+        -- 2. Add it back with ON DELETE CASCADE
+        ALTER TABLE public.profiles
+        ADD CONSTRAINT profiles_id_fkey FOREIGN KEY (id)
+        REFERENCES auth.users (id) ON DELETE CASCADE;
+        ```
+-   **Files Affected**:
+    -   Database schema (constraint modification).
+    -   `docs/technical.md` (updated to document this common issue and solution).
+-   **Lesson Learned**: When deleting from `auth.users` in Supabase, always verify the `ON DELETE` action of any foreign key constraints in `public` tables (especially `public.profiles`) that reference `auth.users.id`. `NO ACTION` or `RESTRICT` will cause deletion failures. Change to `CASCADE` or `SET NULL` as appropriate for the data model. Also, check for chained dependencies if other tables reference the `profiles` table.
+
+---
+
+-   **Date**: YYYY-MM-DD <!-- User should replace with current date -->
+-   **Error Description**: Scheduled map reset (with "backup before reset" enabled) successfully performed the backup but then failed to delete data from `pois` and `grid_squares` tables.
+-   **Context/Symptoms**: The Supabase Edge Function log for `perform-map-reset` showed the error: `Failed to delete POIs: invalid input syntax for type uuid: "0"`. This occurred because the delete operation was attempting `supabaseAdmin.from('pois').delete().neq('id', '0')` where the `id` column is of type UUID, and '0' is not a valid UUID string.
+-   **Investigation/Diagnosis**: Examined the `perform-map-reset/index.ts` function. Identified the `.neq('id', '0')` filter in the delete operations for both `pois` and `grid_squares` tables as the cause of the type mismatch.
+-   **Solution/Fix**: Modified `supabase/functions/perform-map-reset/index.ts`. Changed the Supabase query filter for deleting records from `.delete().neq('id', '0')` to `.delete().not('id', 'is', null)` for both `pois` and `grid_squares` tables. This provides a type-safe way to target all rows for deletion, assuming the `id` column is a primary key and thus never null for existing rows.
+-   **Files Affected**:
+    -   `supabase/functions/perform-map-reset/index.ts`
+-   **Lesson Learned**: When attempting to delete all rows in a table using the Supabase query builder with a filter (e.g., `.delete().filter(...)`), ensure the filter condition is type-compatible with the column(s) involved. For UUID primary keys, using a condition like `.not('id', 'is', null)` is a robust and type-safe method to target all rows for deletion. Avoid direct string comparisons with UUID columns unless the string is a valid UUID.
+
+---
