@@ -37,6 +37,15 @@
 *   **Deployment**: Configure CI/CD pipeline for Netlify deployments.
 *   **Documentation**: Continuously update all memory files and code documentation.
 
+2.  **POI Icon Update Race Condition Resolution (Completed 2024-12-31)**
+    *   [x] Identified and analyzed POI icon update race condition issue.
+    *   [x] Implemented 100ms delay in `fetchPoisOnly()` for database transaction synchronization.
+    *   [x] Enhanced React rendering with `useMemo` and `poiDataKey` in `GridSquare.tsx`.
+    *   [x] Improved component keys to include POI count for better React reconciliation.
+    *   [x] Strengthened callback chain with comprehensive error handling and debugging.
+    *   [x] Added extensive debugging throughout POI creation and update flow.
+    *   [x] Documented solution in lessons-learned and architecture documentation.
+
 ## IV. Known Issues / Technical Debt
 
 *   (To be populated as development progresses)
@@ -48,4 +57,10 @@
 *   Supabase client is configured in `src/lib/supabase.ts`.
 *   Core data types are defined in `src/types/index.ts`.
 *   Memory system initialized.
-*   POI Type icon management (upload, display, styling, transparent background) is functional in `PoiTypeManager.tsx`, `PoiCard.tsx`, and `GridSquare.tsx`. 
+*   POI Type icon management (upload, display, styling, transparent background) is functional in `PoiTypeManager.tsx`, `PoiCard.tsx`, and `GridSquare.tsx`.
+*   **POI Icon Real-time Updates**: POI icons on grid squares now update immediately when new POIs are added, without requiring page refreshes. Includes:
+    *   Race condition resolution with database transaction timing
+    *   Enhanced React rendering optimization with `useMemo` and component keys
+    *   Robust callback chain for POI creation and state updates
+    *   Comprehensive error handling and debugging throughout the flow
+    *   Detailed flow documentation for future reference and maintenance 

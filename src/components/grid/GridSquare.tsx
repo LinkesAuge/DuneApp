@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { GridSquare as GridSquareType, Poi, PoiType } from '../../types';
 import { CheckCircle, ImageOff } from 'lucide-react';
 
@@ -29,6 +29,11 @@ const getDisplayImageUrl = (url: string | null): string | undefined => {
 
 const GridSquare: React.FC<GridSquareProps> = ({ square, poisToDisplay = [], poiTypes = [], isHighlighted = false, onClick, onImageClick }) => {
   const [hoveredPoiType, setHoveredPoiType] = useState<PoiType | null>(null);
+
+  // Force re-render when POI data changes by creating a dependency key
+  const poiDataKey = useMemo(() => {
+    return poisToDisplay.map(poi => `${poi.id}-${poi.poi_type_id}`).join(',');
+  }, [poisToDisplay]);
 
   const handleClick = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement;

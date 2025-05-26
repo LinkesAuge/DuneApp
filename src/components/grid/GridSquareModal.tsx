@@ -13,6 +13,7 @@ interface GridSquareModalProps {
   onUpdate: (updatedSquare: GridSquareType) => void;
   onImageClick: () => void;
   onPoiGalleryOpen?: (poi: Poi) => void;
+  onPoiSuccessfullyAdded?: () => void;
 }
 
 const GRID_SIZE = 9;
@@ -22,7 +23,8 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
   onClose, 
   onUpdate, 
   onImageClick,
-  onPoiGalleryOpen 
+  onPoiGalleryOpen,
+  onPoiSuccessfullyAdded
 }) => {
   const { user } = useAuth();
   const [isUploading, setIsUploading] = useState(false);
@@ -299,8 +301,15 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
   );
 
   const handleAddPoi = (newPoi: Poi) => {
+    console.log('[GridSquareModal] POI added, updating local state:', newPoi);
     setPois(prevPois => [newPoi, ...prevPois]);
     setShowAddPoiForm(false);
+    if (onPoiSuccessfullyAdded) {
+      console.log('[GridSquareModal] Calling onPoiSuccessfullyAdded callback');
+      onPoiSuccessfullyAdded();
+    } else {
+      console.warn('[GridSquareModal] onPoiSuccessfullyAdded callback not provided');
+    }
   };
 
   const handleDeletePoi = (poiId: string) => {

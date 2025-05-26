@@ -10,28 +10,34 @@ The Dune Awakening Deep Desert Tracker is a web application built with React (Ty
 flowchart TD
     subgraph "User Interface (React + Tailwind CSS)"
         direction LR
-        A[Auth Components] --> P
+        A[Auth Components] --> P[Pages]
         G[Grid Map Components] --> P
         POI_C[POI Management Components] --> P
         ADM[Admin Panel Components] --> P
-        P[Pages]
     end
 
     subgraph "Frontend Logic (TypeScript)"
         direction LR
-        R[React Router v6] --> S
-        S[State Management (React Context/Hooks)]
-        U[Utility Functions (src/lib)]
-        T[Type Definitions (src/types)]
+        R[React Router v6] --> S[State Management]
+        S[State Management React Context/Hooks]
+        U[Utility Functions src/lib]
+        T[Type Definitions src/types]
     end
 
     subgraph "Backend Services (Supabase)"
         direction LR
-        SB_Auth[Supabase Auth] --> DB
-        SB_DB[Supabase Database (PostgreSQL)] --> DB
-        SB_Store[Supabase Storage] --> DB
-        EF[Edge Functions]
-        DB[Database Schema]
+        SB_Auth["Supabase Auth"] --> DB["Database Schema"]
+        SB_DB["Supabase Database PostgreSQL"] --> DB
+        SB_Store["Supabase Storage"] --> DB
+        EF["Edge Functions"]
+    end
+
+    subgraph "Scheduled Tasks Flow"
+        ADMIN["AdminPanel"] --> SCHEDULE["schedule-admin-task"]
+        SCHEDULE --> PG_FUNC["convert_to_utc_components"]
+        PG_FUNC --> CRON["pg_cron"]
+        CRON --> BACKUP["perform_map_backup"]
+        CRON --> RESET["perform_map_reset"]
     end
 
     P --> S
@@ -40,22 +46,14 @@ flowchart TD
     S --> SB_Store
     S --> EF
     U --> S
-    T -- used by --> P
-    T -- used by --> S
+    T --> P
+    T --> S
 
     classDef supabase fill:#3ecf8e,stroke:#333,stroke-width:2px,color:#fff;
-    class SB_Auth,SB_DB,SB_Store,EF,DB supabase;
+    class SB_Auth,SB_DB,SB_Store,EF,DB,SCHEDULE,PG_FUNC,CRON,BACKUP,RESET supabase;
 
     classDef react fill:#61DAFB,stroke:#333,stroke-width:2px,color:#000;
-    class A,G,POI_C,ADM,P,R,S,U,T react;
-
-    AdminPanel --o|Calls| schedule-admin-task : Schedule Task (local time, timezone)
-    schedule-admin-task --o|RPC| postgresql_db : Calls convert_to_utc_components(local_time, timezone)
-    postgresql_db --o|Returns UTC H,M,DOW| schedule-admin-task
-    schedule-admin-task --o|RPC schedule_cron_job| postgresql_db : (job_name, UTC_CRON_EXPR, command)
-    postgresql_db --|> pg_cron : Stores & Executes Job
-    pg_cron --o|HTTP POST| perform_map_backup : Executes Backup
-    pg_cron --o|HTTP POST| perform_map_reset : Executes Reset (optional backup)
+    class A,G,POI_C,ADM,P,R,S,U,T,ADMIN react;
 ```
 
 ### 2.1. Frontend (Client-Side)
@@ -139,7 +137,7 @@ flowchart TD
 -   **Transparent Backgrounds**: POI Types have an `icon_has_transparent_background` boolean flag.
     -   If true, and the icon is an image URL, the POI type's `color` property is not used as a background for the icon in displays like `PoiCard.tsx` and `GridSquare.tsx`.
 
-## POI Display and Interaction (PoisPage, GridSquareModal, GridGallery)
+### 7.1. POI Display and Interaction (PoisPage, GridSquareModal, GridGallery)
 
 - **Data Flow for POI Details**: `PoisPage` fetches all POIs and their associated `grid_square` data, creating `PoiWithGridSquare` objects. 
   - Clicking a `PoiCard` or `PoiListItem` on `PoisPage` sets `selectedPoi` and `selectedGridSquare`, opening `GridSquareModal`.
@@ -159,7 +157,7 @@ flowchart TD
     - `GridGallery`'s backdrop and "X" button click handlers call `event.stopPropagation()`.
     - `GridSquareModal`'s `handleClickOutside` function includes a specific check: if the `event.target` of the `mousedown` is part of the `GridGallery` structure (identified by CSS classes `div[class*="bg-night-950/90"][class*="z-[60"]`), it ignores the event and does not close itself. This ensures `GridGallery` can be closed without affecting the underlying `GridSquareModal`. 
 
-### Scheduled Tasks Timezone Handling
+### 7.2. Scheduled Tasks Timezone Handling
 
 To allow administrators to schedule tasks (like backups and resets) in their local time, the following process is used:
 
@@ -179,19 +177,292 @@ To allow administrators to schedule tasks (like backups and resets) in their loc
 
 This approach ensures that `pg_cron` (which operates on UTC) correctly schedules tasks according to the user's local time intention, handling complexities like Daylight Saving Time (DST) via PostgreSQL's robust timezone engine.
 
-## Data Storage and Management
+### 7.3. Data Storage and Management
 
--   **Grid Square Data**: `grid_squares` table stores grid map data and screenshot metadata.
--   **POI Data**: `pois` table stores point of interest data.
--   **Screenshot Storage**: `screenshots` bucket stores grid square screenshots and POI type icons.
--   **Scheduled Tasks**: `pg_cron` schedules and executes tasks like backups and resets.
--   **User Profiles**: `profiles` table stores user profiles and roles.
--   **Edge Functions**: Supabase Edge Functions handle specific backend logic.
--   **Database Schema**: Supabase Database schema includes tables for profiles, grid squares, POI types, and POIs.
--   **Supabase Auth**: Manages user authentication and sessions.
--   **Supabase Storage**: Stores screenshots and icons.
--   **Supabase Edge Functions**: Handles edge logic like scheduled tasks.
--   **PostgreSQL**: Stores and manages data, executes scheduled tasks, and handles timezone conversions.
--   **pg_cron**: Executes scheduled tasks like backups and resets.
+-   **Grid Square Data**: `grid_squares` table stores grid map data and screenshot metadata
+-   **POI Data**: `pois` table stores point of interest data with relationships to grid squares and types
+-   **POI Types**: `poi_types` table defines categories, icons, colors, and default descriptions
+-   **User Profiles**: `profiles` table stores user profiles and roles linked to Supabase Auth
+-   **Screenshot Storage**: `screenshots` bucket stores grid square screenshots and POI type icons
+-   **Scheduled Tasks**: `pg_cron` schedules and executes automated tasks like backups and resets
+-   **Edge Functions**: Handle privileged operations like database management and user administration
 
-This architecture ensures efficient data storage, secure access, and reliable task execution, providing a robust backend foundation for the Dune Awakening Deep Desert Tracker. 
+This architecture ensures efficient data storage, secure access, and reliable task execution, providing a robust backend foundation for the Dune Awakening Deep Desert Tracker.
+
+## 8. Detailed Code Flow Documentation
+
+### 8.1. Grid Map System - Component Flow
+
+The grid map system consists of several interconnected components that manage the 9x9 grid display, POI visualization, and user interactions.
+
+```mermaid
+flowchart TD
+    subgraph "Grid System Components"
+        GC[GridContainer.tsx]
+        GS[GridSquare.tsx]
+        GSM[GridSquareModal.tsx]
+        GG[GridGallery.tsx]
+    end
+
+    subgraph "POI Components"
+        APF[AddPoiForm.tsx]
+        PL[PoiList.tsx]
+        PC[PoiCard.tsx]
+    end
+
+    subgraph "Data Flow"
+        DB[(Supabase DB)]
+        ST[Storage]
+    end
+
+    GC -->|renders 81 instances| GS
+    GS -->|onClick| GSM
+    GSM -->|onUpdate| GC
+    GSM -->|contains| APF
+    GSM -->|contains| PL
+    PL -->|renders| PC
+    APF -->|onPoiAdded| GSM
+    GSM -->|onPoiSuccessfullyAdded| GC
+    GC -->|fetchPoisOnly| DB
+    GSM -->|onImageClick| GG
+
+    DB -->|grid_squares, pois, poi_types| GC
+    ST -->|screenshots, icons| GS
+```
+
+### 8.2. POI Creation Flow - Detailed Steps
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant GSM as GridSquareModal
+    participant APF as AddPoiForm
+    participant SB as Supabase
+    participant GC as GridContainer
+
+    User->>GSM: Click "Add POI"
+    GSM->>APF: Show AddPoiForm
+    User->>APF: Fill form & submit
+    APF->>SB: Upload screenshots to Storage
+    APF->>SB: Insert POI record to DB
+    SB-->>APF: Return POI data
+    APF->>GSM: Call onPoiAdded(newPoi)
+    GSM->>GSM: Update local POI state
+    GSM->>GC: Call onPoiSuccessfullyAdded()
+    GC->>GC: Wait 100ms (transaction delay)
+    GC->>SB: fetchPoisOnly()
+    SB-->>GC: Return updated POI list
+    GC->>GC: setPois() + force re-render
+    GC->>GSM: Re-render with new POI count
+```
+
+### 8.3. Grid Square Rendering & POI Icon Display
+
+```mermaid
+flowchart TD
+    subgraph "GridContainer State Management"
+        GC_STATE[GridContainer State]
+        POIS["pois: Poi[]"]
+        TYPES["poiTypes: PoiType[]"]
+        SQUARES["gridSquares: GridSquare[]"]
+    end
+
+    subgraph "GridSquare Rendering Process"
+        GS_PROPS[GridSquare Props]
+        POI_FILTER[Filter POIs for square]
+        ICON_LOGIC[Icon rendering logic]
+        DISPLAY[Final display]
+    end
+
+    subgraph "Icon Type Handling"
+        EMOJI[Emoji Icon]
+        IMAGE[Image URL Icon]
+        TRANSPARENT[Transparent Background Check]
+    end
+
+    GC_STATE --> GS_PROPS
+    POIS --> POI_FILTER
+    POI_FILTER --> |poisToDisplay| GS_PROPS
+    TYPES --> |poiTypes| GS_PROPS
+
+    GS_PROPS --> ICON_LOGIC
+    ICON_LOGIC --> EMOJI
+    ICON_LOGIC --> IMAGE
+    ICON_LOGIC --> TRANSPARENT
+    
+    EMOJI --> DISPLAY
+    IMAGE --> DISPLAY
+    TRANSPARENT --> DISPLAY
+
+    GS_PROPS -.->|useMemo poiDataKey| POI_FILTER
+```
+
+### 8.4. React State Synchronization Pattern
+
+The application uses a specific pattern to ensure React components re-render when underlying data changes:
+
+```mermaid
+flowchart LR
+    subgraph "State Change Detection"
+        DATA[POI Data Change]
+        MEMO[useMemo with poiDataKey]
+        KEY[Component Key with POI count]
+        RENDER[Force Re-render]
+    end
+
+    subgraph "Implementation Details"
+        DETAIL1[poiDataKey mapping]
+        DETAIL2[Dynamic component keys]
+        DETAIL3[useMemo dependencies]
+    end
+
+    DATA --> MEMO
+    DATA --> KEY
+    MEMO --> RENDER
+    KEY --> RENDER
+    
+    MEMO -.-> DETAIL1
+    KEY -.-> DETAIL2
+    RENDER -.-> DETAIL3
+```
+
+**Implementation Details:**
+
+- **poiDataKey mapping**: `poiDataKey = pois.map(poi => \`${poi.id}-${poi.poi_type_id}\`).join(',')`
+- **Dynamic component keys**: `key={\`square-${coordinate}-${poisForThisSquare.length}\`}`
+- **useMemo dependencies**: `useMemo(() => {...}, [poiDataKey])`
+
+### 8.5. Modal State Management & Gallery Interaction
+
+```mermaid
+stateDiagram-v2
+    [*] --> GridView
+    GridView --> GridSquareModal : ClickSquare
+    GridSquareModal --> GridView : CloseModal
+    
+    state GridSquareModal {
+        [*] --> ViewingSquare
+        ViewingSquare --> AddingPOI : ClickAddPOI
+        AddingPOI --> ViewingSquare : SaveCancel
+        ViewingSquare --> PoiGallery : ClickPOIImage
+        PoiGallery --> ViewingSquare : CloseGallery
+        
+        ViewingSquare --> ClickOutsideHandling : mousedownOutside
+        ClickOutsideHandling --> [*] : CloseIfNotGallery
+        ClickOutsideHandling --> ViewingSquare : IgnoreIfGalleryClick
+    }
+```
+
+### 8.6. Icon Type Management Flow
+
+```mermaid
+flowchart TD
+    subgraph "Icon Upload Process"
+        UPLOAD[Icon File Upload]
+        RESIZE[Client-side Resize to 48px]
+        CONVERT[Convert to PNG]
+        STORE["Store in screenshots/icons/"]
+    end
+
+    subgraph "Icon Display Logic"
+        CHECK["isIconUrl() check"]
+        EMOJI_RENDER["Render as span"]
+        IMAGE_RENDER["Render as img"]
+        BG_CHECK[Check transparent_background flag]
+        APPLY_BG[Apply POI type color]
+        NO_BG[Transparent background]
+    end
+
+    UPLOAD --> RESIZE
+    RESIZE --> CONVERT
+    CONVERT --> STORE
+
+    STORE --> CHECK
+    CHECK -->|URL detected| IMAGE_RENDER
+    CHECK -->|Not URL| EMOJI_RENDER
+    
+    IMAGE_RENDER --> BG_CHECK
+    BG_CHECK -->|true| NO_BG
+    BG_CHECK -->|false| APPLY_BG
+```
+
+### 8.7. Data Flow: Grid Container Lifecycle
+
+```mermaid
+flowchart TD
+    MOUNT["Component Mount"] --> FETCH_INITIAL["fetchInitialData"]
+    
+    FETCH_INITIAL --> PARALLEL["Parallel Fetch"]
+    PARALLEL --> GRID_SQUARES["Fetch grid_squares"]
+    PARALLEL --> POIS["Fetch pois"]
+    PARALLEL --> POI_TYPES["Fetch poi_types"]
+    
+    GRID_SQUARES --> CHECK_MISSING["Check for missing squares"]
+    CHECK_MISSING --> CREATE_MISSING["Create missing grid squares"]
+    CREATE_MISSING --> RENDER_GRID["Render 9x9 Grid"]
+    
+    POIS --> FILTER_POIS["Filter POIs per square"]
+    POI_TYPES --> ICON_LOOKUP["Enable icon lookups"]
+    
+    FILTER_POIS --> RENDER_GRID
+    ICON_LOOKUP --> RENDER_GRID
+    
+    subgraph "User Interactions"
+        ADD_POI["User adds POI"]
+        CALLBACK["onPoiSuccessfullyAdded"]
+        REFETCH["fetchPoisOnly with delay"]
+        UPDATE["Update state and re-render"]
+    end
+    
+    RENDER_GRID --> ADD_POI
+    ADD_POI --> CALLBACK
+    CALLBACK --> REFETCH
+    REFETCH --> UPDATE
+    UPDATE --> RENDER_GRID
+```
+
+### 8.8. Component Communication Patterns
+
+#### Callback Chain for POI Updates
+
+```
+AddPoiForm.onSubmit()
+  ↓ (onPoiAdded)
+GridSquareModal.handleAddPoi()
+  ↓ (onPoiSuccessfullyAdded)
+GridContainer.fetchPoisOnly()
+  ↓ (setPois + re-render trigger)
+GridSquare components re-render with new POI icons
+```
+
+#### Data Flow for Icon Display
+
+```
+GridContainer.pois[] 
+  ↓ (filter by grid_square_id)
+GridSquare.poisToDisplay[]
+  ↓ (map to unique poi_type_ids)
+PoiType.icon + PoiType.color + PoiType.icon_has_transparent_background
+  ↓ (render logic)
+Icon display with proper styling and background
+```
+
+### 8.9. Performance Optimizations
+
+1. **React.useMemo for POI Data**: Creates dependencies on actual data changes rather than object references
+2. **Component Keys**: Include dynamic data (POI count) to help React's reconciliation  
+3. **Debounced Updates**: 100ms delay prevents excessive re-fetching during rapid updates
+4. **Filtered Data Passing**: Only pass relevant POIs to each GridSquare component
+5. **Image Resizing**: Client-side icon resizing reduces storage and bandwidth requirements
+
+### 8.10. Error Handling & Debugging
+
+The application includes comprehensive debugging for troubleshooting:
+
+- **Console Logging**: Strategic logs throughout the POI creation and update flow
+- **Error Boundaries**: Graceful error handling in UI components  
+- **State Validation**: Checks for data consistency and callback availability
+- **Network Error Handling**: Proper error messages for Supabase operations
+- **User Feedback**: Loading states and error messages for all async operations
+
+This detailed flow documentation provides a comprehensive understanding of how the major features interact, making it easier for developers to understand the codebase, debug issues, and implement new features. 

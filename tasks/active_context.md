@@ -74,4 +74,46 @@
     *   Updating `AdminPanel.tsx` with UI and logic for deletion.
     *   Troubleshooting and resolving a "Database error deleting user" by identifying the `public.profiles.id` foreign key constraint (`profiles_id_fkey`) to `auth.users(id)` had `ON DELETE NO ACTION`. This was changed to `ON DELETE CASCADE`.
     *   Verifying no other public tables blocked profile deletion.
-*   **Next Steps**: Documented the fix in `error-documentation.mdc`, `lessons-learned.mdc`, and `technical.md`. Proceed with user request for editing user information (username/email). 
+*   **Next Steps**: Documented the fix in `error-documentation.mdc`, `lessons-learned.mdc`, and `technical.md`. Proceed with user request for editing user information (username/email).
+
+## Update: POI Icon Update Race Condition Resolved (2024-12-31)
+
+**Problem Identified:** POI icons on the grid map weren't updating immediately when new POIs were added to grid squares, requiring a page refresh to see changes.
+
+**Root Cause Analysis:**
+- Race condition in callback chain when adding POIs via `AddPoiForm`
+- `fetchPoisOnly()` was called immediately after POI creation, but database transaction might not be fully committed
+- React's reconciliation wasn't detecting POI data changes in `GridSquare` components
+- Component keys weren't sufficient to trigger re-renders when POI data changed
+
+**Solutions Implemented:**
+
+1. **Enhanced `fetchPoisOnly()` in GridContainer.tsx:**
+   - Added 100ms delay to allow database transaction commitment
+   - Added comprehensive error handling and debugging logs
+   - Added forced re-render mechanism
+
+2. **Improved React Rendering in GridSquare.tsx:**
+   - Added `useMemo` hook with `poiDataKey` to detect POI data changes
+   - Forces component re-renders when POI data actually changes
+   - Enhanced component keys to include POI count in `GridContainer`
+
+3. **Enhanced Callback Chain:**
+   - `AddPoiForm` -> `GridSquareModal.handleAddPoi()` -> `onPoiSuccessfullyAdded` callback -> `GridContainer.fetchPoisOnly()`
+   - Added comprehensive debugging throughout the chain
+   - Enhanced error handling and user feedback
+
+4. **Component Communication Improvements:**
+   - Better prop passing and callback handling between components
+   - Enhanced debugging to track callback execution
+   - Improved error states and loading indicators
+
+**Files Modified:**
+- `src/components/grid/GridContainer.tsx` (Enhanced fetchPoisOnly, better React keys)
+- `src/components/grid/GridSquare.tsx` (Added useMemo for POI data tracking)
+- `src/components/grid/GridSquareModal.tsx` (Enhanced callback handling and debugging)
+- `src/components/poi/AddPoiForm.tsx` (Added debugging and error handling)
+
+**Outcome:** POI icons now update immediately when new POIs are added, providing seamless user experience without requiring page refreshes.
+
+**Next Steps:** Continue with other development tasks. The current solution is sufficient for production requirements. 

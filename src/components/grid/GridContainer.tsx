@@ -24,93 +24,115 @@ const GridContainer: React.FC = () => {
   const [selectedPoiTypeIds, setSelectedPoiTypeIds] = useState<Set<string>>(new Set());
   const [isHighlightFilterOpen, setIsHighlightFilterOpen] = useState<boolean>(false);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      setIsLoading(true);
-      setError(null);
-      
-      try {
-        // Fetch grid squares, POIs, and POI types in parallel
-        const [gridSquaresResult, poisResult, poiTypesResult] = await Promise.all([
-          supabase
-            .from('grid_squares')
-            .select('*')
-            .order('coordinate', { ascending: true }),
-          supabase
-            .from('pois')
-            .select('*'),
-          supabase
-            .from('poi_types')
-            .select('*')
-        ]);
+  const fetchInitialData = async () => {
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      // Fetch grid squares, POIs, and POI types in parallel
+      const [gridSquaresResult, poisResult, poiTypesResult] = await Promise.all([
+        supabase
+          .from('grid_squares')
+          .select('*')
+          .order('coordinate', { ascending: true }),
+        supabase
+          .from('pois')
+          .select('*'),
+        supabase
+          .from('poi_types')
+          .select('*')
+      ]);
 
-        if (gridSquaresResult.error) throw gridSquaresResult.error;
-        if (poisResult.error) throw poisResult.error;
-        if (poiTypesResult.error) throw poiTypesResult.error;
+      if (gridSquaresResult.error) throw gridSquaresResult.error;
+      if (poisResult.error) throw poisResult.error;
+      if (poiTypesResult.error) throw poiTypesResult.error;
 
-        const currentSquares = gridSquaresResult.data || [];
-        setGridSquares(currentSquares);
-        setPois(poisResult.data || []);
-        setPoiTypes(poiTypesResult.data || []);
+      const currentSquares = gridSquaresResult.data || [];
+      setGridSquares(currentSquares);
+      setPois(poisResult.data || []);
+      setPoiTypes(poiTypesResult.data || []);
 
-        // Calculate missing squares
-        const existingCoordinates = new Set(currentSquares.map(square => square.coordinate));
-        const missingSquares: Partial<GridSquareType>[] = [];
+      // Calculate missing squares
+      const existingCoordinates = new Set(currentSquares.map(square => square.coordinate));
+      const missingSquares: Partial<GridSquareType>[] = [];
 
-        for (let y = 0; y < GRID_SIZE; y++) {
-          for (let x = 0; x < GRID_SIZE; x++) {
-            const letter = String.fromCharCode(65 + (GRID_SIZE - 1 - y));
-            const number = x + 1;
-            const coordinate = `${letter}${number}`;
+      for (let y = 0; y < GRID_SIZE; y++) {
+        for (let x = 0; x < GRID_SIZE; x++) {
+          const letter = String.fromCharCode(65 + (GRID_SIZE - 1 - y));
+          const number = x + 1;
+          const coordinate = `${letter}${number}`;
 
-            if (!existingCoordinates.has(coordinate)) {
-              missingSquares.push({
-                coordinate,
-                is_explored: false,
-                screenshot_url: null,
-              });
-            }
-          }
-        }
-
-        // Insert missing squares if needed
-        if (missingSquares.length > 0) {
-          const { data: newSquares, error: upsertError } = await supabase
-            .from('grid_squares')
-            .upsert(
-              missingSquares,
-              {
-                onConflict: 'coordinate',
-                ignoreDuplicates: true,
-              }
-            )
-            .select();
-
-          if (upsertError) {
-            console.warn('Error upserting grid squares:', upsertError);
-          } else if (newSquares) {
-            setGridSquares(prev => {
-              const updatedSquares = [...prev];
-              newSquares.forEach(newSquare => {
-                const existingIndex = updatedSquares.findIndex(s => s.coordinate === newSquare.coordinate);
-                if (existingIndex === -1) {
-                  updatedSquares.push(newSquare);
-                }
-              });
-              return updatedSquares;
+          if (!existingCoordinates.has(coordinate)) {
+            missingSquares.push({
+              coordinate,
+              is_explored: false,
+              screenshot_url: null,
             });
           }
         }
-      } catch (err: any) {
-        console.error('Error fetching data:', err);
-        setError(err.message);
-      } finally {
-        setIsLoading(false);
       }
-    };
 
-    fetchData();
+      // Insert missing squares if needed
+      if (missingSquares.length > 0) {
+        const { data: newSquares, error: upsertError } = await supabase
+          .from('grid_squares')
+          .upsert(
+            missingSquares,
+            {
+              onConflict: 'coordinate',
+              ignoreDuplicates: true,
+            }
+          )
+          .select('id, coordinate, screenshot_url, is_explored, uploaded_by, upload_date');
+
+        if (upsertError) {
+          console.warn('Error upserting grid squares:', upsertError);
+        } else if (newSquares) {
+          setGridSquares(prev => {
+            const updatedSquares = [...prev];
+            newSquares.forEach(newSquare => {
+              const existingIndex = updatedSquares.findIndex(s => s.coordinate === newSquare.coordinate);
+              if (existingIndex === -1) {
+                updatedSquares.push(newSquare);
+              }
+            });
+            return updatedSquares.sort((a, b) => a.coordinate.localeCompare(b.coordinate));
+          });
+        }
+      }
+    } catch (err: any) {
+      console.error('Error fetching initial data:', err);
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchInitialData();
   }, []);
+
+  const fetchPoisOnly = async () => {
+    try {
+      // Add a small delay to ensure database transaction is committed
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      console.log('[GridContainer] Refetching POIs after add...');
+      const { data: poisData, error: poisError } = await supabase
+        .from('pois')
+        .select('*');
+      if (poisError) throw poisError;
+      
+      console.log('[GridContainer] Fetched POIs:', poisData?.length || 0);
+      setPois(poisData || []);
+      
+      // Force a re-render by updating a refresh key
+      setError(null); // This will trigger a state update and force re-render
+    } catch (err: any) {
+      console.error('Error fetching POIs after add:', err);
+      setError('Failed to update POI list');
+    }
+  };
 
   const handleSquareClick = (square: GridSquareType) => {
     setSelectedSquare(square);
@@ -378,7 +400,7 @@ const GridContainer: React.FC = () => {
 
                   return square ? (
                     <GridSquare 
-                      key={`square-${coordinate}`}
+                      key={`square-${coordinate}-${poisForThisSquare.length}`}
                       square={square}
                       poisToDisplay={poisForThisSquare} // Updated prop
                       poiTypes={poiTypes} // Pass all poiTypes for lookup within GridSquare
@@ -406,13 +428,16 @@ const GridContainer: React.FC = () => {
           square={selectedSquare} 
           onClose={() => setSelectedSquare(null)} 
           onUpdate={(updatedSquare) => {
-            setGridSquares(squares => 
-              squares.map(s => s.id === updatedSquare.id ? updatedSquare : s)
+            setGridSquares(prev => 
+              prev.map(s => s.id === updatedSquare.id ? updatedSquare : s)
             );
-            setSelectedSquare(updatedSquare);
+            // Fetch POIs if the updated square affects the POI list (e.g. explored status reveals new ones)
+            // For a new POI added within the modal, onPoiSuccessfullyAdded handles it directly.
+            // However, if onUpdate *could* change POI visibility, consider calling fetchPois() here too.
           }}
-          onImageClick={() => selectedSquare.screenshot_url && handleGalleryOpen(selectedSquare)}
+          onImageClick={() => selectedSquare && handleGalleryOpen(selectedSquare)}
           onPoiGalleryOpen={handlePoiGalleryOpen}
+          onPoiSuccessfullyAdded={fetchPoisOnly} // Pass the new callback
         />
       )}
 
