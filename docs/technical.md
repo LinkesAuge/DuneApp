@@ -218,4 +218,300 @@ DROP CONSTRAINT fk_pois_created_by;
 ALTER TABLE public.pois
 ADD CONSTRAINT fk_pois_created_by FOREIGN KEY (created_by)
 REFERENCES public.profiles (id) ON DELETE CASCADE;
-``` 
+```
+
+## 9. Hagga Basin Interactive Map System - Technical Implementation
+
+### 9.1. Additional Dependencies
+
+**New Package Requirements**:
+```bash
+npm install react-zoom-pan-pinch
+```
+
+-   **react-zoom-pan-pinch**: Interactive zoom and pan functionality for the 4000x4000px Hagga Basin map
+    -   Provides touch gesture support for mobile devices
+    -   Configurable zoom limits and pan boundaries
+    -   Smooth animations and optimized performance
+
+### 9.2. Coordinate System Implementation
+
+**Pixel-Based Coordinate System**: The Hagga Basin uses absolute pixel coordinates (0-4000) stored in the database, converted to CSS percentage positioning for responsive display.
+
+**Core Conversion Functions**:
+```typescript
+// Utility functions for coordinate conversion
+export const getMarkerPosition = (x: number, y: number) => ({
+  left: `${(x / 4000) * 100}%`,
+  top: `${(y / 4000) * 100}%`
+});
+
+export const getPixelCoordinates = (
+  clickX: number, 
+  clickY: number, 
+  mapRect: DOMRect
+) => ({
+  x: Math.round((clickX / mapRect.width) * 4000),
+  y: Math.round((clickY / mapRect.height) * 4000)
+});
+
+export const validateCoordinates = (x: number, y: number): boolean => {
+  return x >= 0 && x <= 4000 && y >= 0 && y <= 4000;
+};
+```
+
+### 9.3. Database Schema Extensions
+
+**Modified Tables**:
+```sql
+-- Extend existing pois table for multi-map support
+ALTER TABLE pois 
+ADD COLUMN map_type TEXT CHECK (map_type IN ('deep_desert', 'hagga_basin')) DEFAULT 'deep_desert',
+ADD COLUMN coordinates_x INTEGER, -- Pixel coordinates (0-4000)
+ADD COLUMN coordinates_y INTEGER, -- Pixel coordinates (0-4000)  
+ADD COLUMN privacy_level TEXT CHECK (privacy_level IN ('global', 'private', 'shared')) DEFAULT 'global';
+
+-- Migrate existing data
+UPDATE pois SET map_type = 'deep_desert' WHERE map_type IS NULL;
+```
+
+**New Supporting Tables**:
+```sql
+-- Base map management for admin uploads
+CREATE TABLE hagga_basin_base_maps (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  name TEXT NOT NULL,
+  image_url TEXT NOT NULL,
+  is_active BOOLEAN DEFAULT false,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  created_by UUID REFERENCES auth.users(id) ON DELETE CASCADE
+);
+
+-- Overlay layer management with ordering and opacity
+CREATE TABLE hagga_basin_overlays (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  name TEXT NOT NULL,
+  image_url TEXT NOT NULL,
+  opacity DECIMAL(3,2) DEFAULT 1.0 CHECK (opacity >= 0.0 AND opacity <= 1.0),
+  display_order INTEGER NOT NULL,
+  is_active BOOLEAN DEFAULT true,
+  can_toggle BOOLEAN DEFAULT true,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  created_by UUID REFERENCES auth.users(id) ON DELETE CASCADE
+);
+
+-- POI collection system for grouping and sharing
+CREATE TABLE poi_collections (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  name TEXT NOT NULL,
+  description TEXT,
+  created_by UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  is_public BOOLEAN DEFAULT false,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Many-to-many relationship for POI collections
+CREATE TABLE poi_collection_items (
+  collection_id UUID REFERENCES poi_collections(id) ON DELETE CASCADE,
+  poi_id UUID REFERENCES pois(id) ON DELETE CASCADE,
+  added_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  PRIMARY KEY (collection_id, poi_id)
+);
+
+-- Individual POI sharing permissions
+CREATE TABLE poi_shares (
+  poi_id UUID REFERENCES pois(id) ON DELETE CASCADE,
+  shared_with_user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  shared_by_user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  PRIMARY KEY (poi_id, shared_with_user_id)
+);
+
+-- User custom icons with enforced limits
+CREATE TABLE custom_icons (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  image_url TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+```
+
+### 9.4. Row Level Security (RLS) Policies
+
+**Privacy-Aware POI Visibility**:
+```sql
+-- POI visibility policy considering privacy levels
+CREATE POLICY "poi_visibility_policy" ON pois
+FOR SELECT USING (
+  privacy_level = 'global' OR
+  created_by = auth.uid() OR
+  (privacy_level = 'shared' AND id IN (
+    SELECT poi_id FROM poi_shares WHERE shared_with_user_id = auth.uid()
+  ))
+);
+
+-- Custom icons limited to 10 per user
+CREATE POLICY "custom_icons_user_limit" ON custom_icons
+FOR INSERT WITH CHECK (
+  user_id = auth.uid() AND
+  (SELECT COUNT(*) FROM custom_icons WHERE user_id = auth.uid()) < 10
+);
+
+-- Admin-only access for base maps and overlays
+CREATE POLICY "admin_only_base_maps" ON hagga_basin_base_maps
+FOR ALL USING (
+  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin'))
+);
+```
+
+### 9.5. Storage Structure & Management
+
+**Extended Folder Organization**:
+```
+screenshots/ (existing bucket)
+├── [existing grid screenshots]
+├── icons/ (existing POI type icons)
+├── hagga-basin/
+│   ├── base-maps/
+│   │   └── [admin-uploaded-base-maps.png/jpg/webp]
+│   └── overlays/
+│       └── [admin-uploaded-overlays.png/jpg/webp]
+└── custom-icons/
+    └── [user-id]/
+        └── [user-custom-icons.png] (max 10 per user)
+```
+
+**File Upload Validation**:
+- **Base Maps/Overlays**: No size limit (admin-only), PNG/JPEG/WebP formats
+- **Custom Icons**: 1MB limit, PNG format only, client-side validation
+- **Automatic Cleanup**: Orphaned files removed when parent records deleted
+
+### 9.6. Interactive Map Performance Optimizations
+
+**React Optimization Patterns**:
+```typescript
+// Memoized POI marker component
+const MapPOIMarker = React.memo(({ poi, onClick }: MapPOIMarkerProps) => {
+  // Component implementation
+}, (prevProps, nextProps) => {
+  return prevProps.poi.id === nextProps.poi.id &&
+         prevProps.poi.updated_at === nextProps.poi.updated_at;
+});
+
+// Debounced search for POI filtering
+const useDebouncedSearch = (searchTerm: string, delay: number = 300) => {
+  const [debouncedTerm, setDebouncedTerm] = useState(searchTerm);
+  
+  useEffect(() => {
+    const handler = setTimeout(() => setDebouncedTerm(searchTerm), delay);
+    return () => clearTimeout(handler);
+  }, [searchTerm, delay]);
+  
+  return debouncedTerm;
+};
+
+// Memoized coordinate conversion
+const useCoordinateConverter = () => {
+  return useMemo(() => ({
+    getMarkerPosition,
+    getPixelCoordinates,
+    validateCoordinates
+  }), []);
+};
+```
+
+**Image Loading Strategies**:
+- Lazy loading for overlay images outside viewport
+- Progressive loading for base map with low-res placeholder
+- Image preloading for frequently accessed overlays
+- WebP format preference with fallback to PNG/JPEG
+
+### 9.7. Interactive Map Configuration
+
+**Zoom/Pan Setup**:
+```typescript
+const mapConfig = {
+  initialScale: 1,
+  minScale: 0.25,      // Allow zooming out to see full map
+  maxScale: 3,         // Allow zooming in for detail work
+  limitToBounds: true, // Prevent panning outside map
+  centerOnInit: true,  // Center map on initial load
+  wheel: { step: 0.05 }, // Smooth scroll wheel zooming
+  pinch: { step: 5 },    // Touch pinch zoom sensitivity
+  doubleClick: { disabled: false } // Enable double-click zoom
+};
+```
+
+**Touch Gesture Support**:
+- Pinch-to-zoom for mobile devices
+- Two-finger pan for map navigation
+- Long-press for POI placement on touch devices
+- Gesture boundary enforcement to prevent accidental navigation
+
+### 9.8. Component Architecture Patterns
+
+**Layer Management System**:
+```typescript
+// CSS z-index hierarchy
+const layerZIndex = {
+  baseMap: 1,
+  overlayStart: 2,
+  overlayEnd: 9,
+  poiMarkers: 10,
+  poiLabels: 11,
+  uiControls: 20
+} as const;
+
+// Dynamic overlay styling
+const getOverlayStyle = (overlay: HaggaBasinOverlay) => ({
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  width: '100%',
+  height: '100%',
+  zIndex: layerZIndex.overlayStart + overlay.display_order,
+  opacity: overlay.opacity,
+  display: overlay.is_active ? 'block' : 'none'
+});
+```
+
+**Privacy Filtering Queries**:
+```typescript
+// Optimized POI fetching with privacy filtering
+const fetchHaggaBasinPOIs = async (userId: string) => {
+  const { data, error } = await supabase
+    .from('pois')
+    .select(`
+      *,
+      poi_types (*),
+      profiles (username)
+    `)
+    .eq('map_type', 'hagga_basin')
+    .or(`
+      privacy_level.eq.global,
+      created_by.eq.${userId},
+      id.in.(${await getSharedPOIIds(userId)})
+    `);
+  
+  return { data, error };
+};
+```
+
+### 9.9. Development Workflow Integration
+
+**Environment Setup for Hagga Basin**:
+1. Database migrations applied automatically via Supabase CLI
+2. Storage folder structure created on first admin upload
+3. Component lazy loading for optimal development HMR
+4. TypeScript strict mode compatibility for coordinate typing
+
+**Testing Considerations**:
+- Unit tests for coordinate conversion functions
+- Integration tests for POI privacy filtering
+- Performance tests for large datasets (1000+ POIs)
+- Mobile device testing for touch interactions
+- Cross-browser compatibility for zoom/pan functionality
+
+This technical foundation provides comprehensive support for the Hagga Basin interactive map system while maintaining performance, security, and scalability standards established by the existing Deep Desert tracker system. 

@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-The Dune Awakening Deep Desert Tracker is a web application built with React (TypeScript) on the frontend and Supabase for backend services (Authentication, Database, Storage). The application allows users to track exploration data on a grid-based map of Dune Awakening's deep desert region.
+The Dune Awakening Deep Desert Tracker is a web application built with React (TypeScript) on the frontend and Supabase for backend services (Authentication, Database, Storage). The application allows users to track exploration data across multiple game regions: a grid-based map system for the Deep Desert region and an interactive coordinate-based map system for the Hagga Basin region.
 
 ## 2. Components and Layers
 
@@ -11,9 +11,11 @@ flowchart TD
     subgraph "User Interface (React + Tailwind CSS)"
         direction LR
         A[Auth Components] --> P[Pages]
-        G[Grid Map Components] --> P
-        POI_C[POI Management Components] --> P
+        G[Deep Desert Grid Components] --> P
+        HB[Hagga Basin Interactive Map Components] --> P
+        POI_C[Unified POI Management Components] --> P
         ADM[Admin Panel Components] --> P
+        COL[POI Collections & Sharing] --> P
     end
 
     subgraph "Frontend Logic (TypeScript)"
@@ -22,6 +24,8 @@ flowchart TD
         S[State Management React Context/Hooks]
         U[Utility Functions src/lib]
         T[Type Definitions src/types]
+        COORD[Coordinate Conversion Utils]
+        ZOOM[Zoom/Pan Logic react-zoom-pan-pinch]
     end
 
     subgraph "Backend Services (Supabase)"
@@ -30,6 +34,28 @@ flowchart TD
         SB_DB["Supabase Database PostgreSQL"] --> DB
         SB_Store["Supabase Storage"] --> DB
         EF["Edge Functions"]
+    end
+
+    subgraph "Database Schema (Extended)"
+        direction TB
+        POIS["pois (unified with map_type)"]
+        GRID["grid_squares (Deep Desert)"]
+        TYPES["poi_types (shared)"]
+        PROFILES["profiles"]
+        BASE_MAPS["hagga_basin_base_maps"]
+        OVERLAYS["hagga_basin_overlays"]
+        COLLECTIONS["poi_collections"]
+        SHARES["poi_shares"]
+        CUSTOM_ICONS["custom_icons"]
+    end
+
+    subgraph "Storage Structure"
+        direction TB
+        SCREENSHOTS["screenshots/ (existing)"]
+        ICONS["screenshots/icons/ (POI types)"]
+        HB_BASE["screenshots/hagga-basin/base-maps/"]
+        HB_OVERLAYS["screenshots/hagga-basin/overlays/"]
+        CUSTOM["screenshots/custom-icons/[user-id]/"]
     end
 
     subgraph "Scheduled Tasks Flow"
@@ -48,12 +74,35 @@ flowchart TD
     U --> S
     T --> P
     T --> S
+    COORD --> HB
+    ZOOM --> HB
+
+    DB --> POIS
+    DB --> GRID
+    DB --> TYPES
+    DB --> PROFILES
+    DB --> BASE_MAPS
+    DB --> OVERLAYS
+    DB --> COLLECTIONS
+    DB --> SHARES
+    DB --> CUSTOM_ICONS
+
+    SB_Store --> SCREENSHOTS
+    SB_Store --> ICONS
+    SB_Store --> HB_BASE
+    SB_Store --> HB_OVERLAYS
+    SB_Store --> CUSTOM
 
     classDef supabase fill:#3ecf8e,stroke:#333,stroke-width:2px,color:#fff;
     class SB_Auth,SB_DB,SB_Store,EF,DB,SCHEDULE,PG_FUNC,CRON,BACKUP,RESET supabase;
+    class POIS,GRID,TYPES,PROFILES,BASE_MAPS,OVERLAYS,COLLECTIONS,SHARES,CUSTOM_ICONS supabase;
+    class SCREENSHOTS,ICONS,HB_BASE,HB_OVERLAYS,CUSTOM supabase;
 
     classDef react fill:#61DAFB,stroke:#333,stroke-width:2px,color:#000;
-    class A,G,POI_C,ADM,P,R,S,U,T,ADMIN react;
+    class A,G,HB,POI_C,ADM,COL,P,R,S,U,T,ADMIN,COORD,ZOOM react;
+
+    classDef new fill:#f39c12,stroke:#333,stroke-width:2px,color:#fff;
+    class HB,COL,BASE_MAPS,OVERLAYS,COLLECTIONS,SHARES,CUSTOM_ICONS,HB_BASE,HB_OVERLAYS,CUSTOM,COORD,ZOOM new;
 ```
 
 ### 2.1. Frontend (Client-Side)
@@ -62,13 +111,15 @@ flowchart TD
     -   Built with React 18 and TypeScript.
     -   Uses Tailwind CSS for styling.
     -   Lucide React for icons.
-    -   Components are organized into: `admin`, `auth`, `common`, `grid`, `poi`.
-    -   `pages/` directory contains top-level page components.
+    -   Components organized into: `admin`, `auth`, `common`, `grid`, `poi`, `hagga-basin`.
+    -   `pages/` directory contains top-level page components including `HaggaBasinPage.tsx`.
 -   **Application Logic (src/lib, src/types, React Hooks/Context)**:
     -   React Router v6 for client-side routing.
-    -   State management likely handled by React Context API and hooks.
+    -   State management handled by React Context API and hooks.
     -   `src/lib/supabase.ts` configures the Supabase client.
     -   `src/types/index.ts` defines TypeScript interfaces for data structures.
+    -   **Coordinate Conversion Utilities**: Functions for converting between pixel coordinates and CSS positioning.
+    -   **Zoom/Pan Integration**: `react-zoom-pan-pinch` library for interactive map functionality.
 
 ### 2.2. Backend (Server-Side - Supabase)
 
@@ -76,18 +127,27 @@ flowchart TD
     -   Handles user authentication (signup, signin).
     -   Manages user roles and sessions.
 -   **Supabase Database (PostgreSQL)**:
-    -   Stores application data:
+    -   **Extended Schema for Multi-Map Support**:
         -   `profiles`: User profiles and roles.
-        -   `grid_squares`: Grid map data and screenshot metadata.
-        -   `poi_types`: POI categories and types.
-        -   `pois`: Point of Interest data.
-    -   Row Level Security (RLS) policies are enforced on all tables.
-    -   Database migrations are located in `/supabase/migrations/`.
+        -   `grid_squares`: Deep Desert grid map data and screenshot metadata.
+        -   `poi_types`: POI categories and types (shared across both map systems).
+        -   `pois`: **Unified** Point of Interest data with `map_type` field and coordinate support.
+        -   `hagga_basin_base_maps`: Base map management for Hagga Basin.
+        -   `hagga_basin_overlays`: Overlay layer management with ordering and opacity.
+        -   `poi_collections`: User-created POI groupings.
+        -   `poi_collection_items`: Many-to-many relationship for collections.
+        -   `poi_shares`: Individual POI sharing permissions.
+        -   `custom_icons`: User-uploaded custom icons with per-user limits.
+    -   Row Level Security (RLS) policies enforced on all tables.
+    -   Database migrations located in `/supabase/migrations/`.
 -   **Supabase Storage**:
-    -   `screenshots` bucket: Stores grid square screenshots (public read, authenticated upload, user-specific delete). Also stores POI type icons in an `icons/` subfolder (public read, admin/editor upload/delete).
-    -   `poi-icons` bucket: Stores POI type icons (public read, admin/editor upload/delete).  *DEPRECATED in favor of `screenshots/icons/` due to access issues.*
--   **Supabase Edge Functions (located in `/supabase/functions/`)**:
-    -   `manage-database`: Handles database operations (backup, restore, reset map data).
+    -   `screenshots` bucket with extended folder structure:
+        -   `icons/`: POI type icons (existing)
+        -   `hagga-basin/base-maps/`: Admin-uploaded base maps
+        -   `hagga-basin/overlays/`: Admin-uploaded overlay layers
+        -   `custom-icons/[user-id]/`: User-specific custom icon storage
+-   **Supabase Edge Functions**:
+    -   `manage-database`: Handles database operations (backup, restore, reset map data for both systems).
     -   `get-user-emails`: Admin-only function for retrieving user email addresses.
 
 ## 3. Data Flow
@@ -558,3 +618,159 @@ The application includes comprehensive debugging for troubleshooting:
 - **User Feedback**: Loading states and error messages for all async operations
 
 This detailed flow documentation provides a comprehensive understanding of how the major features interact, making it easier for developers to understand the codebase, debug issues, and implement new features. 
+
+## 9. Hagga Basin Interactive Map System
+
+### 9.1. Coordinate System Architecture
+
+**Pixel-Based Coordinates**: The Hagga Basin uses a 4000x4000 pixel coordinate system where POIs are positioned using absolute pixel coordinates (x: 0-4000, y: 0-4000).
+
+**Coordinate Conversion Functions**:
+```typescript
+// Convert pixel coordinates to CSS percentage positioning
+const getMarkerPosition = (x: number, y: number) => ({
+  left: `${(x / 4000) * 100}%`,
+  top: `${(y / 4000) * 100}%`
+});
+
+// Convert click position to pixel coordinates
+const getPixelCoordinates = (clickX: number, clickY: number, mapRect: DOMRect) => ({
+  x: Math.round((clickX / mapRect.width) * 4000),
+  y: Math.round((clickY / mapRect.height) * 4000)
+});
+```
+
+### 9.2. Interactive Map Components
+
+**Core Components**:
+- `HaggaBasinPage.tsx`: Main page container with filtering sidebar and map controls
+- `InteractiveMap.tsx`: Zoom/pan container using `react-zoom-pan-pinch`
+- `MapPOIMarker.tsx`: Individual POI display with click handling and tooltips
+- `MapOverlayControls.tsx`: Layer toggle panel with opacity controls
+- `POIPlacementModal.tsx`: Reuses existing POI creation logic with coordinate capture
+
+**Zoom/Pan Implementation**:
+```typescript
+<TransformWrapper
+  initialScale={1}
+  minScale={0.25}
+  maxScale={3}
+  limitToBounds={true}
+  centerOnInit={true}
+  wheel={{ step: 0.05 }}
+  pinch={{ step: 5 }}
+  doubleClick={{ disabled: false }}
+>
+  <TransformComponent>
+    <div className="relative">
+      <BaseMapLayer />
+      <OverlayLayers />
+      <POIMarkerLayer />
+    </div>
+  </TransformComponent>
+</TransformWrapper>
+```
+
+### 9.3. Layer Management System
+
+**Layer Hierarchy** (CSS z-index based):
+1. **Base Map** (z-index: 1): Primary 4000x4000px map image
+2. **Overlay Layers** (z-index: 2-9): Admin-managed overlay images with individual opacity controls
+3. **POI Markers** (z-index: 10): Interactive POI markers and labels
+
+**Admin Overlay Management**:
+- Upload overlay images (PNG, JPEG, WebP)
+- Set display order (simple up/down controls)
+- Configure opacity levels (0.0 - 1.0)
+- Toggle user visibility permissions
+- Enable/disable individual overlay toggle controls
+
+### 9.4. POI Privacy & Sharing System
+
+**Privacy Levels**:
+- `global`: Visible to all users (default)
+- `private`: Visible only to creator
+- `shared`: Visible to creator and specifically shared users
+
+**Collection System**:
+- Users can create named POI collections
+- Collections can be public or private
+- Per-collection sharing with specific users
+- Collection metadata (name, description, creation date)
+
+**Individual POI Sharing**:
+- Direct POI sharing with specific users
+- Granular permission control
+- Share tracking and management
+
+### 9.5. Custom Icon System
+
+**User Icon Management**:
+- Maximum 10 custom icons per user (enforced via RLS)
+- 1MB file size limit, PNG format only
+- User-specific storage folder: `custom-icons/[user-id]/`
+- Integration with emoji picker for comprehensive icon selection
+
+**Icon Processing**:
+- Client-side validation for file size and format
+- Automatic filename sanitization
+- Unique filename generation to prevent conflicts
+
+### 9.6. Database Schema Integration
+
+**Extended POI Table Structure**:
+```sql
+ALTER TABLE pois 
+ADD COLUMN map_type TEXT CHECK (map_type IN ('deep_desert', 'hagga_basin')) DEFAULT 'deep_desert',
+ADD COLUMN coordinates_x INTEGER, -- Pixel coordinates (0-4000)
+ADD COLUMN coordinates_y INTEGER, -- Pixel coordinates (0-4000)  
+ADD COLUMN privacy_level TEXT CHECK (privacy_level IN ('global', 'private', 'shared')) DEFAULT 'global';
+```
+
+**New Supporting Tables**:
+- `hagga_basin_base_maps`: Base map management
+- `hagga_basin_overlays`: Overlay configuration and ordering
+- `poi_collections`: Collection metadata
+- `poi_collection_items`: Many-to-many POI/collection relationships
+- `poi_shares`: Individual POI sharing permissions
+- `custom_icons`: User icon library with RLS enforcement
+
+### 9.7. Performance Optimizations
+
+**Rendering Optimizations**:
+- `React.memo` for POI markers to prevent unnecessary re-renders
+- `useCallback` for event handlers to maintain referential equality
+- Debounced search and filtering (300ms delay)
+- Virtual scrolling for large POI collections
+
+**Image Loading**:
+- Lazy loading for overlay images
+- Progressive image loading for base maps
+- Efficient caching strategies for frequently accessed assets
+
+**Coordinate Calculations**:
+- Memoized coordinate conversion functions
+- Efficient bounding box calculations for visible POIs
+- Optimized hit detection for POI clicking
+
+### 9.8. Integration with Existing Systems
+
+**Unified POI Management**:
+- Single POI interface supports both grid squares and coordinates
+- Shared POI types and categories across both map systems
+- Consistent filtering and search functionality
+- Unified activity feed including both map types
+
+**Dashboard Integration**:
+- Separate statistics for Deep Desert vs. Hagga Basin
+- Combined exploration metrics and insights
+- Collection usage analytics
+- Privacy level distribution metrics
+
+**Admin Panel Extension**:
+- Dedicated Hagga Basin management section
+- Base map upload and configuration
+- Overlay management with ordering controls
+- POI oversight and moderation tools
+
+This architecture maintains full backwards compatibility while adding powerful new interactive mapping capabilities, ensuring seamless integration with the existing Deep Desert grid system. 
