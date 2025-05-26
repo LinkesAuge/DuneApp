@@ -1123,7 +1123,8 @@ const AdminPanel: React.FC = () => {
                           disabled={profile.id === user?.id}
                           className="bg-white border border-sand-300 text-night-700 rounded-md px-3 py-2 text-sm focus:ring-spice-500 focus:border-spice-500 shadow-sm"
                         >
-                          <option value="user">User</option>
+                          <option value="pending">Pending</option>
+                          <option value="member">Member</option>
                           <option value="editor">Editor</option>
                           <option value="admin">Admin</option>
                         </select>

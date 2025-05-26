@@ -191,7 +191,99 @@ This architecture ensures efficient data storage, secure access, and reliable ta
 
 ## 8. Detailed Code Flow Documentation
 
-### 8.1. Grid Map System - Component Flow
+## 8. Recent Technical Implementations
+
+### 8.1. Filter System Alignment & UI Consistency (2025-01-01)
+
+**Achievement**: Successfully unified the filtering systems between POI page and grid map for consistent user experience.
+
+**Key Changes Implemented:**
+
+1. **Grid Map Filter Styling Updates (`src/components/filters/GridFilter.tsx`)**:
+   - Migrated from custom styling (`px-3 py-1 text-xs rounded-full` with custom colors) to standardized `btn` classes
+   - Category buttons now use `btn text-xs px-2 py-1` with `btn-primary`/`btn-outline` states
+   - POI type buttons follow same styling pattern for consistency
+   - Clear filters button updated to `btn btn-danger text-xs w-full md:w-auto`
+
+2. **POI Page Filter Structure Updates (`src/pages/PoisPage.tsx`)**:
+   - Implemented consistent category grouping structure matching grid map approach
+   - Simplified complex conditional logic for type grouping
+   - Added proper uncategorized section handling
+   - Removed unused `availablePoiTypesForTagging` computed value
+
+3. **Visual Consistency Improvements**:
+   - **Background Alignment**: Added `bg-sand-50` background to grid map filter section to match POI page
+   - **Color Harmony**: Updated POI filter titles from `text-night-800` to `text-sand-800` for consistency
+   - **Subtitle Alignment**: Changed category subtitles from `text-night-700` to `text-sand-600`
+   - **Unified Theme**: Both filters now use identical color schemes and visual hierarchy
+
+**Impact**: Users now experience consistent filtering patterns across all interfaces, reducing cognitive load and improving navigation efficiency.
+
+**Files Modified**:
+- `src/components/filters/GridFilter.tsx` (styling and structure)
+- `src/pages/PoisPage.tsx` (filter logic and structure)
+
+### 8.2. Comment System Architecture (Planned)
+
+**Database Schema Design**:
+```sql
+-- POI Comments Table
+CREATE TABLE poi_comments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    poi_id UUID REFERENCES pois(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+    content TEXT NOT NULL,
+    parent_id UUID REFERENCES poi_comments(id) ON DELETE CASCADE, -- For threading
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Grid Square Comments Table  
+CREATE TABLE grid_comments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    grid_square_id UUID REFERENCES grid_squares(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+    content TEXT NOT NULL,
+    parent_id UUID REFERENCES grid_comments(id) ON DELETE CASCADE, -- For threading
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+```
+
+**Component Architecture**:
+```mermaid
+flowchart TD
+    subgraph "Comment System Components"
+        CF[CommentForm.tsx] --> CL[CommentsList.tsx]
+        CL --> CI[CommentItem.tsx]
+        CI --> CR[CommentReplies.tsx]
+        CR --> CI
+    end
+    
+    subgraph "Integration Points"
+        PC[PoiCard.tsx] --> CF
+        GSM[GridSquareModal.tsx] --> CF
+        PP[PoisPage.tsx] --> CL
+        GSM --> CL
+    end
+    
+    subgraph "Data Flow"
+        CF --> SUP[Supabase Client]
+        CL --> SUP
+        SUP --> RT[Real-time Subscriptions]
+        RT --> CL
+    end
+```
+
+**Features Planned**:
+- Threaded comment discussions with reply support
+- Real-time comment updates via Supabase subscriptions
+- Moderation tools for admins
+- Comment filtering and sorting options
+- User mention system (@username)
+- Comment reactions/voting system
+
+### 8.3. Grid Map System - Component Flow
 
 The grid map system consists of several interconnected components that manage the 9x9 grid display, POI visualization, and user interactions.
 

@@ -4,6 +4,8 @@
 
 -   **Memory System Initialization**: Successfully initialized the core memory files and directory structure as per `memory.mdc`.
 -   **Project Onboarding**: Gaining a comprehensive understanding of the existing "Dune Awakening Deep Desert Tracker" project, including its features, tech stack, and codebase.
+-   **Comment System Development**: Preparing to implement a comprehensive comment system for POIs and grid squares to enhance community collaboration and information sharing.
+-   **Post-Filter Alignment Phase**: Recently completed major UI/UX improvements for filter consistency across the application.
 
 ## Recent Changes & Decisions
 
@@ -117,3 +119,124 @@
 **Outcome:** POI icons now update immediately when new POIs are added, providing seamless user experience without requiring page refreshes.
 
 **Next Steps:** Continue with other development tasks. The current solution is sufficient for production requirements. 
+
+## Recent Changes & Decisions (2025-01-01)
+
+### Filter System Alignment & UI Consistency (Completed)
+
+**Achievement**: Successfully unified the filtering experience between POI page and grid map for seamless user navigation.
+
+**Key Accomplishments**:
+
+1. **Grid Map Filter Modernization (`src/components/filters/GridFilter.tsx`)**:
+   - Replaced custom styling (`px-3 py-1 text-xs rounded-full` with custom colors) with standardized `btn` component classes
+   - Updated category buttons to use `btn text-xs px-2 py-1` with proper `btn-primary`/`btn-outline` states
+   - Applied consistent styling to POI type buttons and clear filters functionality
+   - Enhanced accessibility and visual consistency across the interface
+
+2. **POI Page Filter Restructuring (`src/pages/PoisPage.tsx`)**:
+   - Reimplemented filter structure to match grid map's category-based grouping approach
+   - Simplified complex conditional logic for type grouping, improving maintainability
+   - Added proper handling for uncategorized POI types
+   - Removed unused computed values (`availablePoiTypesForTagging`) for cleaner code
+
+3. **Visual Harmony Improvements**:
+   - **Background Consistency**: Aligned filter section backgrounds (`bg-sand-50`) between both interfaces
+   - **Color Unification**: Updated title colors from `text-night-800` to `text-sand-800` and subtitle colors from `text-night-700` to `text-sand-600`
+   - **Design Language**: Established unified visual hierarchy and styling patterns across all filter components
+
+**Impact**: Users now experience consistent filtering behavior and visual design across all application interfaces, significantly reducing cognitive load and improving overall user experience.
+
+**Files Modified**:
+- `src/components/filters/GridFilter.tsx` - Complete styling overhaul and structure improvements
+- `src/pages/PoisPage.tsx` - Filter logic restructuring and visual consistency updates
+
+## Next Steps (Immediate Priority)
+
+### Comment System Implementation - Phase 1
+
+1. **Database Schema Design & Migration**:
+   - Create `poi_comments` table with relationships to POIs and users
+   - Create `grid_comments` table for grid square discussions
+   - Implement proper foreign key constraints with CASCADE delete policies
+   - Design comment threading system with parent-child relationships
+   - Add performance indexes for efficient comment queries
+
+2. **Row Level Security (RLS) Policies**:
+   - Define security policies for comment creation, viewing, editing, and deletion
+   - Implement role-based access for admin moderation capabilities
+   - Ensure proper user isolation and data protection
+
+3. **Core Component Development**:
+   - Develop `CommentForm.tsx` for creating and editing comments
+   - Create `CommentItem.tsx` for individual comment display with user info and timestamps
+   - Build `CommentsList.tsx` container with pagination and sorting functionality
+
+## Open Questions / Items for Discussion
+
+1. **Comment Moderation Strategy**: What level of moderation should be implemented initially? Should there be auto-moderation features or purely manual admin review?
+
+2. **Real-time vs. Polling**: Should comment updates use Supabase real-time subscriptions for immediate updates, or would periodic polling be sufficient initially?
+
+3. **Comment Depth Limits**: How many levels of threading should be allowed for replies to prevent overly deep nested conversations?
+
+4. **User Notification System**: Should users receive notifications for replies to their comments? If so, in-app only or email notifications as well?
+
+## Development Environment Status
+
+- **Local Development**: Running on `localhost:5175` with Vite dev server
+- **Database**: Supabase PostgreSQL with current schema including profiles, grid_squares, pois, poi_types
+- **Authentication**: Supabase Auth with role-based access control fully functional
+- **Storage**: Supabase Storage with screenshots bucket for POI images and grid screenshots
+- **Current User**: Active authenticated session for development and testing
+
+## Technical Context for Comment System
+
+### Existing Architecture Integration Points
+
+1. **POI Integration**: Comments will be integrated into:
+   - `PoiCard.tsx` components for quick comment previews
+   - `GridSquareModal.tsx` for detailed POI discussions
+   - `PoisPage.tsx` for comprehensive comment management
+
+2. **Grid Square Integration**: Comments will be accessible through:
+   - `GridSquareModal.tsx` for location-specific discussions
+   - Grid overview interfaces for community activity indicators
+
+3. **Admin Integration**: Comment management will be added to:
+   - Admin Panel for moderation tools
+   - User management interfaces for comment-related user actions
+
+### Data Flow Design
+
+```
+User Input → CommentForm → Supabase Client → Database
+Database → Real-time Subscriptions → CommentsList → UI Update
+```
+
+### Component Hierarchy Plan
+
+```
+GridSquareModal / PoiCard
+├── CommentsList
+│   ├── CommentItem
+│   │   ├── CommentReplies (nested)
+│   │   └── User Actions (edit/delete/reply)
+│   └── Pagination Controls
+└── CommentForm (create new comment)
+```
+
+## Recent Memory Updates
+
+All core memory files have been updated to reflect:
+- Completed filter alignment achievements
+- Updated project status and technical implementations
+- Comment system architecture planning
+- Enhanced feature roadmap with prioritized enhancements
+- Current development focus and next steps
+
+**Updated Files**:
+- `docs/product_requirement_docs.md` - Added comment system features and UI consistency requirements
+- `docs/architecture.md` - Documented filter alignment implementation and comment system design
+- `tasks/tasks_plan.md` - Updated project status and comprehensive task breakdown
+- `tasks/active_context.md` - This file, reflecting current development state 
