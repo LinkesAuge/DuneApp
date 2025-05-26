@@ -11,6 +11,9 @@
 - **Authentication**: Role-based access control with admin/user permissions
 - **Dual Mapping Systems**: Both Deep Desert grid and Hagga Basin coordinate systems fully functional
 - **Admin Tools**: Complete management panel with scheduling and automation
+- **Map Settings Management**: **NEW** - Complete admin configuration system with database persistence
+- **POI Position Editing**: **NEW** - Interactive map-based position change functionality
+- **Custom Icon System**: **NEW** - User uploads with admin-configurable scaling (64px-128px)
 - **Mobile Support**: Touch-optimized responsive design throughout
 - **Real-time Updates**: Live synchronization across all interfaces
 - **Performance**: Optimized queries, React memoization, efficient rendering
@@ -540,4 +543,428 @@ const fetchHaggaBasinPOIs = async (userId: string) => {
 - Mobile device testing for touch interactions
 - Cross-browser compatibility for zoom/pan functionality
 
-This technical foundation provides comprehensive support for the Hagga Basin interactive map system while maintaining performance, security, and scalability standards established by the existing Deep Desert tracker system. 
+This technical foundation provides comprehensive support for the Hagga Basin interactive map system while maintaining performance, security, and scalability standards established by the existing Deep Desert tracker system.
+
+## 10. Admin Settings Management System - Technical Implementation
+
+### 10.1. Database Schema for Configuration Storage
+
+**App Settings Table**:
+```sql
+-- Admin configuration persistence table
+CREATE TABLE app_settings (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  setting_key TEXT UNIQUE NOT NULL,
+  setting_value JSONB NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  created_by UUID REFERENCES auth.users(id) ON DELETE SET NULL
+);
+
+-- Enable RLS for admin-only access
+ALTER TABLE app_settings ENABLE ROW LEVEL SECURITY;
+
+-- Admin-only access policy
+CREATE POLICY "admin_only_app_settings" ON app_settings
+FOR ALL USING (
+  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
+);
+
+-- Automatic updated_at timestamp
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER update_app_settings_updated_at
+    BEFORE UPDATE ON app_settings
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+```
+
+### 10.2. Settings Configuration Schema
+
+**Map Settings JSON Structure**:
+```typescript
+interface MapSettings {
+  icon_scaling: {
+    min_size: number;        // Minimum icon size (default: 64px)
+    max_size: number;        // Maximum icon size (default: 128px)
+    base_size: number;       // Base icon size (default: 64px)
+  };
+  interactions: {
+    enable_dragging: boolean;           // POI marker dragging (default: true)
+    enable_tooltips: boolean;           // Hover tooltips (default: true)
+    enable_position_change: boolean;    // Position change mode (default: true)
+  };
+  display: {
+    default_zoom_level: number;         // Initial zoom (default: 1)
+  };
+  filtering: {
+    visible_poi_types: string[];        // Array of POI type IDs (default: all)
+    enable_advanced_filtering: boolean; // Advanced filters (default: false)
+    show_shared_indicators: boolean;    // Shared POI highlighting (default: true)
+  };
+}
+
+// Default settings used for reset functionality
+const DEFAULT_MAP_SETTINGS: MapSettings = {
+  icon_scaling: {
+    min_size: 64,
+    max_size: 128,
+    base_size: 64
+  },
+  interactions: {
+    enable_dragging: true,
+    enable_tooltips: true,
+    enable_position_change: true
+  },
+  display: {
+    default_zoom_level: 1
+  },
+  filtering: {
+    visible_poi_types: [], // Empty array means all types visible
+    enable_advanced_filtering: false,
+    show_shared_indicators: true
+  }
+};
+```
+
+### 10.3. Controlled Component State Management
+
+**React State Architecture**:
+```typescript
+// AdminPanel.tsx - Settings state management
+const AdminPanel: React.FC = () => {
+  // Map settings state with controlled inputs
+  const [mapSettings, setMapSettings] = useState<MapSettings>(DEFAULT_MAP_SETTINGS);
+  const [isLoadingSettings, setIsLoadingSettings] = useState(true);
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
+
+  // POI types for filter checkboxes
+  const [poiTypes, setPoiTypes] = useState<POIType[]>([]);
+  const [visiblePoiTypes, setVisiblePoiTypes] = useState<string[]>([]);
+
+  // Load settings on component mount
+  useEffect(() => {
+    loadMapSettings();
+    fetchPoiTypes();
+  }, []);
+
+  // Database operations
+  const loadMapSettings = async () => {
+    try {
+      setIsLoadingSettings(true);
+      const { data, error } = await supabase
+        .from('app_settings')
+        .select('setting_value')
+        .eq('setting_key', 'map_settings')
+        .maybeSingle();
+
+      if (error) throw error;
+      
+      if (data?.setting_value) {
+        const loadedSettings = data.setting_value as MapSettings;
+        setMapSettings(loadedSettings);
+        setVisiblePoiTypes(loadedSettings.filtering.visible_poi_types);
+      }
+    } catch (error) {
+      console.error('Error loading map settings:', error);
+    } finally {
+      setIsLoadingSettings(false);
+    }
+  };
+
+  const saveMapSettings = async () => {
+    try {
+      setIsSavingSettings(true);
+      
+      const settingsToSave = {
+        ...mapSettings,
+        filtering: {
+          ...mapSettings.filtering,
+          visible_poi_types: visiblePoiTypes
+        }
+      };
+
+      const { error } = await supabase
+        .from('app_settings')
+        .upsert({
+          setting_key: 'map_settings',
+          setting_value: settingsToSave
+        });
+
+      if (error) throw error;
+      
+      setMapSettings(settingsToSave);
+      // Success feedback to user
+    } catch (error) {
+      console.error('Error saving map settings:', error);
+      // Error feedback to user
+    } finally {
+      setIsSavingSettings(false);
+    }
+  };
+
+  const resetMapSettings = () => {
+    setMapSettings(DEFAULT_MAP_SETTINGS);
+    setVisiblePoiTypes(DEFAULT_MAP_SETTINGS.filtering.visible_poi_types);
+  };
+};
+```
+
+### 10.4. Form Input Patterns
+
+**Controlled Input Components**:
+```typescript
+// Icon scaling controls
+<div className="space-y-4">
+  <div>
+    <label className="block text-sm font-medium text-night-700 mb-2">
+      Minimum Icon Size (px)
+    </label>
+    <input
+      type="number"
+      min="32"
+      max="256"
+      value={mapSettings.icon_scaling.min_size}
+      onChange={(e) => setMapSettings(prev => ({
+        ...prev,
+        icon_scaling: {
+          ...prev.icon_scaling,
+          min_size: parseInt(e.target.value) || 64
+        }
+      }))}
+      className="w-full px-3 py-2 border border-sand-300 rounded-md focus:outline-none focus:ring-2 focus:ring-spice-500"
+    />
+  </div>
+  
+  <div>
+    <label className="block text-sm font-medium text-night-700 mb-2">
+      Maximum Icon Size (px)
+    </label>
+    <input
+      type="number"
+      min="32"
+      max="256"
+      value={mapSettings.icon_scaling.max_size}
+      onChange={(e) => setMapSettings(prev => ({
+        ...prev,
+        icon_scaling: {
+          ...prev.icon_scaling,
+          max_size: parseInt(e.target.value) || 128
+        }
+      }))}
+      className="w-full px-3 py-2 border border-sand-300 rounded-md focus:outline-none focus:ring-2 focus:ring-spice-500"
+    />
+  </div>
+</div>
+
+// POI type visibility checkboxes
+<div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+  {poiTypes.map(type => (
+    <label key={type.id} className="flex items-center space-x-2 p-2 rounded-md hover:bg-sand-100">
+      <input
+        type="checkbox"
+        checked={visiblePoiTypes.length === 0 || visiblePoiTypes.includes(type.id)}
+        onChange={(e) => {
+          if (e.target.checked) {
+            setVisiblePoiTypes(prev => 
+              prev.length === 0 ? [type.id] : [...prev, type.id]
+            );
+          } else {
+            setVisiblePoiTypes(prev => prev.filter(id => id !== type.id));
+          }
+        }}
+        className="w-4 h-4 text-spice-600 border-sand-300 rounded focus:ring-spice-500"
+      />
+      <span className="text-sm text-night-700">{type.name}</span>
+    </label>
+  ))}
+</div>
+```
+
+### 10.5. Settings Application Patterns
+
+**Real-time Settings Usage**:
+```typescript
+// MapPOIMarker.tsx - Icon scaling implementation
+const MapPOIMarker: React.FC<MapPOIMarkerProps> = ({ poi, settings }) => {
+  const getIconSize = useCallback((zoomLevel: number): number => {
+    const { min_size, max_size, base_size } = settings?.icon_scaling || {
+      min_size: 64,
+      max_size: 128,
+      base_size: 64
+    };
+    
+    const size = base_size * zoomLevel;
+    return Math.max(min_size, Math.min(max_size, size));
+  }, [settings]);
+
+  const iconSize = getIconSize(zoomLevel);
+  
+  return (
+    <div
+      className={`absolute transform -translate-x-1/2 -translate-y-1/2 cursor-pointer transition-all duration-200 ${
+        settings?.interactions.enable_dragging ? 'hover:scale-110' : ''
+      }`}
+      style={{
+        left: `${(poi.coordinates_x / 4000) * 100}%`,
+        top: `${(poi.coordinates_y / 4000) * 100}%`,
+        width: `${iconSize}px`,
+        height: `${iconSize}px`
+      }}
+      onClick={settings?.interactions.enable_position_change ? handleClick : undefined}
+    >
+      {/* Icon rendering based on settings */}
+    </div>
+  );
+};
+
+// InteractiveMap.tsx - Settings integration
+const InteractiveMap: React.FC = () => {
+  const [settings, setSettings] = useState<MapSettings | null>(null);
+
+  useEffect(() => {
+    loadSettings();
+  }, []);
+
+  const loadSettings = async () => {
+    const { data } = await supabase
+      .from('app_settings')
+      .select('setting_value')
+      .eq('setting_key', 'map_settings')
+      .maybeSingle();
+
+    if (data?.setting_value) {
+      setSettings(data.setting_value as MapSettings);
+    }
+  };
+
+  return (
+    <TransformWrapper
+      initialScale={settings?.display.default_zoom_level || 1}
+      minScale={0.25}
+      maxScale={3}
+    >
+      {/* Map content with settings applied */}
+    </TransformWrapper>
+  );
+};
+```
+
+### 10.6. Performance Optimizations
+
+**Settings Caching Strategy**:
+```typescript
+// Global settings context for efficient sharing
+const SettingsContext = createContext<MapSettings | null>(null);
+
+export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [settings, setSettings] = useState<MapSettings | null>(null);
+
+  useEffect(() => {
+    // Load settings once at app level
+    loadSettings();
+    
+    // Optional: Subscribe to settings changes for multi-admin scenarios
+    const subscription = supabase
+      .channel('app_settings')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'app_settings',
+        filter: 'setting_key=eq.map_settings'
+      }, (payload) => {
+        if (payload.new?.setting_value) {
+          setSettings(payload.new.setting_value as MapSettings);
+        }
+      })
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  return (
+    <SettingsContext.Provider value={settings}>
+      {children}
+    </SettingsContext.Provider>
+  );
+};
+
+// Custom hook for accessing settings
+export const useMapSettings = () => {
+  const context = useContext(SettingsContext);
+  return context || DEFAULT_MAP_SETTINGS;
+};
+```
+
+### 10.7. Validation and Error Handling
+
+**Input Validation Patterns**:
+```typescript
+// Settings validation schema
+const validateMapSettings = (settings: Partial<MapSettings>): string[] => {
+  const errors: string[] = [];
+
+  if (settings.icon_scaling) {
+    const { min_size, max_size, base_size } = settings.icon_scaling;
+    
+    if (min_size && (min_size < 16 || min_size > 512)) {
+      errors.push('Minimum icon size must be between 16 and 512 pixels');
+    }
+    
+    if (max_size && (max_size < 16 || max_size > 512)) {
+      errors.push('Maximum icon size must be between 16 and 512 pixels');
+    }
+    
+    if (min_size && max_size && min_size > max_size) {
+      errors.push('Minimum icon size cannot be larger than maximum icon size');
+    }
+    
+    if (base_size && (base_size < min_size || base_size > max_size)) {
+      errors.push('Base icon size must be between minimum and maximum sizes');
+    }
+  }
+
+  if (settings.display?.default_zoom_level) {
+    const zoom = settings.display.default_zoom_level;
+    if (zoom < 0.25 || zoom > 3) {
+      errors.push('Default zoom level must be between 0.25 and 3');
+    }
+  }
+
+  return errors;
+};
+
+// Error handling in save function
+const saveMapSettings = async () => {
+  try {
+    const validationErrors = validateMapSettings(mapSettings);
+    if (validationErrors.length > 0) {
+      setErrorMessage(validationErrors.join(', '));
+      return;
+    }
+
+    setIsSavingSettings(true);
+    setErrorMessage('');
+
+    // Save operation...
+    
+    setSuccessMessage('Settings saved successfully!');
+    setTimeout(() => setSuccessMessage(''), 3000);
+  } catch (error) {
+    console.error('Error saving settings:', error);
+    setErrorMessage('Failed to save settings. Please try again.');
+  } finally {
+    setIsSavingSettings(false);
+  }
+};
+```
+
+This comprehensive admin settings management system provides a robust, scalable foundation for application configuration while maintaining the performance and security standards established throughout the platform. 

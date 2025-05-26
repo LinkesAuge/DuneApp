@@ -6,6 +6,9 @@ interface MapPOIMarkerProps {
   poi: Poi;
   poiType: PoiType;
   customIcons: CustomIcon[];
+  zoom?: number;
+  onMouseDown?: (poi: Poi, event: React.MouseEvent) => void;
+  isDragging?: boolean;
 }
 
 // Helper function to determine if an icon is a URL or emoji
@@ -43,10 +46,28 @@ const privacyColors = {
   shared: 'text-blue-500'
 } as const;
 
-const MapPOIMarker: React.FC<MapPOIMarkerProps> = ({ poi, poiType, customIcons }) => {
+const MapPOIMarker: React.FC<MapPOIMarkerProps> = ({ 
+  poi, 
+  poiType, 
+  customIcons, 
+  zoom = 1, 
+  onMouseDown,
+  isDragging = false 
+}) => {
   const imageUrl = getDisplayImageUrl(poiType.icon, customIcons);
   const PrivacyIcon = privacyIcons[poi.privacy_level];
   const privacyColor = privacyColors[poi.privacy_level];
+
+  // Calculate icon size with constraints (64px min, 128px max)
+  // TODO: Make these configurable from admin settings
+  const baseSize = 64; // Base size in pixels
+  const maxSize = 128;
+  const minSize = 64;
+  
+  // Scale with zoom but constrain to min/max
+  const scaledSize = Math.max(minSize, Math.min(maxSize, baseSize * zoom));
+  const iconSize = scaledSize;
+  const innerIconSize = iconSize * 0.75; // Icon content is 75% of container
 
   return (
     <div className="relative group">
@@ -54,26 +75,37 @@ const MapPOIMarker: React.FC<MapPOIMarkerProps> = ({ poi, poiType, customIcons }
       <div className="relative">
         {/* POI Icon */}
         <div 
-          className="w-8 h-8 rounded-full border-2 border-white shadow-lg flex items-center justify-center cursor-pointer hover:scale-110 transition-transform"
+          className={`rounded-full border-2 border-white shadow-lg flex items-center justify-center transition-all duration-200 ${
+            isDragging 
+              ? 'cursor-grabbing scale-110 z-50' 
+              : 'cursor-grab hover:scale-110'
+          }`}
           style={{
+            width: `${iconSize}px`,
+            height: `${iconSize}px`,
             backgroundColor: poiType.icon_has_transparent_background && imageUrl 
               ? 'transparent' 
-              : poiType.color
+              : poiType.color,
+            opacity: isDragging ? 0.8 : 1
           }}
+          onMouseDown={(e) => onMouseDown?.(poi, e)}
         >
           {imageUrl ? (
             <img
               src={imageUrl}
               alt={poiType.name}
-              className="w-6 h-6 object-contain"
+              className="object-contain"
               style={{
+                width: `${innerIconSize}px`,
+                height: `${innerIconSize}px`,
                 filter: poiType.icon_has_transparent_background ? 'none' : 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))'
               }}
             />
           ) : (
             <span 
-              className="text-sm leading-none"
+              className="leading-none font-medium"
               style={{ 
+                fontSize: `${innerIconSize * 0.5}px`,
                 color: poiType.icon_has_transparent_background ? poiType.color : 'white',
                 textShadow: poiType.icon_has_transparent_background ? '0 1px 2px rgba(0,0,0,0.3)' : 'none'
               }}
@@ -89,11 +121,25 @@ const MapPOIMarker: React.FC<MapPOIMarkerProps> = ({ poi, poiType, customIcons }
             <PrivacyIcon className={`w-2.5 h-2.5 ${privacyColor}`} />
           </div>
         )}
+
+        {/* Shared POI Indicator - Special highlighting for shared POIs */}
+        {poi.privacy_level === 'shared' && (
+          <div className="absolute inset-0 rounded-full animate-pulse">
+            <div className="absolute inset-0 rounded-full border-2 border-blue-400 opacity-60"></div>
+            <div className="absolute inset-0 rounded-full border border-blue-300 opacity-40 scale-110"></div>
+          </div>
+        )}
       </div>
 
-      {/* Hover Tooltip */}
-      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
-        <div className="bg-night-900 text-white px-3 py-2 rounded-lg shadow-lg whitespace-nowrap max-w-xs">
+      {/* Hover Tooltip - Fixed size, doesn't scale with zoom */}
+      <div 
+        className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-[100]"
+        style={{ 
+          transform: `translateX(-50%) translateY(-${iconSize/2 + 8}px) scale(${1/zoom})`,
+          transformOrigin: 'center bottom'
+        }}
+      >
+        <div className="bg-night-900 text-white px-3 py-2 rounded-lg shadow-xl whitespace-nowrap max-w-xs">
           {/* POI Title */}
           <div className="font-medium text-sm">{poi.title}</div>
           
@@ -112,6 +158,11 @@ const MapPOIMarker: React.FC<MapPOIMarkerProps> = ({ poi, poiType, customIcons }
               {poi.description}
             </div>
           )}
+          
+          {/* Click hint */}
+          <div className="text-xs text-sand-500 mt-2 italic border-t border-sand-700 pt-2">
+            (click for more info)
+          </div>
           
           {/* Tooltip arrow */}
           <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-night-900"></div>

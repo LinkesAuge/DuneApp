@@ -66,6 +66,20 @@ const AdminPanel: React.FC = () => {
   const [editError, setEditError] = useState<string | null>(null);
   const [isUpdatingUser, setIsUpdatingUser] = useState(false);
 
+  // Map Settings State
+  const [mapSettings, setMapSettings] = useState({
+    iconMinSize: 64,
+    iconMaxSize: 128,
+    iconBaseSize: 64,
+    enableDragging: true,
+    showTooltips: true,
+    enablePositionChange: true,
+    defaultZoom: 0.4,
+    defaultVisibleTypes: [] as string[],
+    enableAdvancedFiltering: false,
+    showSharedIndicators: true
+  });
+
   const fetchScheduledTasks = async () => {
     setError(null);
     try {
@@ -714,6 +728,65 @@ const AdminPanel: React.FC = () => {
     }
   };
 
+  // Map Settings Functions
+  const saveMapSettings = async () => {
+    try {
+      const { error } = await supabase
+        .from('app_settings')
+        .upsert({
+          key: 'hagga_basin_settings',
+          value: mapSettings,
+          updated_at: new Date().toISOString()
+        });
+
+      if (error) throw error;
+      alert('Map settings saved successfully!');
+    } catch (err: any) {
+      console.error('Error saving map settings:', err);
+      alert('Error saving settings: ' + err.message);
+    }
+  };
+
+  const loadMapSettings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'hagga_basin_settings')
+        .single();
+
+      if (error && error.code !== 'PGRST116') throw error; // Ignore "not found" errors
+      
+      if (data?.value) {
+        setMapSettings(prev => ({ ...prev, ...data.value }));
+      }
+    } catch (err: any) {
+      console.error('Error loading map settings:', err);
+    }
+  };
+
+  const resetMapSettings = () => {
+    setMapSettings({
+      iconMinSize: 64,
+      iconMaxSize: 128,
+      iconBaseSize: 64,
+      enableDragging: true,
+      showTooltips: true,
+      enablePositionChange: true,
+      defaultZoom: 0.4,
+      defaultVisibleTypes: [],
+      enableAdvancedFiltering: false,
+      showSharedIndicators: true
+    });
+  };
+
+  // Load settings on component mount
+  useEffect(() => {
+    if (user && user.role === 'admin') {
+      loadMapSettings();
+    }
+  }, [user]);
+
   if (!user) {
     navigate('/auth');
     return null;
@@ -1169,12 +1242,253 @@ const AdminPanel: React.FC = () => {
               onUpdate={setPoiTypes}
             />
           ) : activeTab === 'maps' ? (
-            <div className="space-y-6">
+            <div className="space-y-8">
               <div>
                 <h2 className="text-2xl font-semibold text-night-700 mb-1">Map Management</h2>
-                <p className="text-sm text-night-500">Upload and manage base maps for different regions.</p>
+                <p className="text-sm text-night-500">Upload and manage base maps and configure map settings.</p>
               </div>
-              <BaseMapUploader />
+              
+              {/* Hagga Basin Settings */}
+              <div className="bg-sand-50 border border-sand-200 rounded-lg p-6">
+                <h3 className="text-xl font-semibold text-night-700 mb-4 flex items-center">
+                  <Map className="w-5 h-5 mr-2 text-spice-600" />
+                  Hagga Basin Settings
+                </h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* POI Icon Scaling */}
+                  <div className="space-y-4">
+                    <h4 className="text-lg font-medium text-night-600">POI Icon Scaling</h4>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-sm font-medium text-night-700 mb-1">
+                          Minimum Icon Size (pixels)
+                        </label>
+                        <input
+                          type="number"
+                          min="32"
+                          max="128"
+                          value={mapSettings.iconMinSize}
+                          onChange={(e) => setMapSettings(prev => ({
+                            ...prev,
+                            iconMinSize: parseInt(e.target.value) || 64
+                          }))}
+                          className="w-full px-3 py-2 border border-sand-300 rounded-md focus:outline-none focus:ring-2 focus:ring-spice-500"
+                          placeholder="Default: 64"
+                        />
+                        <p className="text-xs text-night-500 mt-1">Icons won't scale smaller than this size</p>
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-night-700 mb-1">
+                          Maximum Icon Size (pixels)
+                        </label>
+                        <input
+                          type="number"
+                          min="64"
+                          max="256"
+                          value={mapSettings.iconMaxSize}
+                          onChange={(e) => setMapSettings(prev => ({
+                            ...prev,
+                            iconMaxSize: parseInt(e.target.value) || 128
+                          }))}
+                          className="w-full px-3 py-2 border border-sand-300 rounded-md focus:outline-none focus:ring-2 focus:ring-spice-500"
+                          placeholder="Default: 128"
+                        />
+                        <p className="text-xs text-night-500 mt-1">Icons won't scale larger than this size</p>
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-night-700 mb-1">
+                          Base Icon Size (pixels)
+                        </label>
+                        <input
+                          type="number"
+                          min="32"
+                          max="128"
+                          value={mapSettings.iconBaseSize}
+                          onChange={(e) => setMapSettings(prev => ({
+                            ...prev,
+                            iconBaseSize: parseInt(e.target.value) || 64
+                          }))}
+                          className="w-full px-3 py-2 border border-sand-300 rounded-md focus:outline-none focus:ring-2 focus:ring-spice-500"
+                          placeholder="Default: 64"
+                        />
+                        <p className="text-xs text-night-500 mt-1">Base size before zoom scaling is applied</p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Map Interaction Settings */}
+                  <div className="space-y-4">
+                    <h4 className="text-lg font-medium text-night-600">Map Interaction</h4>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <label className="text-sm font-medium text-night-700">
+                          Enable POI Dragging
+                        </label>
+                        <input
+                          type="checkbox"
+                          checked={mapSettings.enableDragging}
+                          onChange={(e) => setMapSettings(prev => ({
+                            ...prev,
+                            enableDragging: e.target.checked
+                          }))}
+                          className="w-4 h-4 text-spice-600 border-sand-300 rounded focus:ring-spice-500"
+                        />
+                      </div>
+                      
+                      <div className="flex items-center justify-between">
+                        <label className="text-sm font-medium text-night-700">
+                          Show POI Tooltips
+                        </label>
+                        <input
+                          type="checkbox"
+                          checked={mapSettings.showTooltips}
+                          onChange={(e) => setMapSettings(prev => ({
+                            ...prev,
+                            showTooltips: e.target.checked
+                          }))}
+                          className="w-4 h-4 text-spice-600 border-sand-300 rounded focus:ring-spice-500"
+                        />
+                      </div>
+                      
+                      <div className="flex items-center justify-between">
+                        <label className="text-sm font-medium text-night-700">
+                          Enable Position Change Mode
+                        </label>
+                        <input
+                          type="checkbox"
+                          checked={mapSettings.enablePositionChange}
+                          onChange={(e) => setMapSettings(prev => ({
+                            ...prev,
+                            enablePositionChange: e.target.checked
+                          }))}
+                          className="w-4 h-4 text-spice-600 border-sand-300 rounded focus:ring-spice-500"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-night-700 mb-1">
+                          Default Zoom Level
+                        </label>
+                        <input
+                          type="number"
+                          min="0.1"
+                          max="2.0"
+                          step="0.1"
+                          value={mapSettings.defaultZoom}
+                          onChange={(e) => setMapSettings(prev => ({
+                            ...prev,
+                            defaultZoom: parseFloat(e.target.value) || 0.4
+                          }))}
+                          className="w-full px-3 py-2 border border-sand-300 rounded-md focus:outline-none focus:ring-2 focus:ring-spice-500"
+                          placeholder="Default: 0.4"
+                        />
+                        <p className="text-xs text-night-500 mt-1">Initial zoom level when map loads</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Action Buttons */}
+                <div className="flex justify-end space-x-3 mt-6 pt-4 border-t border-sand-300">
+                  <button 
+                    onClick={resetMapSettings}
+                    className="px-4 py-2 text-sm font-medium text-night-700 bg-sand-100 hover:bg-sand-200 rounded-md transition-colors"
+                  >
+                    Reset to Defaults
+                  </button>
+                  <button 
+                    onClick={saveMapSettings}
+                    className="px-4 py-2 text-sm font-medium text-white bg-spice-600 hover:bg-spice-700 rounded-md transition-colors"
+                  >
+                    Save Settings
+                  </button>
+                </div>
+              </div>
+              
+              {/* Filter Management */}
+              <div className="bg-sand-50 border border-sand-200 rounded-lg p-6">
+                <h3 className="text-xl font-semibold text-night-700 mb-4 flex items-center">
+                  <ListChecks className="w-5 h-5 mr-2 text-spice-600" />
+                  Filter Management
+                </h3>
+                
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="text-lg font-medium text-night-600 mb-3">Default Visible POI Types</h4>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                      {poiTypes.map(type => (
+                        <label key={type.id} className="flex items-center space-x-2 p-2 rounded-md hover:bg-sand-100">
+                          <input
+                            type="checkbox"
+                            checked={mapSettings.defaultVisibleTypes.includes(type.id)}
+                            onChange={(e) => {
+                              setMapSettings(prev => ({
+                                ...prev,
+                                defaultVisibleTypes: e.target.checked 
+                                  ? [...prev.defaultVisibleTypes, type.id]
+                                  : prev.defaultVisibleTypes.filter(id => id !== type.id)
+                              }));
+                            }}
+                            className="w-4 h-4 text-spice-600 border-sand-300 rounded focus:ring-spice-500"
+                          />
+                          <span className="text-sm text-night-700">{type.name}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium text-night-700">
+                      Enable Advanced Filtering
+                    </label>
+                    <input
+                      type="checkbox"
+                      checked={mapSettings.enableAdvancedFiltering}
+                      onChange={(e) => setMapSettings(prev => ({
+                        ...prev,
+                        enableAdvancedFiltering: e.target.checked
+                      }))}
+                      className="w-4 h-4 text-spice-600 border-sand-300 rounded focus:ring-spice-500"
+                    />
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium text-night-700">
+                      Show Shared POI Indicators
+                    </label>
+                    <input
+                      type="checkbox"
+                      checked={mapSettings.showSharedIndicators}
+                      onChange={(e) => setMapSettings(prev => ({
+                        ...prev,
+                        showSharedIndicators: e.target.checked
+                      }))}
+                      className="w-4 h-4 text-spice-600 border-sand-300 rounded focus:ring-spice-500"
+                    />
+                  </div>
+                </div>
+                
+                <div className="flex justify-end space-x-3 mt-6 pt-4 border-t border-sand-300">
+                  <button 
+                    onClick={saveMapSettings}
+                    className="px-4 py-2 text-sm font-medium text-white bg-spice-600 hover:bg-spice-700 rounded-md transition-colors"
+                  >
+                    Apply Filter Settings
+                  </button>
+                </div>
+              </div>
+              
+              {/* Base Map Upload */}
+              <div className="bg-white border border-sand-200 rounded-lg p-6">
+                <h3 className="text-xl font-semibold text-night-700 mb-4 flex items-center">
+                  <Upload className="w-5 h-5 mr-2 text-spice-600" />
+                  Base Map Upload
+                </h3>
+                <BaseMapUploader />
+              </div>
             </div>
           ) : (
             <DatabaseTab />

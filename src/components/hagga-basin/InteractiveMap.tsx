@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { TransformWrapper, TransformComponent, ReactZoomPanPinchRef } from 'react-zoom-pan-pinch';
-import { Plus, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
+import { Plus, ZoomIn, ZoomOut, RotateCcw, Target } from 'lucide-react';
 import type { 
   HaggaBasinBaseMap, 
   HaggaBasinOverlay, 
@@ -12,6 +12,8 @@ import type {
 import { getMarkerPosition, getRelativeCoordinates, validateCoordinates, formatCoordinates } from '../../lib/coordinates';
 import MapPOIMarker from './MapPOIMarker';
 import POIPlacementModal from './POIPlacementModal';
+import POIEditModal from './POIEditModal';
+import HaggaBasinPoiCard from './HaggaBasinPoiCard';
 
 interface InteractiveMapProps {
   baseMap: HaggaBasinBaseMap;
@@ -19,6 +21,9 @@ interface InteractiveMapProps {
   pois: Poi[];
   poiTypes: PoiType[];
   onPoiCreated: (poi: Poi) => void;
+  onPoiUpdated?: (poi: Poi) => void;
+  onPoiDeleted?: (poiId: string) => void;
+  onPoiShare?: (poi: Poi) => void;
   customIcons: CustomIcon[];
 }
 
@@ -52,6 +57,9 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
   pois,
   poiTypes,
   onPoiCreated,
+  onPoiUpdated,
+  onPoiDeleted,
+  onPoiShare,
   customIcons
 }) => {
   const transformRef = useRef<ReactZoomPanPinchRef | null>(null);
@@ -62,11 +70,53 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const [placementCoordinates, setPlacementCoordinates] = useState<PixelCoordinates | null>(null);
   const [showPlacementModal, setShowPlacementModal] = useState(false);
   const [selectedPoi, setSelectedPoi] = useState<Poi | null>(null);
+  const [editingPoi, setEditingPoi] = useState<Poi | null>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [currentZoom, setCurrentZoom] = useState(mapConfig.initialScale);
+  
+  // State for POI position changing
+  const [positionChangeMode, setPositionChangeMode] = useState(false);
+  const [changingPositionPoi, setChangingPositionPoi] = useState<Poi | null>(null);
 
-  // Handle map click for POI placement
+  // POI dragging state
+  const [draggedPoi, setDraggedPoi] = useState<Poi | null>(null);
+  const [dragOffset, setDragOffset] = useState<{ x: number; y: number } | null>(null);
+
+  // Handle map click for POI placement and position changing
   const handleMapClick = useCallback((event: React.MouseEvent) => {
-    if (!placementMode || !mapElementRef.current) return;
+    if (!mapElementRef.current || draggedPoi) return;
+    
+    // Handle position change mode
+    if (positionChangeMode && changingPositionPoi) {
+      event.preventDefault();
+      event.stopPropagation();
+      
+      try {
+        const coordinates = getRelativeCoordinates(event, mapElementRef.current);
+        
+        if (validateCoordinates(coordinates.x, coordinates.y)) {
+          const updatedPoi = {
+            ...changingPositionPoi,
+            coordinates_x: coordinates.x,
+            coordinates_y: coordinates.y
+          };
+          
+          if (onPoiUpdated) {
+            onPoiUpdated(updatedPoi);
+          }
+          
+          // Exit position change mode
+          setPositionChangeMode(false);
+          setChangingPositionPoi(null);
+        }
+      } catch (error) {
+        console.error('Error updating POI position:', error);
+      }
+      return;
+    }
+    
+    // Handle regular placement mode
+    if (!placementMode) return;
 
     event.preventDefault();
     event.stopPropagation();
@@ -89,21 +139,119 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
     } catch (error) {
       console.error('Error calculating coordinates:', error);
     }
-  }, [placementMode]);
+  }, [placementMode, positionChangeMode, changingPositionPoi, draggedPoi, onPoiUpdated]);
 
-  // Handle ESC key to cancel placement mode
+  // Handle POI dragging
+  const handlePoiMouseDown = useCallback((poi: Poi, event: React.MouseEvent) => {
+    if (!mapElementRef.current) return;
+    
+    event.preventDefault();
+    event.stopPropagation();
+    
+    const rect = mapElementRef.current.getBoundingClientRect();
+    const poiPosition = getMarkerPosition(poi.coordinates_x || 0, poi.coordinates_y || 0);
+    
+    // Calculate offset from mouse to POI center
+    const offset = {
+      x: event.clientX - rect.left - parseFloat(poiPosition.left),
+      y: event.clientY - rect.top - parseFloat(poiPosition.top)
+    };
+    
+    setDraggedPoi(poi);
+    setDragOffset(offset);
+  }, []);
+
+  const handleMouseMove = useCallback((event: React.MouseEvent) => {
+    if (!draggedPoi || !dragOffset || !mapElementRef.current) return;
+    
+    event.preventDefault();
+    
+    const coordinates = getRelativeCoordinates(event, mapElementRef.current);
+    
+    // Apply offset to get the correct POI position
+    const adjustedCoordinates = {
+      x: coordinates.x - dragOffset.x / 4000 * 100, // Convert back to percentage
+      y: coordinates.y - dragOffset.y / 4000 * 100
+    };
+    
+    if (validateCoordinates(adjustedCoordinates.x, adjustedCoordinates.y)) {
+      // Update POI position optimistically
+      const updatedPoi = {
+        ...draggedPoi,
+        coordinates_x: adjustedCoordinates.x,
+        coordinates_y: adjustedCoordinates.y
+      };
+      
+      // Temporarily update the POI in the list for immediate visual feedback
+      setDraggedPoi(updatedPoi);
+    }
+  }, [draggedPoi, dragOffset]);
+
+  const handleMouseUp = useCallback(async () => {
+    if (!draggedPoi) return;
+    
+    try {
+      // Update POI in database
+      if (onPoiUpdated) {
+        await onPoiUpdated(draggedPoi);
+      }
+    } catch (error) {
+      console.error('Error updating POI position:', error);
+    } finally {
+      setDraggedPoi(null);
+      setDragOffset(null);
+    }
+  }, [draggedPoi, onPoiUpdated]);
+
+  // Track zoom level for icon scaling
+  useEffect(() => {
+    if (transformRef.current) {
+      const handleTransform = (ref: ReactZoomPanPinchRef) => {
+        setCurrentZoom(ref.state.scale);
+      };
+      
+      // Listen to transform changes
+      const unsubscribe = transformRef.current.instance.wrapperComponent?.addEventListener?.('wheel', () => {
+        if (transformRef.current) {
+          handleTransform(transformRef.current);
+        }
+      });
+      
+      return () => {
+        if (unsubscribe) {
+          unsubscribe();
+        }
+      };
+    }
+  }, [transformRef.current]);
+
+  // Start position change mode for a POI
+  const startPositionChange = useCallback((poi: Poi) => {
+    setChangingPositionPoi(poi);
+    setPositionChangeMode(true);
+    setPlacementMode(false);
+    setSelectedPoi(null);
+  }, []);
+
+  // Handle ESC key to cancel placement/position change modes
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && placementMode) {
-        setPlacementMode(false);
-        setPlacementCoordinates(null);
-        setShowPlacementModal(false);
+      if (event.key === 'Escape') {
+        if (placementMode) {
+          setPlacementMode(false);
+          setPlacementCoordinates(null);
+          setShowPlacementModal(false);
+        }
+        if (positionChangeMode) {
+          setPositionChangeMode(false);
+          setChangingPositionPoi(null);
+        }
       }
     };
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [placementMode]);
+  }, [placementMode, positionChangeMode]);
 
   // Ensure proper positioning when transform ref is available and image is loaded
   useEffect(() => {
@@ -203,7 +351,7 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
             style={{ 
               width: '4000px', 
               height: '4000px',
-              cursor: placementMode ? 'crosshair' : 'grab'
+              cursor: (placementMode || positionChangeMode) ? 'crosshair' : 'grab'
             }}
             onClick={handleMapClick}
           >
@@ -239,16 +387,24 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
               const poiType = poiTypes.find(type => type.id === poi.poi_type_id);
               if (!poiType) return null;
 
+              // Use dragged position if this POI is being dragged
+              const displayPoi = draggedPoi && draggedPoi.id === poi.id ? draggedPoi : poi;
+
               return (
                 <div
                   key={poi.id}
-                  style={getPoiMarkerStyle(poi)}
+                  style={getPoiMarkerStyle(displayPoi)}
                   onClick={(e) => handlePoiClick(poi, e)}
+                  onMouseMove={draggedPoi ? handleMouseMove : undefined}
+                  onMouseUp={draggedPoi ? handleMouseUp : undefined}
                 >
                   <MapPOIMarker
-                    poi={poi}
+                    poi={displayPoi}
                     poiType={poiType}
                     customIcons={customIcons}
+                    zoom={currentZoom}
+                    onMouseDown={handlePoiMouseDown}
+                    isDragging={draggedPoi?.id === poi.id}
                   />
                 </div>
               );
@@ -331,6 +487,19 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
         </div>
       )}
 
+      {/* Position Change Mode Indicator */}
+      {positionChangeMode && changingPositionPoi && (
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-40 pointer-events-none">
+          <div className="bg-blue-500/80 text-white px-4 py-2 rounded-lg shadow-lg">
+            <div className="text-center">
+              <Target className="w-6 h-6 mx-auto mb-1" />
+              <div className="text-sm font-medium">Click to move "{changingPositionPoi.title}"</div>
+              <div className="text-xs opacity-90">Press ESC to cancel</div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* POI Placement Modal */}
       {showPlacementModal && placementCoordinates && (
         <POIPlacementModal
@@ -345,29 +514,64 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
         />
       )}
 
-      {/* POI Details Modal - Placeholder for future implementation */}
-      {selectedPoi && (
-        <div 
-          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center"
-          onClick={() => setSelectedPoi(null)}
-        >
-          <div 
-            className="bg-white rounded-lg p-6 max-w-md w-full mx-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className="text-lg font-semibold text-sand-800 mb-2">{selectedPoi.title}</h3>
-            <p className="text-sand-600 mb-4">{selectedPoi.description}</p>
-            <div className="text-sm text-sand-500">
-              Coordinates: {formatCoordinates(selectedPoi.coordinates_x || 0, selectedPoi.coordinates_y || 0)}
-            </div>
-            <button
-              onClick={() => setSelectedPoi(null)}
-              className="mt-4 btn btn-outline w-full"
-            >
-              Close
-            </button>
-          </div>
-        </div>
+      {/* POI Details Card */}
+      {selectedPoi && (() => {
+        const poiType = poiTypes.find(type => type.id === selectedPoi.poi_type_id);
+        if (!poiType) return null;
+        
+        return (
+          <HaggaBasinPoiCard
+            poi={selectedPoi}
+            poiType={poiType}
+            customIcons={customIcons}
+            isOpen={true}
+            onClose={() => setSelectedPoi(null)}
+            onEdit={() => {
+              setEditingPoi(selectedPoi);
+              setSelectedPoi(null);
+            }}
+            onDelete={async () => {
+              if (window.confirm(`Are you sure you want to delete "${selectedPoi.title}"?`)) {
+                try {
+                  if (onPoiDeleted) {
+                    await onPoiDeleted(selectedPoi.id);
+                  }
+                  setSelectedPoi(null);
+                } catch (error) {
+                  console.error('Error deleting POI:', error);
+                  alert('Failed to delete POI. Please try again.');
+                }
+              }
+            }}
+            onShare={() => {
+              if (onPoiShare) {
+                onPoiShare(selectedPoi);
+              }
+              setSelectedPoi(null);
+            }}
+            onImageClick={() => {
+              // TODO: Open gallery modal
+              console.log('Open gallery for POI:', selectedPoi.id);
+            }}
+          />
+                 );
+       })()}
+
+      {/* POI Edit Modal */}
+      {editingPoi && (
+        <POIEditModal
+          poi={editingPoi}
+          poiTypes={poiTypes}
+          customIcons={customIcons}
+          onPoiUpdated={(updatedPoi) => {
+            if (onPoiUpdated) {
+              onPoiUpdated(updatedPoi);
+            }
+            setEditingPoi(null);
+          }}
+          onClose={() => setEditingPoi(null)}
+          onPositionChange={startPositionChange}
+        />
       )}
 
       {/* Coordinate Display for Development */}

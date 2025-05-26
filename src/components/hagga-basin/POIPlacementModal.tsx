@@ -44,6 +44,27 @@ const privacyOptions = [
   }
 ];
 
+// Helper function to determine if an icon is a URL or emoji
+const isIconUrl = (icon: string): boolean => {
+  return icon.startsWith('http') || icon.startsWith('/') || icon.includes('.');
+};
+
+// Helper function to get display image URL for POI icons
+const getDisplayImageUrl = (icon: string, customIcons: CustomIcon[]): string | null => {
+  // Check if it's a custom icon reference
+  const customIcon = customIcons.find(ci => ci.id === icon || ci.name === icon);
+  if (customIcon) {
+    return customIcon.image_url;
+  }
+  
+  // Check if it's already a URL
+  if (isIconUrl(icon)) {
+    return icon;
+  }
+  
+  return null;
+};
+
 const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
   coordinates,
   poiTypes,
@@ -57,13 +78,17 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [selectedPoiTypeId, setSelectedPoiTypeId] = useState('');
+  const [selectedCustomIcon, setSelectedCustomIcon] = useState<string | null>(null);
   const [privacyLevel, setPrivacyLevel] = useState<PrivacyLevel>('global');
   const [screenshots, setScreenshots] = useState<File[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Get categories for organizing POI types
+  // Get categories for organizing POI types, including custom icons
   const categories = [...new Set(poiTypes.map(type => type.category))];
+  if (customIcons.length > 0) {
+    categories.push('custom');
+  }
 
   // Handle screenshot upload
   const handleScreenshotUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -130,8 +155,8 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
       return;
     }
 
-    if (!selectedPoiTypeId) {
-      setError('Please select a POI type');
+    if (!selectedPoiTypeId && !selectedCustomIcon) {
+      setError('Please select a POI type or custom icon');
       return;
     }
 
@@ -143,7 +168,8 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
       const poiData = {
         title: title.trim(),
         description: description.trim() || null,
-        poi_type_id: selectedPoiTypeId,
+        poi_type_id: selectedCustomIcon ? null : selectedPoiTypeId,
+        custom_icon_id: selectedCustomIcon || null,
         created_by: user.id,
         map_type: 'hagga_basin',
         coordinates_x: coordinates.x,
@@ -275,37 +301,119 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
             </label>
             <div className="space-y-4">
               {categories.map(category => {
+                // Handle custom icons category
+                if (category === 'custom') {
+                  return (
+                    <div key={category}>
+                      <h4 className="text-sm font-medium text-sand-600 mb-2 capitalize">
+                        Custom Icons
+                      </h4>
+                      <div className="grid grid-cols-2 gap-2">
+                        {customIcons.map(customIcon => (
+                          <label
+                            key={`custom-${customIcon.id}`}
+                            className={`flex items-center p-3 border rounded-lg cursor-pointer transition-colors ${
+                              selectedCustomIcon === customIcon.id
+                                ? 'border-spice-500 bg-spice-50'
+                                : 'border-sand-200 hover:border-sand-300'
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="poiType"
+                              value={`custom-${customIcon.id}`}
+                              checked={selectedCustomIcon === customIcon.id}
+                              onChange={() => {
+                                setSelectedCustomIcon(customIcon.id);
+                                setSelectedPoiTypeId(''); // Clear regular type selection
+                              }}
+                              className="sr-only"
+                            />
+                            
+                            {/* Custom Icon */}
+                            <div className="w-6 h-6 rounded-full border border-white shadow-sm flex items-center justify-center mr-3 bg-sand-200">
+                              <img
+                                src={customIcon.image_url}
+                                alt={customIcon.name}
+                                className="w-4 h-4 object-contain"
+                              />
+                            </div>
+                            
+                            <span className="text-sm font-medium text-sand-700 truncate">
+                              {customIcon.name}
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                }
+
+                // Handle regular POI type categories
                 const categoryTypes = poiTypes.filter(type => type.category === category);
                 
                 return (
                   <div key={category}>
-                    <h4 className="text-sm font-medium text-sand-600 mb-2">{category}</h4>
+                    <h4 className="text-sm font-medium text-sand-600 mb-2 capitalize">{category}</h4>
                     <div className="grid grid-cols-2 gap-2">
-                      {categoryTypes.map(type => (
-                        <label
-                          key={type.id}
-                          className={`flex items-center p-3 border rounded-lg cursor-pointer transition-colors ${
-                            selectedPoiTypeId === type.id
-                              ? 'border-spice-500 bg-spice-50'
-                              : 'border-sand-200 hover:border-sand-300'
-                          }`}
-                        >
-                          <input
-                            type="radio"
-                            value={type.id}
-                            checked={selectedPoiTypeId === type.id}
-                            onChange={(e) => setSelectedPoiTypeId(e.target.value)}
-                            className="sr-only"
-                          />
-                          <div
-                            className="w-6 h-6 rounded-full flex items-center justify-center mr-3 text-white text-sm"
-                            style={{ backgroundColor: type.color }}
+                      {categoryTypes.map(type => {
+                        const imageUrl = getDisplayImageUrl(type.icon, customIcons);
+                        
+                        return (
+                          <label
+                            key={type.id}
+                            className={`flex items-center p-3 border rounded-lg cursor-pointer transition-colors ${
+                              selectedPoiTypeId === type.id && !selectedCustomIcon
+                                ? 'border-spice-500 bg-spice-50'
+                                : 'border-sand-200 hover:border-sand-300'
+                            }`}
                           >
-                            {type.icon}
-                          </div>
-                          <span className="text-sm font-medium text-sand-700">{type.name}</span>
-                        </label>
-                      ))}
+                            <input
+                              type="radio"
+                              name="poiType"
+                              value={type.id}
+                              checked={selectedPoiTypeId === type.id && !selectedCustomIcon}
+                              onChange={(e) => {
+                                setSelectedPoiTypeId(e.target.value);
+                                setSelectedCustomIcon(null); // Clear custom icon selection
+                              }}
+                              className="sr-only"
+                            />
+                            
+                            {/* POI Type Icon */}
+                            <div 
+                              className="w-6 h-6 rounded-full flex items-center justify-center mr-3 text-white text-sm"
+                              style={{
+                                backgroundColor: type.icon_has_transparent_background && imageUrl 
+                                  ? 'transparent' 
+                                  : type.color
+                              }}
+                            >
+                              {imageUrl ? (
+                                <img
+                                  src={imageUrl}
+                                  alt={type.name}
+                                  className="w-4 h-4 object-contain"
+                                  style={{
+                                    filter: type.icon_has_transparent_background ? 'none' : 'drop-shadow(0 1px 1px rgba(0,0,0,0.3))'
+                                  }}
+                                />
+                              ) : (
+                                <span 
+                                  style={{ 
+                                    color: type.icon_has_transparent_background ? type.color : 'white',
+                                    textShadow: type.icon_has_transparent_background ? '0 1px 1px rgba(0,0,0,0.3)' : 'none'
+                                  }}
+                                >
+                                  {type.icon}
+                                </span>
+                              )}
+                            </div>
+                            
+                            <span className="text-sm font-medium text-sand-700">{type.name}</span>
+                          </label>
+                        );
+                      })}
                     </div>
                   </div>
                 );

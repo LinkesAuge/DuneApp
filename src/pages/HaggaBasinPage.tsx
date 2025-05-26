@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
-import { MapPin, Filter, Settings, Plus, FolderOpen, Share } from 'lucide-react';
+import { MapPin, Filter, Settings, Plus, FolderOpen, Share, Image } from 'lucide-react';
 import type { 
   Poi, 
   PoiType, 
@@ -11,6 +11,9 @@ import type {
   User
 } from '../types';
 import InteractiveMap from '../components/hagga-basin/InteractiveMap';
+import CollectionModal from '../components/hagga-basin/CollectionModal';
+import CustomIconsModal from '../components/hagga-basin/CustomIconsModal';
+import SharePoiModal from '../components/hagga-basin/SharePoiModal';
 import { useAuth } from '../components/auth/AuthProvider';
 
 const HaggaBasinPage: React.FC = () => {
@@ -40,6 +43,12 @@ const HaggaBasinPage: React.FC = () => {
   // Map state
   const [selectedOverlays, setSelectedOverlays] = useState<string[]>([]);
   const [activeBaseMap, setActiveBaseMap] = useState<HaggaBasinBaseMap | null>(null);
+  
+  // Modal state
+  const [showCollectionModal, setShowCollectionModal] = useState(false);
+  const [showCustomIconsModal, setShowCustomIconsModal] = useState(false);
+  const [showSharePoiModal, setShowSharePoiModal] = useState(false);
+  const [selectedPoiForShare, setSelectedPoiForShare] = useState<Poi | null>(null);
 
   // Initialize data on component mount
   useEffect(() => {
@@ -225,6 +234,66 @@ const HaggaBasinPage: React.FC = () => {
     );
   };
 
+  // Handle sharing POI
+  const handleSharePoi = (poi: Poi) => {
+    setSelectedPoiForShare(poi);
+    setShowSharePoiModal(true);
+  };
+
+  // Handle POI editing
+  const handlePoiUpdated = async (updatedPoi: Poi) => {
+    try {
+      const { error } = await supabase
+        .from('pois')
+        .update({
+          title: updatedPoi.title,
+          description: updatedPoi.description,
+          coordinates_x: updatedPoi.coordinates_x,
+          coordinates_y: updatedPoi.coordinates_y,
+          poi_type_id: updatedPoi.poi_type_id,
+          custom_icon_id: updatedPoi.custom_icon_id,
+          privacy_level: updatedPoi.privacy_level,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', updatedPoi.id);
+
+      if (error) throw error;
+
+      // Update local state
+      setPois(prev => prev.map(p => p.id === updatedPoi.id ? updatedPoi : p));
+    } catch (error) {
+      console.error('Error updating POI:', error);
+      throw error;
+    }
+  };
+
+  // Handle POI deletion
+  const handlePoiDeleted = async (poiId: string) => {
+    try {
+      const { error } = await supabase
+        .from('pois')
+        .delete()
+        .eq('id', poiId);
+
+      if (error) throw error;
+
+      // Update local state
+      setPois(prev => prev.filter(p => p.id !== poiId));
+    } catch (error) {
+      console.error('Error deleting POI:', error);
+      throw error;
+    }
+  };
+
+  // Handle custom icon updates
+  const handleCustomIconUploaded = (newIcon: CustomIcon) => {
+    setCustomIcons(prev => [newIcon, ...prev]);
+  };
+
+  const handleCustomIconDeleted = (iconId: string) => {
+    setCustomIcons(prev => prev.filter(icon => icon.id !== iconId));
+  };
+
   // Get unique categories for filtering
   const categories = [...new Set(poiTypes.map(type => type.category))];
 
@@ -351,30 +420,93 @@ const HaggaBasinPage: React.FC = () => {
                   </select>
                 </div>
 
-                {/* Category Filters */}
+                {/* POI Type Filters */}
                 <div>
-                  <label className="block text-sm font-medium text-sand-700 mb-2">
-                    Categories
-                  </label>
-                  <div className="space-y-2">
-                    {categories.map(category => (
-                      <label key={category} className="flex items-center">
-                        <input
-                          type="checkbox"
-                          checked={selectedCategories.includes(category)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedCategories(prev => [...prev, category]);
-                            } else {
-                              setSelectedCategories(prev => prev.filter(c => c !== category));
-                            }
-                          }}
-                          className="rounded border-sand-300 text-spice-600 focus:ring-spice-500"
-                        />
-                        <span className="ml-2 text-sm text-sand-700">{category}</span>
-                      </label>
-                    ))}
+                  <div className="flex justify-between items-center mb-3">
+                    <label className="block text-sm font-medium text-sand-700">
+                      POI Types
+                    </label>
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => setSelectedCategories(categories)}
+                        className="text-xs text-spice-600 hover:text-spice-700"
+                        title="Show All"
+                      >
+                        All
+                      </button>
+                      <span className="text-xs text-sand-400">|</span>
+                      <button
+                        onClick={() => setSelectedCategories([])}
+                        className="text-xs text-spice-600 hover:text-spice-700"
+                        title="Hide All"
+                      >
+                        None
+                      </button>
+                    </div>
                   </div>
+                  
+                  {/* Category Sections */}
+                  {categories.map(category => {
+                    const categoryTypes = poiTypes.filter(type => type.category === category);
+                    const categoryVisible = selectedCategories.includes(category);
+                    
+                    return (
+                      <div key={category} className="mb-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <label className="flex items-center cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={categoryVisible}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedCategories(prev => [...prev, category]);
+                                } else {
+                                  setSelectedCategories(prev => prev.filter(c => c !== category));
+                                }
+                              }}
+                              className="rounded border-sand-300 text-spice-600 focus:ring-spice-500"
+                            />
+                            <span className="ml-2 text-sm font-medium text-sand-700 capitalize">
+                              {category}
+                            </span>
+                          </label>
+                          <span className="text-xs text-sand-500">
+                            {categoryTypes.length}
+                          </span>
+                        </div>
+                        
+                        {/* Individual POI Types in Category */}
+                        {categoryVisible && (
+                          <div className="ml-6 space-y-1">
+                            {categoryTypes.map(type => {
+                              const typePoiCount = filteredPois.filter(poi => poi.poi_type_id === type.id).length;
+                              
+                              return (
+                                <label key={type.id} className="flex items-center justify-between cursor-pointer group">
+                                  <div className="flex items-center">
+                                    <input
+                                      type="checkbox"
+                                      checked={true} // For now, all types within visible categories are shown
+                                      onChange={() => {
+                                        // TODO: Implement individual type filtering
+                                      }}
+                                      className="rounded border-sand-300 text-spice-600 focus:ring-spice-500 w-3 h-3"
+                                    />
+                                    <span className="ml-2 text-xs text-sand-600 group-hover:text-sand-800">
+                                      {type.name}
+                                    </span>
+                                  </div>
+                                  <span className="text-xs text-sand-400">
+                                    {typePoiCount}
+                                  </span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
 
                 {/* Stats */}
@@ -390,15 +522,65 @@ const HaggaBasinPage: React.FC = () => {
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
                   <h3 className="text-sm font-medium text-sand-700">Your Collections</h3>
-                  <button className="btn btn-sm btn-primary">
+                  <button 
+                    onClick={() => setShowCollectionModal(true)}
+                    className="btn btn-sm btn-primary"
+                  >
                     <Plus className="w-4 h-4" />
                   </button>
                 </div>
                 
-                {/* Collections will be implemented in future phases */}
-                <div className="text-sm text-sand-500 italic">
-                  Collection management coming soon...
+                {/* Custom Icons Section */}
+                <div className="pt-4 border-t border-sand-200">
+                  <div className="flex justify-between items-center mb-3">
+                    <h4 className="text-sm font-medium text-sand-700">Custom Icons</h4>
+                    <button 
+                      onClick={() => setShowCustomIconsModal(true)}
+                      className="btn btn-sm btn-outline"
+                    >
+                      <Image className="w-4 h-4 mr-1" />
+                      Manage
+                    </button>
+                  </div>
+                  <p className="text-xs text-sand-500">
+                    {customIcons.length}/10 custom icons • Upload PNG files for POI markers
+                  </p>
                 </div>
+                
+                {collections.length === 0 ? (
+                  <div className="text-center py-8">
+                    <FolderOpen className="w-12 h-12 text-sand-400 mx-auto mb-4" />
+                    <p className="text-sand-600 mb-2">No collections yet</p>
+                    <p className="text-sand-500 text-sm">Create your first collection to organize POIs</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {collections.map(collection => (
+                      <div 
+                        key={collection.id} 
+                        className="bg-sand-50 border border-sand-200 rounded-lg p-3 cursor-pointer hover:bg-sand-100 transition-colors"
+                        onClick={() => setShowCollectionModal(true)}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center">
+                              <FolderOpen className="w-4 h-4 text-spice-600 mr-2" />
+                              <h4 className="font-medium text-sand-800">{collection.name}</h4>
+                              {collection.is_public && (
+                                <div className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded">
+                                  Public
+                                </div>
+                              )}
+                            </div>
+                            {collection.description && (
+                              <p className="text-sm text-sand-600 mt-1">{collection.description}</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
@@ -459,6 +641,9 @@ const HaggaBasinPage: React.FC = () => {
             pois={filteredPois}
             poiTypes={poiTypes}
             onPoiCreated={handlePoiCreated}
+            onPoiUpdated={handlePoiUpdated}
+            onPoiDeleted={handlePoiDeleted}
+            onPoiShare={handleSharePoi}
             customIcons={customIcons}
           />
         ) : (
@@ -473,6 +658,36 @@ const HaggaBasinPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Collection Modal */}
+      <CollectionModal
+        isOpen={showCollectionModal}
+        onClose={() => setShowCollectionModal(false)}
+        onCollectionCreated={(newCollection) => {
+          setCollections(prev => [newCollection, ...prev]);
+          setShowCollectionModal(false);
+        }}
+        existingCollections={collections}
+      />
+
+      {/* Custom Icons Modal */}
+      <CustomIconsModal
+        isOpen={showCustomIconsModal}
+        onClose={() => setShowCustomIconsModal(false)}
+        customIcons={customIcons}
+        onIconUploaded={handleCustomIconUploaded}
+        onIconDeleted={handleCustomIconDeleted}
+      />
+
+      {/* Share POI Modal */}
+      <SharePoiModal
+        isOpen={showSharePoiModal}
+        onClose={() => {
+          setShowSharePoiModal(false);
+          setSelectedPoiForShare(null);
+        }}
+        poi={selectedPoiForShare}
+      />
     </div>
   );
 };
