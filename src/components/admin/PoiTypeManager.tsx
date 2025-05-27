@@ -524,7 +524,7 @@ const PoiTypeManager: React.FC = () => {
       )}
 
       {!isEditing && (
-        <div className="space-y-8">
+        <div className="space-y-6">
           {Object.keys(typesByCategory).length === 0 && !isLoading && (
             <div className="text-center text-sand-500 py-10">
               <ImageIcon size={52} className="mx-auto mb-4 text-sand-400" />
@@ -532,55 +532,79 @@ const PoiTypeManager: React.FC = () => {
               <p className="text-sm mt-1">Click "Add New Type" to get started.</p>
             </div>
           )}
-          {Object.entries(typesByCategory)
-            .sort(([catA], [catB]) => catA.localeCompare(catB))
-            .map(([category, types]) => (
-            <div key={category} className="bg-sand-200 border border-sand-300 rounded-lg shadow-md overflow-hidden">
-              <h3 className="text-xl font-semibold text-night-800 bg-sand-300/50 px-6 py-4 border-b border-sand-300">{category}</h3>
-              <ul className="divide-y divide-sand-300">
-                {types.sort((a, b) => a.name.localeCompare(b.name)).map(type => (
-                  <li key={type.id} className="px-6 py-4 flex items-center justify-between group hover:bg-blue-100 transition-colors duration-150">
-                    <div className="flex items-center space-x-4">
-                      <div 
-                        className="w-12 h-12 rounded-lg flex items-center justify-center text-white text-2xl flex-shrink-0"
-                        style={{ backgroundColor: (isIconUrl(type.icon) && type.icon_has_transparent_background) ? 'transparent' : (type.color || '#6B7280') }} // Use transparent if specified for URL icons
-                      >
-                        {isIconUrl(type.icon) ? (
-                          <img src={getDisplayImageUrl(type.icon)} alt={type.name} className="w-8 h-8 object-contain" />
-                        ) : (
-                          <span>{type.icon}</span>
-                        )}
+          
+          {/* Two-Column Layout for POI Types */}
+          <div className="grid grid-cols-2 gap-4">
+            {Object.entries(typesByCategory)
+              .sort(([catA], [catB]) => catA.localeCompare(catB))
+              .map(([category, types]) => (
+                <div key={category} className="bg-sand-50 border border-sand-200 rounded-lg p-4">
+                  {/* Category Header */}
+                  <div className="mb-3 pb-2 border-b border-sand-300">
+                    <h3 className="text-sm font-semibold text-sand-800 capitalize">{category}</h3>
+                    <span className="text-xs text-sand-600">{types.length} types</span>
+                  </div>
+                  
+                  {/* POI Types Grid */}
+                  <div className="space-y-2">
+                    {types.sort((a, b) => a.name.localeCompare(b.name)).map(type => (
+                      <div key={type.id} className="flex items-center justify-between p-2 rounded hover:bg-sand-100 transition-colors group">
+                        <div className="flex items-center space-x-2 flex-1 min-w-0">
+                          {/* POI Type Icon */}
+                          <div 
+                            className="w-6 h-6 rounded flex items-center justify-center text-white text-sm flex-shrink-0"
+                            style={{ 
+                              backgroundColor: (isIconUrl(type.icon) && type.icon_has_transparent_background) 
+                                ? 'transparent' 
+                                : (type.color || '#6B7280') 
+                            }}
+                          >
+                            {isIconUrl(type.icon) ? (
+                              <img 
+                                src={getDisplayImageUrl(type.icon)} 
+                                alt={type.name} 
+                                className="w-4 h-4 object-contain" 
+                              />
+                            ) : (
+                              <span className="text-xs">{type.icon}</span>
+                            )}
+                          </div>
+                          
+                          {/* Type Name */}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-sand-800 truncate group-hover:text-spice-700 transition-colors">
+                              {type.name}
+                            </p>
+                            {type.default_description && (
+                              <p className="text-xs text-sand-600 truncate">{type.default_description}</p>
+                            )}
+                          </div>
+                        </div>
+                        
+                        {/* Action Buttons */}
+                        <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => handleEdit(type)}
+                            className="p-1 text-sand-500 hover:text-spice-600 transition-colors"
+                            title="Edit type"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(type)}
+                            disabled={isSubmitting}
+                            className="p-1 text-sand-500 hover:text-red-600 transition-colors disabled:opacity-50"
+                            title="Delete type"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
-                      <div className="flex-grow">
-                        <p className="font-medium text-night-800 text-lg group-hover:text-blue-800 transition-colors duration-150">{type.name}</p>
-                        {type.default_description && <p className="text-sm text-sand-600 mt-1 group-hover:text-blue-700 transition-colors duration-150">{type.default_description}</p>}
-                      </div>
-                    </div>
-                    <div className="flex space-x-2 flex-shrink-0">
-                      <button 
-                        type="button" 
-                        onClick={() => handleEdit(type)} 
-                        disabled={isSubmitting || isUploading} 
-                        title="Edit" 
-                        className="p-2 rounded-full text-sand-600 group-hover:text-blue-600 hover:bg-blue-200/70 transition-colors duration-150"
-                      >
-                        <Edit2 className="h-5 w-5" />
-                      </button>
-                      <button 
-                        type="button" 
-                        onClick={() => handleDelete(type)} 
-                        disabled={isSubmitting || isUploading} 
-                        className="p-2 rounded-full text-red-500 group-hover:text-red-600 hover:bg-red-100 transition-colors duration-150" 
-                        title="Delete"
-                      >
-                        <Trash2 className="h-5 w-5" />
-                      </button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
+                    ))}
+                  </div>
+                </div>
+              ))}
+          </div>
         </div>
       )}
     </div>

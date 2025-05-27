@@ -25,7 +25,7 @@ const Dashboard: React.FC = () => {
               </h1>
               <p className="text-sand-600">
                 Welcome back{user ? `, ${user.user_metadata?.username || 'Explorer'}` : ''}! 
-                Here's what's happening in the Deep Desert.
+                Here's what's happening across the Deep Desert and Hagga Basin regions.
               </p>
             </div>
           </div>
@@ -64,17 +64,24 @@ const Dashboard: React.FC = () => {
               <h3 className="text-lg font-semibold text-night-900 mb-4">Quick Actions</h3>
               <div className="space-y-3">
                 <Link
-                  to="/grid"
+                  to="/deep-desert"
                   className="flex items-center justify-between p-3 bg-sand-50 rounded-lg hover:bg-sand-100 transition-colors"
                 >
-                  <span className="text-sm font-medium text-night-800">View Grid Map</span>
+                  <span className="text-sm font-medium text-night-800">Deep Desert Grid</span>
                   <span className="text-xs text-sand-500">→</span>
+                </Link>
+                <Link
+                  to="/hagga-basin"
+                  className="flex items-center justify-between p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+                >
+                  <span className="text-sm font-medium text-night-800">Hagga Basin Map</span>
+                  <span className="text-xs text-blue-500">→</span>
                 </Link>
                 <Link
                   to="/pois"
                   className="flex items-center justify-between p-3 bg-sand-50 rounded-lg hover:bg-sand-100 transition-colors"
                 >
-                  <span className="text-sm font-medium text-night-800">Browse POIs</span>
+                  <span className="text-sm font-medium text-night-800">Browse All POIs</span>
                   <span className="text-xs text-sand-500">→</span>
                 </Link>
                 {user?.role === 'admin' && (
@@ -100,7 +107,7 @@ const Dashboard: React.FC = () => {
         {/* Footer info */}
         <div className="mt-12 text-center">
           <p className="text-sm text-sand-500">
-            Dune Awakening Deep Desert Tracker • Community-driven exploration
+            Dune Awakening Tracker • Deep Desert & Hagga Basin • Community-driven exploration
           </p>
         </div>
       </div>

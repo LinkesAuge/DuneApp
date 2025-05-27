@@ -1,14 +1,16 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { GridSquare as GridSquareType, Poi, PoiType } from '../../types';
 import GridSquare from './GridSquare';
 import GridSquareModal from './GridSquareModal';
 import GridGallery from './GridGallery';
-import { Map, ChevronDown, ChevronUp, FilterX } from 'lucide-react';
+import { Map, ChevronDown, ChevronUp, FilterX, ExternalLink } from 'lucide-react';
 
 const GRID_SIZE = 9;
 
 const GridContainer: React.FC = () => {
+  const navigate = useNavigate();
   const [gridSquares, setGridSquares] = useState<GridSquareType[]>([]);
   const [selectedSquare, setSelectedSquare] = useState<GridSquareType | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -135,6 +137,12 @@ const GridContainer: React.FC = () => {
   };
 
   const handleSquareClick = (square: GridSquareType) => {
+    // Navigate directly to the individual grid page
+    navigate(`/deep-desert/grid/${square.coordinate}`);
+  };
+
+  const handleSquareModalOpen = (square: GridSquareType) => {
+    // For cases where we still want to open the modal (e.g., right-click context menu)
     setSelectedSquare(square);
   };
 
@@ -245,13 +253,25 @@ const GridContainer: React.FC = () => {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Deep Desert Grid Map</h1>
-        <div className="flex items-center mb-4">
-          <Map className="text-spice-600 mr-2" size={20} />
-          <p className="text-night-700">
-            Exploration progress: {exploredSquares} of {totalSquares} squares ({Math.round(explorationProgress)}%)
-          </p>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h1 className="text-3xl font-bold mb-2">Deep Desert Grid Map</h1>
+            <div className="flex items-center">
+              <Map className="text-spice-600 mr-2" size={20} />
+              <p className="text-night-700">
+                Exploration progress: {exploredSquares} of {totalSquares} squares ({Math.round(explorationProgress)}%)
+              </p>
+            </div>
+          </div>
+          <div className="text-right text-sm text-sand-600">
+            <div className="mb-1">💡 <strong>Tip:</strong> Click any grid square to view details</div>
+            <div className="flex items-center justify-end gap-2">
+              <ExternalLink className="w-4 h-4" />
+              <span>Individual grid pages now available</span>
+            </div>
+          </div>
         </div>
+        
         <div className="w-full bg-sand-200 rounded-full h-2.5 mb-6">
           <div 
             className="bg-spice-600 h-2.5 rounded-full transition-all duration-500 ease-out" 
@@ -350,6 +370,8 @@ const GridContainer: React.FC = () => {
             </div>
           )}
         </div>
+
+
       </div>
 
       {error && (
@@ -363,14 +385,14 @@ const GridContainer: React.FC = () => {
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-spice-600"></div>
         </div>
       ) : (
-        <div className="relative bg-sand-300 rounded-lg overflow-visible border border-sand-400 shadow-lg">
+        <div className="relative bg-sand-300 rounded-lg overflow-visible shadow-lg">
           {/* Grid coordinates - top (numbers) */}
-          <div className="flex border-b border-sand-400">
-            <div className="w-10 h-10 bg-sand-400 flex items-center justify-center font-bold text-night-700"></div>
+          <div className="flex border-b border-dotted border-orange-700">
+            <div className="w-10 h-10 bg-sand-400 flex items-center justify-center font-bold text-night-700 border-r border-dotted border-orange-700"></div>
             {Array.from({ length: GRID_SIZE }, (_, i) => (
               <div 
                 key={`top-${i + 1}`} 
-                className="w-full h-10 flex-1 flex items-center justify-center font-bold text-night-700 border-l border-sand-400"
+                className="w-full h-10 flex-1 flex items-center justify-center font-bold text-night-700 border-l border-dotted border-orange-700"
               >
                 {i + 1}
               </div>
@@ -382,7 +404,7 @@ const GridContainer: React.FC = () => {
             {Array.from({ length: GRID_SIZE }, (_, y) => (
               <div key={`row-${y}`} className="flex">
                 {/* Side coordinate (letter) */}
-                <div className="w-10 h-full bg-sand-400 flex items-center justify-center font-bold text-night-700 border-t border-sand-400">
+                <div className="w-10 flex-shrink-0 bg-sand-400 flex items-center justify-center font-bold text-night-700 border-t border-dotted border-orange-700 border-r border-dotted border-orange-700 aspect-square">
                   {String.fromCharCode(65 + (GRID_SIZE - 1 - y))}
                 </div>
 
@@ -399,21 +421,42 @@ const GridContainer: React.FC = () => {
                     : [];
 
                   return square ? (
-                    <GridSquare 
+                    <div 
                       key={`square-${coordinate}-${poisForThisSquare.length}`}
-                      square={square}
-                      poisToDisplay={poisForThisSquare} // Updated prop
-                      poiTypes={poiTypes} // Pass all poiTypes for lookup within GridSquare
-                      isHighlighted={highlightedGridSquareIds.has(square.id)} // New prop
-                      onClick={() => handleSquareClick(square)}
-                      onImageClick={() => square.screenshot_url && handleGalleryOpen(square)}
-                    />
+                      className="relative group flex-1 aspect-square"
+                    >
+                      <GridSquare 
+                        square={square}
+                        poisToDisplay={poisForThisSquare} // Updated prop
+                        poiTypes={poiTypes} // Pass all poiTypes for lookup within GridSquare
+                        isHighlighted={highlightedGridSquareIds.has(square.id)} // New prop
+                        onClick={() => handleSquareClick(square)}
+                        onImageClick={() => square.screenshot_url && handleGalleryOpen(square)}
+                      />
+                      
+                      {/* Hover overlay with "View Details" button */}
+                      <div className="absolute inset-0 bg-night-950/70 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center pointer-events-none z-30">
+                        <div className="bg-white text-night-800 px-3 py-2 rounded-lg shadow-lg flex items-center gap-2 font-medium">
+                          <ExternalLink className="w-4 h-4" />
+                          View Details
+                        </div>
+                      </div>
+                    </div>
                   ) : (
                     <div 
                       key={`square-${coordinate}`}
-                      className="aspect-square border border-sand-400 bg-sand-200 flex items-center justify-center text-sand-600"
+                      className="border border-dotted border-orange-700 bg-sand-200 flex items-center justify-center text-sand-600 cursor-pointer hover:bg-sand-300 transition-colors group relative flex-1 aspect-square overflow-hidden"
+                      onClick={() => navigate(`/deep-desert/grid/${coordinate}`)}
                     >
-                      {coordinate}
+                      <span className="font-medium">{coordinate}</span>
+                      
+                      {/* Hover overlay for empty squares */}
+                      <div className="absolute inset-0 bg-night-950/70 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
+                        <div className="bg-white text-night-800 px-3 py-2 rounded-lg shadow-lg flex items-center gap-2 font-medium text-sm">
+                          <ExternalLink className="w-4 h-4" />
+                          Explore Square
+                        </div>
+                      </div>
                     </div>
                   );
                 })}

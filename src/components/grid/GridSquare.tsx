@@ -63,10 +63,10 @@ const GridSquare: React.FC<GridSquareProps> = ({ square, poisToDisplay = [], poi
 
   return (
     <div 
-      className={`aspect-square flex-1 border relative group cursor-pointer transition-all duration-200 hover:shadow-md ${
+      className={`w-full h-full border relative group cursor-pointer transition-all duration-200 hover:shadow-md overflow-hidden ${
         square.is_explored ? 'bg-white' : 'bg-sand-200'
       } ${
-        isHighlighted ? 'border-2 border-spice-700 shadow-spice-700/20 shadow-inner animate-pulse-highlight' : 'border-sand-400'
+        isHighlighted ? 'border-2 border-spice-700 shadow-spice-700/20 shadow-inner animate-pulse-highlight' : 'border-dotted border-orange-700'
       }`}
       onClick={handleClick}
     >

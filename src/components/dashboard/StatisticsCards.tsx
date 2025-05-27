@@ -7,7 +7,9 @@ import {
   MessageSquare, 
   Eye, 
   Camera, 
-  Users 
+  Users,
+  Mountain,
+  Waves
 } from 'lucide-react';
 
 const StatisticsCards: React.FC = () => {
@@ -23,24 +25,39 @@ const StatisticsCards: React.FC = () => {
       // Fetch all statistics in parallel
       const [
         poisResult,
+        deepDesertPoisResult,
+        haggaBasinPoisResult,
         commentsResult,
         exploredGridSquaresResult,
         screenshotsResult,
-        usersResult
+        usersResult,
+        collectionsResult,
+        privatePoisResult,
+        sharedPoisResult
       ] = await Promise.all([
         supabase.from('pois').select('id', { count: 'exact', head: true }),
+        supabase.from('pois').select('id', { count: 'exact', head: true }).eq('map_type', 'deep_desert'),
+        supabase.from('pois').select('id', { count: 'exact', head: true }).eq('map_type', 'hagga_basin'),
         supabase.from('comments').select('id', { count: 'exact', head: true }),
         supabase.from('grid_squares').select('id', { count: 'exact', head: true }).eq('is_explored', true),
         supabase.from('comment_screenshots').select('id', { count: 'exact', head: true }),
-        supabase.from('profiles').select('id', { count: 'exact', head: true })
+        supabase.from('profiles').select('id', { count: 'exact', head: true }),
+        supabase.from('poi_collections').select('id', { count: 'exact', head: true }),
+        supabase.from('pois').select('id', { count: 'exact', head: true }).eq('privacy_level', 'private'),
+        supabase.from('pois').select('id', { count: 'exact', head: true }).eq('privacy_level', 'shared')
       ]);
 
       // Check for errors
       if (poisResult.error) throw poisResult.error;
+      if (deepDesertPoisResult.error) throw deepDesertPoisResult.error;
+      if (haggaBasinPoisResult.error) throw haggaBasinPoisResult.error;
       if (commentsResult.error) throw commentsResult.error;
       if (exploredGridSquaresResult.error) throw exploredGridSquaresResult.error;
       if (screenshotsResult.error) throw screenshotsResult.error;
       if (usersResult.error) throw usersResult.error;
+      if (collectionsResult.error) throw collectionsResult.error;
+      if (privatePoisResult.error) throw privatePoisResult.error;
+      if (sharedPoisResult.error) throw sharedPoisResult.error;
 
       // Also count POI screenshots
       const { count: poiScreenshotsCount, error: poiScreenshotsError } = await supabase
@@ -52,10 +69,15 @@ const StatisticsCards: React.FC = () => {
       setStats({
         totalPois: poisResult.count || 0,
         totalComments: commentsResult.count || 0,
-        totalGridSquares: 0, // Not needed anymore, but keeping for type compatibility
+        totalGridSquares: 81, // Deep Desert is 9x9 grid
         exploredGridSquares: exploredGridSquaresResult.count || 0,
         totalScreenshots: (screenshotsResult.count || 0) + (poiScreenshotsCount || 0),
-        totalUsers: usersResult.count || 0
+        totalUsers: usersResult.count || 0,
+        deepDesertPois: deepDesertPoisResult.count || 0,
+        haggaBasinPois: haggaBasinPoisResult.count || 0,
+        poiCollections: collectionsResult.count || 0,
+        sharedPois: sharedPoisResult.count || 0,
+        privatePois: privatePoisResult.count || 0
       });
     } catch (err: any) {
       console.error('Error fetching statistics:', err);
@@ -71,8 +93,8 @@ const StatisticsCards: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-        {Array.from({ length: 5 }).map((_, i) => (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-6">
+        {Array.from({ length: 7 }).map((_, i) => (
           <div key={i} className="bg-white rounded-lg shadow-sm border border-sand-200 p-6 animate-pulse">
             <div className="flex items-center justify-between">
               <div className="flex-1">
@@ -105,12 +127,20 @@ const StatisticsCards: React.FC = () => {
   if (!stats) return null;
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-6">
       <StatCard
-        title="Total POIs"
-        value={stats.totalPois}
-        icon={MapPin}
-        subtitle="Points of Interest"
+        title="Deep Desert POIs"
+        value={stats.deepDesertPois}
+        icon={Mountain}
+        subtitle="Grid-based POIs"
+        color="orange"
+      />
+      
+      <StatCard
+        title="Hagga Basin POIs"
+        value={stats.haggaBasinPois}
+        icon={Waves}
+        subtitle="Map-based POIs"
         color="blue"
       />
       
@@ -126,8 +156,8 @@ const StatisticsCards: React.FC = () => {
         title="Explored Areas"
         value={stats.exploredGridSquares}
         icon={Eye}
-        subtitle="Grid squares mapped"
-        color="orange"
+        subtitle={`${stats.exploredGridSquares}/81 grids`}
+        color="purple"
       />
       
       <StatCard
@@ -144,6 +174,14 @@ const StatisticsCards: React.FC = () => {
         icon={Users}
         subtitle="Community members"
         color="green"
+      />
+
+      <StatCard
+        title="Collections"
+        value={stats.poiCollections}
+        icon={MapPin}
+        subtitle="POI collections"
+        color="indigo"
       />
     </div>
   );

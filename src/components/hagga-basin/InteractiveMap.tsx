@@ -25,7 +25,10 @@ interface InteractiveMapProps {
   onPoiUpdated?: (poi: Poi) => void;
   onPoiDeleted?: (poiId: string) => void;
   onPoiShare?: (poi: Poi) => void;
+  onPoiGalleryOpen?: (poi: Poi) => void;
   customIcons: CustomIcon[];
+  placementMode?: boolean;
+  onPlacementModeChange?: (mode: boolean) => void;
 }
 
 // Map configuration for zoom/pan (initialScale will be set dynamically)
@@ -61,7 +64,10 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
   onPoiUpdated,
   onPoiDeleted,
   onPoiShare,
-  customIcons
+  onPoiGalleryOpen,
+  customIcons,
+  placementMode = false,
+  onPlacementModeChange
 }) => {
   const transformRef = useRef<ReactZoomPanPinchRef | null>(null);
   const mapElementRef = useRef<HTMLDivElement | null>(null);
@@ -73,7 +79,6 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const mapConfig = getMapConfig(mapSettings?.defaultZoom || 0.4);
   
   // State for POI placement
-  const [placementMode, setPlacementMode] = useState(false);
   const [placementCoordinates, setPlacementCoordinates] = useState<PixelCoordinates | null>(null);
   const [showPlacementModal, setShowPlacementModal] = useState(false);
   const [selectedPoi, setSelectedPoi] = useState<Poi | null>(null);
@@ -146,14 +151,16 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
       if (validateCoordinates(coordinates.x, coordinates.y)) {
         setPlacementCoordinates(coordinates);
         setShowPlacementModal(true);
-        setPlacementMode(false);
+        if (onPlacementModeChange) {
+          onPlacementModeChange(false);
+        }
       } else {
         console.warn('Invalid coordinates:', coordinates);
       }
     } catch (error) {
       console.error('Error calculating coordinates:', error);
     }
-      }, [placementMode, positionChangeMode, changingPositionPoi, onPoiUpdated]);
+      }, [placementMode, positionChangeMode, changingPositionPoi, onPoiUpdated, onPlacementModeChange]);
 
   // Track zoom level for icon scaling - listen to all zoom events
   const handleZoomChange = useCallback((ref: ReactZoomPanPinchRef) => {
@@ -165,16 +172,20 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const startPositionChange = useCallback((poi: Poi) => {
     setChangingPositionPoi(poi);
     setPositionChangeMode(true);
-    setPlacementMode(false);
+    if (onPlacementModeChange) {
+      onPlacementModeChange(false);
+    }
     setSelectedPoi(null);
-  }, []);
+  }, [onPlacementModeChange]);
 
   // Handle ESC key to cancel placement/position change modes
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         if (placementMode) {
-          setPlacementMode(false);
+          if (onPlacementModeChange) {
+            onPlacementModeChange(false);
+          }
           setPlacementCoordinates(null);
           setShowPlacementModal(false);
         }
@@ -187,7 +198,7 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [placementMode, positionChangeMode]);
+  }, [placementMode, positionChangeMode, onPlacementModeChange]);
 
   // Ensure proper positioning when transform ref is available and image is loaded
   useEffect(() => {
@@ -417,23 +428,7 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
         </button>
       </div>
 
-      {/* POI Placement Controls */}
-      <div className="absolute bottom-4 right-4 z-40">
-        <button
-          onClick={() => setPlacementMode(!placementMode)}
-          className={`flex items-center space-x-2 px-4 py-2 rounded-lg shadow-sm hover:shadow-md transition-all ${
-            placementMode 
-              ? 'bg-spice-500 text-white' 
-              : 'bg-white border border-sand-200 text-sand-700'
-          }`}
-          title="Click on map to place POI"
-        >
-          <Plus className="w-5 h-5" />
-          <span className="font-medium">
-            {placementMode ? 'Click to Place POI' : 'Add POI'}
-          </span>
-        </button>
-      </div>
+
 
       {/* Placement Mode Indicator */}
       {placementMode && (
@@ -511,8 +506,9 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
               setSelectedPoi(null);
             }}
             onImageClick={() => {
-              // TODO: Open gallery modal
-              console.log('Open gallery for POI:', selectedPoi.id);
+              if (onPoiGalleryOpen) {
+                onPoiGalleryOpen(selectedPoi);
+              }
             }}
           />
         );

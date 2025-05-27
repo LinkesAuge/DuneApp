@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Poi, PoiType } from '../../types';
-import { Edit2, Trash2, Image as ImageIcon, MapPin } from 'lucide-react'; // Assuming Image is for a placeholder/thumbnail click
+import { Edit2, Trash2, Image as ImageIcon, MapPin, MessageSquare, Heart } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
 
 interface PoiListItemProps {
   poi: Poi;
@@ -27,8 +28,67 @@ const PoiListItem: React.FC<PoiListItemProps> = ({
   onClick,
   onImageClick
 }) => {
+  const [commentCount, setCommentCount] = useState<number>(0);
+  const [likeCount, setLikeCount] = useState<number>(0);
+  
   const formattedDate = new Date(poi.created_at).toLocaleDateString();
   const hasScreenshots = poi.screenshots && poi.screenshots.length > 0;
+
+  // Map type styling
+  const getMapTypeInfo = (mapType: string) => {
+    switch (mapType) {
+      case 'deep_desert':
+        return {
+          label: 'Deep Desert',
+          bgColor: 'bg-orange-100',
+          textColor: 'text-orange-800',
+          icon: '🏜️'
+        };
+      case 'hagga_basin':
+        return {
+          label: 'Hagga Basin',
+          bgColor: 'bg-blue-100',
+          textColor: 'text-blue-800',
+          icon: '🏔️'
+        };
+      default:
+        return {
+          label: 'Unknown',
+          bgColor: 'bg-gray-100',
+          textColor: 'text-gray-800',
+          icon: '❓'
+        };
+    }
+  };
+
+  const mapTypeInfo = getMapTypeInfo(poi.map_type);
+
+  // Fetch comment and like counts
+  useEffect(() => {
+    const fetchCounts = async () => {
+      try {
+        // Fetch comment count
+        const { count: commentsCount } = await supabase
+          .from('comments')
+          .select('*', { count: 'exact', head: true })
+          .eq('poi_id', poi.id);
+
+        // Fetch like count
+        const { count: likesCount } = await supabase
+          .from('likes')
+          .select('*', { count: 'exact', head: true })
+          .eq('target_type', 'poi')
+          .eq('target_id', poi.id);
+
+        setCommentCount(commentsCount || 0);
+        setLikeCount(likesCount || 0);
+      } catch (error) {
+        console.error('Error fetching counts:', error);
+      }
+    };
+
+    fetchCounts();
+  }, [poi.id]);
 
   return (
     <div className="bg-white shadow-sm rounded-lg p-3 hover:shadow-md transition-shadow duration-150 flex items-center gap-3 border border-sand-200">
@@ -58,8 +118,28 @@ const PoiListItem: React.FC<PoiListItemProps> = ({
       <div className="flex-grow cursor-pointer min-w-0" onClick={() => onClick(poi)}>
         <h3 className="text-md font-semibold text-night-900 hover:text-spice-700 transition-colors truncate" title={poi.title}>{poi.title}</h3>
         <div className="text-xs text-night-600 mt-1 space-y-0.5">
-          <p><span className="font-medium">Type:</span> {poiType?.name || 'N/A'} ({poiType?.category || 'Uncategorized'})</p>
-          {gridSquareCoordinate && <p><span className="font-medium">Grid:</span> {gridSquareCoordinate}</p>}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span><span className="font-medium">Type:</span> {poiType?.name || 'N/A'} ({poiType?.category || 'Uncategorized'})</span>
+            {/* Map Type Badge */}
+            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${mapTypeInfo.bgColor} ${mapTypeInfo.textColor}`}>
+              <span className="mr-1">{mapTypeInfo.icon}</span>
+              {mapTypeInfo.label}
+            </span>
+          </div>
+          {poi.map_type === 'deep_desert' && gridSquareCoordinate && (
+            <p><span className="font-medium">Grid:</span> {gridSquareCoordinate}</p>
+          )}
+          {/* Engagement Stats */}
+          <div className="flex items-center gap-3 mt-1">
+            <div className="flex items-center gap-1">
+              <MessageSquare size={12} className="text-blue-500" />
+              <span className="text-blue-600 font-medium">{commentCount}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <Heart size={12} className="text-red-500" />
+              <span className="text-red-600 font-medium">{likeCount}</span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -84,8 +164,6 @@ const PoiListItem: React.FC<PoiListItemProps> = ({
               <ImageIcon size={20} className="text-sand-400" />
           </div>
         )} 
-        {/* For spacing if no image click handler but screenshots exist - might remove if not needed */}
-        {/* {!onImageClick && hasScreenshots && <div className="w-12 h-12 flex-shrink-0"></div>}  */}
 
         <div className="sm:text-right space-y-0.5">
           <p className="text-xs text-sand-700 truncate" title={creator?.username || 'Unknown'}>By: {creator?.username || 'Unknown'}</p>

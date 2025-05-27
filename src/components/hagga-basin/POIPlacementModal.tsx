@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { X, MapPin, Lock, Users, Eye, Image, Upload } from 'lucide-react';
+import { X, MapPin, Lock, Users, Eye, Image, Upload, Plus } from 'lucide-react';
 import type { 
   PixelCoordinates, 
   PoiType, 
@@ -10,6 +10,7 @@ import type {
 } from '../../types';
 import { formatCoordinates } from '../../lib/coordinates';
 import { useAuth } from '../auth/AuthProvider';
+import CustomPoiTypeModal from './CustomPoiTypeModal';
 
 interface POIPlacementModalProps {
   coordinates: PixelCoordinates;
@@ -17,6 +18,8 @@ interface POIPlacementModalProps {
   customIcons: CustomIcon[];
   onPoiCreated: (poi: Poi) => void;
   onClose: () => void;
+  mapType?: 'deep_desert' | 'hagga_basin';
+  gridSquareId?: string;
 }
 
 // Privacy level options with descriptions
@@ -70,7 +73,9 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
   poiTypes,
   customIcons,
   onPoiCreated,
-  onClose
+  onClose,
+  mapType = 'hagga_basin',
+  gridSquareId
 }) => {
   const { user } = useAuth();
   
@@ -85,9 +90,53 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
   const [showDetailedPoiSelection, setShowDetailedPoiSelection] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showCustomPoiTypeModal, setShowCustomPoiTypeModal] = useState(false);
+  const [userCreatedPoiTypes, setUserCreatedPoiTypes] = useState<PoiType[]>([]);
 
   // Get categories for organizing POI types
   const categories = [...new Set(poiTypes.map(type => type.category))];
+
+  // Auto-fill title and description when POI type is selected
+  useEffect(() => {
+    if (selectedPoiTypeId && !selectedPoiTypeId.startsWith('custom_')) {
+      const selectedType = poiTypes.find(type => type.id === selectedPoiTypeId);
+      if (selectedType) {
+        setTitle(selectedType.name);
+        setDescription(selectedType.default_description || '');
+      }
+    } else if (selectedPoiTypeId.startsWith('custom_')) {
+      const customIconId = selectedPoiTypeId.replace('custom_', '');
+      const customIcon = customIcons.find(icon => icon.id === customIconId);
+      if (customIcon) {
+        setTitle(customIcon.name);
+        setDescription('');
+      }
+    }
+  }, [selectedPoiTypeId, poiTypes, customIcons]);
+
+  // Get user-created POI types for the custom modal
+  useEffect(() => {
+    const userTypes = poiTypes.filter(type => type.created_by === user?.id);
+    setUserCreatedPoiTypes(userTypes);
+  }, [poiTypes, user?.id]);
+
+  // Handle custom POI type creation
+  const handleCustomPoiTypeCreated = (newPoiType: PoiType) => {
+    setUserCreatedPoiTypes(prev => [newPoiType, ...prev]);
+    setSelectedPoiTypeId(newPoiType.id);
+    setShowCustomPoiTypeModal(false);
+  };
+
+  const handleCustomPoiTypeDeleted = (poiTypeId: string) => {
+    setUserCreatedPoiTypes(prev => prev.filter(type => type.id !== poiTypeId));
+    if (selectedPoiTypeId === poiTypeId) {
+      setSelectedPoiTypeId('');
+    }
+  };
+
+  const handleCustomPoiTypeUpdated = (updatedPoiType: PoiType) => {
+    setUserCreatedPoiTypes(prev => prev.map(type => type.id === updatedPoiType.id ? updatedPoiType : type));
+  };
 
   // Handle screenshot upload
   const handleScreenshotUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -204,11 +253,11 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
         description: description.trim() || null,
         poi_type_id: finalPoiTypeId,
         created_by: user.id,
-        map_type: 'hagga_basin',
+        map_type: mapType,
         coordinates_x: coordinates.x,
         coordinates_y: coordinates.y,
         privacy_level: privacyLevel,
-        grid_square_id: null, // Hagga Basin POIs don't have grid squares
+        grid_square_id: mapType === 'deep_desert' ? gridSquareId : null,
         custom_icon_id: customIconId
       };
 
@@ -281,7 +330,9 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
           <div className="flex items-center">
             <MapPin className="w-6 h-6 text-spice-500 mr-3" />
             <div>
-              <h3 className="text-lg font-semibold text-sand-800">Add POI to Hagga Basin</h3>
+              <h3 className="text-lg font-semibold text-sand-800">
+                Add POI to {mapType === 'deep_desert' ? 'Deep Desert Grid' : 'Hagga Basin'}
+              </h3>
               <p className="text-sm text-sand-600">
                 Coordinates: {formatCoordinates(coordinates.x, coordinates.y)}
               </p>
@@ -297,40 +348,21 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          {/* Title */}
-          <div>
-            <label className="block text-sm font-medium text-sand-700 mb-2">
-              Title *
-            </label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Enter POI title..."
-              className="w-full px-3 py-2 border border-sand-300 rounded-md focus:outline-none focus:ring-2 focus:ring-spice-500"
-              required
-            />
-          </div>
-
-          {/* Description */}
-          <div>
-            <label className="block text-sm font-medium text-sand-700 mb-2">
-              Description
-            </label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Enter POI description..."
-              rows={3}
-              className="w-full px-3 py-2 border border-sand-300 rounded-md focus:outline-none focus:ring-2 focus:ring-spice-500"
-            />
-          </div>
-
           {/* POI Type Selection */}
           <div>
-            <label htmlFor="poiTypeSelect" className="block text-sm font-medium text-sand-700 mb-2">
-              POI Type *
-            </label>
+            <div className="flex items-center justify-between mb-2">
+              <label htmlFor="poiTypeSelect" className="block text-sm font-medium text-sand-700">
+                POI Type *
+              </label>
+              <button
+                type="button"
+                onClick={() => setShowCustomPoiTypeModal(true)}
+                className="text-sm text-spice-600 hover:text-spice-800 font-medium flex items-center"
+              >
+                <Plus className="w-4 h-4 mr-1" />
+                Create Custom Type
+              </button>
+            </div>
             
             {/* Dropdown Selection */}
             <select
@@ -484,6 +516,35 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
             )}
           </div>
 
+          {/* Title */}
+          <div>
+            <label className="block text-sm font-medium text-sand-700 mb-2">
+              Title *
+            </label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Enter POI title..."
+              className="w-full px-3 py-2 border border-sand-300 rounded-md focus:outline-none focus:ring-2 focus:ring-spice-500"
+              required
+            />
+          </div>
+
+          {/* Description */}
+          <div>
+            <label className="block text-sm font-medium text-sand-700 mb-2">
+              Description
+            </label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Enter POI description..."
+              rows={3}
+              className="w-full px-3 py-2 border border-sand-300 rounded-md focus:outline-none focus:ring-2 focus:ring-spice-500"
+            />
+          </div>
+
           {/* Privacy Level */}
           <div>
             <label className="block text-sm font-medium text-sand-700 mb-2">
@@ -604,6 +665,16 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
           </div>
         </form>
       </div>
+
+      {/* Custom POI Type Modal */}
+      <CustomPoiTypeModal
+        isOpen={showCustomPoiTypeModal}
+        onClose={() => setShowCustomPoiTypeModal(false)}
+        customPoiTypes={userCreatedPoiTypes}
+        onPoiTypeCreated={handleCustomPoiTypeCreated}
+        onPoiTypeDeleted={handleCustomPoiTypeDeleted}
+        onPoiTypeUpdated={handleCustomPoiTypeUpdated}
+      />
     </div>
   );
 };

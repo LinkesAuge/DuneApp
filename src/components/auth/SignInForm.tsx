@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
 import { useAuth } from './AuthProvider';
-import { User, Mail, Lock } from 'lucide-react';
+import { User, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { supabase } from '../../lib/supabase'; // Import supabase client
 
 const SignInForm: React.FC = () => {
   const [identifier, setIdentifier] = useState(''); // Changed from email to identifier
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   
   const authContextValue = useAuth(); // Get the whole context value
-  console.log('AuthContext Value in SignInForm:', authContextValue); // Log it
-  const { signIn, error: authError, setError: setAuthError, isLoading } = authContextValue; // Destructure from the logged value
+  const { signIn, error: authError, setError: setAuthError } = authContextValue; // Destructure from the logged value
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

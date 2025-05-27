@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider } from './components/auth/AuthProvider';
 import Navbar from './components/common/Navbar';
 import Landing from './pages/Landing';
@@ -9,6 +9,7 @@ import GridContainer from './components/grid/GridContainer';
 import PoisPage from './pages/Pois';
 import HaggaBasinPage from './pages/HaggaBasinPage';
 import AdminPanel from './components/admin/AdminPanel';
+import GridPage from './pages/GridPage';
 import { useAuth } from './components/auth/AuthProvider';
 import { AlertTriangle } from 'lucide-react';
 
@@ -29,6 +30,9 @@ const PendingApprovalMessage: React.FC = () => (
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, isLoading } = useAuth();
+  const location = useLocation();
+
+  console.log('ProtectedRoute - user:', user, 'isLoading:', isLoading, 'location:', window.location.href);
 
   if (isLoading) {
     return (
@@ -39,13 +43,16 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
   }
 
   if (!user) {
-    return <Navigate to="/auth" replace />;
+    console.log('No user, redirecting to /auth with return path:', location.pathname);
+    return <Navigate to="/auth" state={{ from: location }} replace />;
   }
 
   if (user.role === 'pending') {
+    console.log('User pending, showing pending message');
     return <PendingApprovalMessage />;
   }
 
+  console.log('User authenticated, rendering children');
   return <>{children}</>;
 };
 
@@ -69,7 +76,7 @@ const AdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
 const AppRoutes: React.FC = () => {
   return (
-    <Routes future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <Routes>
       <Route path="/" element={<Landing />} />
       <Route path="/auth" element={<Auth />} />
       <Route 
@@ -81,12 +88,24 @@ const AppRoutes: React.FC = () => {
         } 
       />
       <Route 
-        path="/grid" 
+        path="/deep-desert" 
         element={
           <ProtectedRoute>
             <GridContainer />
           </ProtectedRoute>
         } 
+      />
+      <Route 
+        path="/deep-desert/grid/:gridId" 
+        element={
+          <ProtectedRoute>
+            <GridPage />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/grid" 
+        element={<Navigate to="/deep-desert" replace />}
       />
       <Route 
         path="/pois" 
@@ -120,7 +139,7 @@ const AppRoutes: React.FC = () => {
 function App() {
   return (
     <AuthProvider>
-      <Router>
+      <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <div className="min-h-screen flex flex-col bg-sand-100">
           <Navbar />
           <main className="flex-1">

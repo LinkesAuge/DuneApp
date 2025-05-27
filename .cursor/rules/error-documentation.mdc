@@ -132,3 +132,38 @@ This document tracks known issues, their states, context, and resolutions encoun
 -   **Lesson Learned**: For persistent user selections that need to survive database operations and component re-renders, always use a database-first approach rather than client-side data modification. Client-side overrides are fragile and don't persist through data refresh cycles. Database persistence with proper foreign key relationships ensures data integrity and consistent display across all application interfaces.
 
 ---
+
+-   **Date**: 2025-01-03
+-   **Error Description**: POI filter All/None toggle buttons not working correctly - "Hide All" would briefly hide POIs but immediately show them again, and overall filtering logic was inconsistent.
+-   **Context/Symptoms**: 
+    -   User reported that All/None filter buttons still didn't work after previous attempts to fix them
+    -   "Hide All" button would update the UI but POIs would remain visible on the map
+    -   Console debugging showed state changes happening correctly but visual results were wrong
+    -   Toggle button text was updating properly but actual POI visibility wasn't responding
+-   **Investigation/Diagnosis**:
+    -   **Root Cause 1 - Filtering Logic Bug**: The condition `if (selectedPoiTypes.length > 0 && !selectedPoiTypes.includes(poi.poi_type_id))` had a fatal flaw:
+        - When `selectedPoiTypes` was empty (Hide All state), the first part `selectedPoiTypes.length > 0` was false
+        - This made the entire condition false, causing all POIs to be shown instead of hidden
+        - The logic was backwards for the "Hide All" scenario
+    -   **Root Cause 2 - State Management Conflict**: A useEffect was automatically re-selecting all POI types whenever `selectedPoiTypes.length === 0`:
+        - This was intended for initial page load setup but triggered on every state change
+        - When user clicked "Hide All" → `selectedPoiTypes` became empty → useEffect immediately refilled it → user action was undone
+        - Created a race condition between user actions and automatic state management
+-   **Solution/Fix**:
+    1.  **Fixed Core Filtering Logic**: Changed condition to `if (!selectedPoiTypes.includes(poi.poi_type_id))`:
+        - Simplified logic that works correctly for both show and hide scenarios
+        - When `selectedPoiTypes` is empty → no POIs pass the filter → all hidden (correct)
+        - When `selectedPoiTypes` has values → only included POIs pass → only selected shown (correct)
+    2.  **Fixed State Management**: Added `initialFilterSetup` flag to control useEffect:
+        - Effect only runs once on initial page load when `!initialFilterSetup`
+        - Prevents interference with user actions after initial setup
+        - Preserves user's filter choices without automatic override
+    3.  **Console Cleanup**: Removed debug logs from `useMapSettings`, `SignInForm`, and `supabase.ts` for production readiness
+-   **Files Affected**:
+    -   `src/pages/HaggaBasinPage.tsx` (Primary fix - filtering logic and state management)
+    -   `src/lib/useMapSettings.ts` (Removed console logs)
+    -   `src/components/auth/SignInForm.tsx` (Removed console logs)
+    -   `src/lib/supabase.ts` (Removed console logs)
+-   **Lesson Learned**: Complex filtering logic with multiple conditions can create edge cases where the logic works for some scenarios but fails for others. When debugging filter systems: (1) Test all possible states including empty selections, (2) Watch for useEffect hooks that might interfere with user actions, (3) Simplify filtering conditions to avoid edge case failures, (4) Use state flags to control when automatic effects should run vs. when user actions should take precedence. Always verify that "hide all" and "show all" scenarios work correctly in filtering systems.
+
+---

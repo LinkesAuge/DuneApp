@@ -55,11 +55,15 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ limit = 20 }) => {
           }
 
           // Get coordinate
-          const { data: gridSquare } = await supabase
-            .from('grid_squares')
-            .select('coordinate')
-            .eq('id', poi.grid_square_id)
-            .single();
+          let gridSquare = null;
+          if (poi.grid_square_id) {
+            const { data } = await supabase
+              .from('grid_squares')
+              .select('coordinate')
+              .eq('id', poi.grid_square_id)
+              .single();
+            gridSquare = data;
+          }
 
           poisWithDetails.push({
             ...poi,

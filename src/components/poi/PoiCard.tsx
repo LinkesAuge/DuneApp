@@ -62,6 +62,35 @@ const PoiCard: React.FC<PoiCardProps> = ({
   
   const imageUrl = poiType ? getDisplayImageUrl(poi, poiType, customIcons) : null;
 
+  // Map type styling
+  const getMapTypeInfo = (mapType: string) => {
+    switch (mapType) {
+      case 'deep_desert':
+        return {
+          label: 'Deep Desert',
+          bgColor: 'bg-orange-100',
+          textColor: 'text-orange-800',
+          icon: '🏜️'
+        };
+      case 'hagga_basin':
+        return {
+          label: 'Hagga Basin',
+          bgColor: 'bg-blue-100',
+          textColor: 'text-blue-800',
+          icon: '🏔️'
+        };
+      default:
+        return {
+          label: 'Unknown',
+          bgColor: 'bg-gray-100',
+          textColor: 'text-gray-800',
+          icon: '❓'
+        };
+    }
+  };
+
+  const mapTypeInfo = getMapTypeInfo(poi.map_type);
+
   return (
     <div 
       className="bg-sand-200 rounded-lg border border-sand-300 hover:border-sand-400 transition-all duration-200 overflow-hidden"
@@ -104,20 +133,27 @@ const PoiCard: React.FC<PoiCardProps> = ({
           )}
           <div className="min-w-0">
             <h4 className="font-semibold text-night-800 truncate">{poi.title}</h4>
-            {poiType && (
-              <span className="badge badge-primary mt-1">
-                {poiType.name}
+            <div className="flex items-center gap-2 mt-1">
+              {poiType && (
+                <span className="badge badge-primary">
+                  {poiType.name}
+                </span>
+              )}
+              {/* Map Type Badge */}
+              <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${mapTypeInfo.bgColor} ${mapTypeInfo.textColor}`}>
+                <span className="mr-1">{mapTypeInfo.icon}</span>
+                {mapTypeInfo.label}
               </span>
-            )}
+            </div>
           </div>
         </div>
 
         <div className="flex items-center gap-4 ml-4">
-          {/* Grid Square Location */}
-          {gridSquareCoordinate && (
+          {/* Grid Coordinate for Deep Desert POIs only */}
+          {poi.map_type === 'deep_desert' && gridSquareCoordinate && (
             <div className="flex items-center text-sm text-night-600">
               <MapPin size={16} className="mr-1" />
-              {gridSquareCoordinate}
+              <span>{gridSquareCoordinate}</span>
             </div>
           )}
 

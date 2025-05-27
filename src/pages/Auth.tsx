@@ -1,14 +1,19 @@
 import React from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../components/auth/AuthProvider';
 import AuthTabs from '../components/auth/AuthTabs';
 
 const Auth: React.FC = () => {
   const { user, isLoading } = useAuth();
+  const location = useLocation();
+  
+  // Get the intended destination from the location state, or default to dashboard
+  const from = (location.state as any)?.from?.pathname || '/dashboard';
 
   // Only redirect if we have a user and we're not loading
   if (user && !isLoading) {
-    return <Navigate to="/dashboard" replace />;
+    console.log('User authenticated, redirecting to:', from);
+    return <Navigate to={from} replace />;
   }
 
   return (

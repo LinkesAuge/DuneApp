@@ -22,37 +22,26 @@ const isIconUrl = (icon: string): boolean => {
 
 // Helper function to get display image URL for POI icons
 const getDisplayImageUrl = (poi: Poi, poiType: PoiType, customIcons: CustomIcon[]): string | null => {
-  console.log('🔧 [MapPOIMarker] getDisplayImageUrl called with:', { 
-    poiCustomIconId: poi.custom_icon_id, 
-    poiTypeIcon: poiType.icon, 
-    customIconsCount: customIcons.length 
-  });
-  
   // First priority: Check if POI has a custom icon reference
   if (poi.custom_icon_id) {
     const customIcon = customIcons.find(ci => ci.id === poi.custom_icon_id);
     if (customIcon) {
-      console.log('🔧 [MapPOIMarker] Using POI custom icon:', customIcon);
       return customIcon.image_url;
-    } else {
-      console.log('🔧 [MapPOIMarker] POI custom icon not found, falling back to POI type icon');
     }
   }
   
   // Second priority: Check if POI type icon is a custom icon reference
   const customIconByPoiType = customIcons.find(ci => ci.id === poiType.icon || ci.name === poiType.icon);
   if (customIconByPoiType) {
-    console.log('🔧 [MapPOIMarker] Using POI type custom icon:', customIconByPoiType);
     return customIconByPoiType.image_url;
   }
   
   // Third priority: Check if POI type icon is already a URL
   if (isIconUrl(poiType.icon)) {
-    console.log('🔧 [MapPOIMarker] POI type icon is URL:', poiType.icon);
     return poiType.icon;
   }
   
-  console.log('🔧 [MapPOIMarker] No image URL found, using emoji icon:', poiType.icon);
+  // Default: Use emoji icon (return null so component uses emoji)
   return null;
 };
 
@@ -193,7 +182,7 @@ const MapPOIMarker: React.FC<MapPOIMarkerProps> = ({
       {/* Rich POI Tooltip on Hover */}
       {mapSettings?.showTooltips && showCard && (
         <div 
-          className="absolute bottom-full left-1/2 mb-2 z-[100] pointer-events-auto"
+          className="absolute bottom-full left-1/2 mb-2 z-[9999] pointer-events-auto"
           style={{ 
             transform: `translateX(-50%) translateY(-${iconSize/2 + 8}px)`,
             transformOrigin: 'center bottom'

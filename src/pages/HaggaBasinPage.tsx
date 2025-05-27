@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
-import { MapPin, Filter, Settings, Plus, FolderOpen, Share, Image } from 'lucide-react';
+import { MapPin, Filter, Settings, Plus, FolderOpen, Share, Image, Edit, Eye, Lock, Users } from 'lucide-react';
 import type { 
   Poi, 
   PoiType, 
@@ -12,8 +12,9 @@ import type {
 } from '../types';
 import InteractiveMap from '../components/hagga-basin/InteractiveMap';
 import CollectionModal from '../components/hagga-basin/CollectionModal';
-import CustomIconsModal from '../components/hagga-basin/CustomIconsModal';
+import CustomPoiTypeModal from '../components/hagga-basin/CustomPoiTypeModal';
 import SharePoiModal from '../components/hagga-basin/SharePoiModal';
+import GridGallery from '../components/grid/GridGallery';
 import { useAuth } from '../components/auth/AuthProvider';
 
 const HaggaBasinPage: React.FC = () => {
@@ -32,9 +33,9 @@ const HaggaBasinPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [activeTab, setActiveTab] = useState<'filters' | 'collections' | 'overlays'>('filters');
+  const [activeTab, setActiveTab] = useState<'filters' | 'customization' | 'overlays'>('filters');
 
-  // Filter state
+  // Filter state - Updated for proper default selection
   const [selectedPoiTypes, setSelectedPoiTypes] = useState<string[]>([]);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [privacyFilter, setPrivacyFilter] = useState<'all' | 'public' | 'private' | 'shared'>('all');
@@ -43,12 +44,22 @@ const HaggaBasinPage: React.FC = () => {
   // Map state
   const [selectedOverlays, setSelectedOverlays] = useState<string[]>([]);
   const [activeBaseMap, setActiveBaseMap] = useState<HaggaBasinBaseMap | null>(null);
+  const [placementMode, setPlacementMode] = useState(false);
   
   // Modal state
   const [showCollectionModal, setShowCollectionModal] = useState(false);
-  const [showCustomIconsModal, setShowCustomIconsModal] = useState(false);
+  const [showCustomPoiTypeModal, setShowCustomPoiTypeModal] = useState(false);
   const [showSharePoiModal, setShowSharePoiModal] = useState(false);
   const [selectedPoiForShare, setSelectedPoiForShare] = useState<Poi | null>(null);
+  const [editingPoiType, setEditingPoiType] = useState<PoiType | null>(null);
+
+  // Gallery state
+  const [showGallery, setShowGallery] = useState(false);
+  const [galleryPoi, setGalleryPoi] = useState<Poi | null>(null);
+  const [galleryIndex, setGalleryIndex] = useState(0);
+
+  // State to track if initial filter setup has been done
+  const [initialFilterSetup, setInitialFilterSetup] = useState(false);
 
   // Initialize data on component mount
   useEffect(() => {
@@ -56,6 +67,16 @@ const HaggaBasinPage: React.FC = () => {
       initializeData();
     }
   }, [authLoading]);
+
+  // Initialize filter state when POI types are loaded (only on initial setup)
+  useEffect(() => {
+    if (poiTypes.length > 0 && !initialFilterSetup) {
+      // By default, select all types and categories on initial load
+      setSelectedPoiTypes(poiTypes.map(type => type.id));
+      setSelectedCategories([...new Set(poiTypes.map(type => type.category))]);
+      setInitialFilterSetup(true);
+    }
+  }, [poiTypes, initialFilterSetup]);
 
   const initializeData = async () => {
     setLoading(true);
@@ -196,24 +217,16 @@ const HaggaBasinPage: React.FC = () => {
     setCustomIcons(data || []);
   };
 
-  // Filter POIs based on current filter state
+  // Filter POIs based on current filter state - Simplified logic
   const filteredPois = pois.filter(poi => {
     // Search term filter
     if (searchTerm && !poi.title.toLowerCase().includes(searchTerm.toLowerCase())) {
       return false;
     }
 
-    // POI type filter
-    if (selectedPoiTypes.length > 0 && !selectedPoiTypes.includes(poi.poi_type_id)) {
+    // POI type filter - Show only selected types (if none selected, show none)
+    if (!selectedPoiTypes.includes(poi.poi_type_id)) {
       return false;
-    }
-
-    // Category filter
-    if (selectedCategories.length > 0) {
-      const poiType = poiTypes.find(type => type.id === poi.poi_type_id);
-      if (!poiType || !selectedCategories.includes(poiType.category)) {
-        return false;
-      }
     }
 
     // Privacy filter
@@ -232,11 +245,212 @@ const HaggaBasinPage: React.FC = () => {
     return true;
   });
 
-  // Handle POI creation
-  const handlePoiCreated = useCallback(async (newPoi: Poi) => {
-    setPois(prev => [newPoi, ...prev]);
-    await fetchHaggaBasinPOIs(); // Refresh to ensure consistency
-  }, []);
+  // Handle individual POI type toggle
+  const handleTypeToggle = (typeId: string) => {
+    setSelectedPoiTypes(prev => {
+      if (prev.includes(typeId)) {
+        return prev.filter(id => id !== typeId);
+      } else {
+        return [...prev, typeId];
+      }
+    });
+  };
+
+  // Get user-created POI types for display in customization tab
+  const userCreatedPoiTypes = poiTypes.filter(type => type.created_by === user?.id);
+
+  // Handle category toggle - now syncs with selectedPoiTypes
+  const handleCategoryToggle = (category: string, checked: boolean) => {
+    const categoryTypeIds = poiTypes
+      .filter(type => type.category === category)
+      .map(type => type.id);
+
+    if (checked) {
+      setSelectedCategories(prev => [...prev, category]);
+      setSelectedPoiTypes(prev => {
+        const newTypes = [...prev];
+        categoryTypeIds.forEach(typeId => {
+          if (!newTypes.includes(typeId)) {
+            newTypes.push(typeId);
+          }
+        });
+        return newTypes;
+      });
+    } else {
+      setSelectedCategories(prev => prev.filter(c => c !== category));
+      setSelectedPoiTypes(prev => prev.filter(typeId => !categoryTypeIds.includes(typeId)));
+    }
+  };
+
+  // Handle "All POIs" toggle - show/hide all POI types
+  const handleToggleAllPois = () => {
+    // Check if all POI types are currently selected
+    const allTypeIds = poiTypes.map(type => type.id);
+    const allTypesSelected = allTypeIds.length > 0 && allTypeIds.every(id => selectedPoiTypes.includes(id));
+    
+    if (allTypesSelected) {
+      // Hide all POIs
+      setSelectedCategories([]);
+      setSelectedPoiTypes([]);
+    } else {
+      // Show all POIs
+      const allCategories = [...new Set(poiTypes.map(type => type.category))];
+      setSelectedCategories(allCategories);
+      setSelectedPoiTypes(allTypeIds);
+    }
+  };
+
+  // Handle "Other Types" toggle - for categories not in main four
+  const handleOtherTypesToggle = () => {
+    const mainCategories = ['Base', 'Resources', 'Locations', 'NPCs'];
+    const otherCategories = categories.filter(cat => !mainCategories.includes(cat));
+    const otherTypeIds = poiTypes
+      .filter(type => otherCategories.includes(type.category))
+      .map(type => type.id);
+    
+    // Check if any other types are currently selected
+    const anyOtherTypesSelected = otherTypeIds.some(id => selectedPoiTypes.includes(id));
+    
+    if (anyOtherTypesSelected) {
+      // Deselect all other types
+      setSelectedCategories(prev => prev.filter(cat => !otherCategories.includes(cat)));
+      setSelectedPoiTypes(prev => prev.filter(id => !otherTypeIds.includes(id)));
+    } else {
+      // Select all other types
+      setSelectedCategories(prev => [...new Set([...prev, ...otherCategories])]);
+      setSelectedPoiTypes(prev => [...new Set([...prev, ...otherTypeIds])]);
+    }
+  };
+
+  // Get unique categories for filtering
+  const categories = [...new Set(poiTypes.map(type => type.category))];
+
+  // Helper function to check if an icon is a URL
+  const isIconUrl = (icon: string): boolean => {
+    return icon.startsWith('http') || icon.startsWith('/') || icon.includes('.');
+  };
+
+  // Helper function to get display image URL
+  const getDisplayImageUrl = (icon: string): string => {
+    if (isIconUrl(icon)) {
+      return icon;
+    }
+    return icon; // Return emoji as-is
+  };
+
+  // Helper function to render a category section
+  const renderCategorySection = (category: string) => {
+    const categoryTypes = poiTypes.filter(type => type.category === category);
+    const categoryTypeIds = categoryTypes.map(type => type.id);
+    
+    // A category is "visible" if ALL its types are selected
+    const categoryVisible = categoryTypeIds.length > 0 && categoryTypeIds.every(id => selectedPoiTypes.includes(id));
+    
+    return (
+      <div key={category} className="mb-3">
+        {/* Category Header - More prominent styling */}
+        <div className="bg-sand-100 border border-sand-200 rounded-lg px-3 py-2 mb-2">
+          <div className="flex items-center justify-between">
+            <label className="flex items-center cursor-pointer group">
+              <input
+                type="checkbox"
+                checked={categoryVisible}
+                onChange={(e) => handleCategoryToggle(category, e.target.checked)}
+                className="rounded border-sand-300 text-spice-600 focus:ring-spice-500"
+              />
+              <span className="ml-2 text-sm font-semibold text-sand-900 capitalize group-hover:text-spice-700 transition-colors">
+                {category}
+              </span>
+            </label>
+            <span className="text-xs text-sand-600 font-medium">
+              {categoryTypes.length}
+            </span>
+          </div>
+        </div>
+        
+        {/* Individual POI Types in Category - No indentation, less spacing */}
+        <div className="space-y-0.5">
+          {categoryTypes.map(type => {
+            const typePoiCount = filteredPois.filter(poi => poi.poi_type_id === type.id).length;
+            const isTypeSelected = selectedPoiTypes.includes(type.id);
+            
+            return (
+              <label 
+                key={type.id} 
+                className={`flex items-center justify-between cursor-pointer group px-2 py-1 rounded transition-all ${
+                  !categoryVisible 
+                    ? 'opacity-40 cursor-not-allowed' 
+                    : isTypeSelected 
+                      ? 'hover:bg-spice-50' 
+                      : 'opacity-60 hover:opacity-80 hover:bg-sand-50'
+                }`}
+              >
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={isTypeSelected}
+                    onChange={() => handleTypeToggle(type.id)}
+                    disabled={!categoryVisible}
+                    className="rounded border-sand-300 text-spice-600 focus:ring-spice-500 w-3 h-3"
+                  />
+                  
+                  {/* POI Type Icon */}
+                  <div 
+                    className="w-4 h-4 rounded flex items-center justify-center ml-2 mr-2 flex-shrink-0"
+                    style={{
+                      backgroundColor: type.icon_has_transparent_background && isIconUrl(type.icon) 
+                        ? 'transparent' 
+                        : type.color
+                    }}
+                  >
+                    {isIconUrl(type.icon) ? (
+                      <img
+                        src={getDisplayImageUrl(type.icon)}
+                        alt={type.name}
+                        className="w-2.5 h-2.5 object-contain"
+                        style={{
+                          filter: type.icon_has_transparent_background ? 'none' : 'drop-shadow(0 1px 1px rgba(0,0,0,0.2))'
+                        }}
+                      />
+                    ) : (
+                      <span 
+                        className="text-xs leading-none"
+                        style={{ 
+                          color: type.icon_has_transparent_background ? type.color : 'white',
+                          textShadow: type.icon_has_transparent_background ? '0 1px 1px rgba(0,0,0,0.2)' : 'none'
+                        }}
+                      >
+                        {type.icon}
+                      </span>
+                    )}
+                  </div>
+                  
+                  <span className={`text-xs transition-colors ${
+                    !categoryVisible 
+                      ? 'text-sand-400' 
+                      : isTypeSelected 
+                        ? 'text-sand-800 group-hover:text-spice-800' 
+                        : 'text-sand-500 group-hover:text-sand-700'
+                  }`}>
+                    {type.name}
+                  </span>
+                </div>
+                <span className={`text-xs ${
+                  !categoryVisible 
+                    ? 'text-sand-300' 
+                    : isTypeSelected 
+                      ? 'text-sand-600' 
+                      : 'text-sand-400'
+                }`}>
+                  {typePoiCount}
+                </span>
+              </label>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
 
   // Handle overlay toggle
   const handleOverlayToggle = (overlayId: string) => {
@@ -245,6 +459,18 @@ const HaggaBasinPage: React.FC = () => {
         ? prev.filter(id => id !== overlayId)
         : [...prev, overlayId]
     );
+  };
+
+  // Handle POI creation
+  const handlePoiCreated = async (newPoi: Poi) => {
+    try {
+      // Add to local state
+      setPois(prev => [newPoi, ...prev]);
+      // Exit placement mode
+      setPlacementMode(false);
+    } catch (error) {
+      console.error('Error handling created POI:', error);
+    }
   };
 
   // Handle sharing POI
@@ -296,17 +522,33 @@ const HaggaBasinPage: React.FC = () => {
     }
   };
 
-  // Handle custom icon updates
-  const handleCustomIconUploaded = (newIcon: CustomIcon) => {
-    setCustomIcons(prev => [newIcon, ...prev]);
+  // Handle custom POI type updates
+  const handleCustomPoiTypeCreated = (newPoiType: PoiType) => {
+    setPoiTypes(prev => [newPoiType, ...prev]);
   };
 
-  const handleCustomIconDeleted = (iconId: string) => {
-    setCustomIcons(prev => prev.filter(icon => icon.id !== iconId));
+  const handleCustomPoiTypeDeleted = (poiTypeId: string) => {
+    setPoiTypes(prev => prev.filter(type => type.id !== poiTypeId));
   };
 
-  // Get unique categories for filtering
-  const categories = [...new Set(poiTypes.map(type => type.category))];
+  const handleCustomPoiTypeUpdated = (updatedPoiType: PoiType) => {
+    setPoiTypes(prev => prev.map(type => type.id === updatedPoiType.id ? updatedPoiType : type));
+    setEditingPoiType(null);
+  };
+
+  const handleCustomPoiTypeEdit = (poiType: PoiType) => {
+    setEditingPoiType(poiType);
+    setShowCustomPoiTypeModal(true);
+  };
+
+  // Handle POI gallery opening
+  const handlePoiGalleryOpen = useCallback((poi: Poi) => {
+    if (poi.screenshots && poi.screenshots.length > 0) {
+      setGalleryPoi(poi);
+      setGalleryIndex(0);
+      setShowGallery(true);
+    }
+  }, []);
 
   if (authLoading || loading) {
     return (
@@ -340,7 +582,7 @@ const HaggaBasinPage: React.FC = () => {
     <div className="bg-sand-50 flex overflow-hidden" style={{height: 'calc(100vh - 4rem)'}}>
       {/* Sidebar */}
       <div className={`bg-white border-r border-sand-200 transition-all duration-300 ${
-        sidebarOpen ? 'w-80' : 'w-0 overflow-hidden'
+        sidebarOpen ? 'w-96' : 'w-0 overflow-hidden'
       }`}>
         <div className="h-full flex flex-col">
           {/* Sidebar Header */}
@@ -372,15 +614,15 @@ const HaggaBasinPage: React.FC = () => {
                 Filters
               </button>
               <button
-                onClick={() => setActiveTab('collections')}
+                onClick={() => setActiveTab('customization')}
                 className={`px-3 py-1 text-sm rounded ${
-                  activeTab === 'collections' 
+                  activeTab === 'customization' 
                     ? 'bg-spice-100 text-spice-700' 
                     : 'text-sand-600 hover:text-sand-800'
                 }`}
               >
-                <FolderOpen className="w-4 h-4 inline mr-1" />
-                Collections
+                <Plus className="w-4 h-4 inline mr-1" />
+                Customization
               </button>
               <button
                 onClick={() => setActiveTab('overlays')}
@@ -399,7 +641,29 @@ const HaggaBasinPage: React.FC = () => {
           {/* Sidebar Content */}
           <div className="flex-1 overflow-y-auto p-4">
             {activeTab === 'filters' && (
-              <div className="space-y-6">
+              <div className="space-y-4">
+                {/* Add POI Button */}
+                <div>
+                  <button
+                    onClick={() => setPlacementMode(!placementMode)}
+                    className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-medium transition-all ${
+                      placementMode 
+                        ? 'bg-spice-500 text-white hover:bg-spice-600' 
+                        : 'bg-white border-2 border-spice-200 text-spice-700 hover:bg-spice-50 hover:border-spice-300'
+                    }`}
+                  >
+                    <Plus className="w-5 h-5" />
+                    <span>
+                      {placementMode ? 'Click on Map to Place POI' : 'Add Point of Interest'}
+                    </span>
+                  </button>
+                  {placementMode && (
+                    <div className="text-xs text-spice-600 mt-2 text-center">
+                      Click anywhere on the map to place a new POI. Click this button again to cancel.
+                    </div>
+                  )}
+                </div>
+
                 {/* Search */}
                 <div>
                   <label className="block text-sm font-medium text-sand-700 mb-2">
@@ -414,184 +678,254 @@ const HaggaBasinPage: React.FC = () => {
                   />
                 </div>
 
-                {/* Privacy Filter */}
-                <div>
-                  <label className="block text-sm font-medium text-sand-700 mb-2">
-                    Visibility
-                  </label>
-                  <select
-                    value={privacyFilter}
-                    onChange={(e) => setPrivacyFilter(e.target.value as any)}
-                    className="w-full px-3 py-2 border border-sand-300 rounded-md focus:outline-none focus:ring-2 focus:ring-spice-500"
-                  >
-                    <option value="all">All POIs</option>
-                    <option value="public">Public Only</option>
-                    <option value="private">Private Only</option>
-                    <option value="shared">Shared Only</option>
-                  </select>
+                {/* Stats at the top */}
+                <div className="bg-spice-50 border border-spice-200 p-3 rounded-lg">
+                  <div className="text-sm font-medium text-spice-800">
+                    Showing {filteredPois.length} of {pois.length} POIs
+                  </div>
                 </div>
 
                 {/* POI Type Filters */}
                 <div>
                   <div className="flex justify-between items-center mb-3">
-                    <label className="block text-sm font-medium text-sand-700">
-                      POI Types
+                    <label className="block text-sm font-medium text-sand-800">
+                      Points of Interests
                     </label>
                     <div className="flex gap-1">
                       <button
-                        onClick={() => setSelectedCategories(categories)}
-                        className="text-xs text-spice-600 hover:text-spice-700"
-                        title="Show All"
+                        onClick={handleToggleAllPois}
+                        className="text-xs text-spice-600 hover:text-spice-700 font-medium"
+                        title="Toggle All POIs"
                       >
-                        All
-                      </button>
-                      <span className="text-xs text-sand-400">|</span>
-                      <button
-                        onClick={() => setSelectedCategories([])}
-                        className="text-xs text-spice-600 hover:text-spice-700"
-                        title="Hide All"
-                      >
-                        None
+                        {(() => {
+                          const allTypeIds = poiTypes.map(type => type.id);
+                          const allTypesSelected = allTypeIds.length > 0 && allTypeIds.every(id => selectedPoiTypes.includes(id));
+                          const buttonText = allTypesSelected ? 'Hide All' : 'Show All';
+                          return buttonText;
+                        })()}
                       </button>
                     </div>
                   </div>
                   
-                  {/* Category Sections */}
-                  {categories.map(category => {
-                    const categoryTypes = poiTypes.filter(type => type.category === category);
-                    const categoryVisible = selectedCategories.includes(category);
+                  {/* Two-Column Layout */}
+                  <div className="grid grid-cols-2 gap-3 mb-4">
+                    {/* Left Column: Base + Resources Types */}
+                    <div className="space-y-1">
+                      {categories.includes('Base') && renderCategorySection('Base')}
+                      {categories.includes('Resources') && renderCategorySection('Resources')}
+                    </div>
                     
-                    return (
-                      <div key={category} className="mb-4">
-                        <div className="flex items-center justify-between mb-2">
-                          <label className="flex items-center cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={categoryVisible}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setSelectedCategories(prev => [...prev, category]);
-                                } else {
-                                  setSelectedCategories(prev => prev.filter(c => c !== category));
-                                }
-                              }}
-                              className="rounded border-sand-300 text-spice-600 focus:ring-spice-500"
-                            />
-                            <span className="ml-2 text-sm font-medium text-sand-700 capitalize">
-                              {category}
-                            </span>
-                          </label>
-                          <span className="text-xs text-sand-500">
-                            {categoryTypes.length}
-                          </span>
-                        </div>
-                        
-                        {/* Individual POI Types in Category */}
-                        {categoryVisible && (
-                          <div className="ml-6 space-y-1">
-                            {categoryTypes.map(type => {
-                              const typePoiCount = filteredPois.filter(poi => poi.poi_type_id === type.id).length;
-                              
-                              return (
-                                <label key={type.id} className="flex items-center justify-between cursor-pointer group">
-                                  <div className="flex items-center">
-                                    <input
-                                      type="checkbox"
-                                      checked={true} // For now, all types within visible categories are shown
-                                      onChange={() => {
-                                        // TODO: Implement individual type filtering
-                                      }}
-                                      className="rounded border-sand-300 text-spice-600 focus:ring-spice-500 w-3 h-3"
-                                    />
-                                    <span className="ml-2 text-xs text-sand-600 group-hover:text-sand-800">
-                                      {type.name}
-                                    </span>
-                                  </div>
-                                  <span className="text-xs text-sand-400">
-                                    {typePoiCount}
-                                  </span>
-                                </label>
-                              );
-                            })}
-                          </div>
-                        )}
+                    {/* Right Column: Locations + NPCs */}
+                    <div className="space-y-1">
+                      {categories.includes('Locations') && renderCategorySection('Locations')}
+                      {categories.includes('NPCs') && renderCategorySection('NPCs')}
+                    </div>
+                  </div>
+                  
+                  {/* Other Categories (if any) */}
+                  {categories.filter(cat => !['Base', 'Resources', 'Locations', 'NPCs'].includes(cat)).length > 0 && (
+                    <div className="border-t border-sand-200 pt-3">
+                      <div className="flex justify-between items-center mb-2">
+                        <h4 className="text-sm font-medium text-sand-800">Other Types</h4>
+                        <button
+                          onClick={handleOtherTypesToggle}
+                          className="text-xs text-spice-600 hover:text-spice-700 font-medium"
+                          title="Toggle All Other Types"
+                        >
+                          {(() => {
+                            const mainCategories = ['Base', 'Resources', 'Locations', 'NPCs'];
+                            const otherCategories = categories.filter(cat => !mainCategories.includes(cat));
+                            const otherTypeIds = poiTypes
+                              .filter(type => otherCategories.includes(type.category))
+                              .map(type => type.id);
+                            const anyOtherTypesSelected = otherTypeIds.some(id => selectedPoiTypes.includes(id));
+                            return anyOtherTypesSelected ? 'Hide All' : 'Show All';
+                          })()}
+                        </button>
                       </div>
-                    );
-                  })}
+                      <div className="space-y-1">
+                        {categories
+                          .filter(cat => !['Base', 'Resources', 'Locations', 'NPCs'].includes(cat))
+                          .map(category => renderCategorySection(category))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
-                {/* Stats */}
-                <div className="bg-sand-50 p-3 rounded-lg">
-                  <div className="text-sm text-sand-600">
-                    Showing {filteredPois.length} of {pois.length} POIs
+                {/* Additional Filters Section */}
+                <div className="border-t border-sand-200 pt-4">
+                  <h4 className="text-sm font-medium text-sand-800 mb-3">Additional Filters</h4>
+                  
+                  {/* Visibility Presets */}
+                  <div>
+                    <label className="block text-sm font-medium text-sand-700 mb-2">
+                      Quick Visibility Filters
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => setPrivacyFilter('public')}
+                        className={`px-3 py-2 text-xs rounded border flex items-center justify-center gap-1 ${
+                          privacyFilter === 'public'
+                            ? 'bg-spice-100 border-spice-300 text-spice-700'
+                            : 'bg-sand-50 border-sand-300 text-sand-600 hover:bg-sand-100'
+                        }`}
+                      >
+                        <Eye className="w-3 h-3 text-green-600" />
+                        Public Only
+                      </button>
+                      <button
+                        onClick={() => setPrivacyFilter('private')}
+                        className={`px-3 py-2 text-xs rounded border flex items-center justify-center gap-1 ${
+                          privacyFilter === 'private'
+                            ? 'bg-spice-100 border-spice-300 text-spice-700'
+                            : 'bg-sand-50 border-sand-300 text-sand-600 hover:bg-sand-100'
+                        }`}
+                      >
+                        <Lock className="w-3 h-3 text-red-600" />
+                        Private Only
+                      </button>
+                      <button
+                        onClick={() => setPrivacyFilter('shared')}
+                        className={`px-3 py-2 text-xs rounded border flex items-center justify-center gap-1 ${
+                          privacyFilter === 'shared'
+                            ? 'bg-spice-100 border-spice-300 text-spice-700'
+                            : 'bg-sand-50 border-sand-300 text-sand-600 hover:bg-sand-100'
+                        }`}
+                      >
+                        <Users className="w-3 h-3 text-blue-600" />
+                        Shared Only
+                      </button>
+                      <button
+                        onClick={() => setPrivacyFilter('all')}
+                        className={`px-3 py-2 text-xs rounded border flex items-center justify-center gap-1 ${
+                          privacyFilter === 'all'
+                            ? 'bg-spice-100 border-spice-300 text-spice-700'
+                            : 'bg-sand-50 border-sand-300 text-sand-600 hover:bg-sand-100'
+                        }`}
+                      >
+                        <Eye className="w-3 h-3 text-sand-600" />
+                        Show All
+                      </button>
+                    </div>
+                    <div className="mt-2 text-xs text-sand-500">
+                      Icons show privacy levels on map POIs: <Eye className="w-3 h-3 inline text-green-600" /> Public, <Lock className="w-3 h-3 inline text-red-600" /> Private, <Users className="w-3 h-3 inline text-blue-600" /> Shared
+                    </div>
                   </div>
                 </div>
               </div>
             )}
 
-            {activeTab === 'collections' && (
+            {activeTab === 'customization' && (
               <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <h3 className="text-sm font-medium text-sand-700">Your Collections</h3>
-                  <button 
-                    onClick={() => setShowCollectionModal(true)}
-                    className="btn btn-sm btn-primary"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </button>
+                {/* Custom POI Types Section */}
+                <div>
+                  <div className="flex justify-between items-center mb-3">
+                    <h4 className="text-sm font-medium text-sand-800">Custom POI Types</h4>
+                    <button 
+                      onClick={() => {
+                        setEditingPoiType(null);
+                        setShowCustomPoiTypeModal(true);
+                      }}
+                      className="btn btn-sm btn-primary"
+                    >
+                      <Plus className="w-4 h-4 mr-1" />
+                      Create
+                    </button>
+                  </div>
+                  
+                  {userCreatedPoiTypes.length === 0 ? (
+                    <div className="text-center py-8">
+                      <Plus className="w-12 h-12 text-sand-400 mx-auto mb-4" />
+                      <p className="text-sand-600 mb-2">No custom POI types yet</p>
+                      <p className="text-sand-500 text-sm">Create custom POI types with your own icons and categories</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {userCreatedPoiTypes.map(poiType => (
+                        <div 
+                          key={poiType.id} 
+                          className="bg-sand-50 border border-sand-200 rounded-lg p-3"
+                        >
+                          <div className="flex items-center">
+                            <div 
+                              className="w-8 h-8 rounded flex items-center justify-center mr-3 flex-shrink-0"
+                              style={{
+                                backgroundColor: poiType.icon_has_transparent_background && poiType.icon.startsWith('http') 
+                                  ? 'transparent' 
+                                  : poiType.color
+                              }}
+                            >
+                              {poiType.icon.startsWith('http') ? (
+                                <img
+                                  src={poiType.icon}
+                                  alt={poiType.name}
+                                  className="w-5 h-5 object-contain"
+                                />
+                              ) : (
+                                <span className="text-sm">{poiType.icon}</span>
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center">
+                                <h4 className="font-medium text-sand-800 truncate">{poiType.name}</h4>
+                                <span className="ml-2 px-2 py-0.5 bg-spice-100 text-spice-700 text-xs rounded capitalize">
+                                  {poiType.category}
+                                </span>
+                              </div>
+                              {poiType.default_description && (
+                                <p className="text-sm text-sand-600 mt-1 truncate">{poiType.default_description}</p>
+                              )}
+                            </div>
+                            {/* Edit button for sidebar */}
+                            <button
+                              onClick={() => handleCustomPoiTypeEdit(poiType)}
+                              className="text-spice-400 hover:text-spice-600 transition-colors ml-2"
+                              title="Edit POI type"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                
-                {/* Custom Icons Section */}
+
+                {/* Collections Section */}
                 <div className="pt-4 border-t border-sand-200">
                   <div className="flex justify-between items-center mb-3">
-                    <h4 className="text-sm font-medium text-sand-700">Custom Icons</h4>
+                    <h4 className="text-sm font-medium text-sand-700">POI Collections</h4>
                     <button 
-                      onClick={() => setShowCustomIconsModal(true)}
+                      onClick={() => setShowCollectionModal(true)}
                       className="btn btn-sm btn-outline"
                     >
-                      <Image className="w-4 h-4 mr-1" />
+                      <FolderOpen className="w-4 h-4 mr-1" />
                       Manage
                     </button>
                   </div>
-                  <p className="text-xs text-sand-500">
-                    {customIcons.length}/10 custom icons • Upload PNG files for POI markers
+                  <p className="text-xs text-sand-500 mb-3">
+                    {collections.length} collections • Organize and share groups of POIs
                   </p>
-                </div>
-                
-                {collections.length === 0 ? (
-                  <div className="text-center py-8">
-                    <FolderOpen className="w-12 h-12 text-sand-400 mx-auto mb-4" />
-                    <p className="text-sand-600 mb-2">No collections yet</p>
-                    <p className="text-sand-500 text-sm">Create your first collection to organize POIs</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {collections.map(collection => (
-                      <div 
-                        key={collection.id} 
-                        className="bg-sand-50 border border-sand-200 rounded-lg p-3 cursor-pointer hover:bg-sand-100 transition-colors"
-                        onClick={() => setShowCollectionModal(true)}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center">
-                              <FolderOpen className="w-4 h-4 text-spice-600 mr-2" />
-                              <h4 className="font-medium text-sand-800">{collection.name}</h4>
-                              {collection.is_public && (
-                                <div className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded">
-                                  Public
-                                </div>
-                              )}
-                            </div>
-                            {collection.description && (
-                              <p className="text-sm text-sand-600 mt-1">{collection.description}</p>
-                            )}
-                          </div>
+                  
+                  {collections.length > 0 && (
+                    <div className="space-y-2 max-h-32 overflow-y-auto">
+                      {collections.slice(0, 3).map(collection => (
+                        <div key={collection.id} className="flex items-center text-sm">
+                          <FolderOpen className="w-4 h-4 text-spice-600 mr-2 flex-shrink-0" />
+                          <span className="text-sand-700 truncate">{collection.name}</span>
+                          {collection.is_public && (
+                            <span className="ml-auto text-xs text-blue-600">Public</span>
+                          )}
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                      ))}
+                      {collections.length > 3 && (
+                        <div className="text-xs text-sand-500 italic">
+                          +{collections.length - 3} more collections
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
@@ -655,7 +989,10 @@ const HaggaBasinPage: React.FC = () => {
             onPoiUpdated={handlePoiUpdated}
             onPoiDeleted={handlePoiDeleted}
             onPoiShare={handleSharePoi}
+            onPoiGalleryOpen={handlePoiGalleryOpen}
             customIcons={customIcons}
+            placementMode={placementMode}
+            onPlacementModeChange={setPlacementMode}
           />
         ) : (
           <div className="h-full flex items-center justify-center bg-sand-100">
@@ -681,13 +1018,19 @@ const HaggaBasinPage: React.FC = () => {
         existingCollections={collections}
       />
 
-      {/* Custom Icons Modal */}
-      <CustomIconsModal
-        isOpen={showCustomIconsModal}
-        onClose={() => setShowCustomIconsModal(false)}
-        customIcons={customIcons}
-        onIconUploaded={handleCustomIconUploaded}
-        onIconDeleted={handleCustomIconDeleted}
+      {/* Custom POI Type Modal */}
+      <CustomPoiTypeModal
+        isOpen={showCustomPoiTypeModal}
+        onClose={() => {
+          setShowCustomPoiTypeModal(false);
+          setEditingPoiType(null);
+        }}
+        customPoiTypes={userCreatedPoiTypes}
+        onPoiTypeCreated={handleCustomPoiTypeCreated}
+        onPoiTypeDeleted={handleCustomPoiTypeDeleted}
+        onPoiTypeUpdated={handleCustomPoiTypeUpdated}
+        onPoiTypeEdit={handleCustomPoiTypeEdit}
+        editingPoiType={editingPoiType}
       />
 
       {/* Share POI Modal */}
@@ -699,6 +1042,31 @@ const HaggaBasinPage: React.FC = () => {
         }}
         poi={selectedPoiForShare}
       />
+
+      {/* Gallery Modal */}
+      {showGallery && galleryPoi?.screenshots && (
+        <GridGallery
+          squares={galleryPoi.screenshots.map(s => ({
+            id: s.id,
+            screenshot_url: s.url,
+            uploaded_by: s.uploaded_by,
+            upload_date: s.upload_date,
+            coordinate: galleryPoi.title || 'POI',
+            is_explored: false,
+          }))}
+          initialIndex={galleryIndex}
+          onClose={() => {
+            setShowGallery(false);
+            setGalleryPoi(null);
+          }}
+          poiInfo={{
+            title: galleryPoi.title,
+            description: galleryPoi.description,
+            created_at: galleryPoi.created_at,
+            created_by: galleryPoi.created_by,
+          }}
+        />
+      )}
     </div>
   );
 };

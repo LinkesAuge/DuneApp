@@ -42,6 +42,7 @@ export interface PoiType {
   category: string;
   default_description: string | null;
   icon_has_transparent_background?: boolean;
+  created_by?: string | null; // NULL means system/admin created, user ID means user-created
 }
 
 export interface PoiScreenshot {

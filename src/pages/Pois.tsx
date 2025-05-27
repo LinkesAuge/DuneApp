@@ -1,16 +1,19 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
-import { Poi, PoiType, GridSquare, PoiWithGridSquare, MapType } from '../types';
+import { Poi, PoiType, GridSquare, PoiWithGridSquare, MapType, CustomIcon } from '../types';
 import { Search, Compass, LayoutGrid, List, Edit2, Trash2, ArrowDownUp, SortAsc, SortDesc } from 'lucide-react';
 import GridSquareModal from '../components/grid/GridSquareModal';
 import GridGallery from '../components/grid/GridGallery';
 import PoiCard from '../components/poi/PoiCard';
-import PoiEditForm from '../components/poi/PoiEditForm';
+import POIEditModal from '../components/hagga-basin/POIEditModal';
 import PoiListItem from '../components/poi/PoiListItem';
+import { useAuth } from '../components/auth/AuthProvider';
 
 const PoisPage: React.FC = () => {
+  const { user } = useAuth();
   const [pois, setPois] = useState<PoiWithGridSquare[]>([]);
   const [poiTypes, setPoiTypes] = useState<PoiType[]>([]);
+  const [customIcons, setCustomIcons] = useState<CustomIcon[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -112,6 +115,9 @@ const PoisPage: React.FC = () => {
         if (typesError) throw typesError;
         setPoiTypes(typesData || []);
 
+        // Fetch custom icons
+        await fetchCustomIcons();
+
         // Fetch user info
         if (poisData) {
           const userIds = [...new Set(poisData.map(poi => poi.created_by))];
@@ -124,7 +130,7 @@ const PoisPage: React.FC = () => {
 
           const userInfoMap = userData.reduce((acc, user) => {
             acc[user.id] = { username: user.username };
-            return acc;
+          return acc;
           }, {} as { [key: string]: { username: string } });
 
           setUserInfo(userInfoMap);
@@ -138,7 +144,24 @@ const PoisPage: React.FC = () => {
     };
 
     fetchData();
-  }, []);
+  }, [user]);
+
+  const fetchCustomIcons = async () => {
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from('custom_icons')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching custom icons:', error);
+      throw error;
+    }
+
+    setCustomIcons(data || []);
+  };
 
   // Group POI types by category
   const typesByCategory = poiTypes.reduce((acc: Record<string, PoiType[]>, type) => {
@@ -537,6 +560,31 @@ const PoisPage: React.FC = () => {
       {/* Collapsible Tag Filters Section - now conditionally rendered without its own button wrapper*/}
       {isTagFilterOpen && (
           <div className="bg-sand-50 p-4 rounded-lg border border-sand-300 shadow-sm mb-6">
+            {/* Map Type Filter Buttons */}
+            <div className="mb-4">
+              <h3 className="text-sm font-semibold text-sand-800 mb-2">Filter by Map Region</h3>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => setSelectedMapType('all')}
+                  className={`btn text-xs px-3 py-1 ${selectedMapType === 'all' ? 'btn-primary' : 'btn-outline'}`}
+                >
+                  🌍 All Regions
+                </button>
+                <button
+                  onClick={() => setSelectedMapType('deep_desert')}
+                  className={`btn text-xs px-3 py-1 ${selectedMapType === 'deep_desert' ? 'btn-primary' : 'btn-outline'}`}
+                >
+                  🏜️ Deep Desert
+                </button>
+                <button
+                  onClick={() => setSelectedMapType('hagga_basin')}
+                  className={`btn text-xs px-3 py-1 ${selectedMapType === 'hagga_basin' ? 'btn-primary' : 'btn-outline'}`}
+                >
+                  🏔️ Hagga Basin
+                </button>
+              </div>
+            </div>
+
             {/* Grid Coordinate Tags */}
             <div className="mb-4">
               <h3 className="text-sm font-semibold text-sand-800 mb-2">Filter by Grid Tags</h3>
@@ -664,18 +712,6 @@ const PoisPage: React.FC = () => {
       ) : (
         <div className={`gap-6 ${displayMode === 'grid' ? 'grid md:grid-cols-2 lg:grid-cols-3' : 'flex flex-col'}`}>
           {filteredPois.map(poi => {
-            if (editingPoiId === poi.id) {
-              return (
-                <PoiEditForm
-                  key={poi.id}
-                  poi={poi}
-                  poiTypes={poiTypes}
-                  onCancel={() => setEditingPoiId(null)}
-                  onUpdate={handleUpdate}
-                />
-              );
-            }
-
             if (displayMode === 'list') {
               return (
                 <PoiListItem
@@ -697,6 +733,7 @@ const PoisPage: React.FC = () => {
                 key={poi.id}
                 poi={poi}
                 poiType={getPoiType(poi.poi_type_id)}
+                customIcons={customIcons}
                 gridSquareCoordinate={poi.grid_square?.coordinate}
                 creator={userInfo[poi.created_by]}
                 onClick={() => handleCardClick(poi)}
@@ -777,6 +814,17 @@ const PoisPage: React.FC = () => {
             created_at: selectedPoi.created_at,
             created_by: selectedPoi.created_by,
           }}
+        />
+      )}
+
+      {/* POI Edit Modal */}
+      {editingPoiId && (
+        <POIEditModal
+          poi={filteredPois.find(poi => poi.id === editingPoiId)!}
+          poiTypes={poiTypes}
+          customIcons={customIcons}
+          onClose={() => setEditingPoiId(null)}
+          onPoiUpdated={handleUpdate}
         />
       )}
     </div>

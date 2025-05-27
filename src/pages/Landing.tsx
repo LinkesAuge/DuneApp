@@ -61,7 +61,7 @@ const Landing: React.FC = () => {
                     View Dashboard
                   </Link>
                   <Link 
-                    to="/grid" 
+                    to="/deep-desert" 
                     className="btn btn-secondary text-lg px-8 py-4 bg-white/10 backdrop-blur-sm border border-white/20 text-white hover:bg-white/20"
                   >
                     <Map className="mr-2" size={20} />
@@ -329,7 +329,7 @@ const Landing: React.FC = () => {
                   Open Dashboard
                 </Link>
                 <Link 
-                  to="/grid" 
+                  to="/deep-desert" 
                   className="btn btn-secondary text-lg px-8 py-4 bg-white/10 backdrop-blur-sm border border-white/20 text-white hover:bg-white/20"
                 >
                   <Map className="mr-2" size={20} />
@@ -346,8 +346,6 @@ const Landing: React.FC = () => {
               </Link>
             )}
           </div>
-
-
         </div>
       </div>
     </div>

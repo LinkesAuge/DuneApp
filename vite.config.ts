@@ -7,6 +7,9 @@ export default defineConfig({
   //   exclude: ['lucide-react'],
   // },
   base: '/',
+  build: {
+    sourcemap: false // Disable source maps in build
+  },
   server: {
     hmr: {
       // Disable HMR console logs

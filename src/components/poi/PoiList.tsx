@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Poi, PoiType, CustomIcon } from '../../types';
 import { supabase } from '../../lib/supabase';
 import { MapPin } from 'lucide-react';
-import PoiEditForm from './PoiEditForm';
+import POIEditModal from '../hagga-basin/POIEditModal';
 import PoiCard from './PoiCard';
 import GridGallery from '../grid/GridGallery';
 
@@ -109,6 +109,9 @@ const PoiList: React.FC<PoiListProps> = ({ pois, poiTypes, customIcons, onDelete
     return poiTypes.find(type => type.id === poiTypeId);
   };
 
+  // Get the POI being edited
+  const editingPoi = pois.find(poi => poi.id === editingPoiId);
+
   if (pois.length === 0) {
     return (
       <div className="text-center py-8 text-sand-400">
@@ -126,36 +129,33 @@ const PoiList: React.FC<PoiListProps> = ({ pois, poiTypes, customIcons, onDelete
         </div>
       )}
       
-      {pois.map(poi => {
-        if (editingPoiId === poi.id) {
-          return (
-            <PoiEditForm 
-              key={poi.id}
-              poi={poi}
-              poiTypes={poiTypes}
-              onCancel={() => setEditingPoiId(null)}
-              onUpdate={(updatedPoi) => {
-                onUpdate(updatedPoi);
-                setEditingPoiId(null);
-              }}
-            />
-          );
-        }
+      {pois.map(poi => (
+        <PoiCard
+          key={poi.id}
+          poi={poi}
+          poiType={getPoiType(poi.poi_type_id)}
+          customIcons={customIcons}
+          gridSquareCoordinate={gridSquares[poi.grid_square_id]}
+          creator={userInfo[poi.created_by]}
+          onEdit={() => setEditingPoiId(poi.id)}
+          onDelete={() => handleDelete(poi.id)}
+          onImageClick={() => onPoiGalleryOpen?.(poi)}
+        />
+      ))}
 
-        return (
-          <PoiCard
-            key={poi.id}
-            poi={poi}
-            poiType={getPoiType(poi.poi_type_id)}
-            customIcons={customIcons}
-            gridSquareCoordinate={gridSquares[poi.grid_square_id]}
-            creator={userInfo[poi.created_by]}
-            onEdit={() => setEditingPoiId(poi.id)}
-            onDelete={() => handleDelete(poi.id)}
-            onImageClick={() => onPoiGalleryOpen?.(poi)}
-          />
-        );
-      })}
+      {/* POI Edit Modal */}
+      {editingPoi && (
+        <POIEditModal
+          poi={editingPoi}
+          poiTypes={poiTypes}
+          customIcons={customIcons}
+          onClose={() => setEditingPoiId(null)}
+          onPoiUpdated={(updatedPoi) => {
+            onUpdate(updatedPoi);
+            setEditingPoiId(null);
+          }}
+        />
+      )}
     </div>
   );
 };

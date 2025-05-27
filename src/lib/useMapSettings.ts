@@ -45,12 +45,13 @@ export const useMapSettings = () => {
         throw fetchError;
       }
 
-      if (data?.setting_value) {
-        const newSettings = { ...defaultMapSettings, ...data.setting_value };
-        console.log('🔧 [useMapSettings] Loaded settings from database:', newSettings);
+      if (data && data.setting_value) {
+        const newSettings = {
+          ...defaultMapSettings,
+          ...data.setting_value
+        };
         setSettings(newSettings);
       } else {
-        console.log('🔧 [useMapSettings] No settings found in database, using defaults:', defaultMapSettings);
         setSettings(defaultMapSettings);
       }
     } catch (err: any) {

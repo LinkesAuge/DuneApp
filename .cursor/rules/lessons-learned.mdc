@@ -300,6 +300,40 @@ This document serves as a learning journal for the Dune Awakening Deep Desert Tr
 
 ---
 
+### 2025-01-03: Custom POI Types System Overhaul - Architectural Design Revolution
+-   **Topic/Feature**: Custom POI Types System - Complete Architectural Redesign.
+-   **Observation/Pattern**:
+    1.  Original custom icon system was fundamentally flawed - created orphaned icons not integrated with POI type/category system.
+    2.  Filtering became complex and inconsistent because custom icons existed outside the standard type hierarchy.
+    3.  User experience was confusing: users expected to create "types" but could only create isolated "icons."
+    4.  Architecture violated the principle of unified data models - created a parallel system instead of extending the existing one.
+-   **Decision/Action Taken**:
+    1.  **Complete System Redesign**: Replaced custom icons with custom POI types that integrate seamlessly with existing architecture.
+    2.  **Database Enhancement**: Added `created_by` field to `poi_types` table to distinguish user-created from system types.
+    3.  **Component Replacement**: Built new `CustomPoiTypeModal` allowing comprehensive POI type creation (name, icon, category, color, description).
+    4.  **UI Restructuring**: Transformed "Collections" tab into "Customization" tab focused on custom type creation.
+    5.  **Filtering Unification**: Removed special custom POI filtering logic - custom types now work exactly like system types.
+    6.  **Admin Integration**: Custom types appear in admin panel alongside system types for unified management.
+-   **Rationale**:
+    1.  To fix fundamental architectural flaw where custom entities existed outside the core data model.
+    2.  To provide users with comprehensive customization capability that matches their mental model of "POI types."
+    3.  To eliminate filtering complexity and inconsistencies caused by parallel systems.
+    4.  To create a scalable foundation that can support unlimited user creativity while maintaining system coherence.
+-   **Impact/Outcome**:
+    -   **Architecture**: Revolutionary improvement from flawed parallel system to seamless integration.
+    -   **User Experience**: Users can now create complete POI types with full feature parity to system types.
+    -   **Code Quality**: Dramatic simplification of filtering logic and elimination of special-case handling.
+    -   **Scalability**: Foundation for unlimited user customization within a coherent system architecture.
+    -   **Maintainability**: Unified codebase with consistent patterns for all POI type interactions.
+-   **Future Consideration**:
+    -   Always extend existing core data models rather than creating parallel systems for user customizations.
+    -   When users request "custom X," analyze whether they actually want "custom type of X" with full feature integration.
+    -   Architectural coherence should be prioritized over implementation convenience - parallel systems create long-term technical debt.
+    -   Document this pattern for future customization features: extend the core model, don't bypass it.
+    -   Consider this approach for any future "custom" features: favorites, filters, views, etc.
+
+---
+
 ### 2025-01-03: Custom Icon Persistence - Database-First vs Client-Side Data Modification
 -   **Topic/Feature**: POI Custom Icon System - Data Persistence Architecture.
 -   **Observation/Pattern**:
@@ -333,4 +367,59 @@ This document serves as a learning journal for the Dune Awakening Deep Desert Tr
 
 ---
 
+### 2025-01-03: POI Filter System Enhancement - User Experience & Technical Improvement
+-   **Topic/Feature**: Hagga Basin POI Filter System - Functionality Fix & Layout Redesign.
+-   **Observation/Pattern**:
+    1.  Individual POI type filtering was completely broken - checkboxes were hardcoded to `checked={true}` with empty `onChange` handlers and TODO comments.
+    2.  The `selectedPoiTypes` state existed but was never populated, making the filtering logic ineffective for individual type selection.
+    3.  Single-column layout felt cramped and didn't efficiently use available sidebar space.
+    4.  User specifically requested a two-column layout with logical grouping: Base+Resource types (left), Locations+NPCs (right).
+    5.  Privacy filtering used a dropdown that could be improved with quick-access buttons.
+-   **Decision/Action Taken**:
+    1.  **Fixed Core Filtering Logic**: 
+        - **Inverted Logic**: Changed from "selected gets hidden" to "selected stays visible" as requested
+        - **Default Selection**: All POI types selected by default on page load for better UX
+        - Implemented `handleTypeToggle(typeId)` to properly manage individual type selection
+        - Enhanced `handleCategoryToggle()` to synchronize with `selectedPoiTypes` state
+        - Modified filtering priority: individual types take precedence over category-level filtering
+        - Connected "All/None" buttons to work with the new state management system
+    2.  **Two-Column Layout Implementation**: 
+        - **Fixed Category Names**: Used correct database categories (`Base`, `Resources`, `Locations`, `NPCs`)
+        - Left column: Base + Resources categories
+        - Right column: Locations + NPCs categories
+        - Full-width section below: Custom POIs + quick privacy filter buttons
+        - Responsive design maintains usability across screen sizes
+        - Proper spacing and visual hierarchy improvements
+    3.  **Enhanced User Experience**: 
+        - **POI Type Icons**: Added icon display next to each POI type name
+        - **Icon Support**: Handles both emoji and image URL icons with proper styling
+        - **Visual States**: Enhanced styling for selected/unselected states with better readability
+        - **Color-Aware**: Icons properly colored based on POI type colors and transparency settings
+        - Always display all types (as requested) but visually indicate when filtered out
+        - Individual types disabled when parent category unchecked, with visual opacity changes
+        - Replaced privacy dropdown with intuitive button grid for quick access
+        - Added "Additional Filters" section for better organization
+-   **Rationale**:
+    1.  To fix broken functionality that was preventing users from effectively filtering POIs by specific types.
+    2.  To implement user's explicit layout requirements for better visual organization and space utilization.
+    3.  To create a more intuitive and efficient filtering interface that scales with the growing number of POI types.
+    4.  To maintain the "always display everything" requirement while providing clear visual feedback about filter states.
+-   **Impact/Outcome**:
+    -   **Functionality**: POI filtering now works correctly for both individual types and categories.
+    -   **User Experience**: Dramatically improved layout efficiency and visual organization.
+    -   **Performance**: Clean TypeScript compilation with zero errors, efficient state management.
+    -   **Maintainability**: Cleaner code structure with proper separation of concerns between category and type filtering.
+    -   **User Satisfaction**: Layout matches exact user requirements with enhanced functionality.
+-   **Future Consideration**:
+    -   Document this pattern for other filtering interfaces in the application to maintain consistency.
+    -   Consider implementing saved filter presets for power users who frequently use specific filter combinations.
+    -   Monitor user behavior to see if the two-column layout could benefit other parts of the application.
+    -   Apply similar enhancement patterns to the Deep Desert grid filter system if needed.
+    -   Consider implementing keyboard shortcuts for common filtering operations.
 
+---
+
+### 2025-01-03: POI Filter System Debugging & Final Resolution
+-   **Topic/Feature**: Hagga Basin POI Filter System - Debugging and Final Resolution.
+-   **Observation/Pattern**:
+    1.  Individual POI type filtering was completely broken - checkboxes were hardcoded to `

@@ -39,9 +39,9 @@ const Navbar: React.FC = () => {
                     Dashboard
                   </Link>
                   <Link
-                    to="/grid"
+                    to="/deep-desert"
                     className={`px-3 py-2 rounded-md text-sm font-medium ${
-                      location.pathname === '/grid'
+                      location.pathname.startsWith('/deep-desert')
                         ? 'bg-night-800 text-white'
                         : 'text-sand-300 hover:bg-night-800 hover:text-white'
                     }`}
@@ -167,9 +167,9 @@ const Navbar: React.FC = () => {
                   Dashboard
                 </Link>
                 <Link
-                  to="/grid"
+                  to="/deep-desert"
                   className={`block px-3 py-2 rounded-md text-base font-medium ${
-                    location.pathname === '/grid'
+                    location.pathname.startsWith('/deep-desert')
                       ? 'bg-night-800 text-white'
                       : 'text-sand-300 hover:bg-night-800 hover:text-white'
                   }`}

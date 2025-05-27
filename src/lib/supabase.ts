@@ -1,14 +1,14 @@
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-if (!supabaseUrl || !supabaseAnonKey) {
+if (!supabaseUrl || !supabaseKey) {
   throw new Error('Missing Supabase environment variables. Please check your .env file.');
 }
 
 // Create Supabase client with storage configuration
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+export const supabase = createClient(supabaseUrl, supabaseKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
@@ -19,6 +19,17 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     },
   },
 });
+
+// Test storage access
+try {
+  if (supabase.storage) {
+    // Removed: console.log("Supabase storage client initialized and accessible.");
+  } else {
+    console.error("Supabase storage client is not accessible.");
+  }
+} catch (error) {
+  console.error("Error accessing Supabase storage:", error);
+}
 
 // Initialize storage bucket if it doesn't exist
 export const initializeStorage = async () => {
