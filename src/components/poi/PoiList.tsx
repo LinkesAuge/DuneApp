@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Poi, PoiType } from '../../types';
+import { Poi, PoiType, CustomIcon } from '../../types';
 import { supabase } from '../../lib/supabase';
 import { MapPin } from 'lucide-react';
 import PoiEditForm from './PoiEditForm';
@@ -9,6 +9,7 @@ import GridGallery from '../grid/GridGallery';
 interface PoiListProps {
   pois: Poi[];
   poiTypes: PoiType[];
+  customIcons: CustomIcon[];
   onDelete: (id: string) => void;
   onUpdate: (poi: Poi) => void;
   onViewScreenshot: () => void;
@@ -19,7 +20,7 @@ interface UserInfo {
   [key: string]: { username: string };
 }
 
-const PoiList: React.FC<PoiListProps> = ({ pois, poiTypes, onDelete, onUpdate, onViewScreenshot, onPoiGalleryOpen }) => {
+const PoiList: React.FC<PoiListProps> = ({ pois, poiTypes, customIcons, onDelete, onUpdate, onViewScreenshot, onPoiGalleryOpen }) => {
   const [editingPoiId, setEditingPoiId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [userInfo, setUserInfo] = useState<UserInfo>({});
@@ -54,7 +55,15 @@ const PoiList: React.FC<PoiListProps> = ({ pois, poiTypes, onDelete, onUpdate, o
 
   useEffect(() => {
     const fetchGridSquares = async () => {
-      const gridSquareIds = [...new Set(pois.map(poi => poi.grid_square_id))];
+      // Filter out null/undefined grid_square_id values to avoid invalid queries
+      const gridSquareIds = [...new Set(pois.map(poi => poi.grid_square_id).filter(id => id != null))];
+      
+      // Only make the query if there are valid grid square IDs
+      if (gridSquareIds.length === 0) {
+        setGridSquares({});
+        return;
+      }
+      
       try {
         const { data, error } = await supabase
           .from('grid_squares')
@@ -138,6 +147,7 @@ const PoiList: React.FC<PoiListProps> = ({ pois, poiTypes, onDelete, onUpdate, o
             key={poi.id}
             poi={poi}
             poiType={getPoiType(poi.poi_type_id)}
+            customIcons={customIcons}
             gridSquareCoordinate={gridSquares[poi.grid_square_id]}
             creator={userInfo[poi.created_by]}
             onEdit={() => setEditingPoiId(poi.id)}

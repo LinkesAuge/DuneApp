@@ -94,7 +94,20 @@ const HaggaBasinPage: React.FC = () => {
       throw error;
     }
 
-    setPois(data || []);
+    // Transform screenshots JSONB[] to PoiScreenshot[] format for compatibility
+    const poisWithTransformedScreenshots = (data || []).map(poi => ({
+      ...poi,
+      screenshots: Array.isArray(poi.screenshots) 
+        ? poi.screenshots.map((screenshot: any, index: number) => ({
+            id: screenshot.id || `${poi.id}_${index}`,
+            url: screenshot.url || screenshot,
+            uploaded_by: screenshot.uploaded_by || poi.created_by,
+            upload_date: screenshot.upload_date || poi.created_at
+          }))
+        : []
+    }));
+
+    setPois(poisWithTransformedScreenshots);
   };
 
   const fetchPoiTypes = async () => {
@@ -251,9 +264,7 @@ const HaggaBasinPage: React.FC = () => {
           coordinates_x: updatedPoi.coordinates_x,
           coordinates_y: updatedPoi.coordinates_y,
           poi_type_id: updatedPoi.poi_type_id,
-          custom_icon_id: updatedPoi.custom_icon_id,
-          privacy_level: updatedPoi.privacy_level,
-          updated_at: new Date().toISOString()
+          privacy_level: updatedPoi.privacy_level
         })
         .eq('id', updatedPoi.id);
 

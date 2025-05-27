@@ -79,22 +79,32 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
   const [title, setTitle] = useState(poi.title);
   const [description, setDescription] = useState(poi.description || '');
   const [selectedPoiTypeId, setSelectedPoiTypeId] = useState(poi.poi_type_id);
-  const [selectedCustomIcon, setSelectedCustomIcon] = useState<string | null>(null);
   const [privacyLevel, setPrivacyLevel] = useState<PrivacyLevel>(poi.privacy_level);
   const [coordinatesX, setCoordinatesX] = useState(poi.coordinates_x || 0);
   const [coordinatesY, setCoordinatesY] = useState(poi.coordinates_y || 0);
+  
+  // Screenshot management - work with existing screenshots from POI
+  const [existingScreenshots, setExistingScreenshots] = useState<{ id: string; url: string }[]>(
+    poi.screenshots?.map(s => ({ id: s.id, url: s.url })) || []
+  );
+  const [screenshotsToDelete, setScreenshotsToDelete] = useState<string[]>([]);
   const [additionalScreenshots, setAdditionalScreenshots] = useState<File[]>([]);
+  
+  // UI state
+  const [showDetailedPoiSelection, setShowDetailedPoiSelection] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Check permissions
   const canEdit = user && (user.id === poi.created_by || user.role === 'admin' || user.role === 'editor');
 
-  // Get categories for organizing POI types, including custom icons
+  // Get categories for organizing POI types
   const categories = [...new Set(poiTypes.map(type => type.category))];
-  if (customIcons.length > 0) {
-    categories.push('custom');
-  }
+
+  // Initialize screenshots from POI data
+  useEffect(() => {
+    setExistingScreenshots(poi.screenshots?.map(s => ({ id: s.id, url: s.url })) || []);
+  }, [poi.screenshots]);
 
   // Handle position change
   const handlePositionChange = () => {
@@ -103,6 +113,15 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
       onClose();
     }
   };
+
+  // Handle existing screenshot deletion
+  const handleDeleteExistingScreenshot = (screenshotId: string) => {
+    setExistingScreenshots(prev => prev.filter(s => s.id !== screenshotId));
+    setScreenshotsToDelete(prev => [...prev, screenshotId]);
+  };
+
+  // Calculate total screenshot count
+  const totalScreenshotCount = existingScreenshots.length + additionalScreenshots.length;
 
   // Handle additional screenshot upload
   const handleScreenshotUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -115,8 +134,20 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
       setError('Some files were invalid. Only images under 10MB are allowed.');
       return;
     }
+
+    // Check total screenshot limit
+    const maxNew = 5 - totalScreenshotCount;
+    if (maxNew <= 0) {
+      setError('Maximum 5 screenshots allowed per POI');
+      return;
+    }
     
-    setAdditionalScreenshots(prev => [...prev, ...validFiles].slice(0, 5)); // Max 5 total
+    const filesToAdd = validFiles.slice(0, maxNew);
+    if (filesToAdd.length < validFiles.length) {
+      setError(`Only ${filesToAdd.length} screenshot(s) can be added (5 total limit)`);
+    }
+    
+    setAdditionalScreenshots(prev => [...prev, ...filesToAdd]);
   };
 
   // Remove additional screenshot
@@ -169,25 +200,61 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
       return;
     }
 
-    if (!selectedPoiTypeId && !selectedCustomIcon) {
-      setError('Please select a POI type or custom icon');
+    if (!selectedPoiTypeId) {
+      setError('Please select a POI type');
       return;
+    }
+
+    // Handle custom icon selection
+    let finalPoiTypeId = selectedPoiTypeId;
+    let customIconId = null;
+    
+    console.log('🔧 [POIEditModal] Selected POI Type ID:', selectedPoiTypeId);
+    console.log('🔧 [POIEditModal] Available custom icons:', customIcons);
+    
+    if (selectedPoiTypeId.startsWith('custom_')) {
+      customIconId = selectedPoiTypeId.replace('custom_', '');
+      const customIcon = customIcons.find(icon => icon.id === customIconId);
+      
+      console.log('🔧 [POIEditModal] Custom icon ID:', customIconId);
+      console.log('🔧 [POIEditModal] Found custom icon:', customIcon);
+      
+      if (!customIcon) {
+        setError('Selected custom icon not found.');
+        return;
+      }
+      
+      // Find a generic POI type to use as base, prefer "Custom" category or first available
+      const customCategoryType = poiTypes.find(type => type.category.toLowerCase() === 'custom');
+      const fallbackType = poiTypes.find(type => type.category.toLowerCase() === 'general') || poiTypes[0];
+      
+      finalPoiTypeId = customCategoryType?.id || fallbackType?.id;
+      
+      console.log('🔧 [POIEditModal] Final POI type ID:', finalPoiTypeId);
+      
+      if (!finalPoiTypeId) {
+        setError('No suitable POI type found for custom icon.');
+        return;
+      }
+      
+      console.log('🔧 [POIEditModal] Will save custom icon ID to database:', customIconId);
     }
 
     setIsSubmitting(true);
     setError(null);
 
     try {
+      // For custom icons, we'll modify the POI type data on the client side after update
+
       // Prepare update data
       const updateData = {
         title: title.trim(),
         description: description.trim() || null,
-        poi_type_id: selectedCustomIcon ? null : selectedPoiTypeId,
-        custom_icon_id: selectedCustomIcon || null,
+        poi_type_id: finalPoiTypeId,
         coordinates_x: coordinatesX,
         coordinates_y: coordinatesY,
         privacy_level: privacyLevel,
-        updated_at: new Date().toISOString()
+        custom_icon_id: customIconId
       };
 
       // Update the POI record
@@ -207,36 +274,58 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
         throw new Error('Failed to update POI');
       }
 
+      // Handle screenshot updates
+      let finalScreenshots = [...poi.screenshots || []];
+      
+      // Remove screenshots marked for deletion
+      if (screenshotsToDelete.length > 0) {
+        finalScreenshots = finalScreenshots.filter(screenshot => 
+          !screenshotsToDelete.includes(screenshot.id)
+        );
+      }
+
       // Upload additional screenshots if any
       if (additionalScreenshots.length > 0) {
         try {
           const screenshotUrls = await uploadAdditionalScreenshots(poi.id);
           
-          // Save screenshot records
-          const screenshotRecords = screenshotUrls.map(url => ({
-            poi_id: poi.id,
+          // Add new screenshots to the array
+          const newScreenshots = screenshotUrls.map((url, index) => ({
+            id: `${poi.id}_${Date.now()}_${index}`,
             url,
-            uploaded_by: user!.id
+            uploaded_by: user!.id,
+            upload_date: new Date().toISOString()
           }));
 
-          const { error: screenshotError } = await supabase
-            .from('poi_screenshots')
-            .insert(screenshotRecords);
-
-          if (screenshotError) {
-            console.error('Error saving screenshot records:', screenshotError);
-            // Don't fail the update for this
-          }
+          finalScreenshots = [...finalScreenshots, ...newScreenshots];
         } catch (screenshotUploadError) {
           console.error('Error uploading screenshots:', screenshotUploadError);
           setError('POI updated successfully, but some screenshots failed to upload');
         }
       }
 
-      // Create updated POI object with existing screenshots
+      // Update POI with new screenshots array
+      if (screenshotsToDelete.length > 0 || additionalScreenshots.length > 0) {
+        const { error: screenshotUpdateError } = await supabase
+          .from('pois')
+          .update({ screenshots: finalScreenshots })
+          .eq('id', poi.id);
+
+        if (screenshotUpdateError) {
+          console.error('Error updating screenshots:', screenshotUpdateError);
+          // Don't fail the main update for this
+        }
+      }
+
+      // Create updated POI object with updated screenshots
       const finalUpdatedPoi = {
         ...updatedPoi,
-        screenshots: poi.screenshots // Keep existing screenshots
+        screenshots: finalScreenshots.map(s => ({
+          id: s.id,
+          url: s.url,
+          uploaded_by: s.uploaded_by,
+          upload_date: s.upload_date
+        }))
       };
 
       onPoiUpdated(finalUpdatedPoi);
@@ -342,7 +431,7 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
                   <div className="text-sm text-sand-700">
                     <div className="font-medium">Current Position:</div>
                     <div className="text-sand-600">
-                      X: {coordinatesX.toFixed(2)}%, Y: {coordinatesY.toFixed(2)}%
+                      X: {coordinatesX.toFixed(0)}, Y: {coordinatesY.toFixed(0)}
                     </div>
                   </div>
                   {onPositionChange && (
@@ -361,134 +450,169 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
 
             {/* POI Type Selection */}
             <div>
-              <label className="block text-sm font-medium text-sand-800 mb-3">
+              <label htmlFor="poiTypeSelect" className="block text-sm font-medium text-sand-800 mb-2">
                 POI Type *
               </label>
-              <div className="space-y-4">
-                {categories.map(category => {
-                  // Handle custom icons category
-                  if (category === 'custom') {
+              
+              {/* Dropdown Selection */}
+              <select
+                id="poiTypeSelect"
+                value={selectedPoiTypeId}
+                onChange={(e) => setSelectedPoiTypeId(e.target.value)}
+                className="input input-bordered w-full mb-3"
+                required
+              >
+                <option value="">Select a POI type</option>
+                {categories.sort().map(category => (
+                  <optgroup key={category} label={category}>
+                    {poiTypes
+                      .filter(type => type.category === category)
+                      .map(type => (
+                        <option key={type.id} value={type.id}>
+                          {type.name}
+                        </option>
+                      ))}
+                  </optgroup>
+                ))}
+                {customIcons.length > 0 && (
+                  <optgroup label="Custom Icons">
+                    {customIcons.map(icon => (
+                      <option key={`custom_${icon.id}`} value={`custom_${icon.id}`}>
+                        {icon.name} (Custom)
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+              </select>
+
+              {/* Show More Details Toggle */}
+              <button
+                type="button"
+                onClick={() => setShowDetailedPoiSelection(!showDetailedPoiSelection)}
+                className="text-sm text-spice-600 hover:text-spice-800 font-medium underline"
+              >
+                {showDetailedPoiSelection ? 'Hide details' : 'Show more details'}
+              </button>
+
+              {/* Detailed Visual Selection */}
+              {showDetailedPoiSelection && (
+                <div className="mt-4 space-y-4 border border-sand-200 rounded-lg p-4 bg-sand-25">
+                  {categories.map(category => {
+                    const categoryTypes = poiTypes.filter(type => type.category === category);
+                    
                     return (
                       <div key={category}>
                         <h4 className="text-sm font-medium text-sand-700 mb-2 capitalize">
-                          Custom Icons
+                          {category}
                         </h4>
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                          {customIcons.map(customIcon => (
-                            <label
-                              key={`custom-${customIcon.id}`}
-                              className={`flex items-center space-x-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                                selectedCustomIcon === customIcon.id
-                                  ? 'border-spice-500 bg-spice-50'
-                                  : 'border-sand-200 hover:border-sand-300 bg-white'
-                              }`}
-                            >
-                              <input
-                                type="radio"
-                                name="poiType"
-                                value={`custom-${customIcon.id}`}
-                                checked={selectedCustomIcon === customIcon.id}
-                                onChange={() => {
-                                  setSelectedCustomIcon(customIcon.id);
-                                  setSelectedPoiTypeId(''); // Clear regular type selection
-                                }}
-                                className="sr-only"
-                              />
-                              
-                              {/* Custom Icon */}
-                              <div className="w-8 h-8 rounded-full border border-white shadow-sm flex items-center justify-center flex-shrink-0 bg-sand-200">
-                                <img
-                                  src={customIcon.image_url}
-                                  alt={customIcon.name}
-                                  className="w-5 h-5 object-contain"
+                          {categoryTypes.map(poiType => {
+                            const imageUrl = getDisplayImageUrl(poiType.icon, customIcons);
+                            
+                            return (
+                              <label
+                                key={poiType.id}
+                                className={`flex items-center space-x-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                                  selectedPoiTypeId === poiType.id
+                                    ? 'border-spice-500 bg-spice-50'
+                                    : 'border-sand-200 hover:border-sand-300 bg-white'
+                                }`}
+                              >
+                                <input
+                                  type="radio"
+                                  name="poiType"
+                                  value={poiType.id}
+                                  checked={selectedPoiTypeId === poiType.id}
+                                  onChange={(e) => setSelectedPoiTypeId(e.target.value)}
+                                  className="sr-only"
                                 />
-                              </div>
-                              
-                              <span className="text-sm font-medium text-sand-800 truncate">
-                                {customIcon.name}
-                              </span>
-                            </label>
-                          ))}
+                                
+                                {/* POI Type Icon */}
+                                <div 
+                                  className="w-8 h-8 rounded-full border border-white shadow-sm flex items-center justify-center flex-shrink-0"
+                                  style={{
+                                    backgroundColor: poiType.icon_has_transparent_background && imageUrl 
+                                      ? 'transparent' 
+                                      : poiType.color
+                                  }}
+                                >
+                                  {imageUrl ? (
+                                    <img
+                                      src={imageUrl}
+                                      alt={poiType.name}
+                                      className="w-5 h-5 object-contain"
+                                      style={{
+                                        filter: poiType.icon_has_transparent_background ? 'none' : 'drop-shadow(0 1px 1px rgba(0,0,0,0.3))'
+                                      }}
+                                    />
+                                  ) : (
+                                    <span 
+                                      className="text-sm leading-none"
+                                      style={{ 
+                                        color: poiType.icon_has_transparent_background ? poiType.color : 'white',
+                                        textShadow: poiType.icon_has_transparent_background ? '0 1px 1px rgba(0,0,0,0.3)' : 'none'
+                                      }}
+                                    >
+                                      {poiType.icon}
+                                    </span>
+                                  )}
+                                </div>
+                                
+                                <span className="text-sm font-medium text-sand-800 truncate">
+                                  {poiType.name}
+                                </span>
+                              </label>
+                            );
+                          })}
                         </div>
                       </div>
                     );
-                  }
+                  })}
 
-                  // Handle regular POI type categories
-                  const categoryTypes = poiTypes.filter(type => type.category === category);
-                  
-                  return (
-                    <div key={category}>
-                      <h4 className="text-sm font-medium text-sand-700 mb-2 capitalize">
-                        {category}
+                  {/* Custom Icons Section */}
+                  {customIcons.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-medium text-sand-700 mb-2">
+                        Custom Icons
                       </h4>
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                        {categoryTypes.map(poiType => {
-                          const imageUrl = getDisplayImageUrl(poiType.icon, customIcons);
-                          
-                          return (
-                            <label
-                              key={poiType.id}
-                              className={`flex items-center space-x-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                                selectedPoiTypeId === poiType.id && !selectedCustomIcon
-                                  ? 'border-spice-500 bg-spice-50'
-                                  : 'border-sand-200 hover:border-sand-300 bg-white'
-                              }`}
-                            >
-                              <input
-                                type="radio"
-                                name="poiType"
-                                value={poiType.id}
-                                checked={selectedPoiTypeId === poiType.id && !selectedCustomIcon}
-                                onChange={(e) => {
-                                  setSelectedPoiTypeId(e.target.value);
-                                  setSelectedCustomIcon(null); // Clear custom icon selection
-                                }}
-                                className="sr-only"
+                        {customIcons.map(customIcon => (
+                          <label
+                            key={`custom_${customIcon.id}`}
+                            className={`flex items-center space-x-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                              selectedPoiTypeId === `custom_${customIcon.id}`
+                                ? 'border-spice-500 bg-spice-50'
+                                : 'border-sand-200 hover:border-sand-300 bg-white'
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="poiType"
+                              value={`custom_${customIcon.id}`}
+                              checked={selectedPoiTypeId === `custom_${customIcon.id}`}
+                              onChange={(e) => setSelectedPoiTypeId(e.target.value)}
+                              className="sr-only"
+                            />
+                            
+                            {/* Custom Icon */}
+                            <div className="w-8 h-8 rounded-full border border-white shadow-sm flex items-center justify-center flex-shrink-0 bg-transparent">
+                              <img
+                                src={customIcon.image_url}
+                                alt={customIcon.name}
+                                className="w-5 h-5 object-contain"
                               />
-                              
-                              {/* POI Type Icon */}
-                              <div 
-                                className="w-8 h-8 rounded-full border border-white shadow-sm flex items-center justify-center flex-shrink-0"
-                                style={{
-                                  backgroundColor: poiType.icon_has_transparent_background && imageUrl 
-                                    ? 'transparent' 
-                                    : poiType.color
-                                }}
-                              >
-                                {imageUrl ? (
-                                  <img
-                                    src={imageUrl}
-                                    alt={poiType.name}
-                                    className="w-5 h-5 object-contain"
-                                    style={{
-                                      filter: poiType.icon_has_transparent_background ? 'none' : 'drop-shadow(0 1px 1px rgba(0,0,0,0.3))'
-                                    }}
-                                  />
-                                ) : (
-                                  <span 
-                                    className="text-sm leading-none"
-                                    style={{ 
-                                      color: poiType.icon_has_transparent_background ? poiType.color : 'white',
-                                      textShadow: poiType.icon_has_transparent_background ? '0 1px 1px rgba(0,0,0,0.3)' : 'none'
-                                    }}
-                                  >
-                                    {poiType.icon}
-                                  </span>
-                                )}
-                              </div>
-                              
-                              <span className="text-sm font-medium text-sand-800 truncate">
-                                {poiType.name}
-                              </span>
-                            </label>
-                          );
-                        })}
+                            </div>
+                            
+                            <span className="text-sm font-medium text-sand-800 truncate">
+                              {customIcon.name}
+                            </span>
+                          </label>
+                        ))}
                       </div>
                     </div>
-                  );
-                })}
-              </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Privacy Level */}
@@ -527,52 +651,77 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
               </div>
             </div>
 
-            {/* Additional Screenshots */}
+            {/* Screenshots Management */}
             <div>
               <label className="block text-sm font-medium text-sand-800 mb-3">
-                Add Screenshots
+                Screenshots ({totalScreenshotCount}/5)
               </label>
               <div className="space-y-3">
-                <div className="flex items-center justify-center w-full">
-                  <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-sand-300 border-dashed rounded-lg cursor-pointer bg-sand-50 hover:bg-sand-100 transition-colors">
-                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                      <Upload className="w-8 h-8 mb-2 text-sand-500" />
-                      <p className="text-sm text-sand-600">
-                        <span className="font-medium">Click to upload</span> additional screenshots
-                      </p>
-                      <p className="text-xs text-sand-500">PNG, JPG up to 10MB (max 5 files)</p>
+                {/* Existing and New Screenshots Grid */}
+                <div className="flex flex-wrap gap-2">
+                  {/* Existing Screenshots */}
+                  {existingScreenshots.map(screenshot => (
+                    <div 
+                      key={screenshot.id}
+                      className="w-20 h-20 relative rounded overflow-hidden border border-sand-300"
+                    >
+                      <img 
+                        src={screenshot.url} 
+                        alt="POI Screenshot" 
+                        className="w-full h-full object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteExistingScreenshot(screenshot.id)}
+                        className="absolute top-0 right-0 bg-red-600 text-white w-5 h-5 flex items-center justify-center rounded-bl-md hover:bg-red-700 transition-colors"
+                        title="Delete screenshot"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
                     </div>
-                    <input
-                      type="file"
-                      multiple
-                      accept="image/*"
-                      onChange={handleScreenshotUpload}
-                      className="hidden"
-                    />
-                  </label>
-                </div>
+                  ))}
 
-                {/* Additional Screenshot Previews */}
-                {additionalScreenshots.length > 0 && (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    {additionalScreenshots.map((file, index) => (
-                      <div key={index} className="relative">
-                        <img
-                          src={URL.createObjectURL(file)}
-                          alt={`Additional screenshot ${index + 1}`}
-                          className="w-full h-24 object-cover rounded-lg border border-sand-300"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => removeAdditionalScreenshot(index)}
-                          className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                  {/* New Screenshots to Upload */}
+                  {additionalScreenshots.map((file, index) => (
+                    <div 
+                      key={`new-${index}`}
+                      className="w-20 h-20 relative rounded overflow-hidden border border-sand-300"
+                    >
+                      <img 
+                        src={URL.createObjectURL(file)} 
+                        alt="New Screenshot" 
+                        className="w-full h-full object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeAdditionalScreenshot(index)}
+                        className="absolute top-0 right-0 bg-red-600 text-white w-5 h-5 flex items-center justify-center rounded-bl-md hover:bg-red-700 transition-colors"
+                        title="Remove screenshot"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                  
+                  {/* Upload Button */}
+                  {totalScreenshotCount < 5 && (
+                    <label className="w-20 h-20 border-2 border-dashed border-sand-300 rounded flex flex-col items-center justify-center text-sand-500 hover:text-sand-700 hover:border-sand-400 cursor-pointer transition-colors">
+                      <Upload className="w-5 h-5" />
+                      <span className="text-xs mt-1">Add</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleScreenshotUpload}
+                        multiple
+                        className="hidden"
+                      />
+                    </label>
+                  )}
+                </div>
+                
+                <p className="text-xs text-sand-600">
+                  Upload up to 5 screenshots total. Each image must be under 10MB. PNG, JPG formats supported.
+                </p>
               </div>
             </div>
           </div>

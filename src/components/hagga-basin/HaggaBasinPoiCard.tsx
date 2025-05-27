@@ -22,16 +22,24 @@ const isIconUrl = (icon: string): boolean => {
 };
 
 // Helper function to get display image URL for POI icons
-const getDisplayImageUrl = (icon: string, customIcons: CustomIcon[]): string | null => {
-  // Check if it's a custom icon reference
-  const customIcon = customIcons.find(ci => ci.id === icon || ci.name === icon);
-  if (customIcon) {
-    return customIcon.image_url;
+const getDisplayImageUrl = (poi: Poi, poiType: PoiType, customIcons: CustomIcon[]): string | null => {
+  // First priority: Check if POI has a custom icon reference
+  if (poi.custom_icon_id) {
+    const customIcon = customIcons.find(ci => ci.id === poi.custom_icon_id);
+    if (customIcon) {
+      return customIcon.image_url;
+    }
   }
   
-  // Check if it's already a URL
-  if (isIconUrl(icon)) {
-    return icon;
+  // Second priority: Check if POI type icon is a custom icon reference
+  const customIconByPoiType = customIcons.find(ci => ci.id === poiType.icon || ci.name === poiType.icon);
+  if (customIconByPoiType) {
+    return customIconByPoiType.image_url;
+  }
+  
+  // Third priority: Check if POI type icon is already a URL
+  if (isIconUrl(poiType.icon)) {
+    return poiType.icon;
   }
   
   return null;
@@ -72,7 +80,7 @@ const HaggaBasinPoiCard: React.FC<HaggaBasinPoiCardProps> = ({
   const { user } = useAuth();
   const canModify = user && (user.id === poi.created_by || user.role === 'admin' || user.role === 'editor');
   
-  const imageUrl = getDisplayImageUrl(poiType.icon, customIcons);
+  const imageUrl = getDisplayImageUrl(poi, poiType, customIcons);
   const PrivacyIcon = privacyIcons[poi.privacy_level];
   const privacyColor = privacyColors[poi.privacy_level];
   const privacyLabel = privacyLabels[poi.privacy_level];
@@ -222,7 +230,7 @@ const HaggaBasinPoiCard: React.FC<HaggaBasinPoiCardProps> = ({
                 <div className="flex items-center text-sand-600">
                   <MapPin className="w-4 h-4 mr-2" />
                   <span>
-                    Coordinates: {poi.coordinates_x?.toFixed(2)}%, {poi.coordinates_y?.toFixed(2)}%
+                    Coordinates: {poi.coordinates_x?.toFixed(0)}, {poi.coordinates_y?.toFixed(0)}
                   </span>
                 </div>
                 <div className="flex items-center text-sand-600">

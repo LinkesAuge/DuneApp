@@ -9,7 +9,8 @@ import type {
   CustomIcon, 
   PixelCoordinates 
 } from '../../types';
-import { getMarkerPosition, getRelativeCoordinates, validateCoordinates, formatCoordinates } from '../../lib/coordinates';
+import { getMarkerPosition, getRelativeCoordinates, validateCoordinates } from '../../lib/coordinates';
+import { useMapSettings } from '../../lib/useMapSettings';
 import MapPOIMarker from './MapPOIMarker';
 import POIPlacementModal from './POIPlacementModal';
 import POIEditModal from './POIEditModal';
@@ -27,9 +28,9 @@ interface InteractiveMapProps {
   customIcons: CustomIcon[];
 }
 
-// Map configuration for zoom/pan
-const mapConfig = {
-  initialScale: 0.4,
+// Map configuration for zoom/pan (initialScale will be set dynamically)
+const getMapConfig = (initialScale: number) => ({
+  initialScale,
   minScale: 0.1,
   maxScale: 4,
   limitToBounds: false,
@@ -39,7 +40,7 @@ const mapConfig = {
   doubleClick: { disabled: false },
   panning: { disabled: false },
   velocityAnimation: { sensitivity: 1, animationTime: 400 }
-};
+});
 
 // Layer z-index configuration
 const layerZIndex = {
@@ -64,7 +65,13 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
 }) => {
   const transformRef = useRef<ReactZoomPanPinchRef | null>(null);
   const mapElementRef = useRef<HTMLDivElement | null>(null);
-
+  
+  // Load admin settings
+  const { settings: mapSettings } = useMapSettings();
+  
+  // Dynamic map config using settings
+  const mapConfig = getMapConfig(mapSettings?.defaultZoom || 0.4);
+  
   // State for POI placement
   const [placementMode, setPlacementMode] = useState(false);
   const [placementCoordinates, setPlacementCoordinates] = useState<PixelCoordinates | null>(null);
@@ -78,13 +85,20 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const [positionChangeMode, setPositionChangeMode] = useState(false);
   const [changingPositionPoi, setChangingPositionPoi] = useState<Poi | null>(null);
 
-  // POI dragging state
-  const [draggedPoi, setDraggedPoi] = useState<Poi | null>(null);
-  const [dragOffset, setDragOffset] = useState<{ x: number; y: number } | null>(null);
+  // Apply initial zoom when settings load
+  useEffect(() => {
+    if (mapSettings && transformRef.current && imageLoaded) {
+      const targetZoom = mapSettings.defaultZoom || 0.4;
+      setTimeout(() => {
+        transformRef.current?.setTransform(200, 200, targetZoom);
+        setCurrentZoom(targetZoom);
+      }, 100);
+    }
+  }, [mapSettings, imageLoaded]);
 
   // Handle map click for POI placement and position changing
   const handleMapClick = useCallback((event: React.MouseEvent) => {
-    if (!mapElementRef.current || draggedPoi) return;
+    if (!mapElementRef.current) return;
     
     // Handle position change mode
     if (positionChangeMode && changingPositionPoi) {
@@ -139,91 +153,13 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
     } catch (error) {
       console.error('Error calculating coordinates:', error);
     }
-  }, [placementMode, positionChangeMode, changingPositionPoi, draggedPoi, onPoiUpdated]);
+      }, [placementMode, positionChangeMode, changingPositionPoi, onPoiUpdated]);
 
-  // Handle POI dragging
-  const handlePoiMouseDown = useCallback((poi: Poi, event: React.MouseEvent) => {
-    if (!mapElementRef.current) return;
-    
-    event.preventDefault();
-    event.stopPropagation();
-    
-    const rect = mapElementRef.current.getBoundingClientRect();
-    const poiPosition = getMarkerPosition(poi.coordinates_x || 0, poi.coordinates_y || 0);
-    
-    // Calculate offset from mouse to POI center
-    const offset = {
-      x: event.clientX - rect.left - parseFloat(poiPosition.left),
-      y: event.clientY - rect.top - parseFloat(poiPosition.top)
-    };
-    
-    setDraggedPoi(poi);
-    setDragOffset(offset);
+  // Track zoom level for icon scaling - listen to all zoom events
+  const handleZoomChange = useCallback((ref: ReactZoomPanPinchRef) => {
+    const newZoom = ref.state.scale;
+    setCurrentZoom(newZoom);
   }, []);
-
-  const handleMouseMove = useCallback((event: React.MouseEvent) => {
-    if (!draggedPoi || !dragOffset || !mapElementRef.current) return;
-    
-    event.preventDefault();
-    
-    const coordinates = getRelativeCoordinates(event, mapElementRef.current);
-    
-    // Apply offset to get the correct POI position
-    const adjustedCoordinates = {
-      x: coordinates.x - dragOffset.x / 4000 * 100, // Convert back to percentage
-      y: coordinates.y - dragOffset.y / 4000 * 100
-    };
-    
-    if (validateCoordinates(adjustedCoordinates.x, adjustedCoordinates.y)) {
-      // Update POI position optimistically
-      const updatedPoi = {
-        ...draggedPoi,
-        coordinates_x: adjustedCoordinates.x,
-        coordinates_y: adjustedCoordinates.y
-      };
-      
-      // Temporarily update the POI in the list for immediate visual feedback
-      setDraggedPoi(updatedPoi);
-    }
-  }, [draggedPoi, dragOffset]);
-
-  const handleMouseUp = useCallback(async () => {
-    if (!draggedPoi) return;
-    
-    try {
-      // Update POI in database
-      if (onPoiUpdated) {
-        await onPoiUpdated(draggedPoi);
-      }
-    } catch (error) {
-      console.error('Error updating POI position:', error);
-    } finally {
-      setDraggedPoi(null);
-      setDragOffset(null);
-    }
-  }, [draggedPoi, onPoiUpdated]);
-
-  // Track zoom level for icon scaling
-  useEffect(() => {
-    if (transformRef.current) {
-      const handleTransform = (ref: ReactZoomPanPinchRef) => {
-        setCurrentZoom(ref.state.scale);
-      };
-      
-      // Listen to transform changes
-      const unsubscribe = transformRef.current.instance.wrapperComponent?.addEventListener?.('wheel', () => {
-        if (transformRef.current) {
-          handleTransform(transformRef.current);
-        }
-      });
-      
-      return () => {
-        if (unsubscribe) {
-          unsubscribe();
-        }
-      };
-    }
-  }, [transformRef.current]);
 
   // Start position change mode for a POI
   const startPositionChange = useCallback((poi: Poi) => {
@@ -262,7 +198,7 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
       }, 200);
       return () => clearTimeout(timer);
     }
-  }, [imageLoaded]);
+  }, [imageLoaded, mapConfig.initialScale]);
 
   // Handle POI marker click
   const handlePoiClick = useCallback((poi: Poi, event: React.MouseEvent) => {
@@ -288,17 +224,34 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
         transformRef.current.setTransform(200, 200, mapConfig.initialScale);
       }
     }, 100);
-  }, []);
+  }, [mapConfig.initialScale]);
 
   // Zoom controls
-  const zoomIn = () => transformRef.current?.zoomIn();
-  const zoomOut = () => transformRef.current?.zoomOut();
+  const zoomIn = () => {
+    transformRef.current?.zoomIn();
+    setTimeout(() => {
+      if (transformRef.current) {
+        handleZoomChange(transformRef.current);
+      }
+    }, 50);
+  };
+  
+  const zoomOut = () => {
+    transformRef.current?.zoomOut();
+    setTimeout(() => {
+      if (transformRef.current) {
+        handleZoomChange(transformRef.current);
+      }
+    }, 50);
+  };
+  
   const resetTransform = () => {
     if (transformRef.current) {
       transformRef.current.resetTransform();
       // Position towards top-left after reset
       setTimeout(() => {
         transformRef.current?.setTransform(200, 200, mapConfig.initialScale);
+        handleZoomChange(transformRef.current);
       }, 50);
     }
   };
@@ -315,16 +268,19 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
     pointerEvents: 'none' as const
   });
 
-  // Get POI marker position style
+  // Get POI marker position style with counter-scaling to neutralize map zoom
   const getPoiMarkerStyle = (poi: Poi) => {
     if (!poi.coordinates_x || !poi.coordinates_y) return {};
     
     const position = getMarkerPosition(poi.coordinates_x, poi.coordinates_y);
+    // Apply counter-scaling to neutralize the map's zoom effect
+    const counterScale = 1 / currentZoom;
+    
     return {
       position: 'absolute' as const,
       left: position.left,
       top: position.top,
-      transform: 'translate(-50%, -50%)',
+      transform: `translate(-50%, -50%) scale(${counterScale})`,
       zIndex: layerZIndex.poiMarkers,
       pointerEvents: 'auto' as const
     };
@@ -338,8 +294,12 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
         {...mapConfig}
         onInit={(ref) => {
           transformRef.current = ref;
-          // Initial centering will be handled after image load
+          setCurrentZoom(ref.state.scale);
         }}
+        onZoom={handleZoomChange}
+        onZoomStop={handleZoomChange}
+        onPanning={handleZoomChange}
+        onPanningStop={handleZoomChange}
       >
         <TransformComponent 
           wrapperStyle={{ width: '100%', height: '100%' }}
@@ -387,24 +347,25 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
               const poiType = poiTypes.find(type => type.id === poi.poi_type_id);
               if (!poiType) return null;
 
-              // Use dragged position if this POI is being dragged
-              const displayPoi = draggedPoi && draggedPoi.id === poi.id ? draggedPoi : poi;
-
               return (
                 <div
                   key={poi.id}
-                  style={getPoiMarkerStyle(displayPoi)}
+                  style={getPoiMarkerStyle(poi)}
                   onClick={(e) => handlePoiClick(poi, e)}
-                  onMouseMove={draggedPoi ? handleMouseMove : undefined}
-                  onMouseUp={draggedPoi ? handleMouseUp : undefined}
                 >
                   <MapPOIMarker
-                    poi={displayPoi}
+                    poi={poi}
                     poiType={poiType}
                     customIcons={customIcons}
                     zoom={currentZoom}
-                    onMouseDown={handlePoiMouseDown}
-                    isDragging={draggedPoi?.id === poi.id}
+                    mapSettings={mapSettings}
+                    onEdit={setEditingPoi}
+                    onDelete={onPoiDeleted}
+                    onShare={onPoiShare}
+                    onImageClick={() => {
+                      // TODO: Open gallery modal
+                      console.log('Open gallery for POI:', poi.id);
+                    }}
                   />
                 </div>
               );
@@ -554,8 +515,8 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
               console.log('Open gallery for POI:', selectedPoi.id);
             }}
           />
-                 );
-       })()}
+        );
+      })()}
 
       {/* POI Edit Modal */}
       {editingPoi && (

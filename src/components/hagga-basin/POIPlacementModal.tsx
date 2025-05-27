@@ -78,17 +78,16 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [selectedPoiTypeId, setSelectedPoiTypeId] = useState('');
-  const [selectedCustomIcon, setSelectedCustomIcon] = useState<string | null>(null);
   const [privacyLevel, setPrivacyLevel] = useState<PrivacyLevel>('global');
   const [screenshots, setScreenshots] = useState<File[]>([]);
+  
+  // UI state
+  const [showDetailedPoiSelection, setShowDetailedPoiSelection] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Get categories for organizing POI types, including custom icons
+  // Get categories for organizing POI types
   const categories = [...new Set(poiTypes.map(type => type.category))];
-  if (customIcons.length > 0) {
-    categories.push('custom');
-  }
 
   // Handle screenshot upload
   const handleScreenshotUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -155,9 +154,44 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
       return;
     }
 
-    if (!selectedPoiTypeId && !selectedCustomIcon) {
-      setError('Please select a POI type or custom icon');
+    if (!selectedPoiTypeId) {
+      setError('Please select a POI type');
       return;
+    }
+
+    // Handle custom icon selection
+    let finalPoiTypeId = selectedPoiTypeId;
+    let customIconId = null;
+    
+    console.log('🔧 [POIPlacementModal] Selected POI Type ID:', selectedPoiTypeId);
+    console.log('🔧 [POIPlacementModal] Available custom icons:', customIcons);
+    
+    if (selectedPoiTypeId.startsWith('custom_')) {
+      customIconId = selectedPoiTypeId.replace('custom_', '');
+      const customIcon = customIcons.find(icon => icon.id === customIconId);
+      
+      console.log('🔧 [POIPlacementModal] Custom icon ID:', customIconId);
+      console.log('🔧 [POIPlacementModal] Found custom icon:', customIcon);
+      
+      if (!customIcon) {
+        setError('Selected custom icon not found.');
+        return;
+      }
+      
+      // Find a generic POI type to use as base, prefer "Custom" category or first available
+      const customCategoryType = poiTypes.find(type => type.category.toLowerCase() === 'custom');
+      const fallbackType = poiTypes.find(type => type.category.toLowerCase() === 'general') || poiTypes[0];
+      
+      finalPoiTypeId = customCategoryType?.id || fallbackType?.id;
+      
+      console.log('🔧 [POIPlacementModal] Final POI type ID:', finalPoiTypeId);
+      
+      if (!finalPoiTypeId) {
+        setError('No suitable POI type found for custom icon.');
+        return;
+      }
+      
+      console.log('🔧 [POIPlacementModal] Will save custom icon ID to database:', customIconId);
     }
 
     setIsSubmitting(true);
@@ -168,14 +202,14 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
       const poiData = {
         title: title.trim(),
         description: description.trim() || null,
-        poi_type_id: selectedCustomIcon ? null : selectedPoiTypeId,
-        custom_icon_id: selectedCustomIcon || null,
+        poi_type_id: finalPoiTypeId,
         created_by: user.id,
         map_type: 'hagga_basin',
         coordinates_x: coordinates.x,
         coordinates_y: coordinates.y,
         privacy_level: privacyLevel,
-        grid_square_id: null // Hagga Basin POIs don't have grid squares
+        grid_square_id: null, // Hagga Basin POIs don't have grid squares
+        custom_icon_id: customIconId
       };
 
       const { data: poi, error: poiError } = await supabase
@@ -193,22 +227,25 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
         throw new Error('Failed to create POI');
       }
 
-      // Upload screenshots if any
-      let screenshotUrls: string[] = [];
+      // Upload screenshots if any and update POI
+      let finalScreenshots: any[] = [];
       if (screenshots.length > 0) {
         try {
-          screenshotUrls = await uploadScreenshots(poi.id);
+          const screenshotUrls = await uploadScreenshots(poi.id);
           
-          // Update POI with screenshot URLs
-          const screenshotRecords = screenshotUrls.map(url => ({
-            poi_id: poi.id,
+          // Create screenshot objects in the format expected by the database
+          finalScreenshots = screenshotUrls.map((url, index) => ({
+            id: `${poi.id}_${Date.now()}_${index}`,
             url,
-            uploaded_by: user.id
+            uploaded_by: user.id,
+            upload_date: new Date().toISOString()
           }));
 
+          // Update the POI with screenshots in JSONB[] format
           const { error: screenshotError } = await supabase
-            .from('poi_screenshots')
-            .insert(screenshotRecords);
+            .from('pois')
+            .update({ screenshots: finalScreenshots })
+            .eq('id', poi.id);
 
           if (screenshotError) {
             console.error('Error saving screenshot records:', screenshotError);
@@ -224,12 +261,7 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
       // Add screenshots to the POI object for immediate display
       const poiWithScreenshots = {
         ...poi,
-        screenshots: screenshotUrls.map((url, index) => ({
-          id: `temp_${index}`,
-          url,
-          uploaded_by: user.id,
-          upload_date: new Date().toISOString()
-        }))
+        screenshots: finalScreenshots
       };
 
       onPoiCreated(poiWithScreenshots as Poi);
@@ -296,129 +328,160 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
 
           {/* POI Type Selection */}
           <div>
-            <label className="block text-sm font-medium text-sand-700 mb-2">
+            <label htmlFor="poiTypeSelect" className="block text-sm font-medium text-sand-700 mb-2">
               POI Type *
             </label>
-            <div className="space-y-4">
-              {categories.map(category => {
-                // Handle custom icons category
-                if (category === 'custom') {
+            
+            {/* Dropdown Selection */}
+            <select
+              id="poiTypeSelect"
+              value={selectedPoiTypeId}
+              onChange={(e) => setSelectedPoiTypeId(e.target.value)}
+              className="input input-bordered w-full mb-3"
+              required
+            >
+              <option value="">Select a POI type</option>
+                              {categories.sort().map(category => (
+                  <optgroup key={category} label={category}>
+                    {poiTypes
+                      .filter(type => type.category === category)
+                      .map(type => (
+                        <option key={type.id} value={type.id}>
+                          {type.name}
+                        </option>
+                      ))}
+                  </optgroup>
+                ))}
+                {customIcons.length > 0 && (
+                  <optgroup label="Custom Icons">
+                    {customIcons.map(icon => (
+                      <option key={`custom_${icon.id}`} value={`custom_${icon.id}`}>
+                        {icon.name} (Custom)
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+            </select>
+
+            {/* Show More Details Toggle */}
+            <button
+              type="button"
+              onClick={() => setShowDetailedPoiSelection(!showDetailedPoiSelection)}
+              className="text-sm text-spice-600 hover:text-spice-800 font-medium underline"
+            >
+              {showDetailedPoiSelection ? 'Hide details' : 'Show more details'}
+            </button>
+
+            {/* Detailed Visual Selection */}
+            {showDetailedPoiSelection && (
+              <div className="mt-4 space-y-4 border border-sand-200 rounded-lg p-4 bg-sand-25">
+                {categories.map(category => {
+                  const categoryTypes = poiTypes.filter(type => type.category === category);
+                  
                   return (
                     <div key={category}>
-                      <h4 className="text-sm font-medium text-sand-600 mb-2 capitalize">
-                        Custom Icons
-                      </h4>
+                      <h4 className="text-sm font-medium text-sand-600 mb-2 capitalize">{category}</h4>
                       <div className="grid grid-cols-2 gap-2">
-                        {customIcons.map(customIcon => (
-                          <label
-                            key={`custom-${customIcon.id}`}
-                            className={`flex items-center p-3 border rounded-lg cursor-pointer transition-colors ${
-                              selectedCustomIcon === customIcon.id
-                                ? 'border-spice-500 bg-spice-50'
-                                : 'border-sand-200 hover:border-sand-300'
-                            }`}
-                          >
-                            <input
-                              type="radio"
-                              name="poiType"
-                              value={`custom-${customIcon.id}`}
-                              checked={selectedCustomIcon === customIcon.id}
-                              onChange={() => {
-                                setSelectedCustomIcon(customIcon.id);
-                                setSelectedPoiTypeId(''); // Clear regular type selection
-                              }}
-                              className="sr-only"
-                            />
-                            
-                            {/* Custom Icon */}
-                            <div className="w-6 h-6 rounded-full border border-white shadow-sm flex items-center justify-center mr-3 bg-sand-200">
-                              <img
-                                src={customIcon.image_url}
-                                alt={customIcon.name}
-                                className="w-4 h-4 object-contain"
+                        {categoryTypes.map(type => {
+                          const imageUrl = getDisplayImageUrl(type.icon, customIcons);
+                          
+                          return (
+                            <label
+                              key={type.id}
+                              className={`flex items-center p-3 border rounded-lg cursor-pointer transition-colors ${
+                                selectedPoiTypeId === type.id
+                                  ? 'border-spice-500 bg-spice-50'
+                                  : 'border-sand-200 hover:border-sand-300'
+                              }`}
+                            >
+                              <input
+                                type="radio"
+                                name="poiType"
+                                value={type.id}
+                                checked={selectedPoiTypeId === type.id}
+                                onChange={(e) => setSelectedPoiTypeId(e.target.value)}
+                                className="sr-only"
                               />
-                            </div>
-                            
-                            <span className="text-sm font-medium text-sand-700 truncate">
-                              {customIcon.name}
-                            </span>
-                          </label>
-                        ))}
+                              
+                              {/* POI Type Icon */}
+                              <div 
+                                className="w-6 h-6 rounded-full flex items-center justify-center mr-3 text-white text-sm"
+                                style={{
+                                  backgroundColor: type.icon_has_transparent_background && imageUrl 
+                                    ? 'transparent' 
+                                    : type.color
+                                }}
+                              >
+                                {imageUrl ? (
+                                  <img
+                                    src={imageUrl}
+                                    alt={type.name}
+                                    className="w-4 h-4 object-contain"
+                                    style={{
+                                      filter: type.icon_has_transparent_background ? 'none' : 'drop-shadow(0 1px 1px rgba(0,0,0,0.3))'
+                                    }}
+                                  />
+                                ) : (
+                                  <span 
+                                    style={{ 
+                                      color: type.icon_has_transparent_background ? type.color : 'white',
+                                      textShadow: type.icon_has_transparent_background ? '0 1px 1px rgba(0,0,0,0.3)' : 'none'
+                                    }}
+                                  >
+                                    {type.icon}
+                                  </span>
+                                )}
+                              </div>
+                              
+                              <span className="text-sm font-medium text-sand-700">{type.name}</span>
+                            </label>
+                          );
+                        })}
                       </div>
                     </div>
                   );
-                }
+                })}
 
-                // Handle regular POI type categories
-                const categoryTypes = poiTypes.filter(type => type.category === category);
-                
-                return (
-                  <div key={category}>
-                    <h4 className="text-sm font-medium text-sand-600 mb-2 capitalize">{category}</h4>
+                {/* Custom Icons Section */}
+                {customIcons.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-medium text-sand-600 mb-2">Custom Icons</h4>
                     <div className="grid grid-cols-2 gap-2">
-                      {categoryTypes.map(type => {
-                        const imageUrl = getDisplayImageUrl(type.icon, customIcons);
-                        
-                        return (
-                          <label
-                            key={type.id}
-                            className={`flex items-center p-3 border rounded-lg cursor-pointer transition-colors ${
-                              selectedPoiTypeId === type.id && !selectedCustomIcon
-                                ? 'border-spice-500 bg-spice-50'
-                                : 'border-sand-200 hover:border-sand-300'
-                            }`}
-                          >
-                            <input
-                              type="radio"
-                              name="poiType"
-                              value={type.id}
-                              checked={selectedPoiTypeId === type.id && !selectedCustomIcon}
-                              onChange={(e) => {
-                                setSelectedPoiTypeId(e.target.value);
-                                setSelectedCustomIcon(null); // Clear custom icon selection
-                              }}
-                              className="sr-only"
+                      {customIcons.map(customIcon => (
+                        <label
+                          key={`custom_${customIcon.id}`}
+                          className={`flex items-center p-3 border rounded-lg cursor-pointer transition-colors ${
+                            selectedPoiTypeId === `custom_${customIcon.id}`
+                              ? 'border-spice-500 bg-spice-50'
+                              : 'border-sand-200 hover:border-sand-300'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="poiType"
+                            value={`custom_${customIcon.id}`}
+                            checked={selectedPoiTypeId === `custom_${customIcon.id}`}
+                            onChange={(e) => setSelectedPoiTypeId(e.target.value)}
+                            className="sr-only"
+                          />
+                          
+                          {/* Custom Icon */}
+                          <div className="w-6 h-6 rounded-full flex items-center justify-center mr-3 bg-transparent">
+                            <img
+                              src={customIcon.image_url}
+                              alt={customIcon.name}
+                              className="w-4 h-4 object-contain"
                             />
-                            
-                            {/* POI Type Icon */}
-                            <div 
-                              className="w-6 h-6 rounded-full flex items-center justify-center mr-3 text-white text-sm"
-                              style={{
-                                backgroundColor: type.icon_has_transparent_background && imageUrl 
-                                  ? 'transparent' 
-                                  : type.color
-                              }}
-                            >
-                              {imageUrl ? (
-                                <img
-                                  src={imageUrl}
-                                  alt={type.name}
-                                  className="w-4 h-4 object-contain"
-                                  style={{
-                                    filter: type.icon_has_transparent_background ? 'none' : 'drop-shadow(0 1px 1px rgba(0,0,0,0.3))'
-                                  }}
-                                />
-                              ) : (
-                                <span 
-                                  style={{ 
-                                    color: type.icon_has_transparent_background ? type.color : 'white',
-                                    textShadow: type.icon_has_transparent_background ? '0 1px 1px rgba(0,0,0,0.3)' : 'none'
-                                  }}
-                                >
-                                  {type.icon}
-                                </span>
-                              )}
-                            </div>
-                            
-                            <span className="text-sm font-medium text-sand-700">{type.name}</span>
-                          </label>
-                        );
-                      })}
+                          </div>
+                          
+                          <span className="text-sm font-medium text-sand-700">{customIcon.name}</span>
+                        </label>
+                      ))}
                     </div>
                   </div>
-                );
-              })}
-            </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Privacy Level */}

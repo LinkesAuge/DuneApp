@@ -143,27 +143,27 @@ const CommentsList: React.FC<CommentsListProps> = ({
 
   return (
     <div className="border border-sand-300 rounded-lg">
-      <button
-        onClick={toggleExpanded}
-        className="w-full flex justify-between items-center p-4 text-left hover:bg-sand-50 transition-colors"
-      >
+      <div className="w-full flex justify-between items-center p-4">
         <div className="flex items-center gap-3">
-          <MessageSquare size={18} className="text-sand-600" />
-          <span className="font-medium text-night-800">
-            Comments ({commentCount})
-          </span>
+          <button
+            onClick={toggleExpanded}
+            className="flex items-center gap-3 text-left hover:bg-sand-50 transition-colors p-2 rounded -m-2"
+          >
+            <MessageSquare size={18} className="text-sand-600" />
+            <span className="font-medium text-night-800">
+              Comments ({commentCount})
+            </span>
+            {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+          </button>
           {showLikeButton && likeTargetType && likeTargetId && (
-            <div onClick={(e) => e.stopPropagation()}>
-              <LikeButton 
-                targetType={likeTargetType}
-                targetId={likeTargetId}
-                size="md"
-              />
-            </div>
+            <LikeButton 
+              targetType={likeTargetType}
+              targetId={likeTargetId}
+              size="md"
+            />
           )}
         </div>
-        {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-      </button>
+      </div>
 
       {isExpanded && (
         <div className="border-t border-sand-300 p-4 space-y-4">

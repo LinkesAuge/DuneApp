@@ -1,5 +1,5 @@
 import React from 'react';
-import { Poi, PoiType } from '../../types';
+import { Poi, PoiType, CustomIcon } from '../../types';
 import { MapPin, Edit, Trash2, Clock } from 'lucide-react';
 import { useAuth } from '../auth/AuthProvider';
 import CommentsList from '../comments/CommentsList';
@@ -8,6 +8,7 @@ import LikeButton from '../common/LikeButton';
 interface PoiCardProps {
   poi: Poi;
   poiType?: PoiType;
+  customIcons: CustomIcon[];
   gridSquareCoordinate?: string;
   creator?: { username: string };
   onEdit?: () => void;
@@ -16,27 +17,39 @@ interface PoiCardProps {
   onClick?: () => void;
 }
 
-// Helper function to check if the icon is a URL
-const isIconUrl = (iconValue: string | null | undefined): iconValue is string => 
-  typeof iconValue === 'string' && (iconValue.startsWith('http://') || iconValue.startsWith('https://'));
+// Helper function to determine if an icon is a URL or emoji
+const isIconUrl = (icon: string): boolean => {
+  return icon.startsWith('http') || icon.startsWith('/') || icon.includes('.');
+};
 
-// Helper function to get the display URL (can be expanded later if needed)
-const getDisplayImageUrl = (url: string | null): string | undefined => {
-  if (!url || !isIconUrl(url)) return undefined;
-  // Basic check to avoid trying to parse non-URL-like strings as URLs
-  if (!url.includes('/')) return undefined; 
-  try {
-    // Simple return for now, can add cache busting like in PoiTypeManager if needed
-    return new URL(url).toString();
-  } catch (e) {
-    console.warn("Invalid URL for POI card icon:", url, e);
-    return url; // Fallback to original url if parsing fails
+// Helper function to get display image URL for POI icons
+const getDisplayImageUrl = (poi: Poi, poiType: PoiType, customIcons: CustomIcon[]): string | null => {
+  // First priority: Check if POI has a custom icon reference
+  if (poi.custom_icon_id) {
+    const customIcon = customIcons.find(ci => ci.id === poi.custom_icon_id);
+    if (customIcon) {
+      return customIcon.image_url;
+    }
   }
+  
+  // Second priority: Check if POI type icon is a custom icon reference
+  const customIconByPoiType = customIcons.find(ci => ci.id === poiType.icon || ci.name === poiType.icon);
+  if (customIconByPoiType) {
+    return customIconByPoiType.image_url;
+  }
+  
+  // Third priority: Check if POI type icon is already a URL
+  if (isIconUrl(poiType.icon)) {
+    return poiType.icon;
+  }
+  
+  return null;
 };
 
 const PoiCard: React.FC<PoiCardProps> = ({
   poi,
   poiType,
+  customIcons,
   gridSquareCoordinate,
   creator,
   onEdit,
@@ -46,6 +59,8 @@ const PoiCard: React.FC<PoiCardProps> = ({
 }) => {
   const { user } = useAuth();
   const canModify = user && (user.id === poi.created_by || user.role === 'admin' || user.role === 'editor');
+  
+  const imageUrl = poiType ? getDisplayImageUrl(poi, poiType, customIcons) : null;
 
   return (
     <div 
@@ -71,14 +86,14 @@ const PoiCard: React.FC<PoiCardProps> = ({
             <div 
               className="w-8 h-8 rounded-full mr-3 flex items-center justify-center flex-shrink-0 overflow-hidden"
               style={{
-                backgroundColor: (isIconUrl(poiType.icon) && poiType.icon_has_transparent_background) 
+                backgroundColor: (imageUrl && poiType.icon_has_transparent_background) 
                                  ? 'transparent' 
                                  : poiType.color
               }}
             >
-              {isIconUrl(poiType.icon) ? (
+              {imageUrl ? (
                 <img 
-                  src={getDisplayImageUrl(poiType.icon)} 
+                  src={imageUrl} 
                   alt={`${poiType.name} icon`} 
                   className="w-full h-full object-contain"
                 />

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
-import { GridSquare as GridSquareType, Poi, PoiType } from '../../types';
+import { GridSquare as GridSquareType, Poi, PoiType, CustomIcon } from '../../types';
 import { useAuth } from '../auth/AuthProvider';
 import { Upload, X, Plus, Check, Image, Trash2, Clock, ChevronUp, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
@@ -31,6 +31,7 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
   const [isUploading, setIsUploading] = useState(false);
   const [pois, setPois] = useState<Poi[]>([]);
   const [poiTypes, setPoiTypes] = useState<PoiType[]>([]);
+  const [customIcons, setCustomIcons] = useState<CustomIcon[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showAddPoiForm, setShowAddPoiForm] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -99,8 +100,8 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
       setError(null);
       
       try {
-        // Fetch POIs and POI types
-        const [poisResult, typesResult] = await Promise.all([
+        // Fetch POIs, POI types, and custom icons
+        const [poisResult, typesResult, customIconsResult] = await Promise.all([
           supabase
             .from('pois')
             .select('*')
@@ -109,11 +110,16 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
           supabase
             .from('poi_types')
             .select('*')
-            .order('category', { ascending: true })
+            .order('category', { ascending: true }),
+          supabase
+            .from('custom_icons')
+            .select('*')
+            .order('name', { ascending: true })
         ]);
 
         if (poisResult.error) throw poisResult.error;
         if (typesResult.error) throw typesResult.error;
+        if (customIconsResult.error) throw customIconsResult.error;
 
         // If there's an uploader, fetch their username
         if (currentSquare.uploaded_by) {
@@ -131,6 +137,7 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
         if (isMounted) {
           setPois(poisResult.data || []);
           setPoiTypes(typesResult.data || []);
+          setCustomIcons(customIconsResult.data || []);
         }
       } catch (err: any) {
         console.error('Error fetching data:', err);

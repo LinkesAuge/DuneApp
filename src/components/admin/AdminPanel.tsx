@@ -71,7 +71,6 @@ const AdminPanel: React.FC = () => {
     iconMinSize: 64,
     iconMaxSize: 128,
     iconBaseSize: 64,
-    enableDragging: true,
     showTooltips: true,
     enablePositionChange: true,
     defaultZoom: 0.4,
@@ -731,37 +730,52 @@ const AdminPanel: React.FC = () => {
   // Map Settings Functions
   const saveMapSettings = async () => {
     try {
-      const { error } = await supabase
+      console.log('🔧 [AdminPanel] Attempting to save map settings:', mapSettings);
+      
+      const { data, error } = await supabase
         .from('app_settings')
         .upsert({
-          key: 'hagga_basin_settings',
-          value: mapSettings,
+          setting_key: 'hagga_basin_settings',
+          setting_value: mapSettings,
           updated_at: new Date().toISOString()
-        });
+        }, {
+          onConflict: 'setting_key'
+        })
+        .select();
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ [AdminPanel] Database error saving settings:', error);
+        throw error;
+      }
+      
+      console.log('✅ [AdminPanel] Settings saved successfully:', data);
       alert('Map settings saved successfully!');
     } catch (err: any) {
-      console.error('Error saving map settings:', err);
+      console.error('❌ [AdminPanel] Error saving map settings:', err);
       alert('Error saving settings: ' + err.message);
     }
   };
 
   const loadMapSettings = async () => {
     try {
+      console.log('🔧 [AdminPanel] Loading map settings from database...');
+      
       const { data, error } = await supabase
         .from('app_settings')
-        .select('value')
-        .eq('key', 'hagga_basin_settings')
+        .select('setting_value')
+        .eq('setting_key', 'hagga_basin_settings')
         .single();
 
       if (error && error.code !== 'PGRST116') throw error; // Ignore "not found" errors
       
-      if (data?.value) {
-        setMapSettings(prev => ({ ...prev, ...data.value }));
+      if (data?.setting_value) {
+        console.log('🔧 [AdminPanel] Found settings in database:', data.setting_value);
+        setMapSettings(prev => ({ ...prev, ...data.setting_value }));
+      } else {
+        console.log('🔧 [AdminPanel] No settings found in database, using defaults');
       }
     } catch (err: any) {
-      console.error('Error loading map settings:', err);
+      console.error('❌ [AdminPanel] Error loading map settings:', err);
     }
   };
 
@@ -770,7 +784,6 @@ const AdminPanel: React.FC = () => {
       iconMinSize: 64,
       iconMaxSize: 128,
       iconBaseSize: 64,
-      enableDragging: true,
       showTooltips: true,
       enablePositionChange: true,
       defaultZoom: 0.4,
@@ -1323,20 +1336,7 @@ const AdminPanel: React.FC = () => {
                   <div className="space-y-4">
                     <h4 className="text-lg font-medium text-night-600">Map Interaction</h4>
                     <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <label className="text-sm font-medium text-night-700">
-                          Enable POI Dragging
-                        </label>
-                        <input
-                          type="checkbox"
-                          checked={mapSettings.enableDragging}
-                          onChange={(e) => setMapSettings(prev => ({
-                            ...prev,
-                            enableDragging: e.target.checked
-                          }))}
-                          className="w-4 h-4 text-spice-600 border-sand-300 rounded focus:ring-spice-500"
-                        />
-                      </div>
+
                       
                       <div className="flex items-center justify-between">
                         <label className="text-sm font-medium text-night-700">

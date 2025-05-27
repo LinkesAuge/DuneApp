@@ -66,6 +66,8 @@ export interface Poi {
   coordinates_x: number | null; // pixel coordinates for Hagga Basin
   coordinates_y: number | null; // pixel coordinates for Hagga Basin
   privacy_level: PrivacyLevel;
+  // NEW: Custom icon support
+  custom_icon_id: string | null; // Reference to custom icon, overrides POI type icon when set
 }
 
 export interface PoiWithGridSquare extends Poi {

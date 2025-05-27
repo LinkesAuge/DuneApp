@@ -7,4 +7,11 @@ export default defineConfig({
   //   exclude: ['lucide-react'],
   // },
   base: '/',
+  server: {
+    hmr: {
+      // Disable HMR console logs
+      overlay: false
+    }
+  },
+  logLevel: 'warn' // Only show warnings and errors, not info messages
 });
