@@ -98,3 +98,37 @@ This document tracks known issues, their states, context, and resolutions encoun
 -   **Lesson Learned**: When attempting to delete all rows in a table using the Supabase query builder with a filter (e.g., `.delete().filter(...)`), ensure the filter condition is type-compatible with the column(s) involved. For UUID primary keys, using a condition like `.not('id', 'is', null)` is a robust and type-safe method to target all rows for deletion. Avoid direct string comparisons with UUID columns unless the string is a valid UUID.
 
 ---
+
+-   **Date**: 2025-01-03
+-   **Error Description**: Custom icons not displaying on map - POIs showed custom icons in edit modals but reverted to default POI type icons (emojis) when displayed on the map.
+-   **Context/Symptoms**: 
+    -   Console logs showed MapPOIMarker receiving emoji icons ("🔰", "🔲", "🛡️") instead of custom icon UUIDs
+    -   POIEditModal correctly processed custom icon selection (UUID: "888361ee-62fd-4b50-b408-cd00644b86b8")
+    -   Custom icon selections didn't persist through database operations and component re-renders
+    -   Map components consistently showed POI type default icons instead of user-selected custom icons
+-   **Investigation/Diagnosis**:
+    -   Root cause identified as client-side data modification approach in POI modals
+    -   POIEditModal and POIPlacementModal were temporarily modifying POI type data client-side
+    -   Database operations saved POI records without custom icon references
+    -   Map components received POI data through database queries, losing client-side modifications
+    -   This created a disconnect between edit interface (showing custom icons) and display interface (showing defaults)
+-   **Solution/Fix**:
+    1.  **Database Schema Enhancement**: Added `custom_icon_id uuid` column to `pois` table with foreign key to `custom_icons(id)` and `ON DELETE SET NULL`
+    2.  **TypeScript Interface Update**: Modified `Poi` interface to include `custom_icon_id: string | null`
+    3.  **Component Logic Overhaul**: Updated all POI-related components to use database-first approach:
+        -   **MapPOIMarker**: Modified `getDisplayImageUrl` to check POI's `custom_icon_id` first, then POI type defaults
+        -   **POIEditModal & POIPlacementModal**: Changed from client-side override to database persistence, saving `custom_icon_id` directly
+        -   **HaggaBasinPoiCard**: Updated icon rendering to use same priority logic as MapPOIMarker
+        -   **PoiCard**: Added `customIcons` prop and updated icon rendering for Deep Desert POIs
+        -   **PoiList**: Added `customIcons` prop passthrough to PoiCard
+        -   **GridSquareModal**: Added custom icons fetching and state management
+    4.  **Database Migration**: Created and executed migration script with indexing for performance
+-   **Files Affected**:
+    -   Database: `add_custom_icon_id_column.sql`
+    -   Types: `src/types/index.ts`
+    -   Map Components: `src/components/hagga-basin/MapPOIMarker.tsx`
+    -   Edit Modals: `src/components/poi/POIEditModal.tsx`, `src/components/poi/POIPlacementModal.tsx`
+    -   Display Components: `src/components/hagga-basin/HaggaBasinPoiCard.tsx`, `src/components/poi/PoiCard.tsx`, `src/components/poi/PoiList.tsx`, `src/components/grid/GridSquareModal.tsx`
+-   **Lesson Learned**: For persistent user selections that need to survive database operations and component re-renders, always use a database-first approach rather than client-side data modification. Client-side overrides are fragile and don't persist through data refresh cycles. Database persistence with proper foreign key relationships ensures data integrity and consistent display across all application interfaces.
+
+---

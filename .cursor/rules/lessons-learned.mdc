@@ -242,7 +242,7 @@ This document serves as a learning journal for the Dune Awakening Deep Desert Tr
     4.  Database schema is comprehensive with advanced features like privacy controls, collections, sharing, and custom icons fully implemented.
     5.  UI/UX is professionally polished with consistent design system, responsive layout, and real-time updates throughout.
 -   **Decision/Action Taken**:
-    1.  **Complete Memory System Update**: Rewrote all core memory files (`active_context.md`, `tasks_plan.md`, `architecture.md`) to reflect actual production-ready status.
+    1.  **Complete Memory System Update**: Rewritten all core memory files (`active_context.md`, `tasks_plan.md`, `architecture.md`) to reflect actual production-ready status.
     2.  **Deployment Priority Shift**: Changed focus from feature implementation to immediate production deployment.
     3.  **Feature Assessment Restructuring**: Identified only 2% remaining work consisting of minor UI polish (collections UI, custom icons upload interface, sharing modal).
     4.  **Production Readiness Verification**: Confirmed all deployment prerequisites are met (database, authentication, admin tools, mobile responsiveness, error handling).
@@ -297,6 +297,39 @@ This document serves as a learning journal for the Dune Awakening Deep Desert Tr
     -   Document admin configuration patterns for future administrative feature development.
     -   Plan for settings versioning if future feature additions require configuration schema changes.
     -   Implement audit logging for admin configuration changes to track system modifications over time.
+
+---
+
+### 2025-01-03: Custom Icon Persistence - Database-First vs Client-Side Data Modification
+-   **Topic/Feature**: POI Custom Icon System - Data Persistence Architecture.
+-   **Observation/Pattern**:
+    1.  Initial implementation used client-side data modification approach where POI edit modals would temporarily override POI type data to show custom icons.
+    2.  This created a fragile system where custom icon selections appeared in edit interfaces but didn't persist to map display components.
+    3.  Database operations would save POI records without custom icon references, causing display components to revert to defaults.
+    4.  Console debugging revealed the disconnect: edit modals processed UUID custom icon IDs correctly, but map components received emoji fallbacks.
+-   **Decision/Action Taken**:
+    1.  **Database Schema Enhancement**: Added `custom_icon_id` column to `pois` table with proper foreign key relationships to `custom_icons` table.
+    2.  **Architecture Shift**: Moved from client-side data modification to database-first persistence approach.
+    3.  **Component Updates**: Updated 8 components across map display, POI editing, and POI listing to use consistent icon resolution logic.
+    4.  **Icon Priority System**: Implemented hierarchical icon resolution (POI custom icon → POI type custom icon → POI type URL → emoji fallback).
+    5.  **TypeScript Integration**: Extended `Poi` interface to include `custom_icon_id: string | null` for type safety.
+-   **Rationale**:
+    1.  Database persistence ensures custom icon selections survive all data refresh cycles and component re-renders.
+    2.  Foreign key relationships maintain data integrity and provide proper cascade behavior.
+    3.  Centralized icon resolution logic eliminates inconsistencies between different UI components.
+    4.  Database-first approach aligns with React's unidirectional data flow principles.
+-   **Impact/Outcome**:
+    -   **Technical**: Custom icons now persist reliably across all interfaces and database operations.
+    -   **User Experience**: Seamless custom icon functionality matching user expectations.
+    -   **Architecture**: Established pattern for persistent user selections requiring database backing.
+    -   **Code Quality**: Consistent icon handling logic across all POI-related components.
+    -   **Debugging**: Enhanced debugging capabilities with clear data flow from database to display.
+-   **Future Consideration**:
+    -   Apply database-first principles to all user preferences and selections that need persistence.
+    -   Consider this pattern for future features like POI favorites, custom filters, or user-specific map settings.
+    -   Document this architectural decision to guide similar implementations in feature development.
+    -   Use foreign key relationships with appropriate cascade behavior for all user-customizable entity references.
+    -   Implement consistent priority/fallback systems for user customizations throughout the application.
 
 ---
 

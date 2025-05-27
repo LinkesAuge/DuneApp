@@ -967,4 +967,27 @@ const saveMapSettings = async () => {
 };
 ```
 
-This comprehensive admin settings management system provides a robust, scalable foundation for application configuration while maintaining the performance and security standards established throughout the platform. 
+This comprehensive admin settings management system provides a robust, scalable foundation for application configuration while maintaining the performance and security standards established throughout the platform.
+
+## Recent Technical Achievements
+
+### Custom Icon Display Fix (January 3, 2025)
+
+**Problem**: Custom icons displayed correctly in edit modals but reverted to default POI type icons (emojis) when shown on map components.
+
+**Root Cause**: Client-side data modification approach where POI modals temporarily overrode POI type data, but these changes didn't persist through database operations.
+
+**Solution Architecture**:
+1. **Database Enhancement**: Added `custom_icon_id uuid` column to `pois` table with foreign key to `custom_icons(id)` and `ON DELETE SET NULL`
+2. **Database-First Approach**: Replaced client-side overrides with persistent database storage
+3. **Icon Resolution Hierarchy**: Implemented priority system (POI custom → POI type custom → POI type URL → emoji)
+4. **Component Consistency**: Updated 8 components to use unified icon resolution logic
+
+**Files Modified**:
+- Database: `add_custom_icon_id_column.sql`
+- Types: `src/types/index.ts` - Added `custom_icon_id: string | null`
+- Map Components: `MapPOIMarker.tsx` - Enhanced `getDisplayImageUrl()`
+- Edit Components: `POIEditModal.tsx`, `POIPlacementModal.tsx` - Database persistence
+- Display Components: `HaggaBasinPoiCard.tsx`, `PoiCard.tsx`, `PoiList.tsx`, `GridSquareModal.tsx`
+
+**Technical Insight**: Database-first persistence ensures data integrity and consistency across all UI components, aligning with React's unidirectional data flow principles. 
