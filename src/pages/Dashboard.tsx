@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../components/auth/AuthProvider';
-import StatisticsCards from '../components/dashboard/StatisticsCards';
+import EnhancedStatisticsCards from '../components/dashboard/EnhancedStatisticsCards';
 import ActivityFeed from '../components/dashboard/ActivityFeed';
 import ExplorationProgress from '../components/dashboard/ExplorationProgress';
 import CommunityStats from '../components/dashboard/CommunityStats';
@@ -25,7 +25,7 @@ const Dashboard: React.FC = () => {
               </h1>
               <p className="text-sand-600">
                 Welcome back{user ? `, ${user.user_metadata?.username || 'Explorer'}` : ''}! 
-                Here's what's happening across the Deep Desert and Hagga Basin regions.
+                Explore detailed regional statistics and community insights for Deep Desert and Hagga Basin.
               </p>
             </div>
           </div>
@@ -37,7 +37,7 @@ const Dashboard: React.FC = () => {
             <TrendingUp size={20} className="text-spice-600" />
             <h2 className="text-xl font-semibold text-night-900">Statistics Overview</h2>
           </div>
-          <StatisticsCards />
+          <EnhancedStatisticsCards />
         </div>
 
         {/* Activity Feed and Additional Info */}
