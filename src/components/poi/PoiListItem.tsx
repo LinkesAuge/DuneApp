@@ -166,8 +166,14 @@ const PoiListItem: React.FC<PoiListItemProps> = ({
         )} 
 
         <div className="sm:text-right space-y-0.5">
-          <p className="text-xs text-sand-700 truncate" title={creator?.username || 'Unknown'}>By: {creator?.username || 'Unknown'}</p>
-          <p className="text-xs text-sand-600">On: {formattedDate}</p>
+          <div className="flex items-center justify-between text-xs text-sand-600">
+            <span className="truncate" title={creator?.username || 'Unknown'}>
+              By {creator?.username || 'Unknown'}
+            </span>
+            <span>
+              {formattedDate}
+            </span>
+          </div>
           <div className="mt-1 flex gap-2 justify-start sm:justify-end">
             <button 
               onClick={(e) => { e.stopPropagation(); onEdit(poi.id); }}

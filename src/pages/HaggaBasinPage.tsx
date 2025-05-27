@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { MapPin, Filter, Settings, Plus, FolderOpen, Share, Image, Edit, Eye, Lock, Users, ChevronLeft, ChevronRight, HelpCircle } from 'lucide-react';
 import type { 
@@ -22,6 +23,7 @@ import { useAuth } from '../components/auth/AuthProvider';
 const HaggaBasinPage: React.FC = () => {
   // Authentication and user state
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   // Core data state
   const [pois, setPois] = useState<Poi[]>([]);
@@ -66,13 +68,11 @@ const HaggaBasinPage: React.FC = () => {
   // Help tooltip state
   const [showHelpTooltip, setShowHelpTooltip] = useState(false);
 
+  // Highlighted POI state for navigation focus
+  const [highlightedPoiId, setHighlightedPoiId] = useState<string | null>(null);
+
   // State to track if initial filter setup has been done
   const [initialFilterSetup, setInitialFilterSetup] = useState(false);
-
-  // Initialize data on component mount
-  useEffect(() => {
-    initializeData();
-  }, []);
 
   // Initialize filter state when POI types are loaded (only on initial setup)
   useEffect(() => {
@@ -582,12 +582,44 @@ const HaggaBasinPage: React.FC = () => {
   }, []);
 
   // Handle POI click for detail view
-  const handlePoiClick = (poi: Poi) => {
-    // For now, just open gallery if screenshots exist
-    if (poi.screenshots && poi.screenshots.length > 0) {
-      handlePoiGalleryOpen(poi);
+  const handlePoiClick = useCallback((poi: Poi) => {
+    console.log('HaggaBasin handlePoiClick called for POI:', poi.title, 'coordinates:', poi.coordinates_x, poi.coordinates_y);
+    // Highlight the POI with pulsing animation
+    setHighlightedPoiId(poi.id);
+    console.log('HaggaBasin: Set highlightedPoiId to:', poi.id);
+    // Remove highlight after 6 seconds
+    setTimeout(() => {
+      setHighlightedPoiId(null);
+      console.log('HaggaBasin: Cleared highlightedPoiId');
+    }, 6000);
+  }, []);
+
+  // Handle POI focusing from URL parameter
+  useEffect(() => {
+    const poiIdFromUrl = searchParams.get('poi');
+    if (poiIdFromUrl && pois.length > 0) {
+      const targetPoi = pois.find(poi => poi.id === poiIdFromUrl);
+      if (targetPoi) {
+        // Highlight the POI with pulsing animation (but don't open modal)
+        setHighlightedPoiId(targetPoi.id);
+        // Remove highlight after 6 seconds
+        setTimeout(() => {
+          setHighlightedPoiId(null);
+        }, 6000);
+        // Remove the POI parameter from URL after focusing
+        setSearchParams(prev => {
+          const newParams = new URLSearchParams(prev);
+          newParams.delete('poi');
+          return newParams;
+        });
+      }
     }
-  };
+  }, [pois, searchParams, setSearchParams]);
+
+  // Initialize data on component mount
+  useEffect(() => {
+    initializeData();
+  }, []);
 
   // Handle POI editing
   const handlePoiEdit = (poi: Poi) => {
@@ -1039,6 +1071,7 @@ const HaggaBasinPage: React.FC = () => {
             onPlacementModeChange={setPlacementMode}
             showHelpTooltip={showHelpTooltip}
             onHelpTooltipChange={setShowHelpTooltip}
+            highlightedPoiId={highlightedPoiId}
           />
         ) : (
           <div className="h-full flex items-center justify-center bg-sand-100">
@@ -1082,6 +1115,7 @@ const HaggaBasinPage: React.FC = () => {
               mapType="hagga_basin"
               userInfo={userInfo}
               onPoiClick={handlePoiClick}
+              onPoiHighlight={handlePoiClick}
               onPoiEdit={handlePoiEdit}
               onPoiDelete={handlePoiDeleted}
               onPoiShare={handleSharePoi}
@@ -1148,11 +1182,18 @@ const HaggaBasinPage: React.FC = () => {
         <GridGallery
           squares={galleryPoi.screenshots.map(s => ({
             id: s.id,
+            coordinate: galleryPoi.title || 'POI',
             screenshot_url: s.url,
+            original_screenshot_url: s.url, // Use same URL for original
+            is_explored: false,
             uploaded_by: s.uploaded_by,
             upload_date: s.upload_date,
-            coordinate: galleryPoi.title || 'POI',
-            is_explored: false,
+            created_at: s.upload_date,
+            crop_x: 0, // Default crop values for POI screenshots
+            crop_y: 0,
+            crop_width: 2000, // Default dimensions
+            crop_height: 2000,
+            crop_created_at: s.upload_date, // Use upload date for crop creation
           }))}
           initialIndex={galleryIndex}
           onClose={() => {

@@ -1,7 +1,9 @@
-import React from 'react';
-import { X, Edit, Trash2, Share, MapPin, Clock, Users, Lock, Eye } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Edit, Trash2, Share, MapPin, Clock, Users, Lock, Eye, User } from 'lucide-react';
 import { Poi, PoiType, CustomIcon } from '../../types';
 import { useAuth } from '../auth/AuthProvider';
+import { supabase } from '../../lib/supabase';
+import { formatCompactDateTime, wasUpdated, formatDateWithPreposition } from '../../lib/dateUtils';
 import CommentsList from '../comments/CommentsList';
 
 interface HaggaBasinPoiCardProps {
@@ -80,10 +82,52 @@ const HaggaBasinPoiCard: React.FC<HaggaBasinPoiCardProps> = ({
   const { user } = useAuth();
   const canModify = user && (user.id === poi.created_by || user.role === 'admin' || user.role === 'editor');
   
+  // State for user information
+  const [creatorInfo, setCreatorInfo] = useState<{ username: string } | null>(null);
+  const [editorInfo, setEditorInfo] = useState<{ username: string } | null>(null);
+  const [loadingUserInfo, setLoadingUserInfo] = useState(true);
+  
   const imageUrl = getDisplayImageUrl(poi, poiType, customIcons);
   const PrivacyIcon = privacyIcons[poi.privacy_level];
   const privacyColor = privacyColors[poi.privacy_level];
   const privacyLabel = privacyLabels[poi.privacy_level];
+  
+  // Check if POI was edited
+  const isEdited = wasUpdated(poi.created_at, poi.updated_at);
+  
+  // Fetch user information for creator and editor
+  useEffect(() => {
+    const fetchUserInfo = async () => {
+      try {
+        setLoadingUserInfo(true);
+        const userIds = [poi.created_by];
+        if (poi.updated_by && poi.updated_by !== poi.created_by) {
+          userIds.push(poi.updated_by);
+        }
+        
+        const { data: userData, error } = await supabase
+          .from('profiles')
+          .select('id, username')
+          .in('id', userIds);
+        
+        if (error) throw error;
+        
+        const creatorData = userData?.find(u => u.id === poi.created_by);
+        const editorData = userData?.find(u => u.id === poi.updated_by);
+        
+        setCreatorInfo(creatorData ? { username: creatorData.username } : null);
+        setEditorInfo(editorData ? { username: editorData.username } : null);
+      } catch (error) {
+        console.error('Error fetching user info:', error);
+      } finally {
+        setLoadingUserInfo(false);
+      }
+    };
+    
+    if (isOpen && poi) {
+      fetchUserInfo();
+    }
+  }, [isOpen, poi.created_by, poi.updated_by]);
 
   if (!isOpen) return null;
 
@@ -226,18 +270,43 @@ const HaggaBasinPoiCard: React.FC<HaggaBasinPoiCardProps> = ({
             {/* POI Metadata */}
             <div className="border-t border-sand-300 pt-4">
               <h3 className="text-sm font-semibold text-sand-800 mb-3">Details</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-                <div className="flex items-center text-sand-600">
-                  <MapPin className="w-4 h-4 mr-2" />
+              <div className="space-y-2 text-xs text-sand-600">
+                {/* Coordinates */}
+                <div className="flex items-center">
+                  <MapPin className="w-3 h-3 mr-2" />
                   <span>
                     Coordinates: {poi.coordinates_x?.toFixed(0)}, {poi.coordinates_y?.toFixed(0)}
                   </span>
                 </div>
-                <div className="flex items-center text-sand-600">
-                  <Clock className="w-4 h-4 mr-2" />
-                  <span>
-                    Added {new Date(poi.created_at).toLocaleDateString()}
-                  </span>
+                
+                {/* Creator and Editor Information - Compact single line */}
+                <div className="flex items-center justify-between text-xs text-sand-600">
+                  <div className="flex items-center">
+                    <User className="w-3 h-3 mr-1.5" />
+                    <span>
+                      Created by {loadingUserInfo ? '...' : (creatorInfo?.username || 'Unknown')} {(() => {
+                        const { date, useOn } = formatDateWithPreposition(poi.created_at);
+                        return useOn ? `on ${date}` : date;
+                      })()}
+                    </span>
+                  </div>
+                  
+                  {/* Edit Information - Only show if POI was edited */}
+                  {isEdited && (
+                    <div className="flex items-center">
+                      <Clock className="w-3 h-3 mr-1.5" />
+                      <span>
+                        Edited {loadingUserInfo ? '...' : (
+                          poi.updated_by && editorInfo?.username 
+                            ? `by ${editorInfo.username} `
+                            : ''
+                        )}{(() => {
+                          const { date, useOn } = formatDateWithPreposition(poi.updated_at);
+                          return useOn ? `on ${date}` : date;
+                        })()}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

@@ -10,6 +10,7 @@ interface ImageCropModalProps {
   onSkip?: () => void;
   title?: string;
   initialCrop?: PixelCrop;
+  defaultToSquare?: boolean;
 }
 
 const ImageCropModal: React.FC<ImageCropModalProps> = ({
@@ -18,7 +19,8 @@ const ImageCropModal: React.FC<ImageCropModalProps> = ({
   onClose,
   onSkip,
   title = "Crop Your Screenshot",
-  initialCrop
+  initialCrop,
+  defaultToSquare = false
 }) => {
   const [crop, setCrop] = useState<Crop>({
     unit: '%',
@@ -28,7 +30,7 @@ const ImageCropModal: React.FC<ImageCropModalProps> = ({
     height: 50,
   });
   const [completedCrop, setCompletedCrop] = useState<PixelCrop>();
-  const [squareMode, setSquareMode] = useState(true);
+  const [squareMode, setSquareMode] = useState(defaultToSquare);
   const [isProcessing, setIsProcessing] = useState(false);
   const imgRef = useRef<HTMLImageElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -79,7 +81,7 @@ const ImageCropModal: React.FC<ImageCropModalProps> = ({
         x: centerX,
         y: centerY,
         width: cropSize,
-        height: squareMode ? cropSize : cropSize * 0.8, // Square or slightly rectangular
+        height: defaultToSquare ? cropSize : cropSize * 0.8, // Square or slightly rectangular
       };
       
       setCrop(newCrop);
@@ -88,7 +90,7 @@ const ImageCropModal: React.FC<ImageCropModalProps> = ({
       const pixelX = (centerX / 100) * displayWidth;
       const pixelY = (centerY / 100) * displayHeight;
       const pixelWidth = (cropSize / 100) * displayWidth;
-      const pixelHeight = ((squareMode ? cropSize : cropSize * 0.8) / 100) * displayHeight;
+      const pixelHeight = ((defaultToSquare ? cropSize : cropSize * 0.8) / 100) * displayHeight;
       
       setCompletedCrop({
         x: pixelX,
@@ -97,7 +99,7 @@ const ImageCropModal: React.FC<ImageCropModalProps> = ({
         height: pixelHeight,
       });
     }
-  }, [initialCrop, squareMode]);
+  }, [initialCrop, defaultToSquare]);
 
   // Generate cropped image canvas
   const generateCroppedImage = useCallback(async (): Promise<Blob | null> => {
@@ -384,7 +386,7 @@ const ImageCropModal: React.FC<ImageCropModalProps> = ({
                 src={imageUrl}
                 alt="Crop preview"
                 onLoad={onImageLoad}
-                className="max-w-full max-h-[60vh] object-contain"
+                className="max-w-full max-h-[75vh] object-contain"
                 crossOrigin="anonymous"
               />
             </ReactCrop>

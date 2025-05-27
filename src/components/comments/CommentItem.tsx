@@ -1,11 +1,14 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { CommentWithUser } from '../../types';
 import { useAuth } from '../auth/AuthProvider';
-import { Clock, Edit2, Trash2, Check, X, ZoomIn, Upload, Image } from 'lucide-react';
+import { Clock, Edit2, Trash2, Check, X, ZoomIn, Upload, Image, Edit, User } from 'lucide-react';
 import LikeButton from '../common/LikeButton';
 import EmojiTextArea from '../common/EmojiTextArea';
 import { uploadImage, deleteImage, extractPathFromUrl } from '../../lib/imageUpload';
+import ImageCropModal from '../grid/ImageCropModal';
+import { PixelCrop } from 'react-image-crop';
+import { formatCompactDateTime, wasUpdated } from '../../lib/dateUtils';
 
 interface CommentItemProps {
   comment: CommentWithUser;
@@ -29,12 +32,59 @@ const CommentItem: React.FC<CommentItemProps> = ({
   const [newScreenshots, setNewScreenshots] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const canEdit = user && (user.id === comment.created_by || user.role === 'admin');
+  // Screenshot cropping state
+  const [showCropModal, setShowCropModal] = useState(false);
+  const [tempImageFile, setTempImageFile] = useState<File | null>(null);
+  const [tempImageUrl, setTempImageUrl] = useState<string | null>(null);
+  const [pendingCroppedFiles, setPendingCroppedFiles] = useState<File[]>([]);
+  const [editingScreenshotId, setEditingScreenshotId] = useState<string | null>(null);
+
+  // User information state
+  const [creatorInfo, setCreatorInfo] = useState<{ username: string } | null>(null);
+  const [editorInfo, setEditorInfo] = useState<{ username: string } | null>(null);
+  const [loadingUserInfo, setLoadingUserInfo] = useState(true);
+
+  const canEdit = user && (user.id === comment.created_by || user.role === 'admin' || user.role === 'editor');
   const canDelete = user && (user.id === comment.created_by || user.role === 'admin');
+
+  // Check if comment was edited
+  const isEdited = wasUpdated(comment.created_at, comment.updated_at);
+
+  // Fetch user information for creator and editor
+  useEffect(() => {
+    const fetchUserInfo = async () => {
+      try {
+        setLoadingUserInfo(true);
+        const userIds = [comment.created_by];
+        if (comment.updated_by && comment.updated_by !== comment.created_by) {
+          userIds.push(comment.updated_by);
+        }
+        
+        const { data: userData, error } = await supabase
+          .from('profiles')
+          .select('id, username')
+          .in('id', userIds);
+        
+        if (error) throw error;
+        
+        const creatorData = userData?.find(u => u.id === comment.created_by);
+        const editorData = userData?.find(u => u.id === comment.updated_by);
+        
+        setCreatorInfo(creatorData ? { username: creatorData.username } : null);
+        setEditorInfo(editorData ? { username: editorData.username } : null);
+      } catch (error) {
+        console.error('Error fetching user info:', error);
+      } finally {
+        setLoadingUserInfo(false);
+      }
+    };
+    
+    fetchUserInfo();
+  }, [comment.created_by, comment.updated_by]);
 
   const existingScreenshots = comment.screenshots || [];
   const remainingExistingScreenshots = existingScreenshots.filter(s => !screenshotsToDelete.includes(s.id));
-  const totalScreenshots = remainingExistingScreenshots.length + newScreenshots.length;
+  const totalScreenshots = remainingExistingScreenshots.length + newScreenshots.length + pendingCroppedFiles.length;
   const availableSlots = 5 - totalScreenshots;
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -58,8 +108,8 @@ const CommentItem: React.FC<CommentItemProps> = ({
       }
     }
 
-    setNewScreenshots(prev => [...prev, ...files]);
-    setError(null);
+    // Process files one by one through cropping
+    processFilesForCropping(files);
     
     // Reset file input
     if (fileInputRef.current) {
@@ -67,8 +117,148 @@ const CommentItem: React.FC<CommentItemProps> = ({
     }
   };
 
+  // Process files through cropping workflow
+  const processFilesForCropping = (files: File[]) => {
+    if (files.length === 0) return;
+    
+    const [firstFile, ...remainingFiles] = files;
+    
+    // Set up for cropping the first file
+    setTempImageFile(firstFile);
+    setTempImageUrl(URL.createObjectURL(firstFile));
+    setShowCropModal(true);
+    
+    // Store remaining files to process after current crop is complete
+    if (remainingFiles.length > 0) {
+      // We'll handle remaining files after crop completion
+      setTempImageFile(prev => {
+        // Store remaining files in a way we can access them
+        (firstFile as any).remainingFiles = remainingFiles;
+        return firstFile;
+      });
+    }
+  };
+
+  // Handle crop completion
+  const handleCropComplete = async (croppedImageBlob: Blob) => {
+    if (!tempImageFile) return;
+
+    try {
+      // Convert blob to File
+      const croppedFile = new File([croppedImageBlob], tempImageFile.name, {
+        type: 'image/jpeg',
+        lastModified: Date.now(),
+      });
+
+      // Add to pending cropped files
+      setPendingCroppedFiles(prev => [...prev, croppedFile]);
+
+      // Check if there are remaining files to process
+      const remainingFiles = (tempImageFile as any).remainingFiles as File[] || [];
+      
+      // Clean up current temp state
+      setShowCropModal(false);
+      setTempImageFile(null);
+      if (tempImageUrl) {
+        URL.revokeObjectURL(tempImageUrl);
+        setTempImageUrl(null);
+      }
+
+      // Process remaining files if any
+      if (remainingFiles.length > 0) {
+        setTimeout(() => processFilesForCropping(remainingFiles), 100);
+      }
+    } catch (error) {
+      console.error('Error processing cropped image:', error);
+      setError('Failed to process cropped image. Please try again.');
+    }
+  };
+
+  // Handle skipping crop for a file (use original)
+  const handleSkipCrop = () => {
+    if (!tempImageFile) return;
+
+    // Add original file to newScreenshots instead of pending cropped files
+    setNewScreenshots(prev => [...prev, tempImageFile]);
+
+    // Check if there are remaining files to process
+    const remainingFiles = (tempImageFile as any).remainingFiles as File[] || [];
+    
+    // Clean up current temp state
+    setShowCropModal(false);
+    setTempImageFile(null);
+    if (tempImageUrl) {
+      URL.revokeObjectURL(tempImageUrl);
+      setTempImageUrl(null);
+    }
+
+    // Process remaining files if any
+    if (remainingFiles.length > 0) {
+      setTimeout(() => processFilesForCropping(remainingFiles), 100);
+    }
+  };
+
+  // Handle closing crop modal
+  const handleCloseCropModal = () => {
+    setShowCropModal(false);
+    setTempImageFile(null);
+    if (tempImageUrl) {
+      URL.revokeObjectURL(tempImageUrl);
+      setTempImageUrl(null);
+    }
+    setEditingScreenshotId(null);
+  };
+
+  // Handle editing existing screenshot
+  const handleEditExistingScreenshot = (screenshotId: string, screenshotUrl: string) => {
+    setEditingScreenshotId(screenshotId);
+    
+    // Create a cache-busted URL to avoid CORS issues
+    const url = new URL(screenshotUrl);
+    url.searchParams.set('t', Date.now().toString());
+    
+    setTempImageUrl(url.toString());
+    setShowCropModal(true);
+  };
+
+  // Handle crop completion for existing screenshot
+  const handleEditCropComplete = async (croppedImageBlob: Blob) => {
+    if (!editingScreenshotId || !user) return;
+
+    try {
+      // Convert blob to File
+      const croppedFile = new File([croppedImageBlob], 'cropped-comment-screenshot.jpg', {
+        type: 'image/jpeg',
+        lastModified: Date.now(),
+      });
+
+      // Add to pending cropped files
+      setPendingCroppedFiles(prev => [...prev, croppedFile]);
+
+      // Remove the original screenshot from existing screenshots
+      setScreenshotsToDelete(prev => [...prev, editingScreenshotId]);
+
+      // Close modal
+      setShowCropModal(false);
+      setTempImageFile(null);
+      if (tempImageUrl) {
+        URL.revokeObjectURL(tempImageUrl);
+        setTempImageUrl(null);
+      }
+      setEditingScreenshotId(null);
+    } catch (error) {
+      console.error('Error processing cropped image:', error);
+      setError('Failed to process cropped image. Please try again.');
+    }
+  };
+
   const removeNewScreenshot = (index: number) => {
     setNewScreenshots(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // Remove cropped screenshot
+  const removeCroppedScreenshot = (index: number) => {
+    setPendingCroppedFiles(prev => prev.filter((_, i) => i !== index));
   };
 
   const markExistingScreenshotForDeletion = (screenshotId: string) => {
@@ -89,7 +279,10 @@ const CommentItem: React.FC<CommentItemProps> = ({
       // 1. Update comment content
       const { error: updateError } = await supabase
         .from('comments')
-        .update({ content: editContent.trim() })
+        .update({ 
+          content: editContent.trim(),
+          updated_by: user!.id
+        })
         .eq('id', comment.id);
 
       if (updateError) throw updateError;
@@ -119,9 +312,10 @@ const CommentItem: React.FC<CommentItemProps> = ({
         }
       }
 
-      // 3. Upload new screenshots
-      if (newScreenshots.length > 0) {
-        const uploadPromises = newScreenshots.map(async (file) => {
+      // 3. Upload new screenshots (both original and cropped)
+      const allNewFiles = [...newScreenshots, ...pendingCroppedFiles];
+      if (allNewFiles.length > 0) {
+        const uploadPromises = allNewFiles.map(async (file) => {
           const { url } = await uploadImage(file, {
             bucket: 'screenshots',
             folder: 'comments'
@@ -148,6 +342,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
       setIsEditing(false);
       setScreenshotsToDelete([]);
       setNewScreenshots([]);
+      setPendingCroppedFiles([]);
       onCommentUpdated();
     } catch (err: any) {
       console.error('Error updating comment:', err);
@@ -202,15 +397,34 @@ const CommentItem: React.FC<CommentItemProps> = ({
       )}
 
       <div className="flex justify-between items-start mb-3">
-        <div className="flex items-center gap-2">
-          <span className="font-medium text-night-800">
-            {comment.user?.username || 'Unknown User'}
-          </span>
-          <div className="flex items-center gap-1 text-xs text-sand-600">
-            <Clock size={12} />
-            <span>{formatDate(comment.created_at)}</span>
-            {comment.updated_at !== comment.created_at && (
-              <span className="italic">(edited)</span>
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <span className="font-medium text-night-800 text-sm">
+              {creatorInfo?.username || 'Unknown User'}
+            </span>
+          </div>
+          
+          {/* Creator and Editor Information - Compact single line */}
+          <div className="flex items-center justify-between text-xs text-sand-600">
+            <div className="flex items-center gap-1">
+              <User className="w-3 h-3" />
+              <span>
+                Posted by {loadingUserInfo ? '...' : (creatorInfo?.username || 'Unknown')} on {formatCompactDateTime(comment.created_at)}
+              </span>
+            </div>
+            
+            {/* Edit information - Only show if comment was edited */}
+            {isEdited && (
+              <div className="flex items-center gap-1">
+                <Clock className="w-3 h-3" />
+                <span>
+                  Edited {loadingUserInfo ? '...' : (
+                    comment.updated_by && editorInfo?.username 
+                      ? `by ${editorInfo.username} `
+                      : ''
+                  )}on {formatCompactDateTime(comment.updated_at)}
+                </span>
+              </div>
             )}
           </div>
         </div>
@@ -270,27 +484,37 @@ const CommentItem: React.FC<CommentItemProps> = ({
                               : 'border-sand-300'
                           }`}
                         />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (isMarkedForDeletion) {
-                              unmarkExistingScreenshotForDeletion(screenshot.id);
-                            } else {
-                              markExistingScreenshotForDeletion(screenshot.id);
-                            }
-                          }}
-                          className={`absolute -top-2 -right-2 rounded-full p-1 transition-colors ${
-                            isMarkedForDeletion
-                              ? 'bg-yellow-600 hover:bg-yellow-700 text-white'
-                              : 'bg-red-600 hover:bg-red-700 text-white'
-                          }`}
-                        >
-                          {isMarkedForDeletion ? (
-                            <Check size={12} />
-                          ) : (
-                            <X size={12} />
-                          )}
-                        </button>
+                        <div className="absolute top-0 right-0 flex">
+                          <button
+                            type="button"
+                            onClick={() => handleEditExistingScreenshot(screenshot.id, screenshot.url)}
+                            className="bg-blue-600 text-white w-5 h-5 flex items-center justify-center rounded-bl-md hover:bg-blue-700 transition-colors"
+                            title="Edit screenshot"
+                          >
+                            <Edit className="w-3 h-3" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (isMarkedForDeletion) {
+                                unmarkExistingScreenshotForDeletion(screenshot.id);
+                              } else {
+                                markExistingScreenshotForDeletion(screenshot.id);
+                              }
+                            }}
+                            className={`w-5 h-5 flex items-center justify-center transition-colors ${
+                              isMarkedForDeletion
+                                ? 'bg-yellow-600 hover:bg-yellow-700 text-white'
+                                : 'bg-red-600 hover:bg-red-700 text-white'
+                            }`}
+                          >
+                            {isMarkedForDeletion ? (
+                              <Check className="w-3 h-3" />
+                            ) : (
+                              <X className="w-3 h-3" />
+                            )}
+                          </button>
+                        </div>
                         {isMarkedForDeletion && (
                           <div className="absolute inset-0 flex items-center justify-center bg-red-500/20 rounded-lg">
                             <span className="text-xs text-red-700 font-medium bg-white/90 px-2 py-1 rounded">
@@ -305,16 +529,16 @@ const CommentItem: React.FC<CommentItemProps> = ({
               </div>
             )}
 
-            {/* New screenshots */}
+            {/* New original screenshots */}
             {newScreenshots.length > 0 && (
               <div className="space-y-2">
-                <h4 className="text-sm font-medium text-night-700">New Screenshots:</h4>
+                <h4 className="text-sm font-medium text-night-700">New Original Screenshots:</h4>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {newScreenshots.map((file, index) => (
-                    <div key={index} className="relative group">
+                    <div key={`original-${index}`} className="relative group">
                       <img
                         src={URL.createObjectURL(file)}
-                        alt={`New screenshot ${index + 1}`}
+                        alt={`New original screenshot ${index + 1}`}
                         className="w-full h-20 object-cover rounded-lg border border-blue-300"
                       />
                       <button
@@ -322,13 +546,44 @@ const CommentItem: React.FC<CommentItemProps> = ({
                         onClick={() => removeNewScreenshot(index)}
                         className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-700"
                       >
-                        <X size={12} />
+                        <X className="w-3 h-3" />
                       </button>
-                      <div className="absolute bottom-1 left-1 bg-black/50 text-white text-xs px-1 rounded">
+                      <div className="absolute bottom-1 left-1 bg-blue-500 text-white text-xs px-1 rounded">
+                        Original
+                      </div>
+                      <div className="absolute bottom-1 right-1 bg-black/50 text-white text-xs px-1 rounded">
                         {(file.size / (1024 * 1024)).toFixed(1)}MB
                       </div>
-                      <div className="absolute top-1 left-1 bg-blue-600 text-white text-xs px-1 rounded">
-                        NEW
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* New cropped screenshots */}
+            {pendingCroppedFiles.length > 0 && (
+              <div className="space-y-2">
+                <h4 className="text-sm font-medium text-night-700">New Cropped Screenshots:</h4>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {pendingCroppedFiles.map((file, index) => (
+                    <div key={`cropped-${index}`} className="relative group">
+                      <img
+                        src={URL.createObjectURL(file)}
+                        alt={`New cropped screenshot ${index + 1}`}
+                        className="w-full h-20 object-cover rounded-lg border border-green-300"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeCroppedScreenshot(index)}
+                        className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-700"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                      <div className="absolute bottom-1 left-1 bg-green-500 text-white text-xs px-1 rounded">
+                        Cropped
+                      </div>
+                      <div className="absolute bottom-1 right-1 bg-black/50 text-white text-xs px-1 rounded">
+                        {(file.size / (1024 * 1024)).toFixed(1)}MB
                       </div>
                     </div>
                   ))}
@@ -364,7 +619,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
             />
 
             {/* Screenshot summary */}
-            {(screenshotsToDelete.length > 0 || newScreenshots.length > 0) && (
+            {(screenshotsToDelete.length > 0 || newScreenshots.length > 0 || pendingCroppedFiles.length > 0) && (
               <div className="text-xs text-sand-600 bg-sand-50 p-2 rounded">
                 {screenshotsToDelete.length > 0 && (
                   <div className="text-red-600">
@@ -373,20 +628,26 @@ const CommentItem: React.FC<CommentItemProps> = ({
                 )}
                 {newScreenshots.length > 0 && (
                   <div className="text-blue-600">
-                    • {newScreenshots.length} new screenshot{newScreenshots.length !== 1 ? 's' : ''} will be added
+                    • {newScreenshots.length} new original screenshot{newScreenshots.length !== 1 ? 's' : ''} will be added
+                  </div>
+                )}
+                {pendingCroppedFiles.length > 0 && (
+                  <div className="text-green-600">
+                    • {pendingCroppedFiles.length} new cropped screenshot{pendingCroppedFiles.length !== 1 ? 's' : ''} will be added
                   </div>
                 )}
               </div>
             )}
           </div>
 
-          <div className="flex gap-2 justify-end">
+          <div className="flex justify-end gap-2">
             <button
               onClick={() => {
                 setIsEditing(false);
                 setEditContent(comment.content);
                 setScreenshotsToDelete([]);
                 setNewScreenshots([]);
+                setPendingCroppedFiles([]);
                 setError(null);
               }}
               disabled={isSubmitting}
@@ -461,6 +722,21 @@ const CommentItem: React.FC<CommentItemProps> = ({
             <div className="flex-1" />
           </div>
         </div>
+      )}
+
+      {/* Image Crop Modal */}
+      {showCropModal && tempImageUrl && (
+        <ImageCropModal
+          imageUrl={tempImageUrl}
+          onCropComplete={editingScreenshotId ? 
+            (croppedImageBlob: Blob) => handleEditCropComplete(croppedImageBlob) :
+            (croppedImageBlob: Blob) => handleCropComplete(croppedImageBlob)
+          }
+          onClose={handleCloseCropModal}
+          onSkip={editingScreenshotId ? undefined : handleSkipCrop}
+          title={editingScreenshotId ? "Edit Comment Screenshot" : "Crop Comment Screenshot"}
+          defaultToSquare={false}
+        />
       )}
     </div>
   );

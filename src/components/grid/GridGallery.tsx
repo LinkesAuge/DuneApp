@@ -98,11 +98,9 @@ const GridGallery: React.FC<GridGalleryProps> = ({ squares, initialIndex, onClos
             </h3>
             {uploader && currentSquare.upload_date && (
               <div className="flex items-center text-sand-300 text-sm mt-1">
-                <Clock size={14} className="mr-1" />
+                <Clock size={14} className="mr-1.5" />
                 <span>
-                  Screenshot by {uploader.username} on{' '}
-                  {new Date(currentSquare.upload_date).toLocaleDateString()} at{' '}
-                  {new Date(currentSquare.upload_date).toLocaleTimeString()}
+                  Screenshot by {uploader.username} on {new Date(currentSquare.upload_date).toLocaleDateString()}
                 </span>
               </div>
             )}
@@ -158,12 +156,12 @@ const GridGallery: React.FC<GridGalleryProps> = ({ squares, initialIndex, onClos
                     {poiInfo.description || 'No description provided'}
                   </p>
                   {poiInfo.created_by && userInfo[poiInfo.created_by] && (
-                    <p className="text-sm text-sand-400">
-                      <Clock size={12} className="inline mr-1" />
-                      POI added by {userInfo[poiInfo.created_by].username} on{' '}
-                      {new Date(poiInfo.created_at).toLocaleDateString()} at{' '}
-                      {new Date(poiInfo.created_at).toLocaleTimeString()}
-                    </p>
+                    <div className="flex items-center text-sm text-sand-400">
+                      <Clock size={12} className="mr-1.5" />
+                      <span>
+                        POI added by {userInfo[poiInfo.created_by].username} on {new Date(poiInfo.created_at).toLocaleDateString()}
+                      </span>
+                    </div>
                   )}
                 </>
               )}

@@ -6,11 +6,14 @@ import type {
   PoiType, 
   CustomIcon, 
   Poi, 
-  PrivacyLevel 
+  PrivacyLevel,
+  PercentageCoordinates
 } from '../../types';
 import { formatCoordinates } from '../../lib/coordinates';
 import { useAuth } from '../auth/AuthProvider';
 import CustomPoiTypeModal from './CustomPoiTypeModal';
+import ImageCropModal from '../grid/ImageCropModal';
+import { PixelCrop } from 'react-image-crop';
 
 interface POIPlacementModalProps {
   coordinates: PixelCoordinates;
@@ -95,6 +98,12 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
   const [showCustomPoiTypeModal, setShowCustomPoiTypeModal] = useState(false);
   const [userCreatedPoiTypes, setUserCreatedPoiTypes] = useState<PoiType[]>([]);
 
+  // Screenshot cropping state
+  const [showCropModal, setShowCropModal] = useState(false);
+  const [tempImageFile, setTempImageFile] = useState<File | null>(null);
+  const [tempImageUrl, setTempImageUrl] = useState<string | null>(null);
+  const [pendingCroppedFiles, setPendingCroppedFiles] = useState<File[]>([]);
+
   // Get categories for organizing POI types
   const categories = [...new Set(poiTypes.map(type => type.category))];
 
@@ -140,9 +149,12 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
     setUserCreatedPoiTypes(prev => prev.map(type => type.id === updatedPoiType.id ? updatedPoiType : type));
   };
 
-  // Handle screenshot upload
+  // Handle screenshot upload - now with cropping
   const handleScreenshotUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
+    
+    if (files.length === 0) return;
+    
     const validFiles = files.filter(file => 
       file.type.startsWith('image/') && file.size <= 10 * 1024 * 1024 // 10MB limit
     );
@@ -151,22 +163,127 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
       setError('Some files were invalid. Only images under 10MB are allowed.');
       return;
     }
+
+    // Check total screenshot limit
+    const totalFiles = screenshots.length + pendingCroppedFiles.length + validFiles.length;
+    if (totalFiles > 5) {
+      setError('Maximum 5 screenshots allowed per POI');
+      return;
+    }
     
-    setScreenshots(prev => [...prev, ...validFiles].slice(0, 5)); // Max 5 screenshots
+    // Process files one by one through cropping
+    processFilesForCropping(validFiles);
   };
 
-  // Remove screenshot
+  // Process files through cropping workflow
+  const processFilesForCropping = (files: File[]) => {
+    if (files.length === 0) return;
+    
+    const [firstFile, ...remainingFiles] = files;
+    
+    // Set up for cropping the first file
+    setTempImageFile(firstFile);
+    setTempImageUrl(URL.createObjectURL(firstFile));
+    setShowCropModal(true);
+    
+    // Store remaining files to process after current crop is complete
+    if (remainingFiles.length > 0) {
+      // We'll handle remaining files after crop completion
+      setTempImageFile(prev => {
+        // Store remaining files in a way we can access them
+        (firstFile as any).remainingFiles = remainingFiles;
+        return firstFile;
+      });
+    }
+  };
+
+  // Handle crop completion
+  const handleCropComplete = async (croppedImageBlob: Blob) => {
+    if (!tempImageFile) return;
+
+    try {
+      // Convert blob to File
+      const croppedFile = new File([croppedImageBlob], tempImageFile.name, {
+        type: 'image/jpeg',
+        lastModified: Date.now(),
+      });
+
+      // Add to pending cropped files
+      setPendingCroppedFiles(prev => [...prev, croppedFile]);
+
+      // Check if there are remaining files to process
+      const remainingFiles = (tempImageFile as any).remainingFiles as File[] || [];
+      
+      // Clean up current temp state
+      setShowCropModal(false);
+      setTempImageFile(null);
+      if (tempImageUrl) {
+        URL.revokeObjectURL(tempImageUrl);
+        setTempImageUrl(null);
+      }
+
+      // Process remaining files if any
+      if (remainingFiles.length > 0) {
+        setTimeout(() => processFilesForCropping(remainingFiles), 100);
+      }
+    } catch (error) {
+      console.error('Error processing cropped image:', error);
+      setError('Failed to process cropped image. Please try again.');
+    }
+  };
+
+  // Handle skipping crop for a file (use original)
+  const handleSkipCrop = () => {
+    if (!tempImageFile) return;
+
+    // Add original file to screenshots instead of pending cropped files
+    setScreenshots(prev => [...prev, tempImageFile]);
+
+    // Check if there are remaining files to process
+    const remainingFiles = (tempImageFile as any).remainingFiles as File[] || [];
+    
+    // Clean up current temp state
+    setShowCropModal(false);
+    setTempImageFile(null);
+    if (tempImageUrl) {
+      URL.revokeObjectURL(tempImageUrl);
+      setTempImageUrl(null);
+    }
+
+    // Process remaining files if any
+    if (remainingFiles.length > 0) {
+      setTimeout(() => processFilesForCropping(remainingFiles), 100);
+    }
+  };
+
+  // Handle closing crop modal
+  const handleCloseCropModal = () => {
+    setShowCropModal(false);
+    setTempImageFile(null);
+    if (tempImageUrl) {
+      URL.revokeObjectURL(tempImageUrl);
+      setTempImageUrl(null);
+    }
+  };
+
+  // Remove screenshot (original files)
   const removeScreenshot = (index: number) => {
     setScreenshots(prev => prev.filter((_, i) => i !== index));
   };
 
+  // Remove cropped screenshot
+  const removeCroppedScreenshot = (index: number) => {
+    setPendingCroppedFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
   // Upload screenshots to Supabase Storage
   const uploadScreenshots = async (poiId: string): Promise<string[]> => {
-    if (screenshots.length === 0) return [];
+    const allFiles = [...screenshots, ...pendingCroppedFiles];
+    if (allFiles.length === 0) return [];
 
     const uploadedUrls: string[] = [];
 
-    for (const file of screenshots) {
+    for (const file of allFiles) {
       const fileExt = file.name.split('.').pop();
       const fileName = `${poiId}_${Date.now()}.${fileExt}`;
       const filePath = `screenshots/${fileName}`;
@@ -280,7 +397,9 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
 
       // Upload screenshots if any and update POI
       let finalScreenshots: any[] = [];
-      if (screenshots.length > 0) {
+      const totalScreenshots = screenshots.length + pendingCroppedFiles.length;
+      
+      if (totalScreenshots > 0) {
         try {
           const screenshotUrls = await uploadScreenshots(poi.id);
           
@@ -624,24 +743,63 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
             </div>
 
             {/* Screenshot Previews */}
-            {screenshots.length > 0 && (
-              <div className="grid grid-cols-2 gap-2">
-                {screenshots.map((file, index) => (
-                  <div key={index} className="relative">
-                    <img
-                      src={URL.createObjectURL(file)}
-                      alt={`Screenshot ${index + 1}`}
-                      className="w-full h-24 object-cover rounded-lg"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeScreenshot(index)}
-                      className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
+            {(screenshots.length > 0 || pendingCroppedFiles.length > 0) && (
+              <div className="space-y-4">
+                {/* Original Screenshots */}
+                {screenshots.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-medium text-sand-700 mb-2">Original Screenshots</h4>
+                    <div className="grid grid-cols-2 gap-2">
+                      {screenshots.map((file, index) => (
+                        <div key={`original-${index}`} className="relative">
+                          <img
+                            src={URL.createObjectURL(file)}
+                            alt={`Original Screenshot ${index + 1}`}
+                            className="w-full h-24 object-cover rounded-lg"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeScreenshot(index)}
+                            className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                          <div className="absolute bottom-1 left-1 bg-blue-500 text-white text-xs px-1 rounded">
+                            Original
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                ))}
+                )}
+
+                {/* Cropped Screenshots */}
+                {pendingCroppedFiles.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-medium text-sand-700 mb-2">Cropped Screenshots</h4>
+                    <div className="grid grid-cols-2 gap-2">
+                      {pendingCroppedFiles.map((file, index) => (
+                        <div key={`cropped-${index}`} className="relative">
+                          <img
+                            src={URL.createObjectURL(file)}
+                            alt={`Cropped Screenshot ${index + 1}`}
+                            className="w-full h-24 object-cover rounded-lg"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeCroppedScreenshot(index)}
+                            className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                          <div className="absolute bottom-1 left-1 bg-green-500 text-white text-xs px-1 rounded">
+                            Cropped
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -690,6 +848,18 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
         onPoiTypeDeleted={handleCustomPoiTypeDeleted}
         onPoiTypeUpdated={handleCustomPoiTypeUpdated}
       />
+
+      {/* Image Crop Modal */}
+      {showCropModal && tempImageFile && tempImageUrl && (
+        <ImageCropModal
+          imageUrl={tempImageUrl}
+          onCropComplete={(croppedImageBlob: Blob) => handleCropComplete(croppedImageBlob)}
+          onClose={handleCloseCropModal}
+          onSkip={handleSkipCrop}
+          title="Crop POI Screenshot"
+          defaultToSquare={false}
+        />
+      )}
     </div>
   );
 };

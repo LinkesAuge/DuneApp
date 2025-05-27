@@ -32,6 +32,8 @@ interface InteractiveMapProps {
   // Help tooltip props
   showHelpTooltip?: boolean;
   onHelpTooltipChange?: (show: boolean) => void;
+  // Highlighting prop
+  highlightedPoiId?: string | null;
 }
 
 // Map configuration for zoom/pan (initialScale will be set dynamically)
@@ -73,7 +75,9 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
   onPlacementModeChange,
   // Help tooltip props
   showHelpTooltip = false,
-  onHelpTooltipChange
+  onHelpTooltipChange,
+  // Highlighting prop
+  highlightedPoiId
 }) => {
   const transformRef = useRef<ReactZoomPanPinchRef | null>(null);
   const mapElementRef = useRef<HTMLDivElement | null>(null);
@@ -276,6 +280,21 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
     };
   };
 
+  // Highlighted POI effect (no centering/zooming)
+  useEffect(() => {
+    if (highlightedPoiId) {
+      console.log('HaggaBasin: Highlighting POI:', highlightedPoiId);
+      const highlightedPoi = pois.find(poi => poi.id === highlightedPoiId);
+      if (highlightedPoi) {
+        console.log('HaggaBasin: Found POI to highlight:', highlightedPoi.title);
+      } else {
+        console.log('HaggaBasin: POI not found for highlighting');
+      }
+    } else {
+      console.log('HaggaBasin: No POI highlighted');
+    }
+  }, [highlightedPoiId, pois]);
+
   return (
     <div className="w-full h-full relative bg-sand-100 overflow-hidden">
       {/* Interactive Map Container */}
@@ -356,6 +375,7 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
                       // TODO: Open gallery modal
                       console.log('Open gallery for POI:', poi.id);
                     }}
+                    isHighlighted={highlightedPoiId === poi.id}
                   />
                 </div>
               );

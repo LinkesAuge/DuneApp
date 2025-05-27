@@ -22,6 +22,7 @@ interface POIPanelProps {
   userInfo?: { [key: string]: { username: string } };
   // Callbacks
   onPoiClick?: (poi: Poi) => void;
+  onPoiHighlight?: (poi: Poi) => void;
   onPoiEdit?: (poi: Poi) => void;
   onPoiDelete?: (poiId: string) => Promise<void>;
   onPoiShare?: (poi: Poi) => void;
@@ -45,6 +46,7 @@ const POIPanel: React.FC<POIPanelProps> = ({
   gridSquares,
   userInfo = {},
   onPoiClick,
+  onPoiHighlight,
   onPoiEdit,
   onPoiDelete,
   onPoiShare,
@@ -226,7 +228,10 @@ const POIPanel: React.FC<POIPanelProps> = ({
                     poiType={poiType}
                     gridSquareCoordinate={gridCoordinate}
                     creator={creator}
-                    onClick={() => onPoiClick?.(poi)}
+                    onClick={() => {
+                      console.log('POIPanel: PoiListItem clicked for POI:', poi.title);
+                      onPoiHighlight?.(poi);
+                    }}
                     onImageClick={() => onPoiGalleryOpen?.(poi)}
                     onEdit={() => onPoiEdit?.(poi)}
                     onDelete={() => onPoiDelete?.(poi.id)}
@@ -242,7 +247,10 @@ const POIPanel: React.FC<POIPanelProps> = ({
                   customIcons={customIcons}
                   gridSquareCoordinate={gridCoordinate}
                   creator={creator}
-                  onClick={() => onPoiClick?.(poi)}
+                  onClick={() => {
+                    console.log('POIPanel: PoiCard clicked for POI:', poi.title);
+                    onPoiHighlight?.(poi);
+                  }}
                   onImageClick={() => onPoiGalleryOpen?.(poi)}
                   onEdit={() => onPoiEdit?.(poi)}
                   onDelete={() => onPoiDelete?.(poi.id)}

@@ -13,6 +13,7 @@ interface MapPOIMarkerProps {
   onDelete?: (poiId: string) => void;
   onShare?: (poi: Poi) => void;
   onImageClick?: (poi: Poi) => void;
+  isHighlighted?: boolean;
 }
 
 // Helper function to determine if an icon is a URL or emoji
@@ -68,13 +69,23 @@ const MapPOIMarker: React.FC<MapPOIMarkerProps> = ({
   onEdit,
   onDelete,
   onShare,
-  onImageClick
+  onImageClick,
+  isHighlighted
 }) => {
   const [showCard, setShowCard] = useState(false);
   const [hoverTimeout, setHoverTimeout] = useState<NodeJS.Timeout | null>(null);
   const imageUrl = getDisplayImageUrl(poi, poiType, customIcons);
   const PrivacyIcon = privacyIcons[poi.privacy_level];
   const privacyColor = privacyColors[poi.privacy_level];
+
+  // Debug highlighting changes
+  useEffect(() => {
+    if (isHighlighted) {
+      console.log('MapPOIMarker: POI', poi.title, 'is now highlighted!');
+    } else {
+      console.log('MapPOIMarker: POI', poi.title, 'highlighting removed');
+    }
+  }, [isHighlighted, poi.title]);
 
   // Calculate icon size with subtle scaling from admin settings
   const baseSize = mapSettings?.iconBaseSize || 64;
@@ -162,6 +173,66 @@ const MapPOIMarker: React.FC<MapPOIMarkerProps> = ({
             </span>
           )}
         </div>
+
+        {/* Highlight Effect - Complete Overlay */}
+        {isHighlighted && (
+          <div 
+            className="absolute pointer-events-none"
+            style={{
+              top: 0,
+              left: 0,
+              width: `${iconSize}px`,
+              height: `${iconSize}px`,
+            }}
+          >
+            {/* Red glowing exclamation mark */}
+            <div 
+              className="absolute bg-red-500 text-white text-lg font-bold px-2 py-1 rounded-full shadow-lg"
+              style={{
+                top: `${iconSize * -0.7}px`,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                zIndex: 999,
+                animation: 'pulse 1s infinite',
+                boxShadow: '0 0 10px rgba(239, 68, 68, 0.8), 0 0 20px rgba(239, 68, 68, 0.6), 0 0 30px rgba(239, 68, 68, 0.4)'
+              }}
+            >
+              !
+            </div>
+            
+            {/* Outer ring - ping animation */}
+            <div 
+              className="absolute animate-ping rounded-full border-4 border-green-500 opacity-75"
+              style={{
+                width: `${iconSize * 1.8}px`,
+                height: `${iconSize * 1.8}px`,
+                top: `${iconSize * -0.4}px`,
+                left: `${iconSize * -0.4}px`
+              }}
+            />
+            {/* Middle ring - pulse animation */}
+            <div 
+              className="absolute animate-pulse rounded-full border-3 border-green-400 opacity-60"
+              style={{
+                width: `${iconSize * 1.4}px`,
+                height: `${iconSize * 1.4}px`,
+                top: `${iconSize * -0.2}px`,
+                left: `${iconSize * -0.2}px`,
+                animationDelay: '0.5s'
+              }}
+            />
+            {/* Inner glow */}
+            <div 
+              className="absolute rounded-full bg-green-500/20"
+              style={{
+                width: `${iconSize}px`,
+                height: `${iconSize}px`,
+                top: '0',
+                left: '0'
+              }}
+            />
+          </div>
+        )}
 
         {/* Privacy Indicator */}
         {poi.privacy_level !== 'global' && (

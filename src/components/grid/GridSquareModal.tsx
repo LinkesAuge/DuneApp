@@ -873,9 +873,7 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
                 <div className="mt-3 text-sm text-night-600 flex items-center">
                   <Clock size={14} className="mr-1.5" />
                   <span>
-                    Updated by {uploaderInfo.username} on{' '}
-                    {new Date(currentSquare.upload_date).toLocaleDateString()} at{' '}
-                    {new Date(currentSquare.upload_date).toLocaleTimeString()}
+                    Updated by {uploaderInfo.username} on {new Date(currentSquare.upload_date).toLocaleDateString()}
                   </span>
                 </div>
               )}
@@ -1004,6 +1002,7 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
           onClose={handleCloseCropModal}
           onSkip={isEditingExisting ? undefined : handleSkipCrop}
           title={isEditingExisting ? 'Edit Screenshot Crop' : 'Crop Your Screenshot'}
+          defaultToSquare={true}
           initialCrop={
             isEditingExisting && currentSquare.crop_x !== null && currentSquare.crop_y !== null && 
             currentSquare.crop_width !== null && currentSquare.crop_height !== null

@@ -31,6 +31,7 @@ export interface GridSquare {
   is_explored: boolean;
   uploaded_by: string | null;
   upload_date: string;
+  updated_by: string | null; // Who last updated/edited this grid square
   // NEW: Crop functionality fields
   original_screenshot_url: string | null;
   crop_x: number | null;
@@ -57,6 +58,8 @@ export interface PoiScreenshot {
   url: string;
   uploaded_by: string;
   upload_date: string;
+  updated_by?: string | null; // Who last edited this screenshot
+  updated_at?: string; // When this screenshot was last updated
 }
 
 // EXTENDED POI interface for multi-map support
@@ -69,6 +72,7 @@ export interface Poi {
   created_by: string;
   created_at: string;
   updated_at: string; // When the POI was last updated
+  updated_by: string | null; // Who last updated/edited this POI
   screenshots: PoiScreenshot[];
   // NEW fields for Hagga Basin support
   map_type: MapType;
@@ -115,6 +119,7 @@ export interface PoiCollection {
   is_public: boolean;
   created_at: string;
   updated_at: string;
+  updated_by: string | null; // Who last updated/edited this collection
 }
 
 export interface PoiCollectionItem {
@@ -180,6 +185,8 @@ export interface CommentScreenshot {
   url: string;
   uploaded_by: string;
   upload_date: string;
+  updated_by?: string | null; // Who last edited this screenshot
+  updated_at?: string; // When this screenshot was last updated
   file_size?: number;
   file_name?: string;
 }
@@ -190,6 +197,7 @@ export interface Comment {
   created_at: string;
   updated_at: string;
   created_by: string;
+  updated_by?: string | null; // Who last edited this comment
   poi_id?: string;
   grid_square_id?: string;
   screenshots?: CommentScreenshot[];

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { useParams, useNavigate, Navigate } from 'react-router-dom';
+import { useParams, useNavigate, Navigate, useSearchParams } from 'react-router-dom';
 import { TransformWrapper, TransformComponent, ReactZoomPanPinchRef } from 'react-zoom-pan-pinch';
 import { supabase } from '../lib/supabase';
 import { GridSquare, Poi, PoiType, CustomIcon, PixelCoordinates, PoiCollection } from '../types';
@@ -30,6 +30,7 @@ const GridPage: React.FC = () => {
   const { gridId } = useParams<GridPageParams>();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   
   // Debug logging
   console.log('GridPage rendered with gridId:', gridId);
@@ -94,6 +95,9 @@ const GridPage: React.FC = () => {
 
   // Help tooltip state
   const [showHelpTooltip, setShowHelpTooltip] = useState(false);
+
+  // Highlighted POI state for navigation focus
+  const [highlightedPoiId, setHighlightedPoiId] = useState<string | null>(null);
 
   // Zoom/Pan state for interactive screenshots
   const [currentZoom, setCurrentZoom] = useState(0.8); // Changed from 0.4 to 0.8 for smaller Deep Desert screenshots
@@ -480,9 +484,10 @@ const GridPage: React.FC = () => {
   };
 
   // Handle POI sharing - Same as Hagga Basin
-  const handleSharePoi = (poi: Poi) => {
+  const handlePoiShare = (poi: Poi) => {
     setSelectedPoiForShare(poi);
     setShowSharePoiModal(true);
+    setSelectedPoi(null);
   };
 
   // Handle POI gallery opening - Same as Hagga Basin
@@ -610,11 +615,38 @@ const GridPage: React.FC = () => {
     setPlacementCoordinates(null);
   };
 
+  // Handle POI click from POI panel - highlighting only
+  const handlePoiHighlight = (poi: Poi) => {
+    console.log('GridPage handlePoiHighlight called for POI:', poi.title, 'coordinates:', poi.coordinates_x, poi.coordinates_y);
+    // Highlight the POI with pulsing animation
+    setHighlightedPoiId(poi.id);
+    console.log('GridPage: Set highlightedPoiId to:', poi.id);
+    // Remove highlight after 6 seconds
+    setTimeout(() => {
+      setHighlightedPoiId(null);
+      console.log('GridPage: Cleared highlightedPoiId');
+    }, 6000);
+  };
+
   // Handle POI click (same as Hagga Basin)
   const handlePoiClick = (poi: Poi, event: React.MouseEvent) => {
     event.preventDefault();
     event.stopPropagation();
+    console.log('GridPage handlePoiClick called for POI:', poi.title, 'coordinates:', poi.coordinates_x, poi.coordinates_y);
+    console.log('GridPage: Setting selectedPoi and highlightedPoiId to:', poi.id);
+    
+    // Open the POI details modal
     setSelectedPoi(poi);
+    
+    // Also highlight the POI with pulsing animation
+    setHighlightedPoiId(poi.id);
+    console.log('GridPage: Set selectedPoi and highlightedPoiId to:', poi.id);
+    
+    // Remove highlight after 6 seconds
+    setTimeout(() => {
+      setHighlightedPoiId(null);
+      console.log('GridPage: Cleared highlightedPoiId');
+    }, 6000);
   };
 
   // Handle POI editing
@@ -640,13 +672,6 @@ const GridPage: React.FC = () => {
       console.error('Error deleting POI:', error);
       throw error;
     }
-  };
-
-  // Handle POI sharing - Same as Hagga Basin
-  const handlePoiShare = (poi: Poi) => {
-    setSelectedPoiForShare(poi);
-    setShowSharePoiModal(true);
-    setSelectedPoi(null);
   };
 
   // Zoom/Pan handlers
@@ -720,7 +745,7 @@ const GridPage: React.FC = () => {
     setPlacementReady(false);
   };
 
-  // Fetch grid square data
+  // Initialize data on component mount
   useEffect(() => {
     const fetchGridData = async () => {
       try {
@@ -1144,6 +1169,43 @@ const GridPage: React.FC = () => {
       return () => clearTimeout(timer);
     }
   }, [error]);
+
+  // Handle POI focusing from URL parameter
+  useEffect(() => {
+    const poiIdFromUrl = searchParams.get('poi');
+    if (poiIdFromUrl && pois.length > 0) {
+      const targetPoi = pois.find(poi => poi.id === poiIdFromUrl);
+      if (targetPoi) {
+        // Highlight the POI with pulsing animation (but don't open modal)
+        setHighlightedPoiId(targetPoi.id);
+        // Remove highlight after 6 seconds
+        setTimeout(() => {
+          setHighlightedPoiId(null);
+        }, 6000);
+        // Remove the POI parameter from URL after focusing
+        setSearchParams(prev => {
+          const newParams = new URLSearchParams(prev);
+          newParams.delete('poi');
+          return newParams;
+        });
+      }
+    }
+  }, [pois, searchParams, setSearchParams]);
+
+  // Highlighted POI effect (no centering/zooming)
+  useEffect(() => {
+    if (highlightedPoiId) {
+      console.log('Deep Desert: Highlighting POI:', highlightedPoiId);
+      const highlightedPoi = pois.find(poi => poi.id === highlightedPoiId);
+      if (highlightedPoi) {
+        console.log('Deep Desert: Found POI to highlight:', highlightedPoi.title);
+      } else {
+        console.log('Deep Desert: POI not found for highlighting');
+      }
+    } else {
+      console.log('Deep Desert: No POI highlighted');
+    }
+  }, [highlightedPoiId, pois]);
 
   // Loading state
   if (loading) {
@@ -1852,6 +1914,7 @@ const GridPage: React.FC = () => {
                             onDelete={() => handlePoiDelete(poi.id)}
                             onShare={() => handlePoiShare(poi)}
                             onImageClick={() => handlePoiGalleryOpen(poi)}
+                            isHighlighted={highlightedPoiId === poi.id}
                           />
                         </div>
                       );
@@ -1993,6 +2056,7 @@ const GridPage: React.FC = () => {
                 gridSquares={gridSquare ? [gridSquare] : []}
                 userInfo={userInfo}
                 onPoiClick={(poi) => handlePoiClick(poi, {} as React.MouseEvent)}
+                onPoiHighlight={handlePoiHighlight}
                 onPoiEdit={handlePoiEdit}
                 onPoiDelete={handlePoiDelete}
                 onPoiShare={handlePoiShare}
@@ -2108,14 +2172,34 @@ const GridPage: React.FC = () => {
         />
       )}
 
-      {/* Gallery Modal - Same as Hagga Basin */}
-      {showGallery && galleryPoi && (
+      {/* Gallery Modal - Fixed to show POI screenshots instead of grid screenshots */}
+      {showGallery && galleryPoi && galleryPoi.screenshots && galleryPoi.screenshots.length > 0 && (
         <GridGallery
           initialIndex={galleryIndex}
-          squares={gridSquare ? [gridSquare] : []}
+          squares={galleryPoi.screenshots.map(s => ({
+            id: s.id,
+            coordinate: galleryPoi.title || 'POI',
+            screenshot_url: s.url,
+            original_screenshot_url: s.url, // Use same URL for original
+            is_explored: false,
+            uploaded_by: s.uploaded_by,
+            upload_date: s.upload_date,
+            created_at: s.upload_date,
+            crop_x: 0, // Default crop values for POI screenshots
+            crop_y: 0,
+            crop_width: 2000, // Default dimensions
+            crop_height: 2000,
+            crop_created_at: s.upload_date, // Use upload date for crop creation
+          }))}
           onClose={() => {
             setShowGallery(false);
             setGalleryPoi(null);
+          }}
+          poiInfo={{
+            title: galleryPoi.title,
+            description: galleryPoi.description,
+            created_at: galleryPoi.created_at,
+            created_by: galleryPoi.created_by,
           }}
         />
       )}
@@ -2128,6 +2212,7 @@ const GridPage: React.FC = () => {
           onClose={handleCloseCropModal}
           onSkip={isEditingExisting ? undefined : handleSkipCrop}
           title={isEditingExisting ? 'Edit Screenshot Crop' : 'Crop Your Screenshot'}
+          defaultToSquare={true}
           initialCrop={
             isEditingExisting && gridSquare && 
             gridSquare.crop_x !== null && gridSquare.crop_y !== null && 

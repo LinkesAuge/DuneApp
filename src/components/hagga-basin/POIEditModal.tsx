@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { X, MapPin, Lock, Users, Eye, Save, Upload, Trash2, Target } from 'lucide-react';
+import { X, MapPin, Lock, Users, Eye, Save, Upload, Trash2, Target, Edit } from 'lucide-react';
 import type { 
   Poi, 
   PoiType, 
@@ -9,6 +9,8 @@ import type {
 } from '../../types';
 import { formatCoordinates } from '../../lib/coordinates';
 import { useAuth } from '../auth/AuthProvider';
+import ImageCropModal from '../grid/ImageCropModal';
+import { PixelCrop } from 'react-image-crop';
 
 interface POIEditModalProps {
   poi: Poi;
@@ -90,6 +92,13 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
   const [screenshotsToDelete, setScreenshotsToDelete] = useState<string[]>([]);
   const [additionalScreenshots, setAdditionalScreenshots] = useState<File[]>([]);
   
+  // Screenshot cropping state
+  const [showCropModal, setShowCropModal] = useState(false);
+  const [tempImageFile, setTempImageFile] = useState<File | null>(null);
+  const [tempImageUrl, setTempImageUrl] = useState<string | null>(null);
+  const [pendingCroppedFiles, setPendingCroppedFiles] = useState<File[]>([]);
+  const [editingScreenshotId, setEditingScreenshotId] = useState<string | null>(null);
+  
   // UI state
   const [showDetailedPoiSelection, setShowDetailedPoiSelection] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -121,11 +130,14 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
   };
 
   // Calculate total screenshot count
-  const totalScreenshotCount = existingScreenshots.length + additionalScreenshots.length;
+  const totalScreenshotCount = existingScreenshots.length + additionalScreenshots.length + pendingCroppedFiles.length;
 
-  // Handle additional screenshot upload
+  // Handle additional screenshot upload - now with cropping
   const handleScreenshotUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
+    
+    if (files.length === 0) return;
+    
     const validFiles = files.filter(file => 
       file.type.startsWith('image/') && file.size <= 10 * 1024 * 1024 // 10MB limit
     );
@@ -147,7 +159,144 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
       setError(`Only ${filesToAdd.length} screenshot(s) can be added (5 total limit)`);
     }
     
-    setAdditionalScreenshots(prev => [...prev, ...filesToAdd]);
+    // Process files one by one through cropping
+    processFilesForCropping(filesToAdd);
+  };
+
+  // Process files through cropping workflow
+  const processFilesForCropping = (files: File[]) => {
+    if (files.length === 0) return;
+    
+    const [firstFile, ...remainingFiles] = files;
+    
+    // Set up for cropping the first file
+    setTempImageFile(firstFile);
+    setTempImageUrl(URL.createObjectURL(firstFile));
+    setShowCropModal(true);
+    
+    // Store remaining files to process after current crop is complete
+    if (remainingFiles.length > 0) {
+      // We'll handle remaining files after crop completion
+      setTempImageFile(prev => {
+        // Store remaining files in a way we can access them
+        (firstFile as any).remainingFiles = remainingFiles;
+        return firstFile;
+      });
+    }
+  };
+
+  // Handle crop completion
+  const handleCropComplete = async (croppedImageBlob: Blob) => {
+    if (!tempImageFile) return;
+
+    try {
+      // Convert blob to File
+      const croppedFile = new File([croppedImageBlob], tempImageFile.name, {
+        type: 'image/jpeg',
+        lastModified: Date.now(),
+      });
+
+      // Add to pending cropped files
+      setPendingCroppedFiles(prev => [...prev, croppedFile]);
+
+      // Check if there are remaining files to process
+      const remainingFiles = (tempImageFile as any).remainingFiles as File[] || [];
+      
+      // Clean up current temp state
+      setShowCropModal(false);
+      setTempImageFile(null);
+      if (tempImageUrl) {
+        URL.revokeObjectURL(tempImageUrl);
+        setTempImageUrl(null);
+      }
+
+      // Process remaining files if any
+      if (remainingFiles.length > 0) {
+        setTimeout(() => processFilesForCropping(remainingFiles), 100);
+      }
+    } catch (error) {
+      console.error('Error processing cropped image:', error);
+      setError('Failed to process cropped image. Please try again.');
+    }
+  };
+
+  // Handle skipping crop for a file (use original)
+  const handleSkipCrop = () => {
+    if (!tempImageFile) return;
+
+    // Add original file to additional screenshots instead of pending cropped files
+    setAdditionalScreenshots(prev => [...prev, tempImageFile]);
+
+    // Check if there are remaining files to process
+    const remainingFiles = (tempImageFile as any).remainingFiles as File[] || [];
+    
+    // Clean up current temp state
+    setShowCropModal(false);
+    setTempImageFile(null);
+    if (tempImageUrl) {
+      URL.revokeObjectURL(tempImageUrl);
+      setTempImageUrl(null);
+    }
+
+    // Process remaining files if any
+    if (remainingFiles.length > 0) {
+      setTimeout(() => processFilesForCropping(remainingFiles), 100);
+    }
+  };
+
+  // Handle closing crop modal
+  const handleCloseCropModal = () => {
+    setShowCropModal(false);
+    setTempImageFile(null);
+    if (tempImageUrl) {
+      URL.revokeObjectURL(tempImageUrl);
+      setTempImageUrl(null);
+    }
+    setEditingScreenshotId(null);
+  };
+
+  // Handle editing existing screenshot
+  const handleEditExistingScreenshot = (screenshotId: string, screenshotUrl: string) => {
+    setEditingScreenshotId(screenshotId);
+    
+    // Create a cache-busted URL to avoid CORS issues
+    const url = new URL(screenshotUrl);
+    url.searchParams.set('t', Date.now().toString());
+    
+    setTempImageUrl(url.toString());
+    setShowCropModal(true);
+  };
+
+  // Handle crop completion for existing screenshot
+  const handleEditCropComplete = async (croppedImageBlob: Blob) => {
+    if (!editingScreenshotId || !user) return;
+
+    try {
+      // Convert blob to File
+      const croppedFile = new File([croppedImageBlob], 'cropped-screenshot.jpg', {
+        type: 'image/jpeg',
+        lastModified: Date.now(),
+      });
+
+      // Add to pending cropped files
+      setPendingCroppedFiles(prev => [...prev, croppedFile]);
+
+      // Remove the original screenshot from existing screenshots
+      setExistingScreenshots(prev => prev.filter(s => s.id !== editingScreenshotId));
+      setScreenshotsToDelete(prev => [...prev, editingScreenshotId]);
+
+      // Close modal
+      setShowCropModal(false);
+      setTempImageFile(null);
+      if (tempImageUrl) {
+        URL.revokeObjectURL(tempImageUrl);
+        setTempImageUrl(null);
+      }
+      setEditingScreenshotId(null);
+    } catch (error) {
+      console.error('Error processing cropped image:', error);
+      setError('Failed to process cropped image. Please try again.');
+    }
   };
 
   // Remove additional screenshot
@@ -155,13 +304,19 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
     setAdditionalScreenshots(prev => prev.filter((_, i) => i !== index));
   };
 
+  // Remove cropped screenshot
+  const removeCroppedScreenshot = (index: number) => {
+    setPendingCroppedFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
   // Upload additional screenshots to Supabase Storage
   const uploadAdditionalScreenshots = async (poiId: string): Promise<string[]> => {
-    if (additionalScreenshots.length === 0) return [];
+    const allFiles = [...additionalScreenshots, ...pendingCroppedFiles];
+    if (allFiles.length === 0) return [];
 
     const uploadedUrls: string[] = [];
 
-    for (const file of additionalScreenshots) {
+    for (const file of allFiles) {
       const fileExt = file.name.split('.').pop();
       const fileName = `${poiId}_${Date.now()}.${fileExt}`;
       const filePath = `screenshots/${fileName}`;
@@ -254,7 +409,8 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
         coordinates_x: coordinatesX,
         coordinates_y: coordinatesY,
         privacy_level: privacyLevel,
-        custom_icon_id: customIconId
+        custom_icon_id: customIconId,
+        updated_by: user!.id
       };
 
       // Update the POI record
@@ -284,8 +440,9 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
         );
       }
 
-      // Upload additional screenshots if any
-      if (additionalScreenshots.length > 0) {
+      // Upload additional screenshots if any (both original and cropped)
+      const allNewFiles = [...additionalScreenshots, ...pendingCroppedFiles];
+      if (allNewFiles.length > 0) {
         try {
           const screenshotUrls = await uploadAdditionalScreenshots(poi.id);
           
@@ -305,7 +462,7 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
       }
 
       // Update POI with new screenshots array
-      if (screenshotsToDelete.length > 0 || additionalScreenshots.length > 0) {
+      if (screenshotsToDelete.length > 0 || allNewFiles.length > 0) {
         const { error: screenshotUpdateError } = await supabase
           .from('pois')
           .update({ screenshots: finalScreenshots })
@@ -657,7 +814,7 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
                 Screenshots ({totalScreenshotCount}/5)
               </label>
               <div className="space-y-3">
-                {/* Existing and New Screenshots Grid */}
+                {/* Screenshots Grid */}
                 <div className="flex flex-wrap gap-2">
                   {/* Existing Screenshots */}
                   {existingScreenshots.map(screenshot => (
@@ -670,18 +827,28 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
                         alt="POI Screenshot" 
                         className="w-full h-full object-cover"
                       />
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteExistingScreenshot(screenshot.id)}
-                        className="absolute top-0 right-0 bg-red-600 text-white w-5 h-5 flex items-center justify-center rounded-bl-md hover:bg-red-700 transition-colors"
-                        title="Delete screenshot"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
+                      <div className="absolute top-0 right-0 flex">
+                        <button
+                          type="button"
+                          onClick={() => handleEditExistingScreenshot(screenshot.id, screenshot.url)}
+                          className="bg-blue-600 text-white w-5 h-5 flex items-center justify-center rounded-bl-md hover:bg-blue-700 transition-colors"
+                          title="Edit screenshot"
+                        >
+                          <Edit className="w-3 h-3" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteExistingScreenshot(screenshot.id)}
+                          className="bg-red-600 text-white w-5 h-5 flex items-center justify-center hover:bg-red-700 transition-colors"
+                          title="Delete screenshot"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
                     </div>
                   ))}
 
-                  {/* New Screenshots to Upload */}
+                  {/* New Screenshots to Upload (Original) */}
                   {additionalScreenshots.map((file, index) => (
                     <div 
                       key={`new-${index}`}
@@ -700,6 +867,34 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
                       >
                         <X className="w-3 h-3" />
                       </button>
+                      <div className="absolute bottom-1 left-1 bg-blue-500 text-white text-xs px-1 rounded">
+                        Original
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Cropped Screenshots to Upload */}
+                  {pendingCroppedFiles.map((file, index) => (
+                    <div 
+                      key={`cropped-${index}`}
+                      className="w-20 h-20 relative rounded overflow-hidden border border-green-300"
+                    >
+                      <img 
+                        src={URL.createObjectURL(file)} 
+                        alt="Cropped Screenshot" 
+                        className="w-full h-full object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeCroppedScreenshot(index)}
+                        className="absolute top-0 right-0 bg-red-600 text-white w-5 h-5 flex items-center justify-center rounded-bl-md hover:bg-red-700 transition-colors"
+                        title="Remove cropped screenshot"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                      <div className="absolute bottom-1 left-1 bg-green-500 text-white text-xs px-1 rounded">
+                        Cropped
+                      </div>
                     </div>
                   ))}
                   
@@ -748,6 +943,21 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Image Crop Modal */}
+      {showCropModal && tempImageUrl && (
+        <ImageCropModal
+          imageUrl={tempImageUrl}
+          onCropComplete={editingScreenshotId ? 
+            (croppedImageBlob: Blob) => handleEditCropComplete(croppedImageBlob) :
+            (croppedImageBlob: Blob) => handleCropComplete(croppedImageBlob)
+          }
+          onClose={handleCloseCropModal}
+          onSkip={editingScreenshotId ? undefined : handleSkipCrop}
+          title={editingScreenshotId ? "Edit POI Screenshot" : "Crop POI Screenshot"}
+          defaultToSquare={false}
+        />
+      )}
     </div>
   );
 };

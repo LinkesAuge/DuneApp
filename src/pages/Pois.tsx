@@ -2,12 +2,12 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { Poi, PoiType, GridSquare, PoiWithGridSquare, MapType, CustomIcon } from '../types';
 import { Search, Compass, LayoutGrid, List, Edit2, Trash2, ArrowDownUp, SortAsc, SortDesc } from 'lucide-react';
-import GridSquareModal from '../components/grid/GridSquareModal';
 import GridGallery from '../components/grid/GridGallery';
 import PoiCard from '../components/poi/PoiCard';
 import POIEditModal from '../components/hagga-basin/POIEditModal';
 import PoiListItem from '../components/poi/PoiListItem';
 import { useAuth } from '../components/auth/AuthProvider';
+import { useNavigate } from 'react-router-dom';
 
 const PoisPage: React.FC = () => {
   const { user } = useAuth();
@@ -20,10 +20,9 @@ const PoisPage: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [selectedType, setSelectedType] = useState<string>('');
   const [selectedMapType, setSelectedMapType] = useState<MapType | 'all'>('all');
-  const [selectedGridSquare, setSelectedGridSquare] = useState<GridSquare | null>(null);
+  const [selectedPoi, setSelectedPoi] = useState<PoiWithGridSquare | null>(null);
   const [showGallery, setShowGallery] = useState(false);
   const [galleryIndex, setGalleryIndex] = useState(0);
-  const [selectedPoi, setSelectedPoi] = useState<PoiWithGridSquare | null>(null);
   const [editingPoiId, setEditingPoiId] = useState<string | null>(null);
   const [userInfo, setUserInfo] = useState<{ [key: string]: { username: string } }>({});
 
@@ -60,15 +59,7 @@ const PoisPage: React.FC = () => {
   ];
   const sortOptions = [...initialSortOptions].sort((a, b) => a.label.localeCompare(b.label));
 
-  /*useEffect(() => {
-    console.log('[PoisPage] State check:', {
-      showGallery,
-      selectedPoiId: selectedPoi?.id || null,
-      selectedPoiTitle: selectedPoi?.title || null,
-      selectedGridSquareId: selectedGridSquare?.id || null,
-      selectedGridSquareCoordinate: selectedGridSquare?.coordinate || null,
-    });
-  }, [showGallery, selectedPoi, selectedGridSquare]);*/
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -184,8 +175,6 @@ const PoisPage: React.FC = () => {
     });
     return Array.from(grids).sort((a, b) => a.localeCompare(b, undefined, {numeric: true, sensitivity: 'base'}));
   }, [pois]);
-
-
 
   // Filter POIs based on search term and selected filters
   const filteredPois = useMemo(() => {
@@ -319,9 +308,17 @@ const PoisPage: React.FC = () => {
   };
 
   const handleCardClick = (poi: PoiWithGridSquare) => {
-    if (poi.grid_square) {
-      setSelectedPoi(poi);
-      setSelectedGridSquare(poi.grid_square);
+    // Navigate to appropriate map page based on POI type
+    if (poi.map_type === 'hagga_basin') {
+      // Navigate to Hagga Basin page with POI parameter
+      navigate(`/hagga-basin?poi=${poi.id}`);
+    } else if (poi.map_type === 'deep_desert' && poi.grid_square?.coordinate) {
+      // Navigate to Deep Desert grid page with POI parameter
+      navigate(`/deep-desert/grid/${poi.grid_square.coordinate}?poi=${poi.id}`);
+    } else {
+      // Fallback: if no proper map type or grid coordinate, show error
+      console.warn('Cannot navigate to POI: missing map type or grid coordinate', poi);
+      alert('Unable to navigate to this POI. Missing location information.');
     }
   };
 
@@ -744,55 +741,6 @@ const PoisPage: React.FC = () => {
             );
           })}
         </div>
-      )}
-
-      {/* Grid Square Modal */}
-      {selectedGridSquare && (
-        <GridSquareModal
-          square={selectedGridSquare}
-          onClose={() => setSelectedGridSquare(null)}
-          onUpdate={(updatedSquare) => {
-            setSelectedGridSquare(updatedSquare);
-            if (selectedPoi && selectedPoi.grid_square_id === updatedSquare.id) {
-              setSelectedPoi(prevPoi => prevPoi ? { ...prevPoi, grid_square: updatedSquare } : null);
-            }
-          }}
-          onImageClick={(gridSquare) => {
-            // When clicking the grid square's screenshot in the modal,
-            // we should open a gallery for the grid square's screenshot, not the POI's screenshots
-            if (gridSquare.screenshot_url) {
-              console.log('[PoisPage] GridSquareModal onImageClick: Opening gallery for grid square screenshot.', {
-                gridSquareCoordinate: gridSquare.coordinate,
-                screenshotUrl: gridSquare.screenshot_url
-              });
-              
-              // Create a temporary POI-like structure for the gallery to show the grid square screenshot
-              const tempPoi = {
-                id: `grid-${gridSquare.id}`,
-                title: `Grid Square ${gridSquare.coordinate}`,
-                description: `Screenshot of grid square ${gridSquare.coordinate}`,
-                created_at: gridSquare.upload_date,
-                created_by: gridSquare.uploaded_by || '',
-                grid_square: gridSquare,
-                screenshots: [{
-                  id: gridSquare.id,
-                  url: gridSquare.screenshot_url,
-                  uploaded_by: gridSquare.uploaded_by || '',
-                  upload_date: gridSquare.upload_date
-                }]
-              };
-              
-              setSelectedPoi(tempPoi as any); // Cast to satisfy TypeScript
-              setShowGallery(true);
-              setGalleryIndex(0);
-            } else {
-              console.warn('[PoisPage] GridSquareModal onImageClick: No screenshot available for grid square.', {
-                gridSquareCoordinate: gridSquare.coordinate
-              });
-            }
-          }}
-          onPoiGalleryOpen={handleGalleryOpen}
-        />
       )}
 
       {/* Screenshot Gallery Modal */}

@@ -1,9 +1,10 @@
 import React from 'react';
 import { Poi, PoiType, CustomIcon } from '../../types';
-import { MapPin, Edit, Trash2, Clock } from 'lucide-react';
+import { MapPin, Edit, Trash2, Clock, User } from 'lucide-react';
 import { useAuth } from '../auth/AuthProvider';
 import CommentsList from '../comments/CommentsList';
 import LikeButton from '../common/LikeButton';
+import { formatCompactDateTime, wasUpdated, formatDateWithPreposition } from '../../lib/dateUtils';
 
 interface PoiCardProps {
   poi: Poi;
@@ -233,17 +234,28 @@ const PoiCard: React.FC<PoiCardProps> = ({
         />
       </div>
 
-      {/* Footer */}
-      {creator && (
-        <div className="px-4 py-2 bg-sand-300/30 border-t border-sand-300 text-xs text-sand-700 flex items-center">
-          <Clock size={12} className="mr-1" />
-          <span>
-            Added by {creator.username} on{' '}
-            {new Date(poi.created_at).toLocaleDateString()} at{' '}
-            {new Date(poi.created_at).toLocaleTimeString()}
-          </span>
+      {/* Footer - Creator and Edit Information */}
+      <div className="px-4 py-2 bg-sand-300/30 border-t border-sand-300">
+        {/* Creator and Editor Information - Compact single line */}
+        <div className="flex items-center justify-between text-xs text-sand-600">
+          <div className="flex items-center">
+            <User className="w-3 h-3 mr-1.5" />
+            <span>
+              Created by {creator?.username || 'Unknown'} on {formatCompactDateTime(poi.created_at)}
+            </span>
+          </div>
+          
+          {/* Edit Information - Only show if POI was edited */}
+          {wasUpdated(poi.created_at, poi.updated_at) && (
+            <div className="flex items-center">
+              <Clock className="w-3 h-3 mr-1.5" />
+              <span>
+                Edited on {formatCompactDateTime(poi.updated_at)}
+              </span>
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 };
