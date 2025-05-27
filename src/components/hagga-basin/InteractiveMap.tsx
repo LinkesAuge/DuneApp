@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { TransformWrapper, TransformComponent, ReactZoomPanPinchRef } from 'react-zoom-pan-pinch';
-import { Plus, ZoomIn, ZoomOut, RotateCcw, Target } from 'lucide-react';
+import { Plus, ZoomIn, ZoomOut, RotateCcw, Target, HelpCircle } from 'lucide-react';
 import type { 
   HaggaBasinBaseMap, 
   HaggaBasinOverlay, 
@@ -29,6 +29,9 @@ interface InteractiveMapProps {
   customIcons: CustomIcon[];
   placementMode?: boolean;
   onPlacementModeChange?: (mode: boolean) => void;
+  // Help tooltip props
+  showHelpTooltip?: boolean;
+  onHelpTooltipChange?: (show: boolean) => void;
 }
 
 // Map configuration for zoom/pan (initialScale will be set dynamically)
@@ -67,7 +70,10 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
   onPoiGalleryOpen,
   customIcons,
   placementMode = false,
-  onPlacementModeChange
+  onPlacementModeChange,
+  // Help tooltip props
+  showHelpTooltip = false,
+  onHelpTooltipChange
 }) => {
   const transformRef = useRef<ReactZoomPanPinchRef | null>(null);
   const mapElementRef = useRef<HTMLDivElement | null>(null);
@@ -75,8 +81,8 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
   // Load admin settings
   const { settings: mapSettings } = useMapSettings();
   
-  // Dynamic map config using settings
-  const mapConfig = getMapConfig(mapSettings?.defaultZoom || 0.4);
+  // Dynamic map config using hardcoded zoom level
+  const mapConfig = getMapConfig(0.4);
   
   // State for POI placement
   const [placementCoordinates, setPlacementCoordinates] = useState<PixelCoordinates | null>(null);
@@ -84,22 +90,11 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const [selectedPoi, setSelectedPoi] = useState<Poi | null>(null);
   const [editingPoi, setEditingPoi] = useState<Poi | null>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
-  const [currentZoom, setCurrentZoom] = useState(mapConfig.initialScale);
+  const [currentZoom, setCurrentZoom] = useState(0.4);
   
   // State for POI position changing
   const [positionChangeMode, setPositionChangeMode] = useState(false);
   const [changingPositionPoi, setChangingPositionPoi] = useState<Poi | null>(null);
-
-  // Apply initial zoom when settings load
-  useEffect(() => {
-    if (mapSettings && transformRef.current && imageLoaded) {
-      const targetZoom = mapSettings.defaultZoom || 0.4;
-      setTimeout(() => {
-        transformRef.current?.setTransform(200, 200, targetZoom);
-        setCurrentZoom(targetZoom);
-      }, 100);
-    }
-  }, [mapSettings, imageLoaded]);
 
   // Handle map click for POI placement and position changing
   const handleMapClick = useCallback((event: React.MouseEvent) => {
@@ -200,17 +195,6 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [placementMode, positionChangeMode, onPlacementModeChange]);
 
-  // Ensure proper positioning when transform ref is available and image is loaded
-  useEffect(() => {
-    if (transformRef.current && imageLoaded) {
-      const timer = setTimeout(() => {
-        // Position towards top-left instead of centering
-        transformRef.current?.setTransform(200, 200, mapConfig.initialScale);
-      }, 200);
-      return () => clearTimeout(timer);
-    }
-  }, [imageLoaded, mapConfig.initialScale]);
-
   // Handle POI marker click
   const handlePoiClick = useCallback((poi: Poi, event: React.MouseEvent) => {
     event.preventDefault();
@@ -228,14 +212,8 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
   // Handle image load to ensure proper positioning
   const handleImageLoad = useCallback(() => {
     setImageLoaded(true);
-    // Position the map towards top-left after image loads
-    setTimeout(() => {
-      if (transformRef.current) {
-        // Instead of centering, position towards top-left
-        transformRef.current.setTransform(200, 200, mapConfig.initialScale);
-      }
-    }, 100);
-  }, [mapConfig.initialScale]);
+    // Remove manual positioning - let centerOnInit handle it automatically
+  }, []);
 
   // Zoom controls
   const zoomIn = () => {
@@ -259,10 +237,11 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const resetTransform = () => {
     if (transformRef.current) {
       transformRef.current.resetTransform();
-      // Position towards top-left after reset
+      // Let resetTransform handle positioning automatically, don't override
       setTimeout(() => {
-        transformRef.current?.setTransform(200, 200, mapConfig.initialScale);
-        handleZoomChange(transformRef.current);
+        if (transformRef.current) {
+          handleZoomChange(transformRef.current);
+        }
       }, 50);
     }
   };
@@ -404,7 +383,7 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
       {/* UI Controls - positioned relative to viewport, not map content */}
       
       {/* Zoom Controls */}
-      <div className="absolute top-4 right-4 z-40 flex flex-col space-y-2">
+      <div className="absolute top-4 left-4 z-40 flex flex-col space-y-2">
         <button
           onClick={zoomIn}
           className="bg-white border border-sand-200 rounded-lg p-2 shadow-sm hover:shadow-md transition-shadow"
@@ -426,9 +405,54 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
         >
           <RotateCcw className="w-5 h-5 text-sand-600" />
         </button>
+        
+        {/* Help Button with Tooltip */}
+        <div className="relative">
+          <button
+            onMouseEnter={() => onHelpTooltipChange?.(true)}
+            onMouseLeave={() => onHelpTooltipChange?.(false)}
+            className="bg-white border border-sand-200 rounded-lg p-2 shadow-sm hover:shadow-md transition-shadow"
+            title="Help & Tips"
+          >
+            <HelpCircle className="w-5 h-5 text-sand-600" />
+          </button>
+          
+          {/* Help Tooltip */}
+          {showHelpTooltip && (
+            <div className="absolute left-full ml-3 top-0 w-80 bg-white border border-sand-200 rounded-lg shadow-lg p-4 z-50">
+              <h4 className="font-medium text-sand-800 mb-3 flex items-center gap-2">
+                <HelpCircle className="w-4 h-4" />
+                Hagga Basin Controls & Tips
+              </h4>
+              <div className="space-y-2 text-sm text-sand-600">
+                <div><strong>Map Controls:</strong></div>
+                <div className="ml-2 space-y-1">
+                  <div>• Mouse wheel or +/- buttons to zoom</div>
+                  <div>• Click and drag to pan around</div>
+                  <div>• Double-click to zoom in quickly</div>
+                  <div>• Reset button to restore original view</div>
+                </div>
+                
+                <div className="mt-3"><strong>POI Management:</strong></div>
+                <div className="ml-2 space-y-1">
+                  <div>• Click on POI cards to view details and screenshots</div>
+                  <div>• Use view toggle to switch between grid and list layouts</div>
+                  <div>• Sort POIs by date, title, category, or type</div>
+                  <div>• Filter POIs using the search and privacy controls</div>
+                </div>
+                
+                <div className="mt-3"><strong>Hagga Basin Features:</strong></div>
+                <div className="ml-2 space-y-1">
+                  <div>• Click "Add POI" then click anywhere on the map</div>
+                  <div>• Use map layers to toggle overlays and visibility</div>
+                  <div>• Coordinate system uses in-game map positions</div>
+                  <div>• Private POIs are only visible to you</div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
-
-
 
       {/* Placement Mode Indicator */}
       {placementMode && (

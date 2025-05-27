@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
-import { MapPin, Filter, Settings, Plus, FolderOpen, Share, Image, Edit, Eye, Lock, Users } from 'lucide-react';
+import { MapPin, Filter, Settings, Plus, FolderOpen, Share, Image, Edit, Eye, Lock, Users, ChevronLeft, ChevronRight, HelpCircle } from 'lucide-react';
 import type { 
   Poi, 
   PoiType, 
@@ -14,12 +14,14 @@ import InteractiveMap from '../components/hagga-basin/InteractiveMap';
 import CollectionModal from '../components/hagga-basin/CollectionModal';
 import CustomPoiTypeModal from '../components/hagga-basin/CustomPoiTypeModal';
 import SharePoiModal from '../components/hagga-basin/SharePoiModal';
+import POIEditModal from '../components/hagga-basin/POIEditModal';
 import GridGallery from '../components/grid/GridGallery';
+import POIPanel from '../components/common/POIPanel';
 import { useAuth } from '../components/auth/AuthProvider';
 
 const HaggaBasinPage: React.FC = () => {
   // Authentication and user state
-  const { user, loading: authLoading } = useAuth();
+  const { user } = useAuth();
 
   // Core data state
   const [pois, setPois] = useState<Poi[]>([]);
@@ -28,11 +30,13 @@ const HaggaBasinPage: React.FC = () => {
   const [overlays, setOverlays] = useState<HaggaBasinOverlay[]>([]);
   const [collections, setCollections] = useState<PoiCollection[]>([]);
   const [customIcons, setCustomIcons] = useState<CustomIcon[]>([]);
+  const [userInfo, setUserInfo] = useState<{ [key: string]: { username: string } }>({});
 
   // UI state
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [showRightPanel, setShowRightPanel] = useState(true);
   const [activeTab, setActiveTab] = useState<'filters' | 'customization' | 'overlays'>('filters');
 
   // Filter state - Updated for proper default selection
@@ -52,21 +56,23 @@ const HaggaBasinPage: React.FC = () => {
   const [showSharePoiModal, setShowSharePoiModal] = useState(false);
   const [selectedPoiForShare, setSelectedPoiForShare] = useState<Poi | null>(null);
   const [editingPoiType, setEditingPoiType] = useState<PoiType | null>(null);
+  const [editingPoi, setEditingPoi] = useState<Poi | null>(null);
 
   // Gallery state
   const [showGallery, setShowGallery] = useState(false);
   const [galleryPoi, setGalleryPoi] = useState<Poi | null>(null);
   const [galleryIndex, setGalleryIndex] = useState(0);
 
+  // Help tooltip state
+  const [showHelpTooltip, setShowHelpTooltip] = useState(false);
+
   // State to track if initial filter setup has been done
   const [initialFilterSetup, setInitialFilterSetup] = useState(false);
 
   // Initialize data on component mount
   useEffect(() => {
-    if (!authLoading) {
-      initializeData();
-    }
-  }, [authLoading]);
+    initializeData();
+  }, []);
 
   // Initialize filter state when POI types are loaded (only on initial setup)
   useEffect(() => {
@@ -129,6 +135,9 @@ const HaggaBasinPage: React.FC = () => {
     }));
 
     setPois(poisWithTransformedScreenshots);
+    
+    // Fetch user info for POI creators
+    await fetchUserInfo(poisWithTransformedScreenshots);
   };
 
   const fetchPoiTypes = async () => {
@@ -215,6 +224,28 @@ const HaggaBasinPage: React.FC = () => {
     }
 
     setCustomIcons(data || []);
+  };
+
+  const fetchUserInfo = async (pois: Poi[]) => {
+    if (pois.length === 0) return;
+
+    const userIds = [...new Set(pois.map(poi => poi.created_by))];
+    const { data: userData, error: userError } = await supabase
+      .from('profiles')
+      .select('id, username')
+      .in('id', userIds);
+
+    if (userError) {
+      console.error('Error fetching user info:', userError);
+      return;
+    }
+
+    const userInfoMap = userData.reduce((acc, user) => {
+      acc[user.id] = { username: user.username };
+      return acc;
+    }, {} as { [key: string]: { username: string } });
+
+    setUserInfo(userInfoMap);
   };
 
   // Filter POIs based on current filter state - Simplified logic
@@ -550,7 +581,20 @@ const HaggaBasinPage: React.FC = () => {
     }
   }, []);
 
-  if (authLoading || loading) {
+  // Handle POI click for detail view
+  const handlePoiClick = (poi: Poi) => {
+    // For now, just open gallery if screenshots exist
+    if (poi.screenshots && poi.screenshots.length > 0) {
+      handlePoiGalleryOpen(poi);
+    }
+  };
+
+  // Handle POI editing
+  const handlePoiEdit = (poi: Poi) => {
+    setEditingPoi(poi);
+  };
+
+  if (loading) {
     return (
       <div className="min-h-screen bg-sand-50 flex items-center justify-center">
         <div className="text-center">
@@ -580,7 +624,7 @@ const HaggaBasinPage: React.FC = () => {
 
   return (
     <div className="bg-sand-50 flex overflow-hidden" style={{height: 'calc(100vh - 4rem)'}}>
-      {/* Sidebar */}
+      {/* Left Sidebar */}
       <div className={`bg-white border-r border-sand-200 transition-all duration-300 ${
         sidebarOpen ? 'w-96' : 'w-0 overflow-hidden'
       }`}>
@@ -993,6 +1037,8 @@ const HaggaBasinPage: React.FC = () => {
             customIcons={customIcons}
             placementMode={placementMode}
             onPlacementModeChange={setPlacementMode}
+            showHelpTooltip={showHelpTooltip}
+            onHelpTooltipChange={setShowHelpTooltip}
           />
         ) : (
           <div className="h-full flex items-center justify-center bg-sand-100">
@@ -1003,6 +1049,46 @@ const HaggaBasinPage: React.FC = () => {
                 An administrator needs to upload a base map to enable the interactive map.
               </p>
             </div>
+          </div>
+        )}
+      </div>
+
+      {/* Right Panel - POI List */}
+      <div className={`${showRightPanel ? 'w-[450px]' : 'w-12'} bg-white border-l border-sand-200 flex flex-col transition-all duration-200`}>
+        <div className="p-4 border-b border-sand-200 flex items-center justify-between">
+          <button
+            onClick={() => setShowRightPanel(!showRightPanel)}
+            className="text-sand-400 hover:text-sand-600"
+            title={showRightPanel ? "Collapse panel" : "Expand panel"}
+          >
+            {showRightPanel ? '✕' : <ChevronLeft className="w-5 h-5" />}
+          </button>
+          {showRightPanel && (
+            <h2 className="text-lg font-semibold text-night-800">POIs & Info</h2>
+          )}
+        </div>
+        {showRightPanel && (
+          <div className="flex-1 overflow-hidden">
+            <POIPanel
+              pois={pois}
+              poiTypes={poiTypes}
+              customIcons={customIcons}
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
+              selectedPoiTypes={selectedPoiTypes}
+              onPoiTypeToggle={handleTypeToggle}
+              privacyFilter={privacyFilter}
+              onPrivacyFilterChange={setPrivacyFilter}
+              mapType="hagga_basin"
+              userInfo={userInfo}
+              onPoiClick={handlePoiClick}
+              onPoiEdit={handlePoiEdit}
+              onPoiDelete={handlePoiDeleted}
+              onPoiShare={handleSharePoi}
+              onPoiGalleryOpen={handlePoiGalleryOpen}
+              enableSorting={true}
+              enableViewToggle={true}
+            />
           </div>
         )}
       </div>
@@ -1042,6 +1128,20 @@ const HaggaBasinPage: React.FC = () => {
         }}
         poi={selectedPoiForShare}
       />
+
+      {/* POI Edit Modal */}
+      {editingPoi && (
+        <POIEditModal
+          poi={editingPoi}
+          poiTypes={poiTypes}
+          customIcons={customIcons}
+          onPoiUpdated={(updatedPoi) => {
+            handlePoiUpdated(updatedPoi);
+            setEditingPoi(null);
+          }}
+          onClose={() => setEditingPoi(null)}
+        />
+      )}
 
       {/* Gallery Modal */}
       {showGallery && galleryPoi?.screenshots && (

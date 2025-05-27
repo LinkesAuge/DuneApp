@@ -33,14 +33,12 @@ interface PlacementCoordinates {
 }
 
 // Configuration for the transform component
-const getImageConfig = (initialScale: number = 0.3) => ({
+const getImageConfig = (initialScale: number = 0.8) => ({
   initialScale,
-  initialPositionX: 100,
-  initialPositionY: 100,
   minScale: 0.1,
   maxScale: 4,
   limitToBounds: false,
-  centerOnInit: false,
+  centerOnInit: true,
   wheel: {
     step: 0.1,
   },
@@ -73,7 +71,7 @@ const InteractivePoiImage: React.FC<InteractivePoiImageProps> = ({
   mapType = 'hagga_basin',
   gridSquareId
 }) => {
-  const [currentZoom, setCurrentZoom] = useState(0.3);
+  const [currentZoom, setCurrentZoom] = useState(0.8);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [showPlacementModal, setShowPlacementModal] = useState(false);
   const [placementCoordinates, setPlacementCoordinates] = useState<PlacementCoordinates | null>(null);
@@ -139,12 +137,7 @@ const InteractivePoiImage: React.FC<InteractivePoiImageProps> = ({
   // Handle image load
   const handleImageLoad = useCallback(() => {
     setImageLoaded(true);
-    setTimeout(() => {
-      if (transformRef.current) {
-        transformRef.current.setTransform(100, 100, imageConfig.initialScale);
-      }
-    }, 100);
-  }, [imageConfig.initialScale]);
+  }, []);
 
   // Escape key handler
   useEffect(() => {
@@ -187,8 +180,9 @@ const InteractivePoiImage: React.FC<InteractivePoiImageProps> = ({
     if (transformRef.current) {
       transformRef.current.resetTransform();
       setTimeout(() => {
-        transformRef.current?.setTransform(100, 100, imageConfig.initialScale);
-        handleZoomChange(transformRef.current);
+        if (transformRef.current) {
+          handleZoomChange(transformRef.current);
+        }
       }, 50);
     }
   };

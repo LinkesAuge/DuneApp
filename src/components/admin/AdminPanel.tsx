@@ -66,17 +66,24 @@ const AdminPanel: React.FC = () => {
   const [editError, setEditError] = useState<string | null>(null);
   const [isUpdatingUser, setIsUpdatingUser] = useState(false);
 
-  // Map Settings State
+  // Map Settings State - Hagga Basin
   const [mapSettings, setMapSettings] = useState({
     iconMinSize: 64,
     iconMaxSize: 128,
     iconBaseSize: 64,
     showTooltips: true,
     enablePositionChange: true,
-    defaultZoom: 0.4,
     defaultVisibleTypes: [] as string[],
     enableAdvancedFiltering: false,
     showSharedIndicators: true
+  });
+
+  // Deep Desert Settings State
+  const [deepDesertSettings, setDeepDesertSettings] = useState({
+    iconMinSize: 32,
+    iconMaxSize: 64,
+    iconBaseSize: 32,
+    showTooltips: true
   });
 
   const fetchScheduledTasks = async () => {
@@ -248,6 +255,8 @@ const AdminPanel: React.FC = () => {
       fetchInitialAdminData();
       fetchScheduledTasks();
       fetchStoredBackups();
+      loadMapSettings();
+      loadDeepDesertSettings();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
@@ -786,10 +795,57 @@ const AdminPanel: React.FC = () => {
       iconBaseSize: 64,
       showTooltips: true,
       enablePositionChange: true,
-      defaultZoom: 0.4,
       defaultVisibleTypes: [],
       enableAdvancedFiltering: false,
       showSharedIndicators: true
+    });
+  };
+
+  // Deep Desert Settings Functions
+  const saveDeepDesertSettings = async () => {
+    try {
+      const { error } = await supabase
+        .from('app_settings')
+        .upsert({
+          setting_key: 'deep_desert_settings',
+          setting_value: deepDesertSettings
+        });
+
+      if (error) throw error;
+      
+      console.log('Deep Desert settings saved successfully');
+      alert('Deep Desert settings saved successfully!');
+    } catch (error) {
+      console.error('Error saving Deep Desert settings:', error);
+      alert('Error saving Deep Desert settings');
+    }
+  };
+
+  const loadDeepDesertSettings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('app_settings')
+        .select('setting_value')
+        .eq('setting_key', 'deep_desert_settings')
+        .single();
+
+      if (error && error.code !== 'PGRST116') throw error; // Ignore "not found" errors
+      
+      if (data?.setting_value) {
+        setDeepDesertSettings(prev => ({ ...prev, ...data.setting_value }));
+      }
+    } catch (err: any) {
+      console.error('Error loading Deep Desert settings:', err);
+      // Keep using defaults
+    }
+  };
+
+  const resetDeepDesertSettings = () => {
+    setDeepDesertSettings({
+      iconMinSize: 32,
+      iconMaxSize: 64,
+      iconBaseSize: 32,
+      showTooltips: true
     });
   };
 
@@ -1336,8 +1392,6 @@ const AdminPanel: React.FC = () => {
                   <div className="space-y-4">
                     <h4 className="text-lg font-medium text-night-600">Map Interaction</h4>
                     <div className="space-y-3">
-
-                      
                       <div className="flex items-center justify-between">
                         <label className="text-sm font-medium text-night-700">
                           Show POI Tooltips
@@ -1367,26 +1421,6 @@ const AdminPanel: React.FC = () => {
                           className="w-4 h-4 text-spice-600 border-sand-300 rounded focus:ring-spice-500"
                         />
                       </div>
-                      
-                      <div>
-                        <label className="block text-sm font-medium text-night-700 mb-1">
-                          Default Zoom Level
-                        </label>
-                        <input
-                          type="number"
-                          min="0.1"
-                          max="2.0"
-                          step="0.1"
-                          value={mapSettings.defaultZoom}
-                          onChange={(e) => setMapSettings(prev => ({
-                            ...prev,
-                            defaultZoom: parseFloat(e.target.value) || 0.4
-                          }))}
-                          className="w-full px-3 py-2 border border-sand-300 rounded-md focus:outline-none focus:ring-2 focus:ring-spice-500"
-                          placeholder="Default: 0.4"
-                        />
-                        <p className="text-xs text-night-500 mt-1">Initial zoom level when map loads</p>
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -1401,6 +1435,116 @@ const AdminPanel: React.FC = () => {
                   </button>
                   <button 
                     onClick={saveMapSettings}
+                    className="px-4 py-2 text-sm font-medium text-white bg-spice-600 hover:bg-spice-700 rounded-md transition-colors"
+                  >
+                    Save Settings
+                  </button>
+                </div>
+              </div>
+              
+              {/* Deep Desert Settings */}
+              <div className="bg-sand-50 border border-sand-200 rounded-lg p-6">
+                <h3 className="text-xl font-semibold text-night-700 mb-4 flex items-center">
+                  <Map className="w-5 h-5 mr-2 text-spice-600" />
+                  Deep Desert Grid Settings
+                </h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* POI Icon Scaling for Deep Desert */}
+                  <div className="space-y-4">
+                    <h4 className="text-lg font-medium text-night-600">POI Icon Scaling</h4>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-sm font-medium text-night-700 mb-1">
+                          Minimum Icon Size (pixels)
+                        </label>
+                        <input
+                          type="number"
+                          min="16"
+                          max="64"
+                          value={deepDesertSettings.iconMinSize}
+                          onChange={(e) => setDeepDesertSettings(prev => ({
+                            ...prev,
+                            iconMinSize: parseInt(e.target.value) || 32
+                          }))}
+                          className="w-full px-3 py-2 border border-sand-300 rounded-md focus:outline-none focus:ring-2 focus:ring-spice-500"
+                          placeholder="Default: 32"
+                        />
+                        <p className="text-xs text-night-500 mt-1">Icons won't scale smaller than this size</p>
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-night-700 mb-1">
+                          Maximum Icon Size (pixels)
+                        </label>
+                        <input
+                          type="number"
+                          min="32"
+                          max="128"
+                          value={deepDesertSettings.iconMaxSize}
+                          onChange={(e) => setDeepDesertSettings(prev => ({
+                            ...prev,
+                            iconMaxSize: parseInt(e.target.value) || 64
+                          }))}
+                          className="w-full px-3 py-2 border border-sand-300 rounded-md focus:outline-none focus:ring-2 focus:ring-spice-500"
+                          placeholder="Default: 64"
+                        />
+                        <p className="text-xs text-night-500 mt-1">Icons won't scale larger than this size</p>
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-night-700 mb-1">
+                          Base Icon Size (pixels)
+                        </label>
+                        <input
+                          type="number"
+                          min="16"
+                          max="64"
+                          value={deepDesertSettings.iconBaseSize}
+                          onChange={(e) => setDeepDesertSettings(prev => ({
+                            ...prev,
+                            iconBaseSize: parseInt(e.target.value) || 32
+                          }))}
+                          className="w-full px-3 py-2 border border-sand-300 rounded-md focus:outline-none focus:ring-2 focus:ring-spice-500"
+                          placeholder="Default: 32"
+                        />
+                        <p className="text-xs text-night-500 mt-1">Base size before zoom scaling is applied</p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Grid Screenshot Interaction Settings */}
+                  <div className="space-y-4">
+                    <h4 className="text-lg font-medium text-night-600">Screenshot Interaction</h4>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <label className="text-sm font-medium text-night-700">
+                          Show POI Tooltips
+                        </label>
+                        <input
+                          type="checkbox"
+                          checked={deepDesertSettings.showTooltips}
+                          onChange={(e) => setDeepDesertSettings(prev => ({
+                            ...prev,
+                            showTooltips: e.target.checked
+                          }))}
+                          className="w-4 h-4 text-spice-600 border-sand-300 rounded focus:ring-spice-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Action Buttons */}
+                <div className="flex justify-end space-x-3 mt-6 pt-4 border-t border-sand-300">
+                  <button 
+                    onClick={resetDeepDesertSettings}
+                    className="px-4 py-2 text-sm font-medium text-night-700 bg-sand-100 hover:bg-sand-200 rounded-md transition-colors"
+                  >
+                    Reset to Defaults
+                  </button>
+                  <button 
+                    onClick={saveDeepDesertSettings}
                     className="px-4 py-2 text-sm font-medium text-white bg-spice-600 hover:bg-spice-700 rounded-md transition-colors"
                   >
                     Save Settings

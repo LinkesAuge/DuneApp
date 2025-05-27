@@ -20,6 +20,7 @@ interface POIPlacementModalProps {
   onClose: () => void;
   mapType?: 'deep_desert' | 'hagga_basin';
   gridSquareId?: string;
+  onRequestPlacement?: () => void; // For Deep Desert - temporarily close modal and enter placement mode
 }
 
 // Privacy level options with descriptions
@@ -75,7 +76,8 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
   onPoiCreated,
   onClose,
   mapType = 'hagga_basin',
-  gridSquareId
+  gridSquareId,
+  onRequestPlacement
 }) => {
   const { user } = useAuth();
   
@@ -333,9 +335,22 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
               <h3 className="text-lg font-semibold text-sand-800">
                 Add POI to {mapType === 'deep_desert' ? 'Deep Desert Grid' : 'Hagga Basin'}
               </h3>
-              <p className="text-sm text-sand-600">
-                Coordinates: {formatCoordinates(coordinates.x, coordinates.y)}
-              </p>
+              <div className="flex items-center gap-2">
+                <p className="text-sm text-sand-600">
+                  Coordinates: {formatCoordinates(coordinates.x, coordinates.y)}
+                </p>
+                {mapType === 'deep_desert' && onRequestPlacement && (
+                  <button
+                    type="button"
+                    onClick={onRequestPlacement}
+                    className="text-xs bg-spice-100 text-spice-700 px-2 py-1 rounded hover:bg-spice-200 transition-colors flex items-center gap-1"
+                    title="Click to change POI placement on the screenshot"
+                  >
+                    <MapPin className="w-3 h-3" />
+                    Place POI
+                  </button>
+                )}
+              </div>
             </div>
           </div>
           <button

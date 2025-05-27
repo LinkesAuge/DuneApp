@@ -969,6 +969,104 @@ const saveMapSettings = async () => {
 
 This comprehensive admin settings management system provides a robust, scalable foundation for application configuration while maintaining the performance and security standards established throughout the platform.
 
+## 11. Map Initialization & Zoom Optimization System
+
+### 11.1. Map Loading Behavior Enhancement
+
+**Problem Solved**: Maps were visibly "jumping" or changing position during initial load, creating a jarring user experience.
+
+**Root Cause**: Maps loaded with `centerOnInit: true` but were immediately repositioned with manual `setTransform` calls in `setTimeout`, causing visual movement.
+
+**Solution**: Eliminated manual positioning and let the `react-zoom-pan-pinch` library handle proper centering automatically.
+
+### 11.2. Optimized Zoom Levels by Content Type
+
+**Standardized Zoom Configuration**:
+```typescript
+// Content-size-appropriate zoom levels
+const ZOOM_LEVELS = {
+  HAGGA_BASIN: 0.4,     // 4000x4000 pixel maps - provides good overview
+  DEEP_DESERT: 0.8      // 2000x2000 pixel screenshots - compensates for smaller size
+};
+
+// InteractiveMap.tsx (Hagga Basin)
+const mapConfig = getMapConfig(0.4);
+
+// GridPage.tsx (Deep Desert)
+initialScale={0.8}
+
+// InteractivePoiImage.tsx (Deep Desert screenshots)
+const getImageConfig = (initialScale: number = 0.8) => ({
+  initialScale,
+  centerOnInit: true,
+  // ... other config
+});
+```
+
+### 11.3. Implementation Details
+
+**Affected Components**:
+- `InteractiveMap.tsx`: Hagga Basin main map interface
+- `GridPage.tsx`: Deep Desert grid screenshot interface  
+- `InteractivePoiImage.tsx`: Reusable POI image component
+- `AdminPanel.tsx`: Removed zoom configuration (now standardized)
+
+**Key Changes**:
+1. **Eliminated Manual Positioning**: Removed all manual `setTransform` calls from `useEffect`, `handleImageLoad`, and `resetTransform` functions
+2. **Library-Native Centering**: Let `centerOnInit: true` handle proper viewport centering automatically
+3. **Admin Simplification**: Removed `defaultZoom` from `MapSettings` interface and admin UI
+4. **Type-Specific Defaults**: Hardcoded optimal zoom levels based on content dimensions
+
+### 11.4. Technical Benefits
+
+**Performance Improvements**:
+- Eliminated unnecessary `setTimeout` operations and manual positioning calculations
+- Reduced visual reflow and layout shifts during map initialization
+- Smoother loading experience with immediate proper positioning
+
+**Code Quality**:
+- Simplified implementation relying on library-native capabilities rather than fighting against them
+- Removed complex zoom configuration management from admin interface
+- Cleaner TypeScript interfaces with unnecessary properties removed
+
+**User Experience**:
+- Professional loading behavior without visual jumping or repositioning artifacts
+- Content-size-appropriate zoom levels provide immediate optimal viewing experience
+- Consistent initialization behavior across all map components
+
+### 11.5. Map Configuration Pattern
+
+**Standard Implementation Pattern**:
+```typescript
+// For large maps (4000x4000px)
+<TransformWrapper
+  initialScale={0.4}
+  centerOnInit={true}
+  // No manual setTransform calls
+>
+
+// For smaller screenshots (2000x2000px)  
+<TransformWrapper
+  initialScale={0.8}
+  centerOnInit={true}
+  // No manual setTransform calls
+>
+```
+
+**Anti-Pattern (Removed)**:
+```typescript
+// DON'T: Manual positioning that causes jumping
+useEffect(() => {
+  if (transformRef.current) {
+    setTimeout(() => {
+      transformRef.current?.setTransform(200, 200, scale); // Causes visual jump
+    }, 100);
+  }
+}, []);
+```
+
+This optimization ensures professional map loading behavior with type-appropriate zoom levels while simplifying the codebase and eliminating unnecessary configuration complexity.
+
 ## Recent Technical Achievements
 
 ### Custom Icon Display Fix (January 3, 2025)

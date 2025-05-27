@@ -28,8 +28,8 @@ flowchart TD
         U[Utility Functions src/lib]
         T[Type Definitions src/types]
         COORD[Coordinate Conversion Utils]
-        ZOOM[Zoom/Pan Logic react-zoom-pan-pinch]
-        ADMIN_LOGIC[Admin Settings State Management]
+        ZOOM[Zoom/Pan Logic react-zoom-pan-pinch + Optimized Initialization]
+        ADMIN_LOGIC[Admin Settings State Management (Simplified)]
     end
 
     subgraph "Backend Services (Supabase) - COMPLETE ✅"
@@ -208,6 +208,15 @@ flowchart TD
 4.  **Database Update**: POI coordinates updated in database with `custom_icon_id` support ✅
 5.  **UI Refresh**: Map marker updates immediately to new position ✅
 6.  **Edit Modal Closure**: Edit modal closes, returning user to updated map ✅
+
+### 3.4. Map Initialization Optimization - **NEW & COMPLETE ✅**
+1.  **Content-Type Detection**: Components identify map type (Hagga Basin 4000x4000px vs Deep Desert 2000x2000px).
+2.  **Optimized Zoom Selection**: Automatic zoom level selection based on content dimensions:
+   - Hagga Basin: 0.4 zoom for large maps (good overview)
+   - Deep Desert: 0.8 zoom for smaller screenshots (compensates for size)
+3.  **Library-Native Centering**: `react-zoom-pan-pinch`'s `centerOnInit: true` handles proper viewport positioning.
+4.  **Elimination of Manual Positioning**: Removed all manual `setTransform` calls that caused visual jumping.
+5.  **Professional Loading**: Maps appear immediately at optimal zoom and position without artifacts.
 
 ## 4. Key Architectural Decisions - **VALIDATED ✅**
 

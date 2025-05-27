@@ -7,7 +7,6 @@ export interface MapSettings {
   iconBaseSize: number;
   showTooltips: boolean;
   enablePositionChange: boolean;
-  defaultZoom: number;
   defaultVisibleTypes: string[];
   enableAdvancedFiltering: boolean;
   showSharedIndicators: boolean;
@@ -19,7 +18,6 @@ export const defaultMapSettings: MapSettings = {
   iconBaseSize: 64,
   showTooltips: true,
   enablePositionChange: true,
-  defaultZoom: 0.4,
   defaultVisibleTypes: [],
   enableAdvancedFiltering: false,
   showSharedIndicators: true

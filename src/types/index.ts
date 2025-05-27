@@ -31,6 +31,13 @@ export interface GridSquare {
   is_explored: boolean;
   uploaded_by: string | null;
   upload_date: string;
+  // NEW: Crop functionality fields
+  original_screenshot_url: string | null;
+  crop_x: number | null;
+  crop_y: number | null;
+  crop_width: number | null;
+  crop_height: number | null;
+  crop_created_at: string | null;
 }
 
 // POI related types - EXTENDED for multi-map support
@@ -61,6 +68,7 @@ export interface Poi {
   description: string | null;
   created_by: string;
   created_at: string;
+  updated_at: string; // When the POI was last updated
   screenshots: PoiScreenshot[];
   // NEW fields for Hagga Basin support
   map_type: MapType;
