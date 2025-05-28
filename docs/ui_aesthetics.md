@@ -31,12 +31,17 @@ slate-900/80  /* Mid-dark - gradient centers, container backgrounds */
 slate-800/60  /* Lighter - gradient bottoms, hover states */
 slate-700/30  /* Accent - borders, dividers */
 slate-600/20  /* Subtle - secondary borders */
+
+/* Specific for focused elements like DiamondIcon backgrounds */
+void-950      /* #2a2438 - Very dark blue with subtle purple, used for DiamondIcon bgColor */
 ```
 
 #### **Dune Gold/Bronze Accent Palette**
 ```css
 /* Primary interactive colors */
-yellow-300    /* Brightest - active states, primary highlights */
+yellow-300    /* Brightest - active states, primary highlights, DiamondIcon border & icon color */
+gold-300      /* Alias for yellow-300, often used for DiamondIcon actualBorderColor & iconColor */
+amber-200     /* Prominent text on dark backgrounds, e.g., within HexCards */
 yellow-400/90 /* Standard - default text, icons */
 yellow-400/80 /* Muted - secondary text */
 yellow-500/90 /* Medium - icon states */
@@ -167,9 +172,66 @@ transition-all duration-500
 ${isMenuOpen ? 'max-h-screen opacity-100' : 'max-h-0 opacity-0'} overflow-hidden
 ```
 
-## 5. Advanced Interaction Patterns
+## 5. Core UI Components & Patterns
 
-### 5.1. Hover State Philosophy
+This section details key reusable components that form the building blocks of the application's UI, beyond the Navbar.
+
+### 5.1. DiamondIcon Component
+
+**Purpose**: A distinct, reusable component for displaying icons within a diamond shape, featuring a prominent border and background. This is a signature element for the application's visual identity, used for highlighting key features or actions.
+
+**Key Styling (Tailwind Classes & Props):**
+- **Background Color (`bgColor`)**: Typically `bg-void-950` (a very dark blue with a subtle purple hint - `#2a2438`).
+- **Border Color (`actualBorderColor`)**: Primarily `bg-gold-300` (`#ffec7a`). Transparent versions like `bg-gold-300/70` are used for a softer effect where appropriate.
+- **Border Thickness (`borderThickness`)**: `1px` is standard for a crisp, defined edge.
+- **Icon Color (`iconColor`)**: `text-gold-300` (`#ffec7a`) to match the border and provide strong contrast against the dark background.
+- **Centering**: The icon passed to `DiamondIcon` is always perfectly centered within the diamond shape using flexbox properties.
+- **Sizing (`size`)**: Offers `sm`, `md`, `lg`, `xl` options, controlling both the overall diamond dimensions and the inner icon size.
+
+**Example Usage (Landing Page - "Production Features" title):**
+```tsx
+<DiamondIcon
+  icon={<Star size={18} strokeWidth={1.5} className="text-gold-300" />}
+  size="sm"
+  bgColor="bg-void-950"
+  actualBorderColor="bg-gold-300"
+  borderThickness={1}
+/>
+```
+
+### 5.2. HexCard Component
+
+**Purpose**: A versatile card component with a unique octagonal clip-path, designed to showcase features, statistics, or other grouped information. It incorporates the `DiamondIcon` for visual consistency.
+
+**Icon Integration**:
+- `HexCard` utilizes the `DiamondIcon` component to display its `icon` prop.
+- The `DiamondIcon`'s `size` within a `HexCard` directly corresponds to the `HexCard`'s own `size` prop (e.g., a `sm` `HexCard` uses a `sm` `DiamondIcon`).
+- Default styling for `DiamondIcon` within `HexCard` (as seen on the landing page's "Key Features Preview"):
+    - `bgColor`: `bg-void-950`
+    - `actualBorderColor`: `bg-gold-300` (or `bg-gold-300/70` for the "feature" variant)
+    - `borderThickness`: `1`
+    - `iconColor`: `text-gold-300`
+
+**Styling Variants (Landing Page - "Key Features Preview" uses `variant="feature"`):**
+- **Background**: Complex gradient (e.g., `from-slate-950 via-slate-900 to-slate-950`).
+- **Border**: Gradient border (e.g., `from-amber-400/60 via-amber-300/80 to-amber-400/60`).
+- **Text Colors**: Uses `amber-200`, `amber-300` for titles, subtitles, and descriptions.
+
+**Example Usage (Landing Page - "Key Features Preview" item):**
+```tsx
+<HexCard
+  key={index}
+  variant="feature" // This variant uses DiamondIcon internally
+  size="sm" // This would make the internal DiamondIcon also 'sm'
+  icon={<Globe size={20} />} // Icon passed to DiamondIcon
+  title="Dual Map System"
+  subtitle="Grid & Interactive"
+/>
+```
+
+## 6. Advanced Interaction Patterns
+
+### 6.1. Hover State Philosophy
 
 **Progressive Enhancement Approach**:
 1. **Base State**: Elegant default appearance
@@ -177,7 +239,7 @@ ${isMenuOpen ? 'max-h-screen opacity-100' : 'max-h-0 opacity-0'} overflow-hidden
 3. **Hover Peak**: Full interactive state with overlays and animations
 4. **Hover Exit**: Smooth return transition
 
-### 5.2. JavaScript-Enhanced Effects
+### 6.2. JavaScript-Enhanced Effects
 
 #### **Dynamic Radial Gradient Overlays**
 ```javascript
@@ -194,7 +256,7 @@ onMouseLeave={(e) => {
 }}
 ```
 
-### 5.3. State Visualization System
+### 6.3. State Visualization System
 
 #### **Active State Indicators**
 - **Color Intensity**: Active elements use brighter gold (`text-yellow-300` vs `text-yellow-500/90`)
@@ -202,9 +264,9 @@ onMouseLeave={(e) => {
 - **Background Overlay**: Active states show persistent purple overlays
 - **Shadow Enhancement**: Active elements receive enhanced shadow effects
 
-## 6. Technical Implementation Standards
+## 7. Technical Implementation Standards
 
-### 6.1. CSS Architecture Principles
+### 7.1. CSS Architecture Principles
 
 #### **Utility-First with Tailwind CSS**
 - **Responsive Design**: Mobile-first breakpoint system
@@ -217,7 +279,7 @@ onMouseLeave={(e) => {
 - **Efficient Selectors**: Tailwind's optimized class generation
 - **Minimal JavaScript**: CSS-first approach with JS only for complex interactions
 
-### 6.2. Component Architecture
+### 7.2. Component Architecture
 
 #### **Reusability Patterns**
 ```typescript
@@ -237,9 +299,9 @@ interface NavButtonProps {
 - **Color Consistency**: Centralized color token usage
 - **Spacing Harmony**: Consistent padding and margin relationships
 
-## 7. Design System Extensions
+## 8. Design System Extensions
 
-### 7.1. Future-Proofing Considerations
+### 8.1. Future-Proofing Considerations
 
 #### **Scalability Patterns**
 - **Component Composition**: Building blocks for complex interfaces
@@ -253,7 +315,7 @@ interface NavButtonProps {
 - **Keyboard Navigation**: Full tab navigation support
 - **Color Contrast**: WCAG AA compliance for all text/background combinations
 
-### 7.2. Brand Evolution Framework
+### 8.2. Brand Evolution Framework
 
 #### **Visual Identity Flexibility**
 The design system is architected to support:
@@ -262,9 +324,9 @@ The design system is architected to support:
 - **Animation Refinement**: Timing and easing adjustments
 - **Component Enhancement**: New interactive patterns following established conventions
 
-## 8. Implementation Guidelines
+## 9. Implementation Guidelines
 
-### 8.1. Developer Standards
+### 9.1. Developer Standards
 
 #### **Code Organization**
 ```typescript
@@ -286,7 +348,7 @@ const ComponentName: React.FC = () => {
 3. **Content styling third**: Typography and icon treatment
 4. **Accent effects last**: Underlines, shadows, borders
 
-### 8.2. Quality Assurance
+### 9.2. Quality Assurance
 
 #### **Visual Testing Checklist**
 - [ ] Gradient consistency across components
@@ -297,9 +359,9 @@ const ComponentName: React.FC = () => {
 - [ ] Typography rendering quality
 - [ ] Interactive feedback responsiveness
 
-## 9. Design Evolution History
+## 10. Design Evolution History
 
-### 9.1. Iterative Development Process
+### 10.1. Iterative Development Process
 
 #### **Phase 1: Basic Foundation** *(Initial Implementation)*
 - Standard Tailwind styling

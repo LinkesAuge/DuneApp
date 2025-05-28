@@ -1,16 +1,92 @@
 # Task Plan: Dune Awakening Deep Desert Tracker
 
-## **🎉 PROJECT STATUS: UI/UX POLISH & SCREENSHOT MANAGEMENT ENHANCEMENT - 100% COMPLETE! 🎉**
+## **🚧 CURRENT MAJOR TASK: GLOBALLY APPLY LANDING PAGE AESTHETIC 🚧**
 
-**FINAL STATUS**: **ALL PHASES COMPLETED SUCCESSFULLY** ✅
+**Overall Goal**: To refactor the entire application's UI to consistently use the newly established "Dune-inspired" aesthetic. This involves updating color palettes, typography, and incorporating core UI components like `DiamondIcon` and `HexCard` (or their stylistic principles) across all relevant pages and components, guided by `docs/ui_aesthetics.md`.
 
-The latest enhancement "**UI/UX Polish & Screenshot Management Enhancement**" has been **successfully implemented and tested**. The application now features comprehensive UI/UX polish with compact metadata layouts, proper grammar, enhanced screenshot management with robust deletion workflows, real-time exploration progress updates, and resolved database integrity issues - providing a professional, production-ready experience with exceptional attention to detail.
+**Status**: **Planning & Initial Phase**
 
-## **✅ UI/UX POLISH & SCREENSHOT MANAGEMENT ENHANCEMENT - COMPLETED (January 27, 2025)**
+### **Phase 1: Navbar Styling Update** - *Pending*
+-   **Goal**: Restyle the main application Navbar (`src/components/common/Navbar.tsx`) to match the landing page aesthetic.
+-   **Key Actions**:
+    -   Update background colors/gradients (likely using `slate` and `void` shades).
+    -   Adjust typography for navigation links (font, weight, color - `gold`/`amber`).
+    -   Potentially incorporate `DiamondIcon` for the logo or key action buttons if stylistically appropriate.
+    -   Ensure hover/active states align with `docs/ui_aesthetics.md`.
+-   **Files to Modify**: `src/components/common/Navbar.tsx`, potentially `tailwind.config.js` if new shared styles are needed.
+
+### **Phase 2: Common Components Styling** - *Pending*
+-   **Goal**: Update core reusable components (buttons, modals, input fields, etc.) to the new theme.
+-   **Key Actions**:
+    -   **Buttons**: Update `src/components/common/HexButton.tsx` (and any other button components) to use `void`/`slate` backgrounds with `gold`/`amber` text/borders and appropriate hover states. Consider if a `DiamondButton` variant is needed.
+    -   **Modals**: Restyle modal backgrounds, title bars, and action buttons.
+    -   **Input Fields**: Update borders, focus states, and text colors.
+-   **Files to Modify**: `src/components/common/*`, `src/index.css` for any base style overrides.
+
+### **Phase 3: Authentication Pages Styling** - *Pending*
+-   **Goal**: Apply the Dune aesthetic to login, signup, and other auth-related pages.
+-   **Key Actions**:
+    -   Update page backgrounds.
+    -   Style forms, input fields, and buttons according to the new theme.
+    -   Ensure branding (logo) is consistent.
+-   **Files to Modify**: `src/pages/AuthPage.tsx` (and any related auth components).
+
+### **Phase 4: Dashboard Styling** - *Pending*
+-   **Goal**: Overhaul the main Dashboard (`src/pages/Dashboard.tsx`) aesthetic.
+-   **Key Actions**:
+    -   Update overall page layout background.
+    -   Restyle existing cards/panels using `HexCard` principles or by creating new themed components.
+    -   Incorporate `DiamondIcon` for statistics or key metrics if appropriate.
+    -   Update charts and data visualizations to match the color palette.
+-   **Files to Modify**: `src/pages/Dashboard.tsx`, `src/components/dashboard/*`.
+
+### **Phase 5: Deep Desert Grid Page Styling** - *Pending*
+-   **Goal**: Apply the theme to the Deep Desert grid interface.
+-   **Key Actions**:
+    -   Restyle the grid itself, POI markers, and info panels.
+    -   Update sidebars, controls, and modals (`GridSquareModal`, `POIPanel`).
+-   **Files to Modify**: `src/pages/GridPage.tsx`, `src/components/grid/*`, `src/components/poi/*`.
+
+### **Phase 6: Hagga Basin Page Styling** - *Pending*
+-   **Goal**: Apply the theme to the Hagga Basin interactive map interface.
+-   **Key Actions**:
+    -   Restyle map controls, POI markers, and info panels.
+    -   Update sidebars and modals (`HaggaBasinPoiModal`, `POIPanel`).
+-   **Files to Modify**: `src/pages/HaggaBasinPage.tsx`, `src/components/hagga-basin/*`, `src/components/poi/*`.
+
+### **Phase 7: Admin Panel Styling** - *Pending*
+-   **Goal**: Update the Admin Panel to align with the new aesthetic, ensuring clarity and usability.
+-   **Key Actions**:
+    -   Restyle tables, forms, buttons, and navigation within the admin section.
+-   **Files to Modify**: `src/pages/AdminPage.tsx`, `src/components/admin/*`.
+
+### **Phase 8: Final Review & Consistency Check** - *Pending*
+-   **Goal**: Conduct a full application review to ensure consistent application of the new theme.
+-   **Key Actions**:
+    -   Check all pages and components for adherence to `docs/ui_aesthetics.md`.
+    -   Test for responsive issues and cross-browser compatibility.
+    -   Address any remaining visual inconsistencies.
+
+---
+
+## **✅ COMPLETED MAJOR TASK: LANDING PAGE AESTHETIC ESTABLISHED (January 28, 2025)**
+
+**Goal**: Define and implement a distinct "Dune-inspired" visual style for the landing page to serve as the theme for the entire application.
+**Result**: **SUCCESS** - Landing page styled with `DiamondIcon` and `HexCard`, using `void-950` backgrounds and `gold-300` accents. Style documented in `docs/ui_aesthetics.md`.
+
+**Key Achievements:**
+-   Styled `DiamondIcon` and `HexCard` components.
+-   Applied these to relevant sections of `src/pages/Landing.tsx`.
+-   Ensured icons are correctly sized and centered.
+-   Updated `docs/ui_aesthetics.md` with new component details and color usage.
+-   Resolved CSS errors related to Tailwind and import order.
+
+---
+
+## **✅ PREVIOUS MAJOR TASK: UI/UX POLISH & SCREENSHOT MANAGEMENT ENHANCEMENT - COMPLETED (January 27, 2025)**
 
 ### **🚀 User Experience & Technical Enhancement Achievement Summary**
 **Goal**: Implement comprehensive UI/UX polish and enhance screenshot management functionality with proper exploration tracking and database integrity.
-
 **Result**: **EXCEPTIONAL SUCCESS** - Professional interface polish with robust screenshot management!
 
 #### **✅ Phase 1: Compact Metadata Layout Implementation** - **COMPLETED** ✅

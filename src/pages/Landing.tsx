@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../components/auth/AuthProvider';
 import HexButton from '../components/common/HexButton';
 import HexCard from '../components/common/HexCard';
+import DiamondIcon from '../components/common/DiamondIcon';
 import { 
   Map, 
   Compass, 
@@ -71,17 +72,6 @@ const Landing: React.FC = () => {
                   className="h-24 md:h-32 lg:h-40 w-auto drop-shadow-lg"
                 />
               </div>
-              
-              {/* Deep Desert Tracker subtitle */}
-              <h2 
-                className="relative z-10 text-3xl md:text-4xl lg:text-5xl text-yellow-400/90 tracking-[0.15em] mb-12 drop-shadow-lg"
-                style={{ 
-                  fontFamily: "'Dune Rise', 'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif",
-                  fontWeight: 'normal'
-                }}
-              >
-                DEEP DESERT TRACKER
-              </h2>
             </div>
             
             {/* Buttons section */}
@@ -172,9 +162,13 @@ const Landing: React.FC = () => {
         <div className="relative max-w-7xl mx-auto px-6">
           <div className="text-center mb-16">
             <div className="inline-flex items-center gap-3 mb-6">
-              <div className="w-12 h-12 bg-gradient-to-r from-violet-600 via-violet-500 to-violet-600 rounded-lg flex items-center justify-center">
-                <Star size={20} strokeWidth={1.5} className="text-white" />
-              </div>
+              <DiamondIcon 
+                icon={<Star size={18} strokeWidth={1.5} className="text-gold-300" />} 
+                size="sm" 
+                bgColor="bg-void-950"
+                actualBorderColor="bg-gold-300"
+                borderThickness={1}
+              />
               <span className="font-light text-yellow-300 tracking-[0.15em] uppercase text-lg" style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
                 Production Features
               </span>
@@ -212,9 +206,15 @@ const Landing: React.FC = () => {
                 }
               ].map((feature, index) => (
                 <div key={index} className="group flex gap-6">
-                  <div className="flex-shrink-0 w-16 h-16 bg-gradient-to-r from-violet-600 via-violet-500 to-violet-600 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                    <div className="text-white">{feature.icon}</div>
-                  </div>
+                  <DiamondIcon 
+                    icon={feature.icon} 
+                    size="md" 
+                    bgColor="bg-void-950"
+                    actualBorderColor="bg-gold-300/70"
+                    borderThickness={1}
+                    iconColor="text-gold-300"
+                    className="flex-shrink-0 group-hover:scale-110 transition-transform duration-300"
+                  />
                   <div>
                     <h3 className="text-2xl font-light text-yellow-300 mb-3 tracking-wide" style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
                       {feature.title}

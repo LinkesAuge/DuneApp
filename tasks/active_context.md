@@ -1,10 +1,65 @@
 # Active Development Context
 
-## **🎉 LATEST ACCOMPLISHMENT: UNIFIED POI PANEL SYSTEM - IMPLEMENTED! 🎉**
+## **⭐ CURRENT MAJOR TASK: GLOBALLY APPLY LANDING PAGE AESTHETIC ⭐**
 
-**Date**: January 27, 2025  
-**Status**: **UNIFIED POI PANEL IMPLEMENTATION - COMPLETED** ✅  
-**Phase**: **PRODUCTION READY** 🚀  
+**Date**: January 28, 2025
+**Status**: **IN PROGRESS** 🚧
+**Phase**: **APPLICATION-WIDE STYLING UPDATE**
+
+**Goal**: To refactor the entire application's UI to consistently use the newly established "Dune-inspired" aesthetic defined in `docs/ui_aesthetics.md`. This includes updating color palettes, typography, and incorporating core UI components like `DiamondIcon` and `HexCard` (or their stylistic principles) across all relevant pages and components.
+
+**Key Style Elements to Propagate:**
+-   **Color Palette**:
+    -   `void-950` (`#2a2438`) for dark, focused backgrounds (e.g., icon containers).
+    -   `gold-300` (`#ffec7a`) / `amber-200` for primary accents, borders, icons, and key text.
+    -   `slate` shades for larger background areas and UI chrome.
+-   **Typography**:
+    -   Primary font: `'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif` for headings and prominent text.
+    -   Consistent use of `font-light` and specific tracking for titles and labels as per `ui_aesthetics.md`.
+-   **UI Components**:
+    -   Leverage `DiamondIcon` for iconic representation where appropriate.
+    -   Adapt `HexCard` styling for other card-like elements or create new components following its aesthetic (octagonal shapes, gradient borders, dark backgrounds).
+-   **Overall Feel**: Sophisticated sci-fi, elegant minimalism, premium materials, deep space atmosphere.
+
+**Scope of Work:**
+-   Navbar
+-   Authentication Pages (Login, Signup)
+-   Dashboard Page
+-   Deep Desert Grid Page & Components
+-   Hagga Basin Page & Components
+-   POI Management Modals/Panels
+-   Admin Panel
+-   Common Components (Buttons, Modals, Inputs, etc.)
+
+---
+
+## **🎉 PREVIOUS MAJOR ACCOMPLISHMENT: LANDING PAGE AESTHETIC ESTABLISHED! 🎉**
+
+**Date**: January 28, 2025
+**Status**: **LANDING PAGE STYLING - COMPLETED & DOCUMENTED** ✅
+**Result**: The landing page now features a distinct "Dune-inspired" aesthetic using `DiamondIcon` and `HexCard` components with a consistent color scheme (`void-950` backgrounds, `gold-300` accents) and typography. This style has been documented in `docs/ui_aesthetics.md` and serves as the theme for the entire application.
+
+**Key Achievements:**
+-   **`DiamondIcon` Component**: Created and styled for displaying icons within a diamond shape.
+    -   Background: `bg-void-950`
+    -   Border: `bg-gold-300`
+    -   Icon Color: `text-gold-300`
+-   **`HexCard` Component**: Updated to use `DiamondIcon` for its internal icons.
+    -   `DiamondIcon` size dynamically adjusted based on `HexCard` size.
+    -   Icons within `DiamondIcon` are now correctly centered.
+-   **Landing Page Updates**:
+    -   Icons for "Production Features" and "Advanced Desert Mapping" sections now use `DiamondIcon` with the new dark blue (`bg-void-950`) background.
+    -   Icons within `HexCard` components in the "Key Features Preview" also use the styled `DiamondIcon`.
+-   **Documentation**: `docs/ui_aesthetics.md` updated to reflect these new components, color choices, and styling guidelines, establishing them as the application-wide theme.
+-   **Error Resolution**: Fixed Tailwind CSS class errors and CSS import order issues.
+
+---
+
+## **🎉 PREVIOUS MAJOR ACCOMPLISHMENT: UNIFIED POI PANEL SYSTEM - IMPLEMENTED! 🎉**
+
+**Date**: January 27, 2025
+**Status**: **UNIFIED POI PANEL IMPLEMENTATION - COMPLETED** ✅
+**Phase**: **PRODUCTION READY** 🚀
 
 ## **🏆 RECENT ACHIEVEMENT SUMMARY**
 

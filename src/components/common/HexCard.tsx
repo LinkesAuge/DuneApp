@@ -1,4 +1,5 @@
 import React from 'react';
+import DiamondIcon from './DiamondIcon'; // Import DiamondIcon
 
 interface HexCardProps {
   children: React.ReactNode;
@@ -65,6 +66,11 @@ const HexCard: React.FC<HexCardProps> = ({
   };
 
   const styles = getVariantStyles();
+
+  // Determine DiamondIcon size based on HexCard's size
+  // HexCard size: 'sm', 'md', 'lg'. DiamondIcon size: 'sm', 'md', 'lg', 'xl'.
+  // We'll map HexCard's size directly to DiamondIcon's size.
+  const diamondIconSize: 'sm' | 'md' | 'lg' = size;
 
   return (
     <div 
@@ -158,9 +164,15 @@ const HexCard: React.FC<HexCardProps> = ({
           <div className="text-center">
             {icon && (
               <div className="flex justify-center mb-3">
-                <div className="w-12 h-12 bg-gradient-to-r from-violet-600 via-violet-500 to-violet-600 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                  <div className="text-white">{icon}</div>
-                </div>
+                <DiamondIcon 
+                  icon={icon} 
+                  size={diamondIconSize}
+                  bgColor="bg-void-950"
+                  actualBorderColor="bg-gold-300" 
+                  borderThickness={1}
+                  iconColor="text-gold-300"
+                  className="group-hover:scale-110 transition-transform duration-300"
+                />
               </div>
             )}
             

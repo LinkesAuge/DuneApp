@@ -24,7 +24,7 @@ const Navbar: React.FC = () => {
       onClick={onClick}
       className="group relative flex items-center h-16 px-4 min-w-[140px] justify-center transition-all duration-300"
     >
-      {/* Button background image */}
+      {/* Button background image - Consistent with ui_aesthetics.md */}
       <div 
         className="absolute inset-0 bg-center bg-cover bg-no-repeat"
         style={{
@@ -33,38 +33,39 @@ const Navbar: React.FC = () => {
         }}
       />
       
-      {/* Advanced purple overlay - fades from top, to sides and bottom */}
+      {/* Advanced purple overlay - Aligned with Landsraad Purple System from ui_aesthetics.md */}
       <div className={`
         absolute inset-0 transition-all duration-300
         ${isActive 
-          ? 'bg-gradient-to-b from-violet-600/50 via-violet-700/30 to-transparent' 
-          : 'bg-gradient-to-b from-violet-600/0 via-violet-700/0 to-transparent group-hover:from-violet-600/40 group-hover:via-violet-700/20'
+          ? 'bg-gradient-to-b from-violet-600/50 via-violet-700/30 to-transparent' // Active state
+          : 'bg-gradient-to-b from-violet-600/0 via-violet-700/0 to-transparent group-hover:from-violet-600/40 group-hover:via-violet-700/20' // Hover state
         }
       `} />
       
-      {/* Radial fade overlay for sides */}
+      {/* Radial fade overlay for sides - Aligned with Landsraad Purple System */}
       <div className={`
         absolute inset-0 transition-all duration-300
         ${isActive 
-          ? 'bg-gradient-radial from-violet-500/20 via-violet-600/10 to-transparent' 
-          : 'bg-gradient-radial from-transparent via-transparent to-transparent group-hover:from-violet-500/15 group-hover:via-violet-600/8'
+          ? 'bg-gradient-radial from-violet-500/20 via-violet-600/10 to-transparent' // Active state
+          : 'bg-gradient-radial from-transparent via-transparent to-transparent group-hover:from-violet-500/15 group-hover:via-violet-600/8' // Hover state
         }
       `} 
       style={{
         background: isActive 
-          ? 'radial-gradient(ellipse at center top, rgba(139, 92, 246, 0.2) 0%, rgba(124, 58, 237, 0.1) 40%, transparent 70%)'
+          ? 'radial-gradient(ellipse at center top, rgba(139, 92, 246, 0.2) 0%, rgba(124, 58, 237, 0.1) 40%, transparent 70%)' // More explicit purple for active
           : undefined
       }}
       />
       
-      {/* Content */}
+      {/* Content - Font and color alignment check */}
       <div className="relative z-10 flex items-center space-x-2">
         <span className={`
           transition-all duration-300
           ${isActive ? 'text-amber-200 drop-shadow-lg' : 'text-amber-300 group-hover:text-amber-100 group-hover:drop-shadow-lg'}
         `}
         style={{
-          textShadow: isActive ? '0 0 8px rgba(251, 191, 36, 0.6)' : undefined
+          textShadow: isActive ? '0 0 8px rgba(251, 191, 36, 0.6)' : undefined, // amber-200 is yellow-300 family
+          fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" // Ensuring font
         }}
         onMouseEnter={(e) => {
           if (!isActive) {
@@ -84,7 +85,8 @@ const Navbar: React.FC = () => {
           ${isActive ? 'text-amber-100 drop-shadow-lg' : 'text-amber-200 group-hover:text-amber-50 group-hover:drop-shadow-lg'}
         `}
         style={{
-          textShadow: isActive ? '0 0 8px rgba(251, 191, 36, 0.6)' : undefined
+          textShadow: isActive ? '0 0 8px rgba(251, 191, 36, 0.6)' : undefined, // amber-100, amber-200 are yellow-300 family
+          fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" // Ensuring font and style as per guide (Nav Labels)
         }}
         onMouseEnter={(e) => {
           if (!isActive) {
@@ -101,12 +103,12 @@ const Navbar: React.FC = () => {
         </span>
       </div>
       
-      {/* Sleek expanding underline */}
+      {/* Sleek expanding underline - Color check against Dune Gold/Bronze and Landsraad Purple */}
       <div className={`
         absolute bottom-1 left-0 transition-all duration-700 ease-out h-0.5 bg-gradient-to-r from-transparent to-transparent
         ${isActive 
-          ? 'w-full via-yellow-300 shadow-md shadow-yellow-300/60' 
-          : 'w-0 via-violet-400 group-hover:w-full group-hover:shadow-md group-hover:shadow-violet-400/50'
+          ? 'w-full via-yellow-300 shadow-md shadow-yellow-300/60' // Active: yellow-300 (Dune Gold)
+          : 'w-0 via-violet-400 group-hover:w-full group-hover:shadow-md group-hover:shadow-violet-400/50' // Hover: violet-400 (Landsraad Purple)
         }
       `} />
     </Link>
@@ -133,23 +135,24 @@ const Navbar: React.FC = () => {
         }}
       />
       
-      {/* Purple overlay with advanced fading */}
+      {/* Purple overlay with advanced fading - Aligned with Landsraad Purple System */}
       <div className={`
         absolute inset-0 transition-all duration-300
         ${isActive 
-          ? 'bg-gradient-to-b from-violet-600/40 via-violet-700/20 to-transparent' 
-          : 'bg-gradient-to-b from-violet-600/0 via-violet-700/0 to-transparent group-hover:from-violet-600/30 group-hover:via-violet-700/15'
+          ? 'bg-gradient-to-b from-violet-600/40 via-violet-700/20 to-transparent' // Active state
+          : 'bg-gradient-to-b from-violet-600/0 via-violet-700/0 to-transparent group-hover:from-violet-600/30 group-hover:via-violet-700/15' // Hover state
         }
       `} />
       
-      {/* Content */}
+      {/* Content - Font and color alignment check */}
       <div className="relative z-10 flex items-center space-x-3">
         <span className={`
           transition-all duration-300
           ${isActive ? 'text-amber-200 drop-shadow-lg' : 'text-amber-300 group-hover:text-amber-100 group-hover:drop-shadow-lg'}
         `}
         style={{
-          textShadow: isActive ? '0 0 8px rgba(251, 191, 36, 0.6)' : undefined
+          textShadow: isActive ? '0 0 8px rgba(251, 191, 36, 0.6)' : undefined, // amber-200 is yellow-300 family
+          fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" // Ensuring font
         }}
         onMouseEnter={(e) => {
           if (!isActive) {
@@ -169,7 +172,8 @@ const Navbar: React.FC = () => {
           ${isActive ? 'text-amber-100 drop-shadow-lg' : 'text-amber-200 group-hover:text-amber-50 group-hover:drop-shadow-lg'}
         `}
         style={{
-          textShadow: isActive ? '0 0 8px rgba(251, 191, 36, 0.6)' : undefined
+          textShadow: isActive ? '0 0 8px rgba(251, 191, 36, 0.6)' : undefined, // amber-100, amber-200 are yellow-300 family
+          fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" // Ensuring font and style as per guide
         }}
         onMouseEnter={(e) => {
           if (!isActive) {
@@ -186,12 +190,12 @@ const Navbar: React.FC = () => {
         </span>
       </div>
       
-      {/* Sleek expanding underline for mobile */}
+      {/* Sleek expanding underline for mobile - Color check against Dune Gold/Bronze and Landsraad Purple */}
       <div className={`
         absolute bottom-0 left-0 transition-all duration-700 ease-out h-0.5 bg-gradient-to-r from-transparent to-transparent
         ${isActive 
-          ? 'w-full via-yellow-300 shadow-sm shadow-yellow-300/60' 
-          : 'w-0 via-violet-400 group-hover:w-full group-hover:shadow-sm group-hover:shadow-violet-400/50'
+          ? 'w-full via-yellow-300 shadow-sm shadow-yellow-300/60' // Active: yellow-300 (Dune Gold)
+          : 'w-0 via-violet-400 group-hover:w-full group-hover:shadow-sm group-hover:shadow-violet-400/50' // Hover: violet-400 (Landsraad Purple)
         }
       `} />
     </Link>
@@ -199,22 +203,32 @@ const Navbar: React.FC = () => {
 
   return (
     <nav className="relative z-50 border-b border-slate-700/30">
-      {/* Navbar background image */}
+      {/* Navbar background image - Ensure this aligns with the three-layer gradient system if possible, or is a deliberate choice */}
+      {/* Consider if navbar-color.png is the "Base Layer" or "Depth Layer" from ui_aesthetics.md */}
       <div 
         className="absolute inset-0 bg-center bg-cover bg-no-repeat"
         style={{
-          backgroundImage: 'url(/images/navbar-color.png?v=' + Date.now() + ')',
-          backgroundSize: 'cover'
+          // backgroundImage: 'url(/images/navbar-color.png?v=' + Date.now() + ')', // Retaining for now, but verify its role
+          // Applying slate gradient as a base, potentially overlaid by navbar-color.png if it acts as a texture/detail layer
+          background: 'linear-gradient(to right, var(--slate-900), var(--slate-800), var(--slate-900))', // Base Layer from guide
+        }}
+      />
+      {/* Secondary overlay, potentially the navbar-color.png or a deeper slate gradient */}
+      <div 
+        className="absolute inset-0 bg-center bg-cover bg-no-repeat opacity-80" // Adjusted opacity if navbar-color.png is used as a detail layer
+        style={{
+          backgroundImage: 'url(/images/navbar-color.png?v=' + Date.now() + ')', // Depth Layer or detail
+          // background: 'linear-gradient(to bottom, var(--slate-950-90), var(--slate-900-80), var(--slate-800-60))', // Alternative Depth Layer
         }}
       />
       
-      {/* Subtle texture overlay */}
+      {/* Subtle texture overlay - This aligns with guide's interactive/detail layers */}
       <div 
         className="absolute inset-0 opacity-10"
         style={{
           backgroundImage: `
-            radial-gradient(circle at 25% 25%, rgba(139, 92, 246, 0.1) 0%, transparent 50%),
-            radial-gradient(circle at 75% 75%, rgba(234, 179, 8, 0.05) 0%, transparent 50%)
+            radial-gradient(circle at 25% 25%, rgba(139, 92, 246, 0.1) 0%, transparent 50%), // Landsraad Purple hint
+            radial-gradient(circle at 75% 75%, rgba(254, 240, 138, 0.05) 0%, transparent 50%) // Dune Gold/Bronze hint (using yellow-200 as proxy for amber/gold)
           `
         }}
       />
@@ -224,35 +238,43 @@ const Navbar: React.FC = () => {
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex items-center h-16">
             
-            {/* Expanded Logo Section - takes much more space with separation */}
+            {/* Expanded Logo Section - Use Trebuchet MS as per guide */}
             <div className="flex-1 max-w-lg mr-12">
-              <Link to="/" className="group relative flex items-center h-16 px-8 transition-all duration-300">
-                {/* Logo button background image */}
+              <Link to="/" className="group relative flex items-center h-16 px-8 transition-all duration-300" style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                {/* Logo button background image - Should align with NavButton styling */}
                 <div 
                   className="absolute inset-0 bg-center bg-cover bg-no-repeat"
                   style={{
-                    backgroundImage: 'url(/images/bg-button.png)',
+                    backgroundImage: 'url(/images/bg-button.png)', // Consistent with NavButton
                     backgroundSize: 'cover'
                   }}
                 />
                 
-                {/* Logo hover gradient */}
-                <div className="absolute inset-0 bg-gradient-to-r from-yellow-600/0 via-yellow-500/0 to-yellow-600/0 group-hover:from-yellow-600/15 group-hover:via-yellow-500/10 group-hover:to-yellow-600/15 transition-all duration-300" />
+                {/* Logo hover gradient - Using Gold/Bronze accent */}
+                <div className="absolute inset-0 bg-gradient-to-r from-yellow-500/0 via-yellow-400/0 to-yellow-500/0 group-hover:from-yellow-500/15 group-hover:via-yellow-400/10 group-hover:to-yellow-500/15 transition-all duration-300" />
                 
                 <div className="relative z-10 flex items-center justify-center">
+                  {/* Apply typography for "DUNE" part of the logo if it's text, or ensure image matches */}
+                  {/* Assuming dune-log.png is the full visual logo */}
                   <img 
                     src={`/images/dune-log.png?v=${Date.now()}`}
-                    alt="Dune Awakening Tracker" 
+                    alt="DUNE AWAKENING TRACKER" 
                     className="h-10 w-auto object-contain transition-all duration-300 group-hover:scale-105 drop-shadow-sm"
                     style={{ 
                       filter: 'brightness(1.1) contrast(1.05)',
                       maxWidth: '200px'
                     }}
                   />
+                  {/* If "DUNE AWAKENING TRACKER" text is separate and needs styling: */}
+                  {/* <span className="font-light text-2xl text-amber-200 tracking-[0.4em]" style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>DUNE</span> */}
+                  {/* <span className="font-thin text-sm text-amber-300 tracking-[0.1em] ml-2" style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>AWAKENING TRACKER</span> */}
                 </div>
                 
-                {/* Sleek logo underline */}
-                <div className="absolute bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-transparent via-yellow-300/90 to-transparent group-hover:w-full transition-all duration-700 ease-out shadow-md shadow-yellow-300/50" />
+                {/* Sleek expanding underline for logo - similar to NavButton */}
+                <div className={`
+                  absolute bottom-1 left-0 transition-all duration-700 ease-out h-0.5 bg-gradient-to-r from-transparent to-transparent
+                  w-0 via-yellow-400 group-hover:w-full group-hover:shadow-md group-hover:shadow-yellow-400/50
+                `} />
               </Link>
             </div>
 

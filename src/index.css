@@ -1,3 +1,6 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700&display=swap');
+@import 'react-image-crop/dist/ReactCrop.css';
+
 /* Custom Font Declarations */
 /* Dune Rise Font */
 @font-face {
@@ -36,17 +39,13 @@
   font-display: swap;
 }
 
-/* Google Fonts (existing) */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700&display=swap');
-@import 'react-image-crop/dist/ReactCrop.css';
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   html {
-    @apply text-night-800;
+    @apply text-void-800;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
@@ -56,7 +55,7 @@
   }
 
   h1, h2, h3, h4, h5, h6 {
-    @apply font-display text-night-950;
+    @apply font-display text-void-950;
   }
 }
 
@@ -65,18 +64,16 @@
     @apply px-4 py-2 rounded-md font-medium transition-all duration-200 inline-flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-offset-2;
   }
 
-
-
   .btn-primary {
     @apply bg-spice-600 text-white hover:bg-spice-700 focus:ring-spice-500;
   }
 
   .btn-secondary {
-    @apply bg-night-600 text-white hover:bg-night-700 focus:ring-night-500;
+    @apply bg-void-600 text-white hover:bg-void-700 focus:ring-void-500;
   }
 
   .btn-outline {
-    @apply border border-night-300 text-night-700 hover:bg-night-50 focus:ring-night-300;
+    @apply border border-void-300 text-void-700 hover:bg-void-50 focus:ring-void-300;
   }
 
   .btn-danger {
@@ -96,7 +93,7 @@
   }
 
   .label {
-    @apply block text-sm font-medium text-night-700 mb-1;
+    @apply block text-sm font-medium text-void-700 mb-1;
   }
 
   .badge {
