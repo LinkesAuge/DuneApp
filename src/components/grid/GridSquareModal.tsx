@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { GridSquare as GridSquareType, Poi, PoiType, CustomIcon } from '../../types';
 import { useAuth } from '../auth/AuthProvider';
-import { Upload, X, Plus, Image, Trash2, Clock, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Target, Edit } from 'lucide-react';
+import { Upload, X, Plus, Image, Trash2, Clock, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Target, Edit, Check } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import PoiList from '../poi/PoiList';
 import AddPoiForm from '../poi/AddPoiForm';
@@ -24,6 +24,14 @@ interface GridSquareModalProps {
 }
 
 const GRID_SIZE = 9;
+
+// Helper for consistent theming of text based on background
+const getThemedTextColor = (variant: 'primary' | 'secondary' | 'muted') => {
+  // Based on docs/ui_aesthetics.md
+  if (variant === 'primary') return 'text-amber-200'; // Prominent text
+  if (variant === 'secondary') return 'text-slate-300'; // Standard text
+  return 'text-slate-400'; // Muted text
+};
 
 const GridSquareModal: React.FC<GridSquareModalProps> = ({ 
   square, 
@@ -237,8 +245,6 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
       setSelectedPoiTypes(poiTypes.map(type => type.id));
     }
   };
-
-
 
   const handleScreenshotUpload = () => {
     fileInputRef.current?.click();
@@ -691,10 +697,10 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (modalRef.current && !modalRef.current.contains(event.target as Node)) {
-        // Check if the click is on a gallery backdrop
         const target = event.target as HTMLElement;
-        const isGalleryBackdrop = target.classList.contains('bg-night-950/90') || 
-                                  target.closest('div[class*="bg-night-950/90"][class*="z-[60"]');
+        // Ensure class check for gallery backdrop uses theme-consistent names if gallery is also restyled
+        const isGalleryBackdrop = target.classList.contains('bg-slate-950/90') || // Updated from night-950
+                                  target.closest('div[class*="bg-slate-950/90"][class*="z-[60"]');
         
         if (!isGalleryBackdrop) {
           onClose();
@@ -782,74 +788,50 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div 
-        ref={modalRef}
-        className="bg-night-900 border border-night-700 rounded-lg shadow-xl w-[95vw] h-[95vh] max-w-[1400px] flex flex-col overflow-hidden"
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-8 py-6 border-b border-night-700">
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-3">
-              <h2 className="text-2xl font-bold text-white">
-                Grid Square {currentSquare.coordinate}
-              </h2>
-              
-              {/* Edit Screenshot Button in Header */}
-              {currentSquare.screenshot_url && currentSquare.original_screenshot_url && canUpdateScreenshot && (
-                <button
-                  onClick={handleEditExistingCrop}
-                  className="text-sm bg-amber-600 text-white hover:bg-amber-700 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5"
-                  title="Edit screenshot crop"
-                >
-                  <Edit size={14} />
-                  Edit
-                </button>
-              )}
-            </div>
-            
-            {/* Navigation Controls */}
-            <div className="flex flex-col items-center gap-1">
+    <div 
+      ref={modalRef} 
+      className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto" // Themed backdrop
+    >
+      <div className="bg-gradient-to-b from-slate-900 to-slate-800 rounded-lg shadow-2xl w-full max-w-6xl max-h-[95vh] flex flex-col border border-slate-700"> {/* Themed content wrapper */}
+        {/* Header Section */}
+        <div className={`flex items-center justify-between p-3 border-b border-slate-700 bg-slate-800`}> {/* Themed header */}
+          <div className="flex items-center space-x-3">
+            {/* Grid Coordinate Select */}
+            <select
+              value={currentSquare.coordinate}
+              onChange={(e) => fetchGridSquare(e.target.value)}
+              className={`px-3 py-2 rounded-md ${getThemedTextColor('secondary')} bg-slate-700 border border-slate-600 focus:ring-amber-400 focus:border-amber-400 text-sm`}
+              style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
+            >
+              {gridOptions.map(coord => (
+                <option key={coord} value={coord} className="bg-slate-700 text-slate-200">
+                  {coord}
+                </option>
+              ))}
+            </select>
+            <h2 className={`text-xl font-bold ${getThemedTextColor('primary')}`} style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+              Grid Square Details
+            </h2>
+          </div>
+
+          {/* Navigation Buttons */}
+          <div className="flex items-center space-x-1">
+            {[
+              { dir: 'left', icon: ChevronLeft, disabled: currentNumber === 1 },
+              { dir: 'right', icon: ChevronRight, disabled: currentNumber === GRID_SIZE },
+              { dir: 'down', icon: ChevronDown, disabled: letterIndex === 0 }, // A is 0
+              { dir: 'up', icon: ChevronUp, disabled: letterIndex === GRID_SIZE -1 }, // I is 8
+            ].map(({ dir, icon: Icon, disabled }) => (
               <button
-                onClick={() => navigateGrid('up')}
-                disabled={letterIndex === GRID_SIZE - 1}
-                className="p-1.5 hover:bg-night-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed text-sand-300 hover:text-white"
+                key={dir}
+                onClick={() => navigateGrid(dir as 'up' | 'down' | 'left' | 'right')}
+                disabled={isLoading || disabled}
+                className={`p-2 rounded-md transition-colors disabled:opacity-40 ${disabled ? getThemedTextColor('muted') : getThemedTextColor('secondary')} hover:bg-slate-700 hover:${getThemedTextColor('primary')}`}
+                title={`Navigate ${dir}`}
               >
-                <ChevronUp size={20} />
+                <Icon size={20} />
               </button>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => navigateGrid('left')}
-                  disabled={currentNumber === 1}
-                  className="p-1.5 hover:bg-night-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed text-sand-300 hover:text-white"
-                >
-                  <ChevronLeft size={20} />
-                </button>
-                <select
-                  value={currentSquare.coordinate}
-                  onChange={(e) => fetchGridSquare(e.target.value)}
-                  className="select w-[4.5rem] text-center px-1 py-1.5 bg-night-700 text-white border-night-600"
-                >
-                  {gridOptions.map(coord => (
-                    <option key={coord} value={coord}>{coord}</option>
-                  ))}
-                </select>
-                <button
-                  onClick={() => navigateGrid('right')}
-                  disabled={currentNumber === GRID_SIZE}
-                  className="p-1.5 hover:bg-night-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed text-sand-300 hover:text-white"
-                >
-                  <ChevronRight size={20} />
-                </button>
-              </div>
-              <button
-                onClick={() => navigateGrid('down')}
-                disabled={letterIndex === 0}
-                className="p-1.5 hover:bg-night-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed text-sand-300 hover:text-white"
-              >
-                <ChevronDown size={20} />
-              </button>
-            </div>
+            ))}
           </div>
           
           <button 
@@ -857,142 +839,35 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
               e.stopPropagation();
               onClose();
             }}
-            className="text-sand-400 hover:text-white p-2 rounded-full hover:bg-night-700 transition-colors"
+            className={`p-2 rounded-full transition-colors ${getThemedTextColor('muted')} hover:bg-slate-700 hover:${getThemedTextColor('primary')}`} // Themed close button
           >
             <X size={24} />
           </button>
         </div>
         
-        {/* Success Message */}
+        {/* Success Message - Retaining green for positive feedback, adjusting intensity slightly */}
         {success && (
-          <div className="mx-8 mt-4 p-3 bg-green-900/20 text-green-300 rounded-lg border border-green-700/30 flex items-center">
+          <div className="mx-8 mt-4 p-3 bg-green-700/20 text-green-300 rounded-lg border border-green-600/30 flex items-center">
             <Check size={16} className="mr-2" />
             {success}
           </div>
         )}
         
-        {/* Error Display */}
+        {/* Error Display - Retaining red for error feedback, adjusting intensity slightly */}
         {error && (
-          <div className="mx-8 mt-4 p-3 bg-red-900/20 text-red-300 rounded-lg border border-red-700/30">
+          <div className="mx-8 mt-4 p-3 bg-red-700/20 text-red-400 rounded-lg border border-red-600/30"> {/* Adjusted text color slightly */}
             {error}
           </div>
         )}
         
-        {/* Main Content */}
-        <div className="flex-1 flex overflow-hidden">
-          {/* Left Panel - POI Controls */}
-          <div className="w-80 bg-sand-50 border-r border-sand-300 overflow-hidden">
-            <PoiControlPanel
-              pois={pois}
-              poiTypes={poiTypes}
-              customIcons={customIcons}
-              selectedPoiTypes={selectedPoiTypes}
-              onTypeToggle={handleTypeToggle}
-              onCategoryToggle={handleCategoryToggle}
-              onToggleAllPois={handleToggleAllPois}
-              showCreatePoiButton={true}
-              onCreatePoiClick={handleCreatePoiClick}
-              compactMode={true}
-            />
-          </div>
-
-          {/* Center - Interactive Screenshot */}
-          <div className="flex-1 flex flex-col bg-sand-200">
-            {/* Screenshot Controls */}
-            <div className="p-6 border-b border-sand-300">
-              <div className="flex justify-between items-center">
-                <h3 className="text-xl font-semibold text-night-800">Screenshot</h3>
-                <div className="flex items-center gap-3">
-                  {/* Placement Mode Toggle */}
-                  {user && currentSquare.screenshot_url && (
-                    <button
-                      onClick={() => setPlacementMode(!placementMode)}
-                      className={`flex items-center text-sm px-4 py-2 rounded-full transition-colors ${
-                        placementMode 
-                          ? 'bg-spice-600 text-white hover:bg-spice-700 shadow-md' 
-                          : 'bg-night-600 text-white hover:bg-night-700 shadow-md'
-                      }`}
-                      title={placementMode ? 'Exit placement mode' : 'Click on map to place POIs'}
-                    >
-                      <Target size={16} className="mr-1.5" />
-                      {placementMode ? 'Exit Placement' : 'Place POI'}
-                    </button>
-                  )}
-                  
-
-                  
-                  {canUpdateScreenshot && (
-                    <button
-                      onClick={handleScreenshotUpload}
-                      disabled={isUploading}
-                      className="btn bg-spice-600 text-white hover:bg-spice-700 text-sm border border-spice-700 shadow-md"
-                    >
-                      {isUploading ? (
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      ) : (
-                        <>
-                          <Upload size={16} />
-                          {currentSquare.screenshot_url ? 'Update' : 'Upload'}
-                        </>
-                      )}
-                    </button>
-                  )}
-
-                  {currentSquare.screenshot_url && canDeleteScreenshot && (
-                    <button
-                      onClick={handleDeleteScreenshot}
-                      className="btn bg-red-600 text-white hover:bg-red-700 text-sm border border-red-700 shadow-md"
-                      title="Delete screenshot"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  )}
-
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    onChange={handleFileChange}
-                    className="hidden"
-                  />
-                </div>
-              </div>
-
-              {currentSquare.uploaded_by && uploaderInfo && (
-                <div className="mt-3 text-sm text-night-600 flex items-center">
-                  <Clock size={14} className="mr-1.5" />
-                  <span>
-                    Updated by {uploaderInfo.username} on {new Date(currentSquare.upload_date).toLocaleDateString()}
-                  </span>
-                </div>
-              )}
-              
-              {/* Placement Mode Instructions */}
-              {placementMode && (
-                <div className="mt-3 p-3 bg-spice-100 text-spice-800 rounded-lg text-sm">
-                  <strong>Placement Mode Active:</strong> Click anywhere on the screenshot to place a new POI. Press Escape to cancel.
-                </div>
-              )}
-            </div>
-
-            {/* Interactive Screenshot Area */}
-            <div className="flex-1 overflow-hidden relative">
+        {/* Main Content Area - This will need further updates for its children */}
+        <div className="flex-grow overflow-y-auto p-6 space-y-6">
+          {/* Screenshot Section */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+            <div className="space-y-3">
+              <h3 className={`text-lg font-semibold ${getThemedTextColor('primary')}`} style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>Screenshot</h3>
               {currentSquare.screenshot_url ? (
-                <>
-                  {/* Edit Button Overlay for Screenshot */}
-                  {currentSquare.original_screenshot_url && canUpdateScreenshot && (
-                    <div className="absolute top-4 left-4 z-20">
-                      <button
-                        onClick={handleEditExistingCrop}
-                        className="bg-amber-600 text-white hover:bg-amber-700 p-2 rounded-lg transition-colors shadow-lg flex items-center gap-1.5"
-                        title="Edit screenshot crop"
-                      >
-                        <Edit size={16} />
-                        Edit Crop
-                      </button>
-                    </div>
-                  )}
-                  
+                <div className="relative group">
                   <InteractivePoiImage
                     imageUrl={currentSquare.screenshot_url}
                     imageAlt={`Grid ${currentSquare.coordinate}`}
@@ -1008,42 +883,69 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
                     mapType="deep_desert"
                     gridSquareId={currentSquare.id}
                   />
-                </>
-              ) : (
-                <div className="h-full flex flex-col items-center justify-center p-8 bg-sand-100">
-                  <Image size={64} className="text-night-500 mb-4" />
-                  <p className="text-lg text-night-600 font-medium">No screenshot uploaded</p>
-                  {!user && <p className="text-sm mt-2 text-night-500">Sign in to upload screenshots</p>}
-                  {user && !canUpdateScreenshot && (
-                    <p className="text-sm mt-2 text-night-500">You don't have permission to update this screenshot</p>
-                  )}
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {!canUpdateScreenshot && currentSquare.screenshot_url && (
+                      <p className={`text-xs ${getThemedTextColor('muted')} mt-2`}>You can only replace screenshots you uploaded.</p>
+                    )}
+                  </div>
                 </div>
+              ) : (
+                <>
+                  <button
+                    onClick={handleScreenshotUpload}
+                    disabled={isUploading || !canUpdateScreenshot}
+                    className={`btn btn-primary text-sm w-full justify-center ${!canUpdateScreenshot ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    {isUploading && <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>}
+                    {isUploading ? 'Uploading...' : 'Upload Screenshot'}
+                  </button>
+                </>
               )}
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                onChange={handleFileChange} 
+                className="hidden" 
+                accept="image/*" 
+              />
+               {uploaderInfo && (
+                <p className={`text-xs ${getThemedTextColor('muted')} pt-2`}>
+                  Uploaded by: <span className={getThemedTextColor('secondary')}>{uploaderInfo.username}</span> on {new Date(currentSquare.updated_at || currentSquare.created_at).toLocaleDateString()}
+                </p>
+              )}
+            </div>
+
+            {/* POI Control Panel Section */}
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <h3 className={`text-lg font-semibold ${getThemedTextColor('primary')}`} style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>Points of Interest ({pois.length})</h3>
+                {user && (
+                  <button
+                    onClick={handleCreatePoiClick}
+                    className="btn btn-primary text-sm"
+                  >
+                    <Plus size={16} className="mr-1" /> Add POI
+                  </button>
+                )}
+              </div>
+              <PoiControlPanel
+                poiTypes={poiTypes}
+                selectedPoiTypes={selectedPoiTypes}
+                onTypeToggle={handleTypeToggle}
+                onCategoryToggle={handleCategoryToggle}
+                onToggleAll={handleToggleAllPois}
+                placementMode={placementMode}
+                onPlacementModeChange={setPlacementMode}
+                // Applying text theming to PoiControlPanel text elements if it doesn't handle it internally
+                // textPrimaryColor={getThemedTextColor('primary')}
+                // textSecondaryColor={getThemedTextColor('secondary')}
+                // textMutedColor={getThemedTextColor('muted')}
+              />
             </div>
           </div>
           
-          {/* Right Panel - POI List & Forms */}
-          <div className="w-96 p-6 border-l border-night-700 bg-night-900/50 overflow-y-auto">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-semibold text-white">Points of Interest</h3>
-              {user && !showAddPoiForm && (
-                <button
-                  onClick={handleCreatePoiClick}
-                  className="btn bg-spice-600 text-white hover:bg-spice-700 text-sm flex items-center gap-1"
-                  title="Create a new POI"
-                >
-                  <Plus size={16} />
-                  Add POI
-                </button>
-              )}
-            </div>
-            
-            {!user && (
-              <div className="mb-6 p-4 bg-night-800 text-sand-300 rounded-lg text-sm">
-                <p><strong>Sign in</strong> to create and manage POIs in this grid square.</p>
-              </div>
-            )}
-            
+          {/* POI List or Add Form Section */}
+          <div className="mt-4">
             {isLoading ? (
               <div className="flex justify-center items-center h-32">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-spice-600"></div>
@@ -1084,26 +986,16 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
       </div>
       
       {/* Image Crop Modal */}
-      {showCropModal && tempImageUrl && (
+      {showCropModal && tempImageUrl && tempImageFile && (
         <ImageCropModal
           imageUrl={tempImageUrl}
           onCropComplete={isEditingExisting ? handleRecropComplete : handleCropComplete}
           onClose={handleCloseCropModal}
-          onSkip={isEditingExisting ? undefined : handleSkipCrop}
-          onDelete={isEditingExisting ? handleDeleteFromCrop : undefined}
-          title={isEditingExisting ? 'Edit Screenshot Crop' : 'Crop Your Screenshot'}
-          defaultToSquare={true}
-          initialCrop={
-            isEditingExisting && currentSquare.crop_x !== null && currentSquare.crop_y !== null && 
-            currentSquare.crop_width !== null && currentSquare.crop_height !== null
-              ? {
-                  x: currentSquare.crop_x,
-                  y: currentSquare.crop_y,
-                  width: currentSquare.crop_width,
-                  height: currentSquare.crop_height,
-                }
-              : undefined
-          }
+          onSkip={handleSkipCrop}
+          onDelete={canDeleteScreenshot ? handleDeleteFromCrop : undefined}
+          title={isEditingExisting ? "Edit Screenshot Crop" : "Crop New Screenshot"}
+          defaultToSquare={true} // Or based on user setting
+          initialCrop={currentSquare.crop_data as PixelCrop || undefined}
         />
       )}
     </div>

@@ -11,31 +11,40 @@
   font-display: swap;
 }
 
-/* Method 1: Local TTF/OTF fonts from public/fonts/ */
+/* Default application font - Trebuchet MS as per ui_aesthetics.md */
 @font-face {
-  font-family: 'CustomFont';
-  src: url('/fonts/CustomFont-Regular.ttf') format('truetype'),
-       url('/fonts/CustomFont-Regular.otf') format('opentype');
+  font-family: 'Trebuchet MS'; /* Referenced by Tailwind config */
+  src: local('Trebuchet MS'), /* Try local first */
+       url('/fonts/TrebuchetMS-Regular.ttf') format('truetype'); /* Fallback - ensure this path is correct or remove if system font is reliable */
   font-weight: 400;
   font-style: normal;
-  font-display: swap; /* Better loading performance */
+  font-display: swap;
 }
 
 @font-face {
-  font-family: 'CustomFont';
-  src: url('/fonts/CustomFont-Bold.ttf') format('truetype'),
-       url('/fonts/CustomFont-Bold.otf') format('opentype');
+  font-family: 'Trebuchet MS';
+  src: local('Trebuchet MS Bold'),
+       url('/fonts/TrebuchetMS-Bold.ttf') format('truetype');
   font-weight: 700;
   font-style: normal;
   font-display: swap;
 }
 
 @font-face {
-  font-family: 'CustomFont';
-  src: url('/fonts/CustomFont-Light.ttf') format('truetype'),
-       url('/fonts/CustomFont-Light.otf') format('opentype');
-  font-weight: 300;
-  font-style: normal;
+  font-family: 'Trebuchet MS';
+  src: local('Trebuchet MS Italic'),
+       url('/fonts/TrebuchetMS-Italic.ttf') format('truetype');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Trebuchet MS';
+  src: local('Trebuchet MS Bold Italic'),
+       url('/fonts/TrebuchetMS-BoldItalic.ttf') format('truetype');
+  font-weight: 700;
+  font-style: italic;
   font-display: swap;
 }
 
@@ -45,84 +54,85 @@
 
 @layer base {
   html {
-    @apply text-void-800;
+    @apply text-slate-300 bg-slate-950; /* Light text on dark bg */
+    font-family: 'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif; /* Base font */
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 
   body {
-    @apply bg-sand-100 min-h-screen;
+    /* Base body background, can be a gradient if desired */
+    @apply bg-slate-950 min-h-screen; 
   }
 
   h1, h2, h3, h4, h5, h6 {
-    @apply font-display text-void-950;
+    @apply font-display text-amber-200; /* font-display is 'Dune Rise', headings prominent with amber */
+    /* For Trebuchet MS headings specifically, if not using font-display: */
+    /* font-family: 'Trebuchet MS', sans-serif; @apply text-amber-200 font-light tracking-wide; */
   }
 }
 
 @layer components {
   .btn {
-    @apply px-4 py-2 rounded-md font-medium transition-all duration-200 inline-flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-offset-2;
+    @apply px-4 py-2 rounded-md font-light uppercase tracking-widest transition-all duration-200 inline-flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-offset-slate-900 focus:ring-offset-2;
+    font-family: 'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif;
   }
 
   .btn-primary {
-    @apply bg-spice-600 text-white hover:bg-spice-700 focus:ring-spice-500;
+    @apply bg-amber-400 text-slate-950 hover:bg-amber-500 focus:ring-amber-300;
   }
 
   .btn-secondary {
-    @apply bg-void-600 text-white hover:bg-void-700 focus:ring-void-500;
+    @apply bg-slate-700 text-slate-100 hover:bg-slate-600 focus:ring-slate-500;
   }
 
   .btn-outline {
-    @apply border border-void-300 text-void-700 hover:bg-void-50 focus:ring-void-300;
+    @apply border border-amber-300/70 text-amber-200 hover:bg-amber-400/10 hover:text-amber-100 focus:ring-amber-300;
   }
 
   .btn-danger {
+    /* Keeping red for danger, ensure good contrast on dark theme */
     @apply bg-red-600 text-white hover:bg-red-700 focus:ring-red-500;
   }
 
   .card {
-    @apply bg-white rounded-lg shadow-md overflow-hidden;
+    @apply bg-gradient-to-b from-slate-800 to-slate-900 rounded-lg shadow-xl overflow-hidden border border-slate-700;
   }
 
-  .input {
-    @apply block w-full px-3 py-2 border border-sand-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500;
-  }
-
-  .select {
-    @apply block w-full px-3 py-2 border border-sand-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500;
+  .input, .select {
+    @apply block w-full px-3 py-2 border border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-amber-400 bg-slate-800 text-slate-200 placeholder-slate-400;
   }
 
   .label {
-    @apply block text-sm font-medium text-void-700 mb-1;
+    @apply block text-sm font-light text-slate-300 mb-1 tracking-wide;
+    font-family: 'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif;
   }
 
   .badge {
-    @apply px-2 py-1 text-xs font-medium rounded-full;
+    @apply px-2 py-1 text-xs font-light rounded-full tracking-wider;
+    font-family: 'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif;
   }
 
   .badge-primary {
-    @apply bg-spice-100 text-spice-800;
+    @apply bg-amber-400/20 text-amber-100;
   }
 
   .badge-secondary {
-    @apply bg-sky-100 text-sky-800;
+    @apply bg-slate-700 text-slate-200;
   }
 }
 
 @layer utilities {
   @keyframes pulse-highlight {
     0%, 100% {
-      border-color: #B95A2C; /* Placeholder for your theme's spice-700 */
+      border-color: var(--amber-400); /* amber-400 for Dune Gold */
       transform: scale(1);
-      box-shadow: 0 0 8px 2px rgba(185, 90, 44, 0.5); /* Tighter, less opaque halo */
-      /* background-color animation removed */
-      /* border-width will rely on the class default (e.g., border-2) */
+      box-shadow: 0 0 8px 2px rgba(251, 191, 36, 0.5); /* Corresponds to yellow-300/amber-300 */
     }
     50% {
-      border-color: #FFA500; /* Placeholder for a very bright/saturated orange */
-      transform: scale(1.02); /* Subtle scale to minimize layout disruption */
-      box-shadow: 0 0 20px 8px rgba(255, 165, 0, 0.7); /* Larger, more intense halo */
-      /* background-color animation removed */
+      border-color: var(--amber-300); /* Brighter amber/yellow */
+      transform: scale(1.02);
+      box-shadow: 0 0 20px 8px rgba(254, 240, 138, 0.7); /* Corresponds to yellow-200 */
     }
   }
 
@@ -174,35 +184,34 @@
     animation-delay: 4s;
   }
 
-  /* Custom Scrollbar Styles */
-  /* Apply to all scrollable elements in the app */
+  /* Custom Scrollbar Styles - Themed */
   * {
     scrollbar-width: thin;
-    scrollbar-color: #c68240 #f5f0e0; /* thumb color, track color (sand-600, sand-100) */
+    scrollbar-color: var(--slate-600) var(--slate-800); /* thumb, track */
   }
 
   *::-webkit-scrollbar {
-    width: 12px;
-    height: 12px;
+    width: 10px;
+    height: 10px;
   }
 
   *::-webkit-scrollbar-track {
-    background: #f5f0e0; /* sand-100 */
-    border-radius: 6px;
-    margin: 2px;
+    @apply bg-slate-800;
+    border-radius: 5px;
+    margin: 1px;
   }
 
   *::-webkit-scrollbar-thumb {
-    background: #c68240; /* sand-600 */
-    border-radius: 6px;
-    border: 2px solid #f5f0e0; /* sand-100 for better contrast */
+    @apply bg-slate-600;
+    border-radius: 5px;
+    border: 2px solid var(--slate-800); /* track color for border */
   }
 
   *::-webkit-scrollbar-thumb:hover {
-    background: #a46234; /* sand-700 */
+    @apply bg-slate-500;
   }
 
   *::-webkit-scrollbar-corner {
-    background: #f5f0e0; /* sand-100 */
+    @apply bg-slate-800;
   }
 }

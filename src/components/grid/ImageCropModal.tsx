@@ -3,6 +3,13 @@ import ReactCrop, { Crop, PixelCrop } from 'react-image-crop';
 import { X, Square, Maximize2, RotateCcw, Check, Download } from 'lucide-react';
 import 'react-image-crop/dist/ReactCrop.css';
 
+// Helper for consistent theming of text based on background (can be imported from a shared util if used in many places)
+const getThemedTextColor = (variant: 'primary' | 'secondary' | 'muted') => {
+  if (variant === 'primary') return 'text-amber-200';
+  if (variant === 'secondary') return 'text-slate-300';
+  return 'text-slate-400';
+};
+
 interface ImageCropModalProps {
   imageUrl: string;
   onCropComplete: (croppedImageBlob: Blob, cropData: PixelCrop) => Promise<void>;
@@ -317,29 +324,25 @@ const ImageCropModal: React.FC<ImageCropModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-5xl max-h-[90vh] w-full mx-4 flex flex-col">
+    <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-gradient-to-b from-slate-900 to-slate-800 rounded-lg shadow-2xl max-w-5xl max-h-[90vh] w-full mx-4 flex flex-col border border-slate-700">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b">
-          <h2 className="text-xl font-semibold text-sand-800">{title}</h2>
+        <div className="flex items-center justify-between p-4 border-b border-slate-700">
+          <h2 className={`text-xl font-semibold ${getThemedTextColor('primary')}`} style={{ fontFamily: "'Trebuchet MS', sans-serif" }}>{title}</h2>
           <button
             onClick={onClose}
-            className="text-sand-400 hover:text-sand-600 transition-colors"
+            className={`${getThemedTextColor('muted')} hover:${getThemedTextColor('primary')} p-1 rounded-full hover:bg-slate-700 transition-colors`}
           >
             <X className="w-6 h-6" />
           </button>
         </div>
 
         {/* Controls */}
-        <div className="flex items-center justify-between p-4 border-b bg-sand-50">
-          <div className="flex items-center gap-4">
+        <div className="flex items-center justify-between p-4 border-b border-slate-700 bg-slate-800">
+          <div className="flex items-center gap-3">
             <button
               onClick={handleSquareModeToggle}
-              className={`flex items-center gap-2 px-3 py-2 rounded transition-colors ${
-                squareMode
-                  ? 'bg-spice-500 text-white'
-                  : 'bg-white border border-sand-300 text-sand-700 hover:bg-sand-100'
-              }`}
+              className={`btn text-xs ${squareMode ? 'btn-primary' : 'btn-outline'}`}
             >
               <Square className="w-4 h-4" />
               Square Mode
@@ -347,114 +350,100 @@ const ImageCropModal: React.FC<ImageCropModalProps> = ({
             
             <button
               onClick={() => setSquareMode(false)}
-              className={`flex items-center gap-2 px-3 py-2 rounded transition-colors ${
-                !squareMode
-                  ? 'bg-spice-500 text-white'
-                  : 'bg-white border border-sand-300 text-sand-700 hover:bg-sand-100'
-              }`}
+              className={`btn text-xs ${!squareMode ? 'btn-primary' : 'btn-outline'}`}
             >
               <Maximize2 className="w-4 h-4" />
               Free Form
             </button>
 
-            <button
+            <button 
               onClick={resetCrop}
-              className="flex items-center gap-2 px-3 py-2 rounded bg-white border border-sand-300 text-sand-700 hover:bg-sand-100 transition-colors"
+              className="btn btn-outline text-xs"
             >
               <RotateCcw className="w-4 h-4" />
-              Reset
+              Reset Crop
             </button>
-          </div>
-
-          <div className="text-sm text-sand-600">
-            Drag to reposition • Drag corners to resize
           </div>
         </div>
 
-        {/* Crop Area */}
-        <div className="flex-1 p-4 overflow-auto bg-sand-100">
-          <div className="flex justify-center">
+        {/* Image Area - ReactCrop component is here, background is inherited */}
+        <div className="flex-grow p-4 overflow-hidden flex items-center justify-center bg-slate-850">
+          {imageUrl ? (
             <ReactCrop
               crop={crop}
-              onChange={(newCrop) => setCrop(newCrop)}
+              onChange={(_, percentCrop) => setCrop(percentCrop)}
               onComplete={(c) => setCompletedCrop(c)}
               aspect={squareMode ? 1 : undefined}
               minWidth={50}
               minHeight={50}
-              keepSelection
+              circularCrop={false}
+              ruleOfThirds
+              className="max-w-full max-h-full"
             >
               <img
                 ref={imgRef}
+                alt="Crop me"
                 src={imageUrl}
-                alt="Crop preview"
                 onLoad={onImageLoad}
-                className="max-w-full max-h-[75vh] object-contain"
-                crossOrigin="anonymous"
+                className="max-w-full max-h-[60vh] object-contain select-none"
+                style={{ imageRendering: 'pixelated' }}
               />
             </ReactCrop>
-          </div>
+          ) : (
+            <p className={getThemedTextColor('secondary')}>Loading image...</p>
+          )}
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-between p-4 border-t bg-white">
+        {/* Footer with Actions */}
+        <div className="flex items-center justify-between p-4 border-t border-slate-700 bg-slate-800">
           <div className="flex gap-3">
             {onSkip && (
               <button
                 onClick={onSkip}
-                className="px-4 py-2 text-sand-600 hover:text-sand-800 font-medium transition-colors"
+                className={`font-light transition-colors ${getThemedTextColor('secondary')} hover:${getThemedTextColor('primary')} text-sm py-2 px-3 rounded-md hover:bg-slate-700`}
+                style={{fontFamily: "'Trebuchet MS', sans-serif"}}
               >
                 Skip Cropping
               </button>
             )}
+            {onDelete && (
+              <button
+                onClick={async () => {
+                  setIsProcessing(true);
+                  try {
+                    await onDelete();
+                  } catch (error) {
+                    console.error('Error deleting screenshot:', error);
+                  } finally {
+                    setIsProcessing(false);
+                  }
+                }}
+                disabled={isProcessing}
+                className="btn btn-danger text-sm"
+              >
+                {isProcessing && onDelete ? 'Deleting...' : 'Delete'}
+              </button>
+            )}
           </div>
           
-                      <div className="flex gap-3">
-              {onDelete && (
-                <button
-                  onClick={async () => {
-                    setIsProcessing(true);
-                    try {
-                      await onDelete();
-                    } catch (error) {
-                      console.error('Error deleting screenshot:', error);
-                    } finally {
-                      setIsProcessing(false);
-                    }
-                  }}
-                  disabled={isProcessing}
-                  className="px-4 py-2 text-red-600 hover:text-red-800 font-medium transition-colors disabled:opacity-50"
-                >
-                  {isProcessing ? 'Deleting...' : 'Delete'}
-                </button>
-              )}
+          <div className="flex gap-3">
             <button
               onClick={onClose}
-              className="px-4 py-2 border border-sand-300 text-sand-700 rounded hover:bg-sand-50 transition-colors"
+              className="btn btn-outline text-sm"
             >
               Cancel
             </button>
             <button
               onClick={handleCropConfirm}
               disabled={isProcessing || !completedCrop}
-              className="px-4 py-2 bg-spice-500 text-white rounded hover:bg-spice-600 disabled:bg-sand-300 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+              className="btn btn-primary text-sm"
             >
-              {isProcessing ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  Processing...
-                </>
-              ) : (
-                <>
-                  <Check className="w-4 h-4" />
-                  Apply Crop
-                </>
-              )}
+              {isProcessing && !onDelete ? 'Processing...' : 'Confirm Crop'}
+              {!isProcessing && <Check size={16} className="ml-1" />}
             </button>
           </div>
         </div>
       </div>
-
-      {/* Hidden canvas for image processing */}
       <canvas ref={canvasRef} className="hidden" />
     </div>
   );
