@@ -4,26 +4,47 @@
 
 **Current Status**: This is a **production-ready application** with comprehensive functionality implemented and operational.
 
+### **Latest Enhancement: UI/UX Polish & Screenshot Management - COMPLETED** ✅
+**Date**: January 27, 2025
+
+#### **✅ UI/UX Polish Implementation**
+- **Compact Metadata Layout**: 6 core components updated with single-line layouts using `flex justify-between`
+- **Grammar Correction System**: New `formatDateWithPreposition()` utility in `dateUtils.ts` for proper date/time grammar
+- **Exploration System Cleanup**: Removed visual checkmarks while preserving all backend tracking functionality
+- **Visual Consistency**: Professional appearance with improved information density across all components
+
+#### **✅ Enhanced Screenshot Management System**
+- **Comprehensive Delete Functionality**: Added delete capabilities with proper file cleanup and database field reset
+- **Exploration Status Synchronization**: All screenshot operations properly update exploration tracking
+- **Database Operation Safety**: Converted to UPSERT operations with conflict resolution to prevent duplicate key violations
+- **Real-time Progress Updates**: Enhanced global event broadcasting system for immediate dashboard updates
+
+#### **✅ Database Integrity Enhancements**
+- **Constraint Violation Resolution**: Fixed "grid_squares_coordinate_key" duplicate violations
+- **UPSERT Operations**: All grid square operations use `onConflict: 'coordinate'` resolution
+- **State Synchronization**: Local and database state remain synchronized across all operations
+- **File Storage Cleanup**: Comprehensive cleanup of both current and original screenshot files
+
 ### **Implementation Achievements** ✅
-- **Frontend**: Complete React + TypeScript application with professional UI/UX
+- **Frontend**: Complete React + TypeScript application with professional UI/UX polish
 - **Backend**: Comprehensive Supabase integration with all services operational  
-- **Database**: Advanced schema with privacy controls, collections, sharing systems
+- **Database**: Advanced schema with privacy controls, collections, sharing systems, and UPSERT safety
 - **Authentication**: Role-based access control with admin/user permissions
 - **Dual Mapping Systems**: Both Deep Desert grid and Hagga Basin coordinate systems fully functional
 - **Admin Tools**: Complete management panel with scheduling and automation
-- **Map Settings Management**: **NEW** - Complete admin configuration system with database persistence
-- **POI Position Editing**: **NEW** - Interactive map-based position change functionality
-- **Custom Icon System**: **NEW** - User uploads with admin-configurable scaling (64px-128px)
+- **Map Settings Management**: Complete admin configuration system with database persistence
+- **POI Position Editing**: Interactive map-based position change functionality
+- **Custom Icon System**: User uploads with admin-configurable scaling (64px-128px)
 - **Mobile Support**: Touch-optimized responsive design throughout
-- **Real-time Updates**: Live synchronization across all interfaces
+- **Real-time Updates**: Live synchronization across all interfaces with enhanced event broadcasting
 - **Performance**: Optimized queries, React memoization, efficient rendering
 
 ### **Technical Excellence Demonstrated** 🏆
 - **Code Quality**: 100% TypeScript coverage with comprehensive type definitions
 - **Architecture**: Clean component separation with scalable patterns
 - **Security**: Row Level Security throughout with proper access controls
-- **Database Design**: Normalized schema with advanced relationship management
-- **UI Consistency**: Unified design system with desert theming
+- **Database Design**: Normalized schema with advanced relationship management and conflict resolution
+- **UI Consistency**: Unified design system with desert theming and compact layouts
 - **Error Handling**: Graceful error states and user feedback throughout
 - **Testing Ready**: Well-structured code base ready for test implementation
 
@@ -93,6 +114,8 @@
 -   **Environment Variables for Configuration**: Supabase keys are managed via `.env` files, separating configuration from code.
 -   **Database Migrations**: Schema changes and initial data seeding are managed via files in `/supabase/migrations/`, ensuring consistent database states across environments.
 -   **Edge Functions for Secure Operations**: Sensitive or privileged operations like database management (`manage-database` function) are handled by Supabase Edge Functions, callable from the frontend but executed securely on the server.
+-   **UPSERT Operations for Data Integrity**: All grid square operations use UPSERT with conflict resolution to prevent duplicate key constraint violations during re-upload scenarios.
+-   **Global Event Broadcasting for Real-time Updates**: Custom browser events ensure immediate dashboard updates across all screenshot operations (upload, crop, edit, delete).
 
 ## 4. Styling and UI
 
@@ -108,6 +131,10 @@
     -   Currently uses custom components with Lucide React for icons.
     -   Future consideration for Shadcn UI or Radix UI primitives is noted by the `ui-ux` rule.
 -   **Theming**: The application uses a single, default theme based on the defined color palette. There is no separate light/dark mode.
+-   **Layout Patterns**:
+    -   **Compact Metadata**: Single-line layouts using `flex justify-between` for optimal horizontal space utilization
+    -   **Consistent Sizing**: `text-xs` sizing and `gap-1` spacing throughout metadata displays
+    -   **Professional Polish**: Clean, modern interface with attention to detail and improved information density
 
 ## 5. Deployment
 
@@ -116,21 +143,25 @@
 -   **Publish Directory**: `dist/`
 -   **Environment Variables**: `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` must be configured in the Netlify dashboard.
 
-## 6. Performance Optimizations (as per documentation)
+## 6. Performance Optimizations
 
 -   Lazy loading of components.
 -   Image size restrictions (e.g., 2MB for screenshots).
--   Efficient database queries.
+-   Efficient database queries with UPSERT operations.
 -   Proper indexing on database tables.
 -   Caching of static assets (handled by Netlify/browser).
+-   **Event-driven architecture**: Efficient event cleanup and minimal re-renders for real-time updates.
+-   **Optimized rendering**: React memoization and component-level optimizations.
 
-## 7. Security Considerations (as per documentation)
+## 7. Security Considerations
 
 -   Row Level Security (RLS) on all Supabase tables.
 -   Role-Based Access Control (RBAC).
 -   Secure file upload restrictions (size, type).
 -   Public/private policies on Supabase Storage buckets.
 -   Admin-only access to sensitive database operations via Edge Functions.
+-   **Database operation safety**: UPSERT operations with conflict resolution prevent constraint violations.
+-   **File cleanup security**: Proper cleanup of both current and original files during deletion operations.
 
 ## 8. Client-Side Image Processing
 
@@ -139,10 +170,45 @@
     -   The resized image is converted to PNG format before being uploaded to Supabase Storage.
     -   This reduces storage requirements and ensures a consistent format for icons.
 
+## 9. Enhanced Screenshot Management System
+
+### 9.1. Screenshot Upload & Crop Operations
+-   **UPSERT Operations**: All screenshot upload operations use `supabase.from('grid_squares').upsert()` with `onConflict: 'coordinate'` to handle both new and existing grid squares safely.
+-   **Exploration Tracking**: Automatic `is_explored: true` setting during all upload and crop operations.
+-   **File Management**: Comprehensive handling of both original and cropped screenshot files with proper cleanup.
+
+### 9.2. Screenshot Deletion Workflow
+1. **File Storage Cleanup**: Removes both current screenshot and original files from Supabase Storage
+2. **Database Field Reset**: Sets all screenshot-related fields to null (`screenshot_url`, `original_screenshot_url`, crop data)
+3. **Exploration Status Update**: Marks grid as `is_explored: false` to remove from exploration progress
+4. **Global Event Broadcasting**: Notifies dashboard components of exploration change via custom browser events
+5. **UI State Synchronization**: Grid squares return to proper empty state styling with sand-200 background
+
+### 9.3. Real-time Progress System
+-   **Event Sources**: Tracks 'crop', 'upload', 'recrop', 'delete' operations through global event system
+-   **Component Listeners**: Dashboard components (ExplorationProgress, StatisticsCards, RegionalStatsPanel) automatically refresh on changes
+-   **Performance Optimized**: Efficient event cleanup with minimal component re-renders
+-   **Debug Support**: Console logging for troubleshooting exploration updates
+
+## 10. Grammar Correction System
+
+### 10.1. Date/Time Grammar Utility
+-   **Function**: `formatDateWithPreposition()` in `src/lib/dateUtils.ts`
+-   **Purpose**: Smart grammar detection for relative time vs actual dates
+-   **Implementation**: 
+    - Detects relative time patterns (e.g., "3 minutes ago", "2 hours ago")
+    - Applies proper preposition usage: "Created by X 3 minutes ago" (not "on 3 minutes ago")
+    - Maintains "on" for actual dates like "on January 27, 2025"
+-   **Components Using**: HaggaBasinPoiCard, PoiCard, CommentItem
+
+### 10.2. Professional Text Standards
+-   All user-facing date/time text now uses grammatically correct English
+-   Consistent application across all metadata display components
+-   Enhanced perceived professionalism of the application
+
 ### Database Schema (`supabase/migrations`)
 
-Brief overview of key tables like `profiles`, `grid_squares`, `pois`, `poi_types` and their relationships. 
-(This section would ideally be auto-generated or link to a schema visualizer if the project had one).
+Brief overview of key tables like `profiles`, `grid_squares`, `pois`, `poi_types` and their relationships, now enhanced with UPSERT conflict resolution and proper foreign key handling.
 
 ### SQL Helper Functions
 
@@ -163,18 +229,14 @@ Brief overview of key tables like `profiles`, `grid_squares`, `pois`, `poi_types
 
 ## Key Libraries and Frameworks
 
--   **React**: Used for frontend development.
+-   **React**: Used for frontend development with enhanced component architecture.
 -   **Supabase**: Provides backend services including authentication, database, and storage.
--   **Tailwind CSS**: Used for styling components.
+-   **Tailwind CSS**: Used for styling components with compact layout patterns.
 -   **Vite**: Used as the build tool for the project.
 -   **React Router v6**: Used for client-side routing.
 -   **Supabase Edge Functions**: Used for server-side logic and secure operations.
--   **Supabase SQL**: Used for database operations and SQL helper functions.
--   **Supabase Functions**: Used for server-side logic and scheduled tasks.
--   **Supabase Storage**: Used for storing images and icons.
+-   **Supabase Storage**: Used for storing images and icons with comprehensive cleanup.
 -   **Supabase Auth**: Used for user authentication.
--   **Supabase SQL**: Used for database operations and SQL helper functions.
--   **Supabase SQL**: Used for database operations and SQL helper functions.
 
 ## User Deletion and Foreign Key Constraints
 
@@ -197,895 +259,33 @@ ADD CONSTRAINT profiles_id_fkey FOREIGN KEY (id)
 REFERENCES auth.users (id) ON DELETE CASCADE;
 ```
 
-### Tables referencing `public.profiles`
+## Database Operation Safety and Constraint Management
 
-Similarly, other tables like `pois` (via `created_by`) and `grid_squares` (via `uploaded_by`) may reference `public.profiles(id)`. If these foreign key constraints also have `ON DELETE NO ACTION` or `ON DELETE RESTRICT`, they will block the deletion of a profile, which in turn would block the deletion of the auth user.
+### Grid Square UPSERT Operations
 
-These constraints must also be updated to either `ON DELETE CASCADE` (if the related data should be deleted with the profile) or `ON DELETE SET NULL` (if the related data should be kept but disassociated from the deleted profile).
+All grid square database operations now use UPSERT with conflict resolution to prevent duplicate key constraint violations:
 
-**Example to identify such constraints:**
 ```sql
-SELECT
-    conname AS constraint_name,
-    conrelid::regclass AS referencing_table_name,
-    a.attname AS referencing_column_name,
-    CASE confdeltype
-        WHEN 'a' THEN 'NO ACTION'
-        WHEN 'r' THEN 'RESTRICT'
-        WHEN 'c' THEN 'CASCADE'
-        WHEN 'n' THEN 'SET NULL'
-        WHEN 'd' THEN 'SET DEFAULT'
-        ELSE 'UNKNOWN'
-    END AS on_delete_action
-FROM
-    pg_constraint AS c
-JOIN
-    pg_attribute AS a ON a.attnum = ANY(c.conkey) AND a.attrelid = c.conrelid
-WHERE
-    c.contype = 'f'  -- 'f' for foreign key
-    AND confrelid = 'public.profiles'::regclass -- The table being referenced (profiles)
-    AND conrelid::regclass::text LIKE 'public.%'; -- Only look in the public schema for referencing tables
+-- Example UPSERT operation for grid squares
+INSERT INTO grid_squares (coordinate, screenshot_url, uploaded_by, is_explored)
+VALUES ($1, $2, $3, true)
+ON CONFLICT (coordinate) 
+DO UPDATE SET 
+  screenshot_url = EXCLUDED.screenshot_url,
+  uploaded_by = EXCLUDED.uploaded_by,
+  updated_by = EXCLUDED.uploaded_by,
+  is_explored = EXCLUDED.is_explored;
 ```
 
-**Example to update a constraint to `ON DELETE SET NULL`:**
-```sql
--- Assuming 'fk_pois_created_by' is the constraint name on 'pois' table
-ALTER TABLE public.pois
-DROP CONSTRAINT fk_pois_created_by;
-
-ALTER TABLE public.pois
-ADD CONSTRAINT fk_pois_created_by FOREIGN KEY (created_by)
-REFERENCES public.profiles (id) ON DELETE SET NULL;
-```
-
-**Example to update a constraint to `ON DELETE CASCADE`:**
-```sql
--- Assuming 'fk_pois_created_by' is the constraint name on 'pois' table
-ALTER TABLE public.pois
-DROP CONSTRAINT fk_pois_created_by;
-
-ALTER TABLE public.pois
-ADD CONSTRAINT fk_pois_created_by FOREIGN KEY (created_by)
-REFERENCES public.profiles (id) ON DELETE CASCADE;
-```
-
-## 9. Hagga Basin Interactive Map System - Technical Implementation
-
-### 9.1. Additional Dependencies
-
-**New Package Requirements**:
-```bash
-npm install react-zoom-pan-pinch
-```
-
--   **react-zoom-pan-pinch**: Interactive zoom and pan functionality for the 4000x4000px Hagga Basin map
-    -   Provides touch gesture support for mobile devices
-    -   Configurable zoom limits and pan boundaries
-    -   Smooth animations and optimized performance
-
-### 9.2. Coordinate System Implementation
-
-**Pixel-Based Coordinate System**: The Hagga Basin uses absolute pixel coordinates (0-4000) stored in the database, converted to CSS percentage positioning for responsive display.
-
-**Core Conversion Functions**:
-```typescript
-// Utility functions for coordinate conversion
-export const getMarkerPosition = (x: number, y: number) => ({
-  left: `${(x / 4000) * 100}%`,
-  top: `${(y / 4000) * 100}%`
-});
-
-export const getPixelCoordinates = (
-  clickX: number, 
-  clickY: number, 
-  mapRect: DOMRect
-) => ({
-  x: Math.round((clickX / mapRect.width) * 4000),
-  y: Math.round((clickY / mapRect.height) * 4000)
-});
-
-export const validateCoordinates = (x: number, y: number): boolean => {
-  return x >= 0 && x <= 4000 && y >= 0 && y <= 4000;
-};
-```
-
-### 9.3. Database Schema Extensions
-
-**Modified Tables**:
-```sql
--- Extend existing pois table for multi-map support
-ALTER TABLE pois 
-ADD COLUMN map_type TEXT CHECK (map_type IN ('deep_desert', 'hagga_basin')) DEFAULT 'deep_desert',
-ADD COLUMN coordinates_x INTEGER, -- Pixel coordinates (0-4000)
-ADD COLUMN coordinates_y INTEGER, -- Pixel coordinates (0-4000)  
-ADD COLUMN privacy_level TEXT CHECK (privacy_level IN ('global', 'private', 'shared')) DEFAULT 'global';
-
--- Migrate existing data
-UPDATE pois SET map_type = 'deep_desert' WHERE map_type IS NULL;
-```
-
-**New Supporting Tables**:
-```sql
--- Base map management for admin uploads
-CREATE TABLE hagga_basin_base_maps (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  name TEXT NOT NULL,
-  image_url TEXT NOT NULL,
-  is_active BOOLEAN DEFAULT false,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  created_by UUID REFERENCES auth.users(id) ON DELETE CASCADE
-);
-
--- Overlay layer management with ordering and opacity
-CREATE TABLE hagga_basin_overlays (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  name TEXT NOT NULL,
-  image_url TEXT NOT NULL,
-  opacity DECIMAL(3,2) DEFAULT 1.0 CHECK (opacity >= 0.0 AND opacity <= 1.0),
-  display_order INTEGER NOT NULL,
-  is_active BOOLEAN DEFAULT true,
-  can_toggle BOOLEAN DEFAULT true,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  created_by UUID REFERENCES auth.users(id) ON DELETE CASCADE
-);
-
--- POI collection system for grouping and sharing
-CREATE TABLE poi_collections (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  name TEXT NOT NULL,
-  description TEXT,
-  created_by UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-  is_public BOOLEAN DEFAULT false,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Many-to-many relationship for POI collections
-CREATE TABLE poi_collection_items (
-  collection_id UUID REFERENCES poi_collections(id) ON DELETE CASCADE,
-  poi_id UUID REFERENCES pois(id) ON DELETE CASCADE,
-  added_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  PRIMARY KEY (collection_id, poi_id)
-);
-
--- Individual POI sharing permissions
-CREATE TABLE poi_shares (
-  poi_id UUID REFERENCES pois(id) ON DELETE CASCADE,
-  shared_with_user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-  shared_by_user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  PRIMARY KEY (poi_id, shared_with_user_id)
-);
-
--- User custom icons with enforced limits
-CREATE TABLE custom_icons (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  image_url TEXT NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-```
-
-### 9.4. Row Level Security (RLS) Policies
-
-**Privacy-Aware POI Visibility**:
-```sql
--- POI visibility policy considering privacy levels
-CREATE POLICY "poi_visibility_policy" ON pois
-FOR SELECT USING (
-  privacy_level = 'global' OR
-  created_by = auth.uid() OR
-  (privacy_level = 'shared' AND id IN (
-    SELECT poi_id FROM poi_shares WHERE shared_with_user_id = auth.uid()
-  ))
-);
-
--- Custom icons limited to 10 per user
-CREATE POLICY "custom_icons_user_limit" ON custom_icons
-FOR INSERT WITH CHECK (
-  user_id = auth.uid() AND
-  (SELECT COUNT(*) FROM custom_icons WHERE user_id = auth.uid()) < 10
-);
-
--- Admin-only access for base maps and overlays
-CREATE POLICY "admin_only_base_maps" ON hagga_basin_base_maps
-FOR ALL USING (
-  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin'))
-);
-```
-
-### 9.5. Storage Structure & Management
-
-**Extended Folder Organization**:
-```
-screenshots/ (existing bucket)
-├── [existing grid screenshots]
-├── icons/ (existing POI type icons)
-├── hagga-basin/
-│   ├── base-maps/
-│   │   └── [admin-uploaded-base-maps.png/jpg/webp]
-│   └── overlays/
-│       └── [admin-uploaded-overlays.png/jpg/webp]
-└── custom-icons/
-    └── [user-id]/
-        └── [user-custom-icons.png] (max 10 per user)
-```
-
-**File Upload Validation**:
-- **Base Maps/Overlays**: No size limit (admin-only), PNG/JPEG/WebP formats
-- **Custom Icons**: 1MB limit, PNG format only, client-side validation
-- **Automatic Cleanup**: Orphaned files removed when parent records deleted
-
-### 9.6. Interactive Map Performance Optimizations
-
-**React Optimization Patterns**:
-```typescript
-// Memoized POI marker component
-const MapPOIMarker = React.memo(({ poi, onClick }: MapPOIMarkerProps) => {
-  // Component implementation
-}, (prevProps, nextProps) => {
-  return prevProps.poi.id === nextProps.poi.id &&
-         prevProps.poi.updated_at === nextProps.poi.updated_at;
-});
-
-// Debounced search for POI filtering
-const useDebouncedSearch = (searchTerm: string, delay: number = 300) => {
-  const [debouncedTerm, setDebouncedTerm] = useState(searchTerm);
-  
-  useEffect(() => {
-    const handler = setTimeout(() => setDebouncedTerm(searchTerm), delay);
-    return () => clearTimeout(handler);
-  }, [searchTerm, delay]);
-  
-  return debouncedTerm;
-};
-
-// Memoized coordinate conversion
-const useCoordinateConverter = () => {
-  return useMemo(() => ({
-    getMarkerPosition,
-    getPixelCoordinates,
-    validateCoordinates
-  }), []);
-};
-```
-
-**Image Loading Strategies**:
-- Lazy loading for overlay images outside viewport
-- Progressive loading for base map with low-res placeholder
-- Image preloading for frequently accessed overlays
-- WebP format preference with fallback to PNG/JPEG
-
-### 9.7. Interactive Map Configuration
-
-**Zoom/Pan Setup**:
-```typescript
-const mapConfig = {
-  initialScale: 1,
-  minScale: 0.25,      // Allow zooming out to see full map
-  maxScale: 3,         // Allow zooming in for detail work
-  limitToBounds: true, // Prevent panning outside map
-  centerOnInit: true,  // Center map on initial load
-  wheel: { step: 0.05 }, // Smooth scroll wheel zooming
-  pinch: { step: 5 },    // Touch pinch zoom sensitivity
-  doubleClick: { disabled: false } // Enable double-click zoom
-};
-```
-
-**Touch Gesture Support**:
-- Pinch-to-zoom for mobile devices
-- Two-finger pan for map navigation
-- Long-press for POI placement on touch devices
-- Gesture boundary enforcement to prevent accidental navigation
-
-### 9.8. Component Architecture Patterns
-
-**Layer Management System**:
-```typescript
-// CSS z-index hierarchy
-const layerZIndex = {
-  baseMap: 1,
-  overlayStart: 2,
-  overlayEnd: 9,
-  poiMarkers: 10,
-  poiLabels: 11,
-  uiControls: 20
-} as const;
-
-// Dynamic overlay styling
-const getOverlayStyle = (overlay: HaggaBasinOverlay) => ({
-  position: 'absolute',
-  top: 0,
-  left: 0,
-  width: '100%',
-  height: '100%',
-  zIndex: layerZIndex.overlayStart + overlay.display_order,
-  opacity: overlay.opacity,
-  display: overlay.is_active ? 'block' : 'none'
-});
-```
-
-**Privacy Filtering Queries**:
-```typescript
-// Optimized POI fetching with privacy filtering
-const fetchHaggaBasinPOIs = async (userId: string) => {
-  const { data, error } = await supabase
-    .from('pois')
-    .select(`
-      *,
-      poi_types (*),
-      profiles (username)
-    `)
-    .eq('map_type', 'hagga_basin')
-    .or(`
-      privacy_level.eq.global,
-      created_by.eq.${userId},
-      id.in.(${await getSharedPOIIds(userId)})
-    `);
-  
-  return { data, error };
-};
-```
-
-### 9.9. Development Workflow Integration
-
-**Environment Setup for Hagga Basin**:
-1. Database migrations applied automatically via Supabase CLI
-2. Storage folder structure created on first admin upload
-3. Component lazy loading for optimal development HMR
-4. TypeScript strict mode compatibility for coordinate typing
-
-**Testing Considerations**:
-- Unit tests for coordinate conversion functions
-- Integration tests for POI privacy filtering
-- Performance tests for large datasets (1000+ POIs)
-- Mobile device testing for touch interactions
-- Cross-browser compatibility for zoom/pan functionality
-
-This technical foundation provides comprehensive support for the Hagga Basin interactive map system while maintaining performance, security, and scalability standards established by the existing Deep Desert tracker system.
-
-## 10. Admin Settings Management System - Technical Implementation
-
-### 10.1. Database Schema for Configuration Storage
-
-**App Settings Table**:
-```sql
--- Admin configuration persistence table
-CREATE TABLE app_settings (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  setting_key TEXT UNIQUE NOT NULL,
-  setting_value JSONB NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  created_by UUID REFERENCES auth.users(id) ON DELETE SET NULL
-);
-
--- Enable RLS for admin-only access
-ALTER TABLE app_settings ENABLE ROW LEVEL SECURITY;
-
--- Admin-only access policy
-CREATE POLICY "admin_only_app_settings" ON app_settings
-FOR ALL USING (
-  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
-);
-
--- Automatic updated_at timestamp
-CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = NOW();
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER update_app_settings_updated_at
-    BEFORE UPDATE ON app_settings
-    FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at_column();
-```
-
-### 10.2. Settings Configuration Schema
-
-**Map Settings JSON Structure**:
-```typescript
-interface MapSettings {
-  icon_scaling: {
-    min_size: number;        // Minimum icon size (default: 64px)
-    max_size: number;        // Maximum icon size (default: 128px)
-    base_size: number;       // Base icon size (default: 64px)
-  };
-  interactions: {
-    enable_dragging: boolean;           // POI marker dragging (default: true)
-    enable_tooltips: boolean;           // Hover tooltips (default: true)
-    enable_position_change: boolean;    // Position change mode (default: true)
-  };
-  display: {
-    default_zoom_level: number;         // Initial zoom (default: 1)
-  };
-  filtering: {
-    visible_poi_types: string[];        // Array of POI type IDs (default: all)
-    enable_advanced_filtering: boolean; // Advanced filters (default: false)
-    show_shared_indicators: boolean;    // Shared POI highlighting (default: true)
-  };
-}
-
-// Default settings used for reset functionality
-const DEFAULT_MAP_SETTINGS: MapSettings = {
-  icon_scaling: {
-    min_size: 64,
-    max_size: 128,
-    base_size: 64
-  },
-  interactions: {
-    enable_dragging: true,
-    enable_tooltips: true,
-    enable_position_change: true
-  },
-  display: {
-    default_zoom_level: 1
-  },
-  filtering: {
-    visible_poi_types: [], // Empty array means all types visible
-    enable_advanced_filtering: false,
-    show_shared_indicators: true
-  }
-};
-```
-
-### 10.3. Controlled Component State Management
-
-**React State Architecture**:
-```typescript
-// AdminPanel.tsx - Settings state management
-const AdminPanel: React.FC = () => {
-  // Map settings state with controlled inputs
-  const [mapSettings, setMapSettings] = useState<MapSettings>(DEFAULT_MAP_SETTINGS);
-  const [isLoadingSettings, setIsLoadingSettings] = useState(true);
-  const [isSavingSettings, setIsSavingSettings] = useState(false);
-
-  // POI types for filter checkboxes
-  const [poiTypes, setPoiTypes] = useState<POIType[]>([]);
-  const [visiblePoiTypes, setVisiblePoiTypes] = useState<string[]>([]);
-
-  // Load settings on component mount
-  useEffect(() => {
-    loadMapSettings();
-    fetchPoiTypes();
-  }, []);
-
-  // Database operations
-  const loadMapSettings = async () => {
-    try {
-      setIsLoadingSettings(true);
-      const { data, error } = await supabase
-        .from('app_settings')
-        .select('setting_value')
-        .eq('setting_key', 'map_settings')
-        .maybeSingle();
-
-      if (error) throw error;
-      
-      if (data?.setting_value) {
-        const loadedSettings = data.setting_value as MapSettings;
-        setMapSettings(loadedSettings);
-        setVisiblePoiTypes(loadedSettings.filtering.visible_poi_types);
-      }
-    } catch (error) {
-      console.error('Error loading map settings:', error);
-    } finally {
-      setIsLoadingSettings(false);
-    }
-  };
-
-  const saveMapSettings = async () => {
-    try {
-      setIsSavingSettings(true);
-      
-      const settingsToSave = {
-        ...mapSettings,
-        filtering: {
-          ...mapSettings.filtering,
-          visible_poi_types: visiblePoiTypes
-        }
-      };
-
-      const { error } = await supabase
-        .from('app_settings')
-        .upsert({
-          setting_key: 'map_settings',
-          setting_value: settingsToSave
-        });
-
-      if (error) throw error;
-      
-      setMapSettings(settingsToSave);
-      // Success feedback to user
-    } catch (error) {
-      console.error('Error saving map settings:', error);
-      // Error feedback to user
-    } finally {
-      setIsSavingSettings(false);
-    }
-  };
-
-  const resetMapSettings = () => {
-    setMapSettings(DEFAULT_MAP_SETTINGS);
-    setVisiblePoiTypes(DEFAULT_MAP_SETTINGS.filtering.visible_poi_types);
-  };
-};
-```
-
-### 10.4. Form Input Patterns
-
-**Controlled Input Components**:
-```typescript
-// Icon scaling controls
-<div className="space-y-4">
-  <div>
-    <label className="block text-sm font-medium text-night-700 mb-2">
-      Minimum Icon Size (px)
-    </label>
-    <input
-      type="number"
-      min="32"
-      max="256"
-      value={mapSettings.icon_scaling.min_size}
-      onChange={(e) => setMapSettings(prev => ({
-        ...prev,
-        icon_scaling: {
-          ...prev.icon_scaling,
-          min_size: parseInt(e.target.value) || 64
-        }
-      }))}
-      className="w-full px-3 py-2 border border-sand-300 rounded-md focus:outline-none focus:ring-2 focus:ring-spice-500"
-    />
-  </div>
-  
-  <div>
-    <label className="block text-sm font-medium text-night-700 mb-2">
-      Maximum Icon Size (px)
-    </label>
-    <input
-      type="number"
-      min="32"
-      max="256"
-      value={mapSettings.icon_scaling.max_size}
-      onChange={(e) => setMapSettings(prev => ({
-        ...prev,
-        icon_scaling: {
-          ...prev.icon_scaling,
-          max_size: parseInt(e.target.value) || 128
-        }
-      }))}
-      className="w-full px-3 py-2 border border-sand-300 rounded-md focus:outline-none focus:ring-2 focus:ring-spice-500"
-    />
-  </div>
-</div>
-
-// POI type visibility checkboxes
-<div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-  {poiTypes.map(type => (
-    <label key={type.id} className="flex items-center space-x-2 p-2 rounded-md hover:bg-sand-100">
-      <input
-        type="checkbox"
-        checked={visiblePoiTypes.length === 0 || visiblePoiTypes.includes(type.id)}
-        onChange={(e) => {
-          if (e.target.checked) {
-            setVisiblePoiTypes(prev => 
-              prev.length === 0 ? [type.id] : [...prev, type.id]
-            );
-          } else {
-            setVisiblePoiTypes(prev => prev.filter(id => id !== type.id));
-          }
-        }}
-        className="w-4 h-4 text-spice-600 border-sand-300 rounded focus:ring-spice-500"
-      />
-      <span className="text-sm text-night-700">{type.name}</span>
-    </label>
-  ))}
-</div>
-```
-
-### 10.5. Settings Application Patterns
-
-**Real-time Settings Usage**:
-```typescript
-// MapPOIMarker.tsx - Icon scaling implementation
-const MapPOIMarker: React.FC<MapPOIMarkerProps> = ({ poi, settings }) => {
-  const getIconSize = useCallback((zoomLevel: number): number => {
-    const { min_size, max_size, base_size } = settings?.icon_scaling || {
-      min_size: 64,
-      max_size: 128,
-      base_size: 64
-    };
-    
-    const size = base_size * zoomLevel;
-    return Math.max(min_size, Math.min(max_size, size));
-  }, [settings]);
-
-  const iconSize = getIconSize(zoomLevel);
-  
-  return (
-    <div
-      className={`absolute transform -translate-x-1/2 -translate-y-1/2 cursor-pointer transition-all duration-200 ${
-        settings?.interactions.enable_dragging ? 'hover:scale-110' : ''
-      }`}
-      style={{
-        left: `${(poi.coordinates_x / 4000) * 100}%`,
-        top: `${(poi.coordinates_y / 4000) * 100}%`,
-        width: `${iconSize}px`,
-        height: `${iconSize}px`
-      }}
-      onClick={settings?.interactions.enable_position_change ? handleClick : undefined}
-    >
-      {/* Icon rendering based on settings */}
-    </div>
-  );
-};
-
-// InteractiveMap.tsx - Settings integration
-const InteractiveMap: React.FC = () => {
-  const [settings, setSettings] = useState<MapSettings | null>(null);
-
-  useEffect(() => {
-    loadSettings();
-  }, []);
-
-  const loadSettings = async () => {
-    const { data } = await supabase
-      .from('app_settings')
-      .select('setting_value')
-      .eq('setting_key', 'map_settings')
-      .maybeSingle();
-
-    if (data?.setting_value) {
-      setSettings(data.setting_value as MapSettings);
-    }
-  };
-
-  return (
-    <TransformWrapper
-      initialScale={settings?.display.default_zoom_level || 1}
-      minScale={0.25}
-      maxScale={3}
-    >
-      {/* Map content with settings applied */}
-    </TransformWrapper>
-  );
-};
-```
-
-### 10.6. Performance Optimizations
-
-**Settings Caching Strategy**:
-```typescript
-// Global settings context for efficient sharing
-const SettingsContext = createContext<MapSettings | null>(null);
-
-export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [settings, setSettings] = useState<MapSettings | null>(null);
-
-  useEffect(() => {
-    // Load settings once at app level
-    loadSettings();
-    
-    // Optional: Subscribe to settings changes for multi-admin scenarios
-    const subscription = supabase
-      .channel('app_settings')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'app_settings',
-        filter: 'setting_key=eq.map_settings'
-      }, (payload) => {
-        if (payload.new?.setting_value) {
-          setSettings(payload.new.setting_value as MapSettings);
-        }
-      })
-      .subscribe();
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, []);
-
-  return (
-    <SettingsContext.Provider value={settings}>
-      {children}
-    </SettingsContext.Provider>
-  );
-};
-
-// Custom hook for accessing settings
-export const useMapSettings = () => {
-  const context = useContext(SettingsContext);
-  return context || DEFAULT_MAP_SETTINGS;
-};
-```
-
-### 10.7. Validation and Error Handling
-
-**Input Validation Patterns**:
-```typescript
-// Settings validation schema
-const validateMapSettings = (settings: Partial<MapSettings>): string[] => {
-  const errors: string[] = [];
-
-  if (settings.icon_scaling) {
-    const { min_size, max_size, base_size } = settings.icon_scaling;
-    
-    if (min_size && (min_size < 16 || min_size > 512)) {
-      errors.push('Minimum icon size must be between 16 and 512 pixels');
-    }
-    
-    if (max_size && (max_size < 16 || max_size > 512)) {
-      errors.push('Maximum icon size must be between 16 and 512 pixels');
-    }
-    
-    if (min_size && max_size && min_size > max_size) {
-      errors.push('Minimum icon size cannot be larger than maximum icon size');
-    }
-    
-    if (base_size && (base_size < min_size || base_size > max_size)) {
-      errors.push('Base icon size must be between minimum and maximum sizes');
-    }
-  }
-
-  if (settings.display?.default_zoom_level) {
-    const zoom = settings.display.default_zoom_level;
-    if (zoom < 0.25 || zoom > 3) {
-      errors.push('Default zoom level must be between 0.25 and 3');
-    }
-  }
-
-  return errors;
-};
-
-// Error handling in save function
-const saveMapSettings = async () => {
-  try {
-    const validationErrors = validateMapSettings(mapSettings);
-    if (validationErrors.length > 0) {
-      setErrorMessage(validationErrors.join(', '));
-      return;
-    }
-
-    setIsSavingSettings(true);
-    setErrorMessage('');
-
-    // Save operation...
-    
-    setSuccessMessage('Settings saved successfully!');
-    setTimeout(() => setSuccessMessage(''), 3000);
-  } catch (error) {
-    console.error('Error saving settings:', error);
-    setErrorMessage('Failed to save settings. Please try again.');
-  } finally {
-    setIsSavingSettings(false);
-  }
-};
-```
-
-This comprehensive admin settings management system provides a robust, scalable foundation for application configuration while maintaining the performance and security standards established throughout the platform.
-
-## 11. Map Initialization & Zoom Optimization System
-
-### 11.1. Map Loading Behavior Enhancement
-
-**Problem Solved**: Maps were visibly "jumping" or changing position during initial load, creating a jarring user experience.
-
-**Root Cause**: Maps loaded with `centerOnInit: true` but were immediately repositioned with manual `setTransform` calls in `setTimeout`, causing visual movement.
-
-**Solution**: Eliminated manual positioning and let the `react-zoom-pan-pinch` library handle proper centering automatically.
-
-### 11.2. Optimized Zoom Levels by Content Type
-
-**Standardized Zoom Configuration**:
-```typescript
-// Content-size-appropriate zoom levels
-const ZOOM_LEVELS = {
-  HAGGA_BASIN: 0.4,     // 4000x4000 pixel maps - provides good overview
-  DEEP_DESERT: 0.8      // 2000x2000 pixel screenshots - compensates for smaller size
-};
-
-// InteractiveMap.tsx (Hagga Basin)
-const mapConfig = getMapConfig(0.4);
-
-// GridPage.tsx (Deep Desert)
-initialScale={0.8}
-
-// InteractivePoiImage.tsx (Deep Desert screenshots)
-const getImageConfig = (initialScale: number = 0.8) => ({
-  initialScale,
-  centerOnInit: true,
-  // ... other config
-});
-```
-
-### 11.3. Implementation Details
-
-**Affected Components**:
-- `InteractiveMap.tsx`: Hagga Basin main map interface
-- `GridPage.tsx`: Deep Desert grid screenshot interface  
-- `InteractivePoiImage.tsx`: Reusable POI image component
-- `AdminPanel.tsx`: Removed zoom configuration (now standardized)
-
-**Key Changes**:
-1. **Eliminated Manual Positioning**: Removed all manual `setTransform` calls from `useEffect`, `handleImageLoad`, and `resetTransform` functions
-2. **Library-Native Centering**: Let `centerOnInit: true` handle proper viewport centering automatically
-3. **Admin Simplification**: Removed `defaultZoom` from `MapSettings` interface and admin UI
-4. **Type-Specific Defaults**: Hardcoded optimal zoom levels based on content dimensions
-
-### 11.4. Technical Benefits
-
-**Performance Improvements**:
-- Eliminated unnecessary `setTimeout` operations and manual positioning calculations
-- Reduced visual reflow and layout shifts during map initialization
-- Smoother loading experience with immediate proper positioning
-
-**Code Quality**:
-- Simplified implementation relying on library-native capabilities rather than fighting against them
-- Removed complex zoom configuration management from admin interface
-- Cleaner TypeScript interfaces with unnecessary properties removed
-
-**User Experience**:
-- Professional loading behavior without visual jumping or repositioning artifacts
-- Content-size-appropriate zoom levels provide immediate optimal viewing experience
-- Consistent initialization behavior across all map components
-
-### 11.5. Map Configuration Pattern
-
-**Standard Implementation Pattern**:
-```typescript
-// For large maps (4000x4000px)
-<TransformWrapper
-  initialScale={0.4}
-  centerOnInit={true}
-  // No manual setTransform calls
->
-
-// For smaller screenshots (2000x2000px)  
-<TransformWrapper
-  initialScale={0.8}
-  centerOnInit={true}
-  // No manual setTransform calls
->
-```
-
-**Anti-Pattern (Removed)**:
-```typescript
-// DON'T: Manual positioning that causes jumping
-useEffect(() => {
-  if (transformRef.current) {
-    setTimeout(() => {
-      transformRef.current?.setTransform(200, 200, scale); // Causes visual jump
-    }, 100);
-  }
-}, []);
-```
-
-This optimization ensures professional map loading behavior with type-appropriate zoom levels while simplifying the codebase and eliminating unnecessary configuration complexity.
-
-## Recent Technical Achievements
-
-### Custom Icon Display Fix (January 3, 2025)
-
-**Problem**: Custom icons displayed correctly in edit modals but reverted to default POI type icons (emojis) when shown on map components.
-
-**Root Cause**: Client-side data modification approach where POI modals temporarily overrode POI type data, but these changes didn't persist through database operations.
-
-**Solution Architecture**:
-1. **Database Enhancement**: Added `custom_icon_id uuid` column to `pois` table with foreign key to `custom_icons(id)` and `ON DELETE SET NULL`
-2. **Database-First Approach**: Replaced client-side overrides with persistent database storage
-3. **Icon Resolution Hierarchy**: Implemented priority system (POI custom → POI type custom → POI type URL → emoji)
-4. **Component Consistency**: Updated 8 components to use unified icon resolution logic
-
-**Files Modified**:
-- Database: `add_custom_icon_id_column.sql`
-- Types: `src/types/index.ts` - Added `custom_icon_id: string | null`
-- Map Components: `MapPOIMarker.tsx` - Enhanced `getDisplayImageUrl()`
-- Edit Components: `POIEditModal.tsx`, `POIPlacementModal.tsx` - Database persistence
-- Display Components: `HaggaBasinPoiCard.tsx`, `PoiCard.tsx`, `PoiList.tsx`, `GridSquareModal.tsx`
-
-**Technical Insight**: Database-first persistence ensures data integrity and consistency across all UI components, aligning with React's unidirectional data flow principles. 
+This pattern ensures that:
+- New grid squares are created properly
+- Existing grid squares are updated without constraint violations
+- Users can delete and re-upload screenshots without errors
+- Database integrity is maintained across all operations
+
+### Exploration Status Management
+
+The `is_explored` field is now managed consistently across all operations:
+- **Upload/Crop Operations**: Set `is_explored: true`
+- **Delete Operations**: Set `is_explored: false`
+- **Dashboard Integration**: Real-time updates via global event broadcasting 

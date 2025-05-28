@@ -16,6 +16,7 @@ import POIPanel from '../components/common/POIPanel';
 import { useAuth } from '../components/auth/AuthProvider';
 import ImageCropModal from '../components/grid/ImageCropModal';
 import { PixelCrop } from 'react-image-crop';
+import { broadcastExplorationChange } from '../lib/explorationEvents';
 
 // Grid validation: A1-I9 pattern
 const VALID_GRID_PATTERN = /^[A-I][1-9]$/;
@@ -877,7 +878,7 @@ const GridPage: React.FC = () => {
 
   // Handle crop completion and upload
   const handleCropComplete = async (croppedImageBlob: Blob, cropData: PixelCrop) => {
-    if (!tempImageFile || !user || !gridSquare) return;
+    if (!tempImageFile || !user) return;
 
     setUploading(true);
     setError(null);
@@ -919,10 +920,11 @@ const GridPage: React.FC = () => {
         height: Math.round(cropData.height)
       };
 
-      // Update grid square with both original and cropped URLs, plus crop metadata
+      // Use upsert to handle both existing and new grid squares
       const { data, error } = await supabase
         .from('grid_squares')
-        .update({
+        .upsert({
+          coordinate: gridId,
           screenshot_url: croppedUrlData.publicUrl,
           original_screenshot_url: originalUrlData.publicUrl,
           crop_x: roundedCropData.x,
@@ -932,9 +934,11 @@ const GridPage: React.FC = () => {
           crop_created_at: new Date().toISOString(),
           uploaded_by: user.id,
           upload_date: new Date().toISOString(),
+          updated_by: user.id,
           is_explored: true
+        }, {
+          onConflict: 'coordinate'
         })
-        .eq('id', gridSquare.id)
         .select()
         .single();
 
@@ -942,6 +946,14 @@ const GridPage: React.FC = () => {
 
       setGridSquare(data);
       console.log('Screenshot uploaded and cropped successfully');
+      
+      // Broadcast exploration status change globally
+      broadcastExplorationChange({
+        gridSquareId: data.id,
+        coordinate: data.coordinate,
+        isExplored: true,
+        source: 'crop'
+      });
       
       // Clean up
       setShowCropModal(false);
@@ -960,7 +972,7 @@ const GridPage: React.FC = () => {
 
   // Handle skipping crop (use original image)
   const handleSkipCrop = async () => {
-    if (!tempImageFile || !user || !gridSquare) return;
+    if (!tempImageFile || !user) return;
 
     setUploading(true);
     setError(null);
@@ -981,10 +993,11 @@ const GridPage: React.FC = () => {
         .from('screenshots')
         .getPublicUrl(fileName);
 
-      // Update grid square (no crop data, original and current URL are the same)
+      // Use upsert to handle both existing and new grid squares (no crop data, original and current URL are the same)
       const { data, error } = await supabase
         .from('grid_squares')
-        .update({
+        .upsert({
+          coordinate: gridId,
           screenshot_url: publicUrlData.publicUrl,
           original_screenshot_url: publicUrlData.publicUrl,
           crop_x: null,
@@ -994,9 +1007,11 @@ const GridPage: React.FC = () => {
           crop_created_at: null,
           uploaded_by: user.id,
           upload_date: new Date().toISOString(),
+          updated_by: user.id,
           is_explored: true
+        }, {
+          onConflict: 'coordinate'
         })
-        .eq('id', gridSquare.id)
         .select()
         .single();
 
@@ -1004,6 +1019,14 @@ const GridPage: React.FC = () => {
 
       setGridSquare(data);
       console.log('Screenshot uploaded successfully');
+      
+      // Broadcast exploration status change globally
+      broadcastExplorationChange({
+        gridSquareId: data.id,
+        coordinate: data.coordinate,
+        isExplored: true,
+        source: 'upload'
+      });
       
       // Clean up
       setShowCropModal(false);
@@ -1098,9 +1121,11 @@ const GridPage: React.FC = () => {
           crop_y: roundedCropData.y,
           crop_width: roundedCropData.width,
           crop_height: roundedCropData.height,
-          crop_created_at: new Date().toISOString()
+          crop_created_at: new Date().toISOString(),
+          updated_by: user.id,
+          is_explored: true
         })
-        .eq('id', gridSquare.id)
+        .eq('coordinate', gridId)
         .select()
         .single();
 
@@ -1108,6 +1133,14 @@ const GridPage: React.FC = () => {
 
       setGridSquare(data);
       console.log('Screenshot crop updated successfully');
+      
+      // Broadcast exploration status change globally
+      broadcastExplorationChange({
+        gridSquareId: data.id,
+        coordinate: data.coordinate,
+        isExplored: true,
+        source: 'recrop'
+      });
       
       // Clean up
       setShowCropModal(false);
@@ -1118,6 +1151,75 @@ const GridPage: React.FC = () => {
       setError(err.message);
     } finally {
       setUploading(false);
+    }
+  };
+
+  // Handle deleting screenshot from crop modal
+  const handleDeleteFromCrop = async () => {
+    if (!confirm('Are you sure you want to delete this screenshot?')) return;
+
+    try {
+      // Extract filename from URL to delete from storage
+      if (gridSquare?.screenshot_url) {
+        const url = new URL(gridSquare.screenshot_url);
+        const fileName = url.pathname.split('/').pop();
+        if (fileName) {
+          await supabase.storage
+            .from('screenshots')
+            .remove([fileName]);
+        }
+      }
+
+      // Also delete original if it's different
+      if (gridSquare?.original_screenshot_url && 
+          gridSquare.original_screenshot_url !== gridSquare.screenshot_url) {
+        const originalUrl = new URL(gridSquare.original_screenshot_url);
+        const originalFileName = originalUrl.pathname.split('/').pop();
+        if (originalFileName) {
+          await supabase.storage
+            .from('screenshots')
+            .remove([originalFileName]);
+        }
+      }
+
+      // Update grid square to remove screenshot reference and mark as not explored
+      const { data, error } = await supabase
+        .from('grid_squares')
+        .update({
+          screenshot_url: null,
+          original_screenshot_url: null,
+          crop_x: null,
+          crop_y: null,
+          crop_width: null,
+          crop_height: null,
+          crop_created_at: null,
+          uploaded_by: null,
+          upload_date: null,
+          updated_by: user?.id || null,
+          is_explored: false
+        })
+        .eq('coordinate', gridId)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setGridSquare(data);
+      console.log('Screenshot deleted successfully');
+      
+      // Broadcast exploration status change globally
+      broadcastExplorationChange({
+        gridSquareId: data.id,
+        coordinate: data.coordinate,
+        isExplored: false,
+        source: 'upload'
+      });
+      
+      // Close the crop modal
+      handleCloseCropModal();
+    } catch (err: any) {
+      console.error('Error deleting screenshot:', err);
+      setError(err.message);
     }
   };
 
@@ -2185,6 +2287,7 @@ const GridPage: React.FC = () => {
             uploaded_by: s.uploaded_by,
             upload_date: s.upload_date,
             created_at: s.upload_date,
+            updated_by: s.uploaded_by, // Use same as uploaded_by for POI screenshots
             crop_x: 0, // Default crop values for POI screenshots
             crop_y: 0,
             crop_width: 2000, // Default dimensions
@@ -2211,6 +2314,7 @@ const GridPage: React.FC = () => {
           onCropComplete={isEditingExisting ? handleRecropComplete : handleCropComplete}
           onClose={handleCloseCropModal}
           onSkip={isEditingExisting ? undefined : handleSkipCrop}
+          onDelete={isEditingExisting ? handleDeleteFromCrop : undefined}
           title={isEditingExisting ? 'Edit Screenshot Crop' : 'Crop Your Screenshot'}
           defaultToSquare={true}
           initialCrop={

@@ -11,6 +11,7 @@ import {
   Mountain,
   Waves
 } from 'lucide-react';
+import { useExplorationChangeListener } from '../../lib/explorationEvents';
 
 const StatisticsCards: React.FC = () => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -90,6 +91,12 @@ const StatisticsCards: React.FC = () => {
   useEffect(() => {
     fetchStatistics();
   }, []);
+
+  // Listen for exploration status changes
+  useExplorationChangeListener((details) => {
+    console.log('StatisticsCards: Received exploration change:', details);
+    fetchStatistics(); // Refresh statistics when exploration status changes
+  });
 
   if (isLoading) {
     return (

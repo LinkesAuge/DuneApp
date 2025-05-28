@@ -4,7 +4,7 @@
 
 The Dune Awakening Deep Desert Tracker is a **production-ready** web application built with React (TypeScript) on the frontend and Supabase for backend services (Authentication, Database, Storage). The application provides comprehensive exploration tracking across multiple game regions: a grid-based map system for the Deep Desert region and an interactive coordinate-based map system for the Hagga Basin region.
 
-**Status**: **100% COMPLETE & VERIFIED** - All architectural components are fully implemented, tested, and operationally verified. Final POI filter system bugs resolved January 3, 2025.
+**Status**: **100% COMPLETE & VERIFIED** - All architectural components are fully implemented, tested, and operationally verified. Latest UI/UX polish and screenshot management enhancement completed January 27, 2025.
 
 ## 2. Components and Layers
 
@@ -19,6 +19,9 @@ flowchart TD
         ADM[Admin Panel Components + Settings] --> P
         COL[POI Collections & Sharing] --> P
         SETTINGS[Map Settings Management] --> P
+        META[Compact Metadata Layout] --> P
+        GRAMMAR[Grammar Correction System] --> P
+        SS_MGT[Enhanced Screenshot Management] --> P
     end
 
     subgraph "Frontend Logic (TypeScript) - COMPLETE ✅"
@@ -30,6 +33,9 @@ flowchart TD
         COORD[Coordinate Conversion Utils]
         ZOOM[Zoom/Pan Logic react-zoom-pan-pinch + Optimized Initialization]
         ADMIN_LOGIC[Admin Settings State Management (Simplified)]
+        EVENTS[Global Event Broadcasting System]
+        DATE_UTILS[Date Grammar Utilities]
+        UPSERT[Database UPSERT Safety Logic]
     end
 
     subgraph "Backend Services (Supabase) - COMPLETE ✅"
@@ -198,6 +204,45 @@ flowchart TD
 2.  **User Interaction**: Admin modifies settings via controlled form components.
 3.  **State Management**: React state maintains current form values with validation.
 4.  **Save Operation**: Admin clicks save, triggering database upsert to `app_settings`.
+
+### 3.3. Enhanced Screenshot Management Flow - **NEW & COMPLETE ✅**
+1.  **Upload Operations**: Use UPSERT with conflict resolution to prevent duplicate key violations
+2.  **Exploration Tracking**: Automatic `is_explored` status updates during all screenshot operations
+3.  **File Management**: Comprehensive cleanup of both original and cropped files during deletion
+4.  **Event Broadcasting**: Global custom events notify dashboard components of exploration changes
+5.  **UI Synchronization**: Real-time updates across all interface components
+
+### 3.4. Grammar Correction Flow - **NEW & COMPLETE ✅**
+1.  **Date Processing**: `formatDateWithPreposition()` utility detects relative vs absolute time
+2.  **Grammar Application**: Smart preposition usage based on time format detection
+3.  **Component Integration**: Consistent application across all metadata display components
+4.  **Professional Standards**: Maintains grammatical accuracy in all user-facing text
+
+## 4. Latest Architecture Enhancements - **COMPLETED January 27, 2025** ✅
+
+### 4.1. UI/UX Polish Architecture
+- **Compact Layout System**: Standardized single-line metadata layouts using `flex justify-between`
+- **Component Consistency**: 6 core components updated with uniform spacing and sizing patterns
+- **Professional Information Density**: Optimized horizontal space utilization while maintaining readability
+- **Visual Hierarchy**: Enhanced with consistent `text-xs` sizing and `gap-1` spacing throughout
+
+### 4.2. Screenshot Management Architecture
+- **UPSERT Safety Layer**: Database operations use conflict resolution to prevent constraint violations
+- **File Lifecycle Management**: Comprehensive tracking and cleanup of screenshot files and originals
+- **Exploration State Engine**: Automatic synchronization of exploration status across all operations
+- **Real-time Event Architecture**: Custom browser events enable immediate cross-component updates
+
+### 4.3. Database Integrity Architecture
+- **Conflict Resolution System**: All grid square operations handle existing/new records safely
+- **State Consistency Engine**: Local and database state remain synchronized across operations
+- **Error Prevention Layer**: Proactive constraint handling prevents user-facing operation failures
+- **Transaction Safety**: Atomic operations ensure data integrity during complex workflows
+
+### 4.4. Enhanced User Experience Architecture
+- **Grammar Intelligence System**: Smart detection and correction of date/time grammar patterns
+- **Professional Text Standards**: Consistent grammatical accuracy across all user-facing content
+- **Visual Polish Framework**: Clean, modern interface with attention to professional detail
+- **Information Optimization**: Maximum screen space efficiency with maintained functionality
 5.  **Real-time Application**: Settings changes apply immediately across the application.
 6.  **Reset Functionality**: Admin can reset to defaults, clearing custom settings.
 

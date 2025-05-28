@@ -481,6 +481,10 @@ const GridContainer: React.FC = () => {
           onImageClick={(square) => handleGalleryOpen(square)}
           onPoiGalleryOpen={handlePoiGalleryOpen}
           onPoiSuccessfullyAdded={fetchPoisOnly} // Pass the new callback
+          onExplorationStatusChanged={() => {
+            // Trigger a re-fetch of grid squares to update exploration status
+            fetchInitialData();
+          }}
         />
       )}
 

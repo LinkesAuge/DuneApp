@@ -8,7 +8,7 @@ import EmojiTextArea from '../common/EmojiTextArea';
 import { uploadImage, deleteImage, extractPathFromUrl } from '../../lib/imageUpload';
 import ImageCropModal from '../grid/ImageCropModal';
 import { PixelCrop } from 'react-image-crop';
-import { formatCompactDateTime, wasUpdated } from '../../lib/dateUtils';
+import { formatCompactDateTime, wasUpdated, formatDateWithPreposition } from '../../lib/dateUtils';
 
 interface CommentItemProps {
   comment: CommentWithUser;
@@ -409,7 +409,10 @@ const CommentItem: React.FC<CommentItemProps> = ({
             <div className="flex items-center gap-1">
               <User className="w-3 h-3" />
               <span>
-                Posted by {loadingUserInfo ? '...' : (creatorInfo?.username || 'Unknown')} on {formatCompactDateTime(comment.created_at)}
+                Posted by {loadingUserInfo ? '...' : (creatorInfo?.username || 'Unknown')} {(() => {
+                  const { date, useOn } = formatDateWithPreposition(comment.created_at);
+                  return useOn ? `on ${date}` : date;
+                })()}
               </span>
             </div>
             
@@ -422,7 +425,10 @@ const CommentItem: React.FC<CommentItemProps> = ({
                     comment.updated_by && editorInfo?.username 
                       ? `by ${editorInfo.username} `
                       : ''
-                  )}on {formatCompactDateTime(comment.updated_at)}
+                  )}{(() => {
+                    const { date, useOn } = formatDateWithPreposition(comment.updated_at);
+                    return useOn ? `on ${date}` : date;
+                  })()}
                 </span>
               </div>
             )}

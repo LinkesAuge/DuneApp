@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Eye, Target, Grid3X3 } from 'lucide-react';
+import { useExplorationChangeListener } from '../../lib/explorationEvents';
 
 interface ExplorationData {
   totalGridSquares: number;
@@ -56,6 +57,12 @@ const ExplorationProgress: React.FC = () => {
   useEffect(() => {
     fetchExplorationData();
   }, []);
+
+  // Listen for exploration status changes
+  useExplorationChangeListener((details) => {
+    console.log('ExplorationProgress: Received exploration change:', details);
+    fetchExplorationData(); // Refresh data when exploration status changes
+  });
 
   if (isLoading) {
     return (

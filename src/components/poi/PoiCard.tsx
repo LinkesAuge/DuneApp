@@ -241,7 +241,10 @@ const PoiCard: React.FC<PoiCardProps> = ({
           <div className="flex items-center">
             <User className="w-3 h-3 mr-1.5" />
             <span>
-              Created by {creator?.username || 'Unknown'} on {formatCompactDateTime(poi.created_at)}
+              Created by {creator?.username || 'Unknown'} {(() => {
+                const { date, useOn } = formatDateWithPreposition(poi.created_at);
+                return useOn ? `on ${date}` : date;
+              })()}
             </span>
           </div>
           
@@ -250,7 +253,10 @@ const PoiCard: React.FC<PoiCardProps> = ({
             <div className="flex items-center">
               <Clock className="w-3 h-3 mr-1.5" />
               <span>
-                Edited on {formatCompactDateTime(poi.updated_at)}
+                Edited {(() => {
+                  const { date, useOn } = formatDateWithPreposition(poi.updated_at);
+                  return useOn ? `on ${date}` : date;
+                })()}
               </span>
             </div>
           )}

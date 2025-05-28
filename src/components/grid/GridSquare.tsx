@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { GridSquare as GridSquareType, Poi, PoiType } from '../../types';
-import { CheckCircle, ImageOff } from 'lucide-react';
+import { ImageOff } from 'lucide-react';
 
 interface GridSquareProps {
   square: GridSquareType;
@@ -110,12 +110,7 @@ const GridSquare: React.FC<GridSquareProps> = ({ square, poisToDisplay = [], poi
         </div>
       )}
       
-      {/* Exploration indicator */}
-      {square.is_explored && (
-        <div className="absolute top-2 right-2 z-10">
-          <CheckCircle size={20} className="text-green-500 drop-shadow-md" />
-        </div>
-      )}
+
 
       {/* POI Type Icons */}
       {poiTypeDetails.length > 0 && (

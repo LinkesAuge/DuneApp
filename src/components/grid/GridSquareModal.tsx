@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { GridSquare as GridSquareType, Poi, PoiType, CustomIcon } from '../../types';
 import { useAuth } from '../auth/AuthProvider';
-import { Upload, X, Plus, Check, Image, Trash2, Clock, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Target, Edit } from 'lucide-react';
+import { Upload, X, Plus, Image, Trash2, Clock, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Target, Edit } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import PoiList from '../poi/PoiList';
 import AddPoiForm from '../poi/AddPoiForm';
@@ -11,6 +11,7 @@ import PoiControlPanel from '../common/PoiControlPanel';
 import InteractivePoiImage from '../common/InteractivePoiImage';
 import ImageCropModal from './ImageCropModal';
 import { PixelCrop } from 'react-image-crop';
+import { broadcastExplorationChange } from '../../lib/explorationEvents';
 
 interface GridSquareModalProps {
   square: GridSquareType;
@@ -19,6 +20,7 @@ interface GridSquareModalProps {
   onImageClick: (square: GridSquareType) => void;
   onPoiGalleryOpen?: (poi: Poi) => void;
   onPoiSuccessfullyAdded?: () => void;
+  onExplorationStatusChanged?: () => void;
 }
 
 const GRID_SIZE = 9;
@@ -29,7 +31,8 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
   onUpdate, 
   onImageClick,
   onPoiGalleryOpen,
-  onPoiSuccessfullyAdded
+  onPoiSuccessfullyAdded,
+  onExplorationStatusChanged
 }) => {
   const { user } = useAuth();
   const [isUploading, setIsUploading] = useState(false);
@@ -235,28 +238,7 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
     }
   };
 
-  const handleExplorationToggle = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('grid_squares')
-        .update({ 
-          is_explored: !currentSquare.is_explored,
-          exploration_date: !currentSquare.is_explored ? new Date().toISOString() : null
-        })
-        .eq('id', currentSquare.id)
-        .select()
-        .single();
 
-      if (error) throw error;
-
-      setCurrentSquare(data);
-      onUpdate(data);
-      setSuccess(`Grid marked as ${data.is_explored ? 'explored' : 'unexplored'}`);
-    } catch (err: any) {
-      console.error('Error updating exploration status:', err);
-      setError(err.message);
-    }
-  };
 
   const handleScreenshotUpload = () => {
     fileInputRef.current?.click();
@@ -337,7 +319,8 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
       // Update grid square with both original and cropped URLs, plus crop metadata
       const { data, error } = await supabase
         .from('grid_squares')
-        .update({
+        .upsert({
+          coordinate: currentSquare.coordinate,
           screenshot_url: croppedUrlData.publicUrl,
           original_screenshot_url: originalUrlData.publicUrl,
           crop_x: roundedCropData.x,
@@ -348,8 +331,9 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
           uploaded_by: user.id,
           upload_date: new Date().toISOString(),
           is_explored: true
+        }, {
+          onConflict: 'coordinate'
         })
-        .eq('coordinate', currentSquare.coordinate)
         .select()
         .single();
 
@@ -358,6 +342,19 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
       setCurrentSquare(data);
       onUpdate(data);
       setSuccess('Screenshot uploaded and cropped successfully');
+      
+      // Broadcast exploration status change globally
+      broadcastExplorationChange({
+        gridSquareId: data.id,
+        coordinate: data.coordinate,
+        isExplored: true,
+        source: 'crop'
+      });
+      
+      // Notify about exploration status change
+      if (onExplorationStatusChanged) {
+        onExplorationStatusChanged();
+      }
       
       // Clean up
       setShowCropModal(false);
@@ -400,7 +397,8 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
       // Update grid square (no crop data, original and current URL are the same)
       const { data, error } = await supabase
         .from('grid_squares')
-        .update({
+        .upsert({
+          coordinate: currentSquare.coordinate,
           screenshot_url: publicUrlData.publicUrl,
           original_screenshot_url: publicUrlData.publicUrl,
           crop_x: null,
@@ -409,9 +407,11 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
           crop_height: null,
           crop_created_at: null,
           uploaded_by: user.id,
-          upload_date: new Date().toISOString()
+          upload_date: new Date().toISOString(),
+          is_explored: true
+        }, {
+          onConflict: 'coordinate'
         })
-        .eq('id', currentSquare.id)
         .select()
         .single();
 
@@ -420,6 +420,19 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
       setCurrentSquare(data);
       onUpdate(data);
       setSuccess('Screenshot uploaded successfully!');
+      
+      // Broadcast exploration status change globally
+      broadcastExplorationChange({
+        gridSquareId: data.id,
+        coordinate: data.coordinate,
+        isExplored: true,
+        source: 'upload'
+      });
+      
+      // Notify about exploration status change
+      if (onExplorationStatusChanged) {
+        onExplorationStatusChanged();
+      }
       
       // Clean up
       setShowCropModal(false);
@@ -514,7 +527,8 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
           crop_y: roundedCropData.y,
           crop_width: roundedCropData.width,
           crop_height: roundedCropData.height,
-          crop_created_at: new Date().toISOString()
+          crop_created_at: new Date().toISOString(),
+          is_explored: true
         })
         .eq('coordinate', currentSquare.coordinate)
         .select()
@@ -525,6 +539,19 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
       setCurrentSquare(data);
       onUpdate(data);
       setSuccess('Screenshot crop updated successfully');
+      
+      // Broadcast exploration status change globally
+      broadcastExplorationChange({
+        gridSquareId: data.id,
+        coordinate: data.coordinate,
+        isExplored: true,
+        source: 'recrop'
+      });
+      
+      // Notify about exploration status change
+      if (onExplorationStatusChanged) {
+        onExplorationStatusChanged();
+      }
       
       // Clean up
       setShowCropModal(false);
@@ -564,13 +591,14 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
         }
       }
 
-      // Update grid square to remove screenshot reference
+      // Update grid square to remove screenshot reference and mark as not explored
       const { data, error } = await supabase
         .from('grid_squares')
         .update({
           screenshot_url: null,
           uploaded_by: null,
-          upload_date: null
+          upload_date: null,
+          is_explored: false
         })
         .eq('id', currentSquare.id)
         .select()
@@ -581,6 +609,14 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
       setCurrentSquare(data);
       onUpdate(data);
       setSuccess('Screenshot deleted successfully');
+      
+      // Broadcast exploration status change globally
+      broadcastExplorationChange({
+        gridSquareId: data.id,
+        coordinate: data.coordinate,
+        isExplored: false,
+        source: 'upload'
+      });
     } catch (err: any) {
       console.error('Error deleting screenshot:', err);
       setError(err.message);
@@ -673,6 +709,75 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
   const handleImageClick = (e: React.MouseEvent) => {
     if (!placementMode) {
       onImageClick(currentSquare);
+    }
+  };
+
+  // Handle deleting screenshot from crop modal
+  const handleDeleteFromCrop = async () => {
+    if (!confirm('Are you sure you want to delete this screenshot?')) return;
+
+    try {
+      // Extract filename from URL to delete from storage
+      if (currentSquare.screenshot_url) {
+        const url = new URL(currentSquare.screenshot_url);
+        const fileName = url.pathname.split('/').pop();
+        if (fileName) {
+          await supabase.storage
+            .from('screenshots')
+            .remove([fileName]);
+        }
+      }
+
+      // Also delete original if it's different
+      if (currentSquare.original_screenshot_url && 
+          currentSquare.original_screenshot_url !== currentSquare.screenshot_url) {
+        const originalUrl = new URL(currentSquare.original_screenshot_url);
+        const originalFileName = originalUrl.pathname.split('/').pop();
+        if (originalFileName) {
+          await supabase.storage
+            .from('screenshots')
+            .remove([originalFileName]);
+        }
+      }
+
+      // Update grid square to remove screenshot reference and mark as not explored
+      const { data, error } = await supabase
+        .from('grid_squares')
+        .update({
+          screenshot_url: null,
+          original_screenshot_url: null,
+          crop_x: null,
+          crop_y: null,
+          crop_width: null,
+          crop_height: null,
+          crop_created_at: null,
+          uploaded_by: null,
+          upload_date: null,
+          is_explored: false
+        })
+        .eq('id', currentSquare.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setCurrentSquare(data);
+      onUpdate(data);
+      setSuccess('Screenshot deleted successfully');
+      
+      // Broadcast exploration status change globally
+      broadcastExplorationChange({
+        gridSquareId: data.id,
+        coordinate: data.coordinate,
+        isExplored: false,
+        source: 'upload'
+      });
+      
+      // Close the crop modal
+      handleCloseCropModal();
+    } catch (err: any) {
+      console.error('Error deleting screenshot:', err);
+      setError(err.message);
     }
   };
 
@@ -814,23 +919,7 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
                     </button>
                   )}
                   
-                  <button
-                    onClick={handleExplorationToggle}
-                    className={`flex items-center text-sm px-4 py-2 rounded-full transition-colors ${
-                      currentSquare.is_explored 
-                        ? 'bg-green-600 text-white hover:bg-green-700 shadow-md' 
-                        : 'bg-night-800 text-white hover:bg-night-900 shadow-md'
-                    }`}
-                  >
-                    {currentSquare.is_explored ? (
-                      <>
-                        <Check size={16} className="mr-1.5" />
-                        Explored
-                      </>
-                    ) : (
-                      'Mark as Explored'
-                    )}
-                  </button>
+
                   
                   {canUpdateScreenshot && (
                     <button
@@ -1001,6 +1090,7 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
           onCropComplete={isEditingExisting ? handleRecropComplete : handleCropComplete}
           onClose={handleCloseCropModal}
           onSkip={isEditingExisting ? undefined : handleSkipCrop}
+          onDelete={isEditingExisting ? handleDeleteFromCrop : undefined}
           title={isEditingExisting ? 'Edit Screenshot Crop' : 'Crop Your Screenshot'}
           defaultToSquare={true}
           initialCrop={

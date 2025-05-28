@@ -5,12 +5,13 @@ import 'react-image-crop/dist/ReactCrop.css';
 
 interface ImageCropModalProps {
   imageUrl: string;
-  onCropComplete: (croppedImageBlob: Blob, cropData: PixelCrop) => void;
+  onCropComplete: (croppedImageBlob: Blob, cropData: PixelCrop) => Promise<void>;
   onClose: () => void;
   onSkip?: () => void;
+  onDelete?: () => Promise<void>;
   title?: string;
-  initialCrop?: PixelCrop;
   defaultToSquare?: boolean;
+  initialCrop?: PixelCrop;
 }
 
 const ImageCropModal: React.FC<ImageCropModalProps> = ({
@@ -18,6 +19,7 @@ const ImageCropModal: React.FC<ImageCropModalProps> = ({
   onCropComplete,
   onClose,
   onSkip,
+  onDelete,
   title = "Crop Your Screenshot",
   initialCrop,
   defaultToSquare = false
@@ -173,7 +175,7 @@ const ImageCropModal: React.FC<ImageCropModalProps> = ({
       const croppedBlob = await generateCroppedImage();
       if (croppedBlob) {
         console.log('Crop successful, blob size:', croppedBlob.size);
-        onCropComplete(croppedBlob, completedCrop);
+        await onCropComplete(croppedBlob, completedCrop);
       } else {
         throw new Error('Failed to generate cropped image blob');
       }
@@ -406,7 +408,25 @@ const ImageCropModal: React.FC<ImageCropModalProps> = ({
             )}
           </div>
           
-          <div className="flex gap-3">
+                      <div className="flex gap-3">
+              {onDelete && (
+                <button
+                  onClick={async () => {
+                    setIsProcessing(true);
+                    try {
+                      await onDelete();
+                    } catch (error) {
+                      console.error('Error deleting screenshot:', error);
+                    } finally {
+                      setIsProcessing(false);
+                    }
+                  }}
+                  disabled={isProcessing}
+                  className="px-4 py-2 text-red-600 hover:text-red-800 font-medium transition-colors disabled:opacity-50"
+                >
+                  {isProcessing ? 'Deleting...' : 'Delete'}
+                </button>
+              )}
             <button
               onClick={onClose}
               className="px-4 py-2 border border-sand-300 text-sand-700 rounded hover:bg-sand-50 transition-colors"

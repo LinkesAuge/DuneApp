@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase';
 import StatCard from './StatCard';
 import CategoryBreakdown from './CategoryBreakdown';
 import { MapPin, TrendingUp, Activity, Users } from 'lucide-react';
+import { useExplorationChangeListener } from '../../lib/explorationEvents';
 
 interface CategoryData {
   name: string;
@@ -67,6 +68,12 @@ const RegionalStatsPanel: React.FC<RegionalStatsPanelProps> = ({
   useEffect(() => {
     fetchRegionalStats();
   }, [region]);
+
+  // Listen for exploration status changes
+  useExplorationChangeListener((details) => {
+    console.log('RegionalStatsPanel: Received exploration change:', details);
+    fetchRegionalStats(); // Refresh regional statistics when exploration status changes
+  });
 
   const fetchRegionalStats = async () => {
     try {
