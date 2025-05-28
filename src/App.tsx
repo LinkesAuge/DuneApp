@@ -16,12 +16,12 @@ import { AlertTriangle } from 'lucide-react';
 const PendingApprovalMessage: React.FC = () => (
   <div className="min-h-[60vh] flex items-center justify-center">
     <div className="text-center max-w-lg mx-auto p-8">
-      <AlertTriangle className="w-16 h-16 text-amber-500 mx-auto mb-4" />
-      <h2 className="text-2xl font-bold text-night-800 mb-3">Pending Approval</h2>
-      <p className="text-night-600 mb-2">
+      <AlertTriangle className="w-16 h-16 text-gold-500 mx-auto mb-4" />
+      <h2 className="text-2xl font-bold text-gold-100 mb-3">Pending Approval</h2>
+      <p className="text-gold-200 mb-2">
         Your account is currently pending approval from an administrator.
       </p>
-      <p className="text-night-500 text-sm">
+      <p className="text-gold-300 text-sm">
         You'll gain full access to all features once your account is approved.
       </p>
     </div>
@@ -140,7 +140,15 @@ function App() {
   return (
     <AuthProvider>
       <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-        <div className="min-h-screen flex flex-col bg-sand-100">
+        <div 
+          className="min-h-screen flex flex-col bg-center bg-cover bg-no-repeat"
+          style={{
+            backgroundImage: 'url(/images/main-bg.jpg)',
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundAttachment: 'fixed'
+          }}
+        >
           <Navbar />
           <main className="flex-1">
             <AppRoutes />

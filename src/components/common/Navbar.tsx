@@ -18,32 +18,97 @@ const Navbar: React.FC = () => {
     icon: React.ReactNode;
     isActive: boolean;
     onClick?: () => void;
-    className?: string;
-  }> = ({ to, children, icon, isActive, onClick, className = '' }) => (
+  }> = ({ to, children, icon, isActive, onClick }) => (
     <Link
       to={to}
       onClick={onClick}
-      className={`
-        relative px-4 py-2.5 rounded-full text-sm font-bold transition-all duration-300 transform
-        ${isActive 
-          ? 'bg-gradient-to-r from-spice-500 to-spice-700 text-white shadow-xl shadow-spice-600/40 scale-105 border-2 border-spice-400' 
-          : 'text-sand-100 hover:text-white hover:bg-gradient-to-r hover:from-spice-500/70 hover:to-spice-600/70 hover:scale-105 hover:shadow-lg border-2 border-transparent hover:border-spice-400/40'
-        }
-        backdrop-blur-md ${className}
-      `}
+      className="group relative flex items-center h-16 px-4 min-w-[140px] justify-center transition-all duration-300"
     >
-      <div className="flex items-center space-x-2">
-        <span className={`transition-all duration-300 ${isActive ? 'text-white' : 'text-sand-300 group-hover:text-white'}`}>
+      {/* Button background image */}
+      <div 
+        className="absolute inset-0 bg-center bg-cover bg-no-repeat"
+        style={{
+          backgroundImage: 'url(/images/bg-button.png)',
+          backgroundSize: 'cover'
+        }}
+      />
+      
+      {/* Advanced purple overlay - fades from top, to sides and bottom */}
+      <div className={`
+        absolute inset-0 transition-all duration-300
+        ${isActive 
+          ? 'bg-gradient-to-b from-violet-600/50 via-violet-700/30 to-transparent' 
+          : 'bg-gradient-to-b from-violet-600/0 via-violet-700/0 to-transparent group-hover:from-violet-600/40 group-hover:via-violet-700/20'
+        }
+      `} />
+      
+      {/* Radial fade overlay for sides */}
+      <div className={`
+        absolute inset-0 transition-all duration-300
+        ${isActive 
+          ? 'bg-gradient-radial from-violet-500/20 via-violet-600/10 to-transparent' 
+          : 'bg-gradient-radial from-transparent via-transparent to-transparent group-hover:from-violet-500/15 group-hover:via-violet-600/8'
+        }
+      `} 
+      style={{
+        background: isActive 
+          ? 'radial-gradient(ellipse at center top, rgba(139, 92, 246, 0.2) 0%, rgba(124, 58, 237, 0.1) 40%, transparent 70%)'
+          : undefined
+      }}
+      />
+      
+      {/* Content */}
+      <div className="relative z-10 flex items-center space-x-2">
+        <span className={`
+          transition-all duration-300
+          ${isActive ? 'text-amber-200 drop-shadow-lg' : 'text-amber-300 group-hover:text-amber-100 group-hover:drop-shadow-lg'}
+        `}
+        style={{
+          textShadow: isActive ? '0 0 8px rgba(251, 191, 36, 0.6)' : undefined
+        }}
+        onMouseEnter={(e) => {
+          if (!isActive) {
+            e.currentTarget.style.textShadow = '0 0 12px rgba(251, 191, 36, 0.8)';
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (!isActive) {
+            e.currentTarget.style.textShadow = 'none';
+          }
+        }}
+        >
           {icon}
         </span>
-        <span className="font-bold">{children}</span>
+        <span className={`
+          font-light text-xs uppercase tracking-widest transition-all duration-300 whitespace-nowrap
+          ${isActive ? 'text-amber-100 drop-shadow-lg' : 'text-amber-200 group-hover:text-amber-50 group-hover:drop-shadow-lg'}
+        `}
+        style={{
+          textShadow: isActive ? '0 0 8px rgba(251, 191, 36, 0.6)' : undefined
+        }}
+        onMouseEnter={(e) => {
+          if (!isActive) {
+            e.currentTarget.style.textShadow = '0 0 12px rgba(251, 191, 36, 0.8)';
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (!isActive) {
+            e.currentTarget.style.textShadow = 'none';
+          }
+        }}
+        >
+          {children}
+        </span>
       </div>
-      {isActive && (
-        <>
-          <div className="absolute inset-0 rounded-full bg-gradient-to-r from-spice-400 via-spice-600 to-spice-800 opacity-90 -z-10 animate-pulse"></div>
-          <div className="absolute -inset-1 rounded-full bg-gradient-to-r from-spice-300 to-spice-700 opacity-20 blur-sm -z-20"></div>
-        </>
-      )}
+      
+      {/* Sleek expanding underline */}
+      <div className={`
+        absolute bottom-1 left-0 transition-all duration-700 ease-out h-0.5 bg-gradient-to-r from-transparent to-transparent
+        ${isActive 
+          ? 'w-full via-yellow-300 shadow-md shadow-yellow-300/60' 
+          : 'w-0 via-violet-400 group-hover:w-full group-hover:shadow-md group-hover:shadow-violet-400/50'
+        }
+      `} />
     </Link>
   );
 
@@ -57,101 +122,169 @@ const Navbar: React.FC = () => {
     <Link
       to={to}
       onClick={onClick}
-      className={`
-        block px-4 py-3 rounded-xl text-base font-bold transition-all duration-300 transform
-        ${isActive 
-          ? 'bg-gradient-to-r from-spice-500 to-spice-700 text-white shadow-lg mx-3 scale-105' 
-          : 'text-sand-100 hover:text-white hover:bg-gradient-to-r hover:from-spice-500/70 hover:to-spice-600/70 hover:translate-x-2 hover:scale-105 mx-3'
-        }
-        backdrop-blur-sm border-2 border-transparent hover:border-spice-400/40
-      `}
+      className="group relative flex items-center px-4 py-4 mx-4 mb-2 transition-all duration-300"
     >
-      <div className="flex items-center space-x-3">
-        <span className={`transition-all duration-300 ${isActive ? 'text-white' : 'text-sand-300'}`}>
+      {/* Mobile button background image */}
+      <div 
+        className="absolute inset-0 bg-center bg-cover bg-no-repeat opacity-70"
+        style={{
+          backgroundImage: 'url(/images/bg-button.png)',
+          backgroundSize: 'cover'
+        }}
+      />
+      
+      {/* Purple overlay with advanced fading */}
+      <div className={`
+        absolute inset-0 transition-all duration-300
+        ${isActive 
+          ? 'bg-gradient-to-b from-violet-600/40 via-violet-700/20 to-transparent' 
+          : 'bg-gradient-to-b from-violet-600/0 via-violet-700/0 to-transparent group-hover:from-violet-600/30 group-hover:via-violet-700/15'
+        }
+      `} />
+      
+      {/* Content */}
+      <div className="relative z-10 flex items-center space-x-3">
+        <span className={`
+          transition-all duration-300
+          ${isActive ? 'text-amber-200 drop-shadow-lg' : 'text-amber-300 group-hover:text-amber-100 group-hover:drop-shadow-lg'}
+        `}
+        style={{
+          textShadow: isActive ? '0 0 8px rgba(251, 191, 36, 0.6)' : undefined
+        }}
+        onMouseEnter={(e) => {
+          if (!isActive) {
+            e.currentTarget.style.textShadow = '0 0 12px rgba(251, 191, 36, 0.8)';
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (!isActive) {
+            e.currentTarget.style.textShadow = 'none';
+          }
+        }}
+        >
           {icon}
         </span>
-        <span>{children}</span>
+        <span className={`
+          font-light text-sm uppercase tracking-wide transition-all duration-300
+          ${isActive ? 'text-amber-100 drop-shadow-lg' : 'text-amber-200 group-hover:text-amber-50 group-hover:drop-shadow-lg'}
+        `}
+        style={{
+          textShadow: isActive ? '0 0 8px rgba(251, 191, 36, 0.6)' : undefined
+        }}
+        onMouseEnter={(e) => {
+          if (!isActive) {
+            e.currentTarget.style.textShadow = '0 0 12px rgba(251, 191, 36, 0.8)';
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (!isActive) {
+            e.currentTarget.style.textShadow = 'none';
+          }
+        }}
+        >
+          {children}
+        </span>
       </div>
+      
+      {/* Sleek expanding underline for mobile */}
+      <div className={`
+        absolute bottom-0 left-0 transition-all duration-700 ease-out h-0.5 bg-gradient-to-r from-transparent to-transparent
+        ${isActive 
+          ? 'w-full via-yellow-300 shadow-sm shadow-yellow-300/60' 
+          : 'w-0 via-violet-400 group-hover:w-full group-hover:shadow-sm group-hover:shadow-violet-400/50'
+        }
+      `} />
     </Link>
   );
 
   return (
-    <nav className="relative z-50 text-white overflow-hidden">
-      {/* Enhanced Background with Patterns */}
-      <div className="absolute inset-0 bg-gradient-to-r from-night-950 via-night-900 to-night-950"></div>
-      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-night-800/20 to-night-950/40"></div>
+    <nav className="relative z-50 border-b border-slate-700/30">
+      {/* Navbar background image */}
+      <div 
+        className="absolute inset-0 bg-center bg-cover bg-no-repeat"
+        style={{
+          backgroundImage: 'url(/images/navbar-color.png?v=' + Date.now() + ')',
+          backgroundSize: 'cover'
+        }}
+      />
+      
+      {/* Subtle texture overlay */}
       <div 
         className="absolute inset-0 opacity-10"
         style={{
-          backgroundImage: `radial-gradient(circle at 25% 25%, rgba(214, 158, 86, 0.3) 0%, transparent 25%), 
-                           radial-gradient(circle at 75% 75%, rgba(215, 100, 64, 0.2) 0%, transparent 25%),
-                           radial-gradient(circle at 50% 50%, rgba(138, 177, 219, 0.1) 0%, transparent 50%)`,
-          backgroundSize: '400px 400px, 300px 300px, 200px 200px',
-          backgroundPosition: '0 0, 100px 100px, 200px 0'
+          backgroundImage: `
+            radial-gradient(circle at 25% 25%, rgba(139, 92, 246, 0.1) 0%, transparent 50%),
+            radial-gradient(circle at 75% 75%, rgba(234, 179, 8, 0.05) 0%, transparent 50%)
+          `
         }}
-      ></div>
-      <div 
-        className="absolute inset-0 opacity-5"
-        style={{
-          backgroundImage: `repeating-linear-gradient(
-            45deg,
-            transparent,
-            transparent 2px,
-            rgba(214, 158, 86, 0.1) 2px,
-            rgba(214, 158, 86, 0.1) 4px
-          )`
-        }}
-      ></div>
-      <div className="absolute inset-0 bg-gradient-to-r from-spice-500/5 via-transparent to-sand-500/5"></div>
+      />
       
-      {/* Content */}
-      <div className="relative border-b-2 border-gradient-to-r from-night-800/50 via-spice-500/30 to-night-800/50 backdrop-blur-lg">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            {/* Sleeker Logo */}
-            <div className="flex items-center">
-              <Link to="/" className="flex items-center group">
-                <div className="relative">
-                  <span className="font-display text-2xl font-bold bg-gradient-to-r from-spice-400 via-spice-500 to-spice-600 bg-clip-text text-transparent">
-                    DUNE
-                  </span>
-                  <span className="font-display text-lg font-medium ml-2 text-sand-100 group-hover:text-sand-50 transition-colors duration-300">
-                    TRACKER
-                  </span>
-                  <div className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-spice-400 to-spice-600 group-hover:w-full transition-all duration-500 rounded-full"></div>
+      {/* Main content */}
+      <div className="relative">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="flex items-center h-16">
+            
+            {/* Expanded Logo Section - takes much more space with separation */}
+            <div className="flex-1 max-w-lg mr-12">
+              <Link to="/" className="group relative flex items-center h-16 px-8 transition-all duration-300">
+                {/* Logo button background image */}
+                <div 
+                  className="absolute inset-0 bg-center bg-cover bg-no-repeat"
+                  style={{
+                    backgroundImage: 'url(/images/bg-button.png)',
+                    backgroundSize: 'cover'
+                  }}
+                />
+                
+                {/* Logo hover gradient */}
+                <div className="absolute inset-0 bg-gradient-to-r from-yellow-600/0 via-yellow-500/0 to-yellow-600/0 group-hover:from-yellow-600/15 group-hover:via-yellow-500/10 group-hover:to-yellow-600/15 transition-all duration-300" />
+                
+                <div className="relative z-10 flex items-center justify-center">
+                  <img 
+                    src={`/images/dune-log.png?v=${Date.now()}`}
+                    alt="Dune Awakening Tracker" 
+                    className="h-10 w-auto object-contain transition-all duration-300 group-hover:scale-105 drop-shadow-sm"
+                    style={{ 
+                      filter: 'brightness(1.1) contrast(1.05)',
+                      maxWidth: '200px'
+                    }}
+                  />
                 </div>
+                
+                {/* Sleek logo underline */}
+                <div className="absolute bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-transparent via-yellow-300/90 to-transparent group-hover:w-full transition-all duration-700 ease-out shadow-md shadow-yellow-300/50" />
               </Link>
             </div>
 
-            {/* Desktop Navigation */}
-            <div className="hidden md:block">
-              <div className="flex items-center space-x-4">
+            {/* Desktop Navigation - centered with separation */}
+            <div className="hidden md:flex flex-1 justify-center max-w-2xl">
+              <div className="flex items-center space-x-1">
                 {user && (
                   <>
                     <NavButton
                       to="/dashboard"
-                      icon={<LayoutDashboard size={16} />}
+                      icon={<LayoutDashboard size={14} strokeWidth={1.5} />}
                       isActive={location.pathname === '/dashboard'}
                     >
                       Dashboard
                     </NavButton>
                     <NavButton
                       to="/deep-desert"
-                      icon={<Pyramid size={16} />}
+                      icon={<Pyramid size={14} strokeWidth={1.5} />}
                       isActive={location.pathname.startsWith('/deep-desert')}
                     >
                       Deep Desert
                     </NavButton>
                     <NavButton
                       to="/hagga-basin"
-                      icon={<Mountain size={16} />}
+                      icon={<Mountain size={14} strokeWidth={1.5} />}
                       isActive={location.pathname === '/hagga-basin'}
                     >
                       Hagga Basin
                     </NavButton>
                     <NavButton
                       to="/pois"
-                      icon={<MapPin size={16} />}
+                      icon={<MapPin size={14} strokeWidth={1.5} />}
                       isActive={location.pathname === '/pois'}
                     >
                       Points of Interest
@@ -159,9 +292,8 @@ const Navbar: React.FC = () => {
                     {user.role === 'admin' && (
                       <NavButton
                         to="/admin"
-                        icon={<Shield size={16} />}
+                        icon={<Shield size={14} strokeWidth={1.5} />}
                         isActive={location.pathname === '/admin'}
-                        className="bg-gradient-to-r from-amber-600/20 to-amber-500/20 border-amber-400/40"
                       >
                         Admin
                       </NavButton>
@@ -171,17 +303,55 @@ const Navbar: React.FC = () => {
               </div>
             </div>
 
-            {/* Enhanced Profile Section */}
-            <div className="hidden md:block">
-              <div className="ml-6 flex items-center">
+            {/* Profile Section - right aligned with separation */}
+            <div className="hidden md:flex flex-1 justify-end max-w-xs ml-12">
+              <div className="flex items-center">
                 {user ? (
                   <div className="relative">
                     <button
                       onClick={toggleProfile}
-                      className="flex items-center px-4 py-2 rounded-full text-sm font-semibold text-sand-100 hover:text-white hover:bg-gradient-to-r hover:from-night-700/80 hover:to-night-600/80 hover:scale-105 transition-all duration-300 border-2 border-transparent hover:border-sand-400/30 backdrop-blur-md group shadow-md"
+                      className="group relative flex items-center h-16 px-4 min-w-[120px] justify-center transition-all duration-300"
                     >
-                      <span className="mr-2 group-hover:text-sand-50 transition-colors duration-300">{user.username}</span>
-                      <User size={18} className="text-sand-300 group-hover:text-sand-100 transition-colors duration-300" />
+                      {/* Profile button background image */}
+                      <div 
+                        className="absolute inset-0 bg-center bg-cover bg-no-repeat"
+                        style={{
+                          backgroundImage: 'url(/images/bg-button.png)',
+                          backgroundSize: 'cover'
+                        }}
+                      />
+                      
+                      {/* Enhanced purple hover overlay with advanced fading */}
+                      <div 
+                        className="absolute inset-0 bg-gradient-to-b from-violet-700/0 via-violet-600/0 to-transparent group-hover:from-violet-700/30 group-hover:via-violet-600/15 transition-all duration-300"
+                        style={{
+                          background: 'radial-gradient(ellipse at center top, rgba(139, 92, 246, 0) 0%, rgba(124, 58, 237, 0) 40%, transparent 70%)',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = 'radial-gradient(ellipse at center top, rgba(139, 92, 246, 0.15) 0%, rgba(124, 58, 237, 0.08) 40%, transparent 70%)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = 'radial-gradient(ellipse at center top, rgba(139, 92, 246, 0) 0%, rgba(124, 58, 237, 0) 40%, transparent 70%)';
+                        }}
+                      />
+                      
+                      <span className="relative z-10 mr-3 text-amber-200 group-hover:text-amber-50 transition-all duration-300 font-light tracking-wide text-xs group-hover:drop-shadow-lg"
+                      style={{
+                        textShadow: 'none'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.textShadow = '0 0 12px rgba(251, 191, 36, 0.8)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.textShadow = 'none';
+                      }}
+                      >
+                        {user.username}
+                      </span>
+                      <User size={14} strokeWidth={1.5} className="relative z-10 text-amber-300 group-hover:text-amber-100 transition-all duration-300 group-hover:drop-shadow-lg" />
+                      
+                      {/* Sleek expanding underline */}
+                      <div className="absolute bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-transparent via-violet-400 to-transparent group-hover:w-full transition-all duration-700 ease-out shadow-md shadow-violet-400/50" />
                     </button>
                     
                     {isProfileOpen && (
@@ -189,29 +359,43 @@ const Navbar: React.FC = () => {
                         <div 
                           className="fixed inset-0 z-40"
                           onClick={() => setIsProfileOpen(false)}
-                        ></div>
-                        <div className="absolute right-0 mt-3 w-56 rounded-2xl shadow-2xl bg-white/95 backdrop-blur-md ring-1 ring-black/5 z-50 border border-sand-200/50 transform transition-all duration-300 animate-in slide-in-from-top-5">
-                          <div className="py-2">
-                            <div className="px-4 py-3 bg-gradient-to-r from-sand-50 to-sand-100 rounded-t-2xl border-b border-sand-200">
-                              <p className="font-semibold text-night-800">{user.username}</p>
-                              <p className="text-xs text-sand-600 flex items-center">
-                                <span className="mr-1">Role:</span>
-                                <span className="px-2 py-0.5 bg-spice-100 text-spice-700 rounded-full text-xs font-medium">
-                                  {user.role}
-                                </span>
-                              </p>
+                        />
+                        <div className="absolute right-0 mt-2 w-56 bg-gradient-to-b from-slate-950 to-slate-900 border border-slate-600/30 shadow-2xl z-50 backdrop-blur-sm">
+                          
+                          {/* Header with gradient */}
+                          <div className="px-4 py-3 border-b border-slate-600/20 bg-gradient-to-r from-amber-600/10 via-amber-500/5 to-amber-600/10">
+                            <p className="font-light text-amber-100 tracking-wide text-sm">{user.username}</p>
+                            <div className="flex items-center mt-1">
+                              <span className="text-xs text-amber-200 mr-2 font-light">Role:</span>
+                              <span className="px-2 py-1 text-xs font-light text-slate-900 bg-gradient-to-r from-amber-200 to-amber-300 tracking-wide">
+                                {user.role}
+                              </span>
                             </div>
-                            <button
-                              onClick={() => {
-                                signOut();
-                                setIsProfileOpen(false);
-                              }}
-                              className="flex items-center w-full text-left px-4 py-3 text-sm text-night-700 hover:bg-sand-50 hover:text-night-900 transition-all duration-200 group rounded-b-2xl"
-                            >
-                              <LogOut size={16} className="mr-3 text-sand-500 group-hover:text-spice-600 transition-colors duration-200" />
-                              <span className="font-medium">Sign Out</span>
-                            </button>
                           </div>
+                          
+                          {/* Sign Out */}
+                          <button
+                            onClick={() => {
+                              signOut();
+                              setIsProfileOpen(false);
+                            }}
+                            className="group relative flex items-center w-full text-left px-4 py-3 text-amber-200 hover:text-amber-50 transition-all duration-300"
+                          >
+                            <div className="absolute inset-0 bg-gradient-to-r from-violet-800/0 to-violet-700/0 group-hover:from-violet-800/20 group-hover:to-violet-700/20 transition-all duration-300" />
+                            
+                            <LogOut size={14} strokeWidth={1.5} className="relative z-10 mr-3 text-amber-300 group-hover:text-amber-100 transition-all duration-300 group-hover:drop-shadow-lg" />
+                            <span className="relative z-10 font-light tracking-wide text-sm group-hover:drop-shadow-lg"
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.textShadow = '0 0 12px rgba(251, 191, 36, 0.8)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.textShadow = 'none';
+                            }}
+                            >Sign Out</span>
+                            
+                            {/* Sleek expanding underline */}
+                            <div className="absolute bottom-0 left-0 w-0 h-px bg-gradient-to-r from-transparent via-violet-400 to-transparent group-hover:w-full transition-all duration-700 ease-out shadow-sm shadow-violet-400/40" />
+                          </button>
                         </div>
                       </>
                     )}
@@ -219,127 +403,168 @@ const Navbar: React.FC = () => {
                 ) : (
                   <Link
                     to="/auth"
-                    className="px-6 py-2.5 rounded-full text-sm font-bold bg-gradient-to-r from-spice-600 to-spice-700 text-white hover:from-spice-500 hover:to-spice-600 hover:scale-105 transition-all duration-300 shadow-lg shadow-spice-600/30 border border-spice-500/50"
+                    className="group relative flex items-center mx-4 px-6 py-3 text-center font-light text-amber-200 hover:text-amber-50 transition-all duration-300 tracking-wide"
+                    onClick={() => setIsMenuOpen(false)}
                   >
-                    Sign In
+                    <div className="absolute inset-0 bg-gradient-to-r from-slate-800/40 via-slate-700/20 to-slate-800/40" />
+                    
+                    {/* Purple hover overlay */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-violet-700/0 via-violet-600/0 to-violet-700/0 group-hover:from-violet-700/30 group-hover:via-violet-600/20 group-hover:to-violet-700/30 transition-all duration-300" />
+                    
+                    <span className="relative z-10 tracking-widest uppercase text-sm">Sign In</span>
+                    
+                    {/* Sleek expanding underline */}
+                    <div className="absolute bottom-0 left-0 w-0 h-0.5 bg-gradient-to-r from-transparent via-violet-400 to-transparent group-hover:w-full transition-all duration-700 ease-out shadow-sm shadow-violet-400/50" />
                   </Link>
                 )}
               </div>
             </div>
 
-            {/* Enhanced Mobile menu button */}
-            <div className="md:hidden flex items-center">
+            {/* Mobile menu button */}
+            <div className="md:hidden">
               <button
                 onClick={toggleMenu}
-                className="inline-flex items-center justify-center p-2 rounded-xl text-sand-300 hover:text-white hover:bg-gradient-to-r hover:from-night-700/60 hover:to-night-600/60 transition-all duration-300 transform hover:scale-110 border-2 border-transparent hover:border-sand-400/30 backdrop-blur-md"
+                className="group relative flex items-center h-16 p-2 transition-all duration-300"
               >
-                <div className="relative w-6 h-6">
+                {/* Mobile menu button background image */}
+                <div 
+                  className="absolute inset-0 bg-center bg-cover bg-no-repeat"
+                  style={{
+                    backgroundImage: 'url(/images/bg-button.png)',
+                    backgroundSize: 'cover'
+                  }}
+                />
+                
+                {/* Purple hover overlay with advanced fading */}
+                <div 
+                  className="absolute inset-0 transition-all duration-300"
+                  style={{
+                    background: 'radial-gradient(ellipse at center top, rgba(139, 92, 246, 0) 0%, rgba(124, 58, 237, 0) 40%, transparent 70%)',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'radial-gradient(ellipse at center top, rgba(139, 92, 246, 0.2) 0%, rgba(124, 58, 237, 0.1) 40%, transparent 70%)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'radial-gradient(ellipse at center top, rgba(139, 92, 246, 0) 0%, rgba(124, 58, 237, 0) 40%, transparent 70%)';
+                  }}
+                />
+                
+                <div className="relative z-10">
                   <Menu 
-                    size={24} 
-                    className={`absolute inset-0 transition-all duration-300 ${isMenuOpen ? 'opacity-0 rotate-180 scale-75' : 'opacity-100 rotate-0 scale-100'}`} 
+                    size={16} 
+                    strokeWidth={1.5}
+                    className={`text-amber-200 group-hover:text-amber-50 transition-all duration-300 group-hover:drop-shadow-lg ${isMenuOpen ? 'opacity-0 rotate-90' : 'opacity-100 rotate-0'}`} 
                   />
                   <X 
-                    size={24} 
-                    className={`absolute inset-0 transition-all duration-300 ${isMenuOpen ? 'opacity-100 rotate-0 scale-100' : 'opacity-0 -rotate-180 scale-75'}`} 
+                    size={16} 
+                    strokeWidth={1.5}
+                    className={`absolute inset-0 text-amber-200 group-hover:text-amber-50 transition-all duration-300 group-hover:drop-shadow-lg ${isMenuOpen ? 'opacity-100 rotate-0' : 'opacity-0 -rotate-90'}`} 
                   />
                 </div>
+                
+                {/* Sleek expanding underline */}
+                <div className="absolute bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-transparent via-violet-400 to-transparent group-hover:w-full transition-all duration-700 ease-out shadow-md shadow-violet-400/50" />
               </button>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Enhanced Mobile menu */}
-      <div className={`md:hidden relative transition-all duration-700 transform ${isMenuOpen ? 'max-h-screen opacity-100 translate-y-0' : 'max-h-0 opacity-0 -translate-y-8'} overflow-hidden`}>
-        {/* Mobile Background */}
-        <div className="absolute inset-0 bg-gradient-to-b from-night-800 via-night-900 to-night-950"></div>
-        <div 
-          className="absolute inset-0 opacity-10"
-          style={{
-            backgroundImage: `radial-gradient(circle at 30% 30%, rgba(214, 158, 86, 0.4) 0%, transparent 40%)`,
-            backgroundSize: '300px 300px'
-          }}
-        ></div>
-        <div className="absolute inset-0 border-t-2 border-gradient-to-r from-spice-500/30 via-sand-400/30 to-spice-500/30"></div>
-        
-        <div className="relative px-4 pt-4 pb-6 space-y-2">
-          {user ? (
-            <>
-              <MobileNavButton
-                to="/dashboard"
-                icon={<LayoutDashboard size={18} />}
-                isActive={location.pathname === '/dashboard'}
-                onClick={() => setIsMenuOpen(false)}
-              >
-                Dashboard
-              </MobileNavButton>
-              <MobileNavButton
-                to="/deep-desert"
-                icon={<Pyramid size={18} />}
-                isActive={location.pathname.startsWith('/deep-desert')}
-                onClick={() => setIsMenuOpen(false)}
-              >
-                Deep Desert
-              </MobileNavButton>
-              <MobileNavButton
-                to="/hagga-basin"
-                icon={<Mountain size={18} />}
-                isActive={location.pathname === '/hagga-basin'}
-                onClick={() => setIsMenuOpen(false)}
-              >
-                Hagga Basin
-              </MobileNavButton>
-              <MobileNavButton
-                to="/pois"
-                icon={<MapPin size={18} />}
-                isActive={location.pathname === '/pois'}
-                onClick={() => setIsMenuOpen(false)}
-              >
-                Points of Interest
-              </MobileNavButton>
-              {user.role === 'admin' && (
+      {/* Mobile menu */}
+      <div className={`md:hidden transition-all duration-500 ${isMenuOpen ? 'max-h-screen opacity-100' : 'max-h-0 opacity-0'} overflow-hidden`}>
+        <div className="bg-gradient-to-b from-slate-950 to-slate-900 border-t border-slate-600/20">
+          <div className="py-4">
+            {user ? (
+              <>
                 <MobileNavButton
-                  to="/admin"
-                  icon={<Shield size={18} />}
-                  isActive={location.pathname === '/admin'}
+                  to="/dashboard"
+                  icon={<LayoutDashboard size={15} strokeWidth={1.5} />}
+                  isActive={location.pathname === '/dashboard'}
                   onClick={() => setIsMenuOpen(false)}
                 >
-                  Admin Panel
+                  Dashboard
                 </MobileNavButton>
-              )}
-              
-              {/* Mobile Profile Section */}
-              <div className="border-t border-night-800/50 pt-4 mt-4 mx-2">
-                <div className="px-4 py-3 bg-gradient-to-r from-night-800/50 to-night-700/50 rounded-xl backdrop-blur-sm border border-night-700/50">
-                  <p className="font-semibold text-sand-100 text-base">{user.username}</p>
-                  <p className="text-xs text-sand-400 flex items-center mt-1">
-                    <span className="mr-2">Role:</span>
-                    <span className="px-2 py-0.5 bg-spice-600/20 text-spice-300 rounded-full text-xs font-medium border border-spice-500/30">
-                      {user.role}
-                    </span>
-                  </p>
-                </div>
-                <button
-                  onClick={() => {
-                    signOut();
-                    setIsMenuOpen(false);
-                  }}
-                  className="flex items-center w-full text-left px-4 py-3 mt-2 text-base font-medium text-sand-200 hover:text-white hover:bg-spice-500/40 transition-all duration-300 rounded-xl mx-2 group border border-transparent hover:border-spice-400/30"
+                <MobileNavButton
+                  to="/deep-desert"
+                  icon={<Pyramid size={15} strokeWidth={1.5} />}
+                  isActive={location.pathname.startsWith('/deep-desert')}
+                  onClick={() => setIsMenuOpen(false)}
                 >
-                  <LogOut size={18} className="mr-3 text-sand-400 group-hover:text-spice-300 transition-colors duration-300" />
-                  <span>Sign Out</span>
-                </button>
-              </div>
-            </>
-          ) : (
-            <Link
-              to="/auth"
-              className="block mx-2 px-6 py-3 rounded-xl text-base font-medium bg-gradient-to-r from-spice-600 to-spice-700 text-white hover:from-spice-500 hover:to-spice-600 transition-all duration-300 text-center shadow-lg"
-              onClick={() => setIsMenuOpen(false)}
-            >
-              Sign In
-            </Link>
-          )}
+                  Deep Desert
+                </MobileNavButton>
+                <MobileNavButton
+                  to="/hagga-basin"
+                  icon={<Mountain size={15} strokeWidth={1.5} />}
+                  isActive={location.pathname === '/hagga-basin'}
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  Hagga Basin
+                </MobileNavButton>
+                <MobileNavButton
+                  to="/pois"
+                  icon={<MapPin size={15} strokeWidth={1.5} />}
+                  isActive={location.pathname === '/pois'}
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  Points of Interest
+                </MobileNavButton>
+                {user.role === 'admin' && (
+                  <MobileNavButton
+                    to="/admin"
+                    icon={<Shield size={15} strokeWidth={1.5} />}
+                    isActive={location.pathname === '/admin'}
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    Admin Panel
+                  </MobileNavButton>
+                )}
+                
+                {/* Mobile Profile */}
+                <div className="mt-6 pt-4 border-t border-slate-600/20">
+                  <div className="mx-4 p-3 bg-gradient-to-r from-amber-600/8 via-amber-500/4 to-amber-600/8 border border-slate-600/30">
+                    <p className="font-light text-amber-100 tracking-wide text-sm">{user.username}</p>
+                    <div className="flex items-center mt-1">
+                      <span className="text-xs text-amber-200 mr-2 font-light">Role:</span>
+                      <span className="px-2 py-1 text-xs font-light text-slate-900 bg-gradient-to-r from-amber-200 to-amber-300 tracking-wide">
+                        {user.role}
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      signOut();
+                      setIsMenuOpen(false);
+                    }}
+                    className="group relative flex items-center w-full text-left px-4 py-3 mt-2 mx-4 text-amber-200 hover:text-amber-50 transition-all duration-300"
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-r from-violet-800/0 to-violet-700/0 group-hover:from-violet-800/20 group-hover:to-violet-700/20 transition-all duration-300" />
+                    
+                    <LogOut size={15} strokeWidth={1.5} className="relative z-10 mr-3 text-amber-300 group-hover:text-amber-100" />
+                    <span className="relative z-10 font-light tracking-wide text-sm">Sign Out</span>
+                    
+                    {/* Sleek expanding underline */}
+                    <div className="absolute bottom-0 left-0 w-0 h-px bg-gradient-to-r from-transparent via-violet-400 to-transparent group-hover:w-full transition-all duration-700 ease-out shadow-sm shadow-violet-400/40" />
+                  </button>
+                </div>
+              </>
+            ) : (
+              <Link
+                to="/auth"
+                className="group relative flex items-center mx-4 px-6 py-3 text-center font-light text-amber-200 hover:text-amber-50 transition-all duration-300 tracking-wide"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-slate-800/40 via-slate-700/20 to-slate-800/40" />
+                
+                {/* Purple hover overlay */}
+                <div className="absolute inset-0 bg-gradient-to-r from-violet-700/0 via-violet-600/0 to-violet-700/0 group-hover:from-violet-700/30 group-hover:via-violet-600/20 group-hover:to-violet-700/30 transition-all duration-300" />
+                
+                <span className="relative z-10 tracking-widest uppercase text-sm">Sign In</span>
+                
+                {/* Sleek expanding underline */}
+                <div className="absolute bottom-0 left-0 w-0 h-0.5 bg-gradient-to-r from-transparent via-violet-400 to-transparent group-hover:w-full transition-all duration-700 ease-out shadow-sm shadow-violet-400/50" />
+              </Link>
+            )}
+          </div>
         </div>
       </div>
     </nav>
