@@ -1,13 +1,18 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { Poi, PoiType, GridSquare, PoiWithGridSquare, MapType, CustomIcon } from '../types';
-import { Search, Compass, LayoutGrid, List, Edit2, Trash2, ArrowDownUp, SortAsc, SortDesc } from 'lucide-react';
+import { Search, Compass, LayoutGrid, List, Edit2, Trash2, ArrowDownUp, SortAsc, SortDesc, Image as ImageIconLucide, Share2, Bookmark, MessageSquare, MapPin } from 'lucide-react';
 import GridGallery from '../components/grid/GridGallery';
-import PoiCard from '../components/poi/PoiCard';
 import POIEditModal from '../components/hagga-basin/POIEditModal';
 import PoiListItem from '../components/poi/PoiListItem';
+import POIPanel from '../components/common/POIPanel';
+import CommentsList from '../components/comments/CommentsList';
+import DiamondIcon from '../components/common/DiamondIcon';
 import { useAuth } from '../components/auth/AuthProvider';
 import { useNavigate } from 'react-router-dom';
+
+const isPoiTypeIconUrl = (iconValue: string | null | undefined): iconValue is string => 
+  typeof iconValue === 'string' && (iconValue.startsWith('http://') || iconValue.startsWith('https://'));
 
 const PoisPage: React.FC = () => {
   const { user } = useAuth();
@@ -420,7 +425,7 @@ const PoisPage: React.FC = () => {
           </select>
           <button 
             onClick={() => setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')}
-            className="btn btn-outline btn-sm p-1.5"
+            className="p-2 bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-amber-300 border border-slate-700 transition-colors duration-150"
             title={`Sort direction: ${sortDirection === 'asc' ? 'Ascending' : 'Descending'}`}
           >
             {sortDirection === 'asc' ? <SortAsc size={18} /> : <SortDesc size={18} />}
@@ -428,17 +433,25 @@ const PoisPage: React.FC = () => {
         </div>
 
         {/* Display Mode Toggle */}
-        <div className="flex border border-sand-300 rounded-md">
+        <div className="flex border border-slate-700">
           <button
             onClick={() => setDisplayMode('grid')}
-            className={`p-2 transition-colors duration-150 ${displayMode === 'grid' ? 'bg-spice-600 text-white' : 'bg-sand-100 hover:bg-sand-200 text-night-700'}`}
+            className={`p-2 transition-colors duration-150 ${
+              displayMode === 'grid' 
+                ? 'bg-slate-700 text-amber-300' 
+                : 'bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-amber-200'
+            }`}
             title="Grid View"
           >
             <LayoutGrid size={18} />
           </button>
           <button
             onClick={() => setDisplayMode('list')}
-            className={`p-2 transition-colors duration-150 ${displayMode === 'list' ? 'bg-spice-600 text-white' : 'bg-sand-100 hover:bg-sand-200 text-night-700'}`}
+            className={`p-2 transition-colors duration-150 ${
+              displayMode === 'list' 
+                ? 'bg-slate-700 text-amber-300' 
+                : 'bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-amber-200'
+            }`}
             title="List View"
           >
             <List size={18} />
@@ -709,14 +722,99 @@ const PoisPage: React.FC = () => {
       ) : (
         <div className={`gap-6 ${displayMode === 'grid' ? 'grid md:grid-cols-2 lg:grid-cols-3' : 'flex flex-col'}`}>
           {filteredPois.map(poi => {
+            const poiType = getPoiType(poi.poi_type_id);
+            const creatorInfo = userInfo[poi.created_by];
+            const customIcon = customIcons.find(ci => ci.id === poi.custom_icon_id);
+
+            // Logic to determine imageUrl for POIPanel
+            let panelImageUrl: string | undefined = undefined;
+            if (poi.screenshots && poi.screenshots.length > 0 && poi.screenshots[0].url) {
+              panelImageUrl = poi.screenshots[0].url;
+            } else if (customIcon?.url) {
+              panelImageUrl = customIcon.url;
+            } else if (poiType?.icon_url) {
+              panelImageUrl = poiType.icon_url;
+            }
+            // If panelImageUrl is still undefined, POIPanel will use its placeholder
+
+            // Prepare POI Type Icon for headerIcon prop
+            let poiTypeRenderIcon: React.ReactNode = <MapPin size={18} className="text-slate-400" />;
+            if (poiType?.icon) {
+              if (isPoiTypeIconUrl(poiType.icon)) {
+                poiTypeRenderIcon = <img src={poiType.icon} alt={poiType.name} className="w-5 h-5 object-contain" />;
+              } else {
+                poiTypeRenderIcon = <span className="text-xl">{poiType.icon}</span>;
+              }
+            }
+            const poiTypeHeaderIcon = (
+              <DiamondIcon 
+                icon={poiTypeRenderIcon} 
+                size="sm"
+                bgColor="bg-void-950"
+                actualBorderColor="bg-gold-400"
+                borderThickness={1.5}
+              />
+            );
+
+            const poiTypeForPanelIcon = poiTypes.find(pt => pt.id === poi.poi_type_id);
+            const panelPoiIcon = poiTypeForPanelIcon?.icon ? (
+              isPoiTypeIconUrl(poiTypeForPanelIcon.icon) ?
+                <img src={poiTypeForPanelIcon.icon} alt="" className="w-5 h-5 object-contain" /> :
+                <span className="text-xl">{poiTypeForPanelIcon.icon}</span>
+            ) : <MapPin size={18} className="text-slate-400" />;
+
+            const panelHeaderActions: React.ReactNode[] = [];
+
+            if (poi.screenshots && poi.screenshots.length > 0) {
+              panelHeaderActions.push(
+                <button 
+                  key="gallery"
+                  onClick={(e) => { e.stopPropagation(); handleGalleryOpen(poi); }} 
+                  className="p-1.5 hover:bg-slate-700 rounded-md transition-colors" 
+                  title="Open Gallery"
+                >
+                  <ImageIconLucide size={16} className="text-amber-300" />
+                </button>
+              );
+            }
+
+            // Conditionally add Edit and Delete buttons if user is creator or admin
+            if (user && (poi.created_by === user.id /* || userIsAdmin */)) {
+              panelHeaderActions.push(
+                <button 
+                  key="edit"
+                  onClick={(e) => { e.stopPropagation(); setEditingPoiId(poi.id); }} 
+                  className="p-1.5 hover:bg-slate-700 rounded-md transition-colors"
+                  title="Edit POI"
+                >
+                  <Edit2 size={16} className="text-amber-300" />
+                </button>
+              );
+              panelHeaderActions.push(
+                <button 
+                  key="delete"
+                  onClick={(e) => { e.stopPropagation(); handleDelete(poi.id); }} 
+                  className="p-1.5 hover:bg-slate-700 rounded-md transition-colors"
+                  title="Delete POI"
+                >
+                  <Trash2 size={16} className="text-red-400 hover:text-red-300" />
+                </button>
+              );
+            }
+
+            let metaText = `Created by ${creatorInfo?.username || 'Unknown'} on ${new Date(poi.created_at).toLocaleDateString()}`;
+            if (poi.updated_at && new Date(poi.updated_at).getTime() !== new Date(poi.created_at).getTime()) {
+              metaText += ` (Updated: ${new Date(poi.updated_at).toLocaleDateString()})`;
+            }
+
             if (displayMode === 'list') {
               return (
                 <PoiListItem
                   key={poi.id}
                   poi={poi}
-                  poiType={getPoiType(poi.poi_type_id)}
+                  poiType={poiType}
                   gridSquareCoordinate={poi.grid_square?.coordinate}
-                  creator={userInfo[poi.created_by]}
+                  creator={creatorInfo}
                   onClick={() => handleCardClick(poi)}
                   onImageClick={() => handleGalleryOpen(poi)}
                   onEdit={() => setEditingPoiId(poi.id)}
@@ -725,19 +823,56 @@ const PoisPage: React.FC = () => {
               );
             }
             
+            // POIPanel for grid mode
             return (
-              <PoiCard
-                key={poi.id}
-                poi={poi}
-                poiType={getPoiType(poi.poi_type_id)}
-                customIcons={customIcons}
-                gridSquareCoordinate={poi.grid_square?.coordinate}
-                creator={userInfo[poi.created_by]}
-                onClick={() => handleCardClick(poi)}
-                onImageClick={() => handleGalleryOpen(poi)}
-                onEdit={() => setEditingPoiId(poi.id)}
-                onDelete={() => handleDelete(poi.id)}
-              />
+              <div key={poi.id} onClick={() => handleCardClick(poi)} className="cursor-pointer group">
+                <POIPanel
+                  headerIcon={poiTypeHeaderIcon}
+                  headerTitle={poi.title}
+                  imageUrl={panelImageUrl}
+                  imageAlt={poi.title}
+                  onImageClick={() => handleGalleryOpen(poi)}
+                  screenshotCount={poi.screenshots?.length || 0}
+                  description={(
+                    <div className="text-sm">
+                      <p className="line-clamp-3">{poi.description || 'No description available.'}</p>
+                    </div>
+                  )}
+                  bundleTitle="Details"
+                  bundleItems={[
+                    `Category: ${poiType?.category || 'Uncategorized'}`,
+                    `Type: ${poiType?.name || 'Unknown Type'}`,
+                    `Grid: ${poi.grid_square?.coordinate || 'N/A'}`,
+                    `Map: ${poi.map_type === 'deep_desert' ? 'Deep Desert' : 'Hagga Basin'}`
+                  ]}
+                  metaInfoText={metaText}
+                  headerBgColor="bg-slate-900"
+                  headerEffectiveBorderColor="bg-gold-500"
+                  bodyBgColor="bg-night-800"
+                  descriptionBgColor="bg-slate-900"
+                  bundleBgColor="bg-slate-900"
+                  accentColor="text-gold-400"
+                  headerTitleColor="text-gold-300"
+                  textColor="text-sand-200"
+                  bundleTitleColor="text-amber-300"
+                  imagePlaceholderIcon={<ImageIconLucide size={48} className="text-slate-500" />}
+                  actionsBarContent={(
+                    <div className="flex items-center justify-around w-full">
+                      {panelHeaderActions}
+                    </div>
+                  )}
+                  footerContent={(
+                    <div onClick={(e) => e.stopPropagation()}>
+                      <CommentsList 
+                        poiId={poi.id} 
+                        showLikeButton={true}
+                        likeTargetType="poi"
+                        likeTargetId={poi.id}
+                      />
+                    </div>
+                  )}
+                />
+              </div>
             );
           })}
         </div>

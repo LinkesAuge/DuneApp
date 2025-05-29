@@ -14,6 +14,8 @@ interface CommentsListProps {
   showLikeButton?: boolean;
   likeTargetType?: 'comment' | 'poi';
   likeTargetId?: string;
+  // Callback for navigation, if CommentsList needs to trigger it (e.g. clicking user profile)
+  onShouldNavigate?: (path: string) => void; 
 }
 
 const CommentsList: React.FC<CommentsListProps> = ({
@@ -22,7 +24,8 @@ const CommentsList: React.FC<CommentsListProps> = ({
   initiallyExpanded = false,
   showLikeButton = false,
   likeTargetType,
-  likeTargetId
+  likeTargetId,
+  onShouldNavigate
 }) => {
   const [comments, setComments] = useState<CommentWithUser[]>([]);
   const [commentCount, setCommentCount] = useState(0);
@@ -117,9 +120,8 @@ const CommentsList: React.FC<CommentsListProps> = ({
   const handleCommentUpdated = () => {
     if (isExpanded) {
       fetchComments();
-    } else {
-      fetchCommentCount();
     }
+    // Count likely doesn't change on update, so no need to fetch count if collapsed
   };
 
   const handleCommentDeleted = () => {
@@ -142,15 +144,15 @@ const CommentsList: React.FC<CommentsListProps> = ({
   };
 
   return (
-    <div className="border border-sand-300 rounded-lg">
-      <div className="w-full flex justify-between items-center p-4">
+    <div className="border border-slate-700 bg-night-900">
+      <div className="w-full flex justify-between items-center p-3">
         <div className="flex items-center gap-3">
           <button
             onClick={toggleExpanded}
-            className="flex items-center gap-3 text-left hover:bg-sand-50 transition-colors p-2 rounded -m-2"
+            className="flex items-center gap-2 text-left hover:bg-slate-700 transition-colors p-2 -m-2 text-slate-300 hover:text-amber-300"
           >
-            <MessageSquare size={18} className="text-sand-600" />
-            <span className="font-medium text-night-800">
+            <MessageSquare size={18} className="" />
+            <span className="font-medium">
               Comments ({commentCount})
             </span>
             {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
@@ -166,21 +168,21 @@ const CommentsList: React.FC<CommentsListProps> = ({
       </div>
 
       {isExpanded && (
-        <div className="border-t border-sand-300 p-4 space-y-4">
+        <div className="border-t border-slate-700 p-4 space-y-4 bg-night-800/50">
           {error && (
-            <div className="text-red-600 text-sm p-2 bg-red-50 rounded">
+            <div className="text-red-300 text-sm p-3 bg-red-900/30 border border-red-700/50">
               Error loading comments: {error}
             </div>
           )}
 
           {isLoading ? (
             <div className="flex justify-center items-center py-8">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-spice-600"></div>
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-amber-400"></div>
             </div>
           ) : (
             <>
               {comments.length === 0 ? (
-                <div className="text-center py-6 text-sand-600">
+                <div className="text-center py-6 text-slate-400">
                   <MessageSquare className="mx-auto mb-2" size={32} />
                   <p>No comments yet. Be the first to comment!</p>
                 </div>
@@ -193,12 +195,13 @@ const CommentsList: React.FC<CommentsListProps> = ({
                       onCommentUpdated={handleCommentUpdated}
                       onCommentDeleted={handleCommentDeleted}
                       onImageClick={handleImageClick}
+                      onShouldNavigate={onShouldNavigate}
                     />
                   ))}
                 </div>
               )}
 
-              <div className="pt-4 border-t border-sand-200">
+              <div className="pt-4 border-t border-slate-700">
                 <CommentForm
                   poiId={poiId}
                   gridSquareId={gridSquareId}

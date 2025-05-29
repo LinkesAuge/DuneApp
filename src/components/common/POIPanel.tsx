@@ -1,21 +1,22 @@
 import React, { useState, useMemo } from 'react';
 import { Poi, PoiType, CustomIcon, GridSquare } from '../../types';
-import { MapPin, LayoutGrid, List, SortAsc, SortDesc } from 'lucide-react';
+import { MapPin, LayoutGrid, List, SortAsc, SortDesc, Bookmark, Image as ImageIcon } from 'lucide-react';
 import PoiCard from '../poi/PoiCard';
 import PoiListItem from '../poi/PoiListItem';
 import HaggaBasinPoiCard from '../hagga-basin/HaggaBasinPoiCard';
+import HexButton from './HexButton';
 
 interface POIPanelProps {
-  pois: Poi[];
-  poiTypes: PoiType[];
-  customIcons: CustomIcon[];
-  searchTerm: string;
-  onSearchChange: (term: string) => void;
-  selectedPoiTypes: string[];
-  onPoiTypeToggle: (typeId: string) => void;
-  privacyFilter: 'all' | 'public' | 'private' | 'shared';
-  onPrivacyFilterChange: (filter: 'all' | 'public' | 'private' | 'shared') => void;
-  mapType: 'deep_desert' | 'hagga_basin';
+  pois?: Poi[];
+  poiTypes?: PoiType[];
+  customIcons?: CustomIcon[];
+  searchTerm?: string;
+  onSearchChange?: (term: string) => void;
+  selectedPoiTypes?: string[];
+  onPoiTypeToggle?: (typeId: string) => void;
+  privacyFilter?: 'all' | 'public' | 'private' | 'shared';
+  onPrivacyFilterChange?: (filter: 'all' | 'public' | 'private' | 'shared') => void;
+  mapType?: 'deep_desert' | 'hagga_basin';
   // Optional grid squares for Deep Desert
   gridSquares?: GridSquare[];
   // User info for displaying creators
@@ -30,19 +31,44 @@ interface POIPanelProps {
   // Panel settings
   enableSorting?: boolean;
   enableViewToggle?: boolean;
+  headerTitle: string;
+  headerSubtitle: string;
+  imageUrl?: string;
+  imageAlt?: string;
+  imagePlaceholderIcon?: React.ReactNode;
+  description: React.ReactNode;
+  bundleTitle?: string;
+  bundleItems?: string[];
+  className?: string;
+  bodyBgColor?: string;
+  textColor?: string;
+  bundleTitleColor?: string;
+  accentColor?: string;
+  descriptionBgColor?: string;
+  descriptionInlineStyle?: React.CSSProperties;
+  bundleBgColor?: string;
+  bundleInlineStyle?: React.CSSProperties;
+  headerActions?: React.ReactNode[];
+  footerContent?: React.ReactNode;
+  headerIcon?: React.ReactNode;
+  metaInfoText?: string;
+  actionsBarContent?: React.ReactNode;
+  screenshotCount?: number;
+  onImageClick?: () => void;
+  panelHeaderHexButtonSize?: 'sm' | 'md' | 'lg';
 }
 
 const POIPanel: React.FC<POIPanelProps> = ({
-  pois,
-  poiTypes,
-  customIcons,
-  searchTerm,
-  onSearchChange,
-  selectedPoiTypes,
-  onPoiTypeToggle,
-  privacyFilter,
-  onPrivacyFilterChange,
-  mapType,
+  pois = [],
+  poiTypes = [],
+  customIcons = [],
+  searchTerm = '',
+  onSearchChange = () => {},
+  selectedPoiTypes = [],
+  onPoiTypeToggle = () => {},
+  privacyFilter = 'all',
+  onPrivacyFilterChange = () => {},
+  mapType = 'deep_desert',
   gridSquares,
   userInfo = {},
   onPoiClick,
@@ -53,6 +79,31 @@ const POIPanel: React.FC<POIPanelProps> = ({
   onPoiGalleryOpen,
   enableSorting = true,
   enableViewToggle = true,
+  headerTitle,
+  headerSubtitle,
+  imageUrl,
+  imageAlt = 'POI Image',
+  imagePlaceholderIcon = <ImageIcon size={48} className="text-slate-500" />,
+  description,
+  bundleTitle,
+  bundleItems,
+  className = '',
+  bodyBgColor = 'bg-night-900',
+  textColor = 'text-sand-200',
+  bundleTitleColor = 'text-gold-300',
+  accentColor = 'text-gold-400',
+  descriptionBgColor,
+  descriptionInlineStyle,
+  bundleBgColor,
+  bundleInlineStyle,
+  headerActions,
+  footerContent,
+  headerIcon,
+  metaInfoText,
+  actionsBarContent,
+  screenshotCount,
+  onImageClick,
+  panelHeaderHexButtonSize = 'lg',
 }) => {
   // Display and sorting state
   const [displayMode, setDisplayMode] = useState<'grid' | 'list'>('grid');
@@ -69,7 +120,7 @@ const POIPanel: React.FC<POIPanelProps> = ({
       }
 
       // POI type filter - Show only selected types
-      if (!selectedPoiTypes.includes(poi.poi_type_id)) {
+      if (selectedPoiTypes.length > 0 && !selectedPoiTypes.includes(poi.poi_type_id)) {
         return false;
       }
 
@@ -150,116 +201,110 @@ const POIPanel: React.FC<POIPanelProps> = ({
   };
 
   return (
-    <div className="h-full flex flex-col p-4">
-      {/* Fixed Header - exact same pattern */}
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="font-semibold text-sand-900 text-base">POIs</h3>
-        <div className="flex items-center gap-2">
-          {/* Right side: View Mode Toggle */}
-          {enableViewToggle && (
-            <div className="flex border border-sand-300 rounded-md">
-              <button
-                onClick={() => setDisplayMode('grid')}
-                className={`p-1.5 transition-colors duration-150 ${displayMode === 'grid' ? 'bg-spice-600 text-white' : 'bg-sand-100 hover:bg-sand-200 text-night-700'}`}
-                title="Grid View"
-              >
-                <LayoutGrid className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => setDisplayMode('list')}
-                className={`p-1.5 transition-colors duration-150 ${displayMode === 'list' ? 'bg-spice-600 text-white' : 'bg-sand-100 hover:bg-sand-200 text-night-700'}`}
-                title="List View"
-              >
-                <List className="w-4 h-4" />
-              </button>
-            </div>
-          )}
+    <div className={`w-full max-w-sm sm:max-w-md rounded-lg shadow-xl border border-slate-700/50 ${className}`}>
+      {/* New Header Structure with HexButton */}
+      <div className="relative flex items-center justify-between p-2 bg-night-800/50">
+        {/* Container for HexButton - centers the button and allows it to grow */}
+        <div className="flex-grow min-w-0 overflow-hidden flex justify-center">
+          <HexButton 
+            variant="primary" 
+            size={panelHeaderHexButtonSize} 
+            icon={headerIcon}
+            className="max-w-full w-full"
+          >
+            {headerTitle}
+          </HexButton>
         </div>
-      </div>
-
-      {/* Fixed Controls - exact same pattern */}
-      <div className="mb-4">
-        {enableSorting && (
-          <div className="flex items-center gap-2">
-            <select 
-              value={sortField}
-              onChange={(e) => setSortField(e.target.value as any)}
-              className="select select-sm text-xs flex-1"
-            >
-              <option value="created_at">Date Created</option>
-              <option value="updated_at">Date Updated</option>
-              <option value="title">Title</option>
-              <option value="category">Category</option>
-              <option value="type">Type</option>
-            </select>
-            <button 
-              onClick={() => setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')}
-              className="btn btn-sm btn-outline p-1.5"
-              title={`Sort direction: ${sortDirection === 'asc' ? 'Ascending' : 'Descending'}`}
-            >
-              {sortDirection === 'asc' ? <SortAsc className="w-4 h-4" /> : <SortDesc className="w-4 h-4" />}
-            </button>
+        {headerActions && (
+          <div className="absolute top-1/2 right-2 -translate-y-1/2 flex items-center space-x-1 z-20">
+            {headerActions.map((action, index) => (
+              <React.Fragment key={index}>{action}</React.Fragment>
+            ))}
           </div>
         )}
       </div>
 
-      {/* Scrollable Content Area - EXACT SAME PATTERN AS WORKING PoiControlPanel */}
-      <div className="flex-1 overflow-y-auto">
-        {sortedPois.length === 0 ? (
-          <div className="text-center py-6 text-sand-600">
-            <MapPin className="w-8 h-8 mx-auto mb-2 text-sand-400" />
-            <div className="font-medium mb-1">No POIs match current filters</div>
-            <div className="text-sm">Try adjusting your search or filters</div>
-          </div>
-        ) : (
-          <div className={`gap-4 ${displayMode === 'grid' ? 'grid grid-cols-1' : 'flex flex-col'}`}>
-            {sortedPois.map(poi => {
-              const poiType = getPoiType(poi.poi_type_id);
-              if (!poiType) return null;
-
-              const gridCoordinate = getGridCoordinate(poi);
-              const creator = userInfo[poi.created_by];
-
-              if (displayMode === 'list') {
-                return (
-                  <PoiListItem
-                    key={poi.id}
-                    poi={poi}
-                    poiType={poiType}
-                    gridSquareCoordinate={gridCoordinate}
-                    creator={creator}
-                    onClick={() => {
-                      console.log('POIPanel: PoiListItem clicked for POI:', poi.title);
-                      onPoiHighlight?.(poi);
+      {/* Body */}
+      <div className={`${bodyBgColor} p-5 relative`}>
+        {(imageUrl || imagePlaceholderIcon) && (
+            <div className="relative w-full h-40 bg-slate-800/60 flex items-center justify-center rounded-md mb-4 border border-slate-700">
+                {onImageClick && imageUrl ? (
+                  <button 
+                    onClick={(e) => { 
+                      e.stopPropagation(); 
+                      if (onImageClick) onImageClick(); 
                     }}
-                    onImageClick={() => onPoiGalleryOpen?.(poi)}
-                    onEdit={() => onPoiEdit?.(poi)}
-                    onDelete={() => onPoiDelete?.(poi.id)}
-                  />
-                );
-              }
-              
-              return (
-                <PoiCard
-                  key={poi.id}
-                  poi={poi}
-                  poiType={poiType}
-                  customIcons={customIcons}
-                  gridSquareCoordinate={gridCoordinate}
-                  creator={creator}
-                  onClick={() => {
-                    console.log('POIPanel: PoiCard clicked for POI:', poi.title);
-                    onPoiHighlight?.(poi);
-                  }}
-                  onImageClick={() => onPoiGalleryOpen?.(poi)}
-                  onEdit={() => onPoiEdit?.(poi)}
-                  onDelete={() => onPoiDelete?.(poi.id)}
-                />
-              );
-            })}
+                    className="w-full h-full appearance-none focus:outline-none cursor-pointer"
+                  >
+                    <img src={imageUrl} alt={imageAlt} className="w-full h-full object-contain rounded-md" />
+                  </button>
+                ) : imageUrl ? (
+                    <img src={imageUrl} alt={imageAlt} className="w-full h-full object-contain rounded-md" />
+                ) : (
+                    imagePlaceholderIcon
+                )}
+                {imageUrl && screenshotCount && screenshotCount > 1 && (
+                  <button 
+                    onClick={(e) => { 
+                      e.stopPropagation(); 
+                      if (onImageClick) onImageClick(); 
+                    }}
+                    className="absolute bottom-1 right-1 bg-night-950 text-gold-300 text-xs px-1.5 py-0.5 rounded-sm cursor-pointer focus:outline-none focus:ring-1 focus:ring-amber-400"
+                    title={`View ${screenshotCount -1} more screenshot(s)`}
+                  >
+                    + {screenshotCount - 1} more
+                  </button>
+                )}
+            </div>
+        )}
+
+        <div 
+          className={`mb-4 p-3 rounded-md ${descriptionBgColor !== undefined ? descriptionBgColor : 'bg-slate-800/30'} ${textColor} text-sm leading-relaxed`} 
+          style={descriptionInlineStyle}
+        >
+          {description}
+        </div>
+
+        {bundleItems && bundleItems.length > 0 && (
+          <div className="border-t border-slate-700 pt-4 mt-4">
+            <h4 className={`text-sm font-semibold mb-2 ${bundleTitleColor}`}>
+              {bundleTitle || 'Contains:'}
+            </h4>
+            <ul 
+              className={`grid grid-cols-2 gap-x-4 p-3 rounded-md ${bundleBgColor !== undefined ? bundleBgColor : 'bg-slate-800/30'}`}
+              style={bundleInlineStyle}
+            >
+              {bundleItems.map((item, index) => (
+                <li key={index} className={`${textColor} text-xs flex items-center mb-1`}>
+                  <span className={`mr-2 ${accentColor}`}>&bull;</span>
+                  {item}
+                </li>
+              ))}
+            </ul>
           </div>
         )}
       </div>
+
+      {/* Footer Content Section (Comments) */}
+      {footerContent && (
+        <div className="border-t border-slate-700 p-4 bg-night-950">
+          {footerContent}
+        </div>
+      )}
+
+      {/* Meta Info Text (Creator/Date) - New Section */}
+      {metaInfoText && (
+        <div className={`${bodyBgColor} px-5 pb-3 pt-1 text-xs ${textColor} text-center border-t border-slate-700/50`}>
+          {metaInfoText}
+        </div>
+      )}
+
+      {/* Actions Bar - New Section */}
+      {actionsBarContent && (
+        <div className={`${bodyBgColor} px-5 pb-4 pt-2 border-t border-slate-700 flex items-center justify-around`}>
+          {actionsBarContent}
+        </div>
+      )}
     </div>
   );
 };

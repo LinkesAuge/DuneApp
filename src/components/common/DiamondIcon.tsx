@@ -2,7 +2,7 @@ import React from 'react';
 
 interface DiamondIconProps {
   icon?: React.ReactNode;
-  size?: 'sm' | 'md' | 'lg' | 'xl';
+  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
   bgColor?: string; // e.g., 'bg-slate-950'
   actualBorderColor?: string; // e.g., 'bg-gold-300' (used as a background for the border layer)
   borderThickness?: number; // e.g., 2 (for 2px border on each side)
@@ -22,13 +22,15 @@ const DiamondIcon: React.FC<DiamondIconProps> = ({
   onClick,
 }) => {
   const baseSizeClasses = {
-    sm: { w: 48, h: 48 }, // Using numbers for calculation
+    xs: { w: 32, h: 32 },
+    sm: { w: 48, h: 48 },
     md: { w: 64, h: 64 },
     lg: { w: 80, h: 80 },
     xl: { w: 96, h: 96 },
   };
 
   const iconSizeClasses = {
+    xs: 'w-4 h-4',
     sm: 'w-5 h-5',
     md: 'w-6 h-6',
     lg: 'w-8 h-8',
@@ -41,9 +43,15 @@ const DiamondIcon: React.FC<DiamondIconProps> = ({
 
   const Component = onClick ? 'button' : 'div';
 
+  // Define hover effects based on presence of onClick
+  // Both versions now use scale-110 for visibility. Brightness differs slightly.
+  const hoverEffectClasses = onClick 
+    ? 'hover:scale-110 hover:brightness-125' 
+    : 'hover:scale-110 hover:brightness-110';
+
   return (
     <Component
-      className={`relative flex items-center justify-center ${className}`}
+      className={`relative flex items-center justify-center transition-all duration-300 ease-in-out ${hoverEffectClasses} ${className}`}
       style={{ 
         width: `${selectedBaseSize.w}px`, 
         height: `${selectedBaseSize.h}px` 

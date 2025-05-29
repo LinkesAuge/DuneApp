@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 
 interface HexButtonProps {
@@ -29,12 +29,31 @@ const HexButton: React.FC<HexButtonProps> = ({
   };
   
   const textSizeClasses = {
+    xs: "text-xs",
     sm: "text-sm",
     md: "text-lg", 
     lg: "text-xl"
   };
 
-  // Back to hexagonal clip path for buttons
+  const textRef = useRef<HTMLSpanElement>(null);
+  const [isMultiline, setIsMultiline] = useState(false);
+
+  useEffect(() => {
+    if (textRef.current) {
+      const hasWrapped = textRef.current.scrollHeight > textRef.current.clientHeight;
+      if (hasWrapped !== isMultiline) {
+        setIsMultiline(hasWrapped);
+      }
+    }
+  }, [children, size, isMultiline]);
+
+  let currentTextSizeClass = textSizeClasses[size];
+  if (isMultiline) {
+    if (size === 'lg') currentTextSizeClass = textSizeClasses.md;
+    else if (size === 'md') currentTextSizeClass = textSizeClasses.sm;
+    else if (size === 'sm') currentTextSizeClass = textSizeClasses.xs;
+  }
+
   const hexagonalClipPath = {
     clipPath: "polygon(20px 0%, calc(100% - 20px) 0%, 100% 50%, calc(100% - 20px) 100%, 20px 100%, 0% 50%)"
   };
@@ -79,13 +98,16 @@ const HexButton: React.FC<HexButtonProps> = ({
           </span>
         )}
         <span 
-          className={`font-light uppercase tracking-widest transition-all duration-300 whitespace-nowrap ${textSizeClasses[size]} ${
+          ref={textRef}
+          className={`font-light uppercase tracking-widest transition-all duration-300 ${currentTextSizeClass} ${
             variant === 'primary' 
               ? 'text-amber-200 group-hover:text-amber-50' 
               : 'text-amber-300 group-hover:text-amber-100'
           } group-hover:drop-shadow-lg`}
           style={{
-            fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif"
+            fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif",
+            display: 'block',
+            lineHeight: '1.2em'
           }}
         >
           {children}
@@ -106,24 +128,21 @@ const HexButton: React.FC<HexButtonProps> = ({
     </>
   );
 
-  const ButtonComponent = ({ children, className: buttonClassName, style, ...props }: any) => (
+  const ButtonComponent = ({ children: btnChildren, className: buttonClassName, style, ...props }: any) => (
     <div 
       className={buttonClassName}
       style={style}
       onMouseEnter={(e) => {
-        // Purple overlay effect
         const purpleOverlay = e.currentTarget.querySelector('.absolute.inset-0\\.5.transition-all') as HTMLElement;
         if (purpleOverlay) {
           purpleOverlay.style.background = 'radial-gradient(ellipse at center top, rgba(139, 92, 246, 0.20) 0%, rgba(124, 58, 237, 0.12) 40%, transparent 70%)';
         }
         
-        // Text glow effects
         const textElements = e.currentTarget.querySelectorAll('span');
         textElements.forEach((span: HTMLElement) => {
           span.style.textShadow = '0 0 12px rgba(251, 191, 36, 0.8)';
         });
         
-        // Underline animation with purple glow
         const underline = e.currentTarget.querySelector('.absolute.bottom-3') as HTMLElement;
         if (underline) {
           underline.style.width = '70%';
@@ -131,19 +150,16 @@ const HexButton: React.FC<HexButtonProps> = ({
         }
       }}
       onMouseLeave={(e) => {
-        // Reset purple overlay
         const purpleOverlay = e.currentTarget.querySelector('.absolute.inset-0\\.5.transition-all') as HTMLElement;
         if (purpleOverlay) {
           purpleOverlay.style.background = 'radial-gradient(ellipse at center top, rgba(139, 92, 246, 0) 0%, rgba(124, 58, 237, 0) 40%, transparent 70%)';
         }
         
-        // Reset text glow effects
         const textElements = e.currentTarget.querySelectorAll('span');
         textElements.forEach((span: HTMLElement) => {
           span.style.textShadow = 'none';
         });
         
-        // Reset underline animation
         const underline = e.currentTarget.querySelector('.absolute.bottom-3') as HTMLElement;
         if (underline) {
           underline.style.width = '0%';
@@ -152,7 +168,7 @@ const HexButton: React.FC<HexButtonProps> = ({
       }}
       {...props}
     >
-      {children}
+      {btnChildren}
     </div>
   );
 

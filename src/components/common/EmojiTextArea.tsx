@@ -8,6 +8,7 @@ interface EmojiTextAreaProps {
   className?: string;
   disabled?: boolean;
   minHeight?: string;
+  maxLength?: number;
 }
 
 const commonEmojis = [
@@ -21,7 +22,8 @@ const EmojiTextArea: React.FC<EmojiTextAreaProps> = ({
   placeholder = "Type your message...",
   className = '',
   disabled = false,
-  minHeight = '80px'
+  minHeight = '80px',
+  maxLength
 }) => {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
@@ -32,21 +34,31 @@ const EmojiTextArea: React.FC<EmojiTextAreaProps> = ({
 
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
-    const newValue = value.slice(0, start) + emoji + value.slice(end);
-    
+    const currentVal = textarea.value;
+
+    if (maxLength && (currentVal.length - (end - start) + emoji.length > maxLength)) {
+      return;
+    }
+
+    const newValue = currentVal.slice(0, start) + emoji + currentVal.slice(end);
     onChange(newValue);
     
-    // Restore cursor position after emoji
     setTimeout(() => {
       textarea.focus();
       textarea.setSelectionRange(start + emoji.length, start + emoji.length);
     }, 0);
-    
     setShowEmojiPicker(false);
   };
 
+  const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    let val = e.target.value;
+    if (maxLength && val.length > maxLength) {
+      val = val.slice(0, maxLength);
+    }
+    onChange(val);
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    // Close emoji picker on Escape
     if (e.key === 'Escape') {
       setShowEmojiPicker(false);
     }
@@ -58,23 +70,24 @@ const EmojiTextArea: React.FC<EmojiTextAreaProps> = ({
         <textarea
           ref={textAreaRef}
           value={value}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={handleTextChange}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           disabled={disabled}
+          maxLength={maxLength}
           className={`
-            w-full p-3 pr-12 border border-sand-300 rounded-lg resize-none 
-            focus:outline-none focus:ring-2 focus:ring-spice-500 focus:border-transparent
+            w-full p-3 pr-12 border border-slate-600 bg-slate-800 text-slate-100 
+            focus:outline-none focus:ring-1 focus:ring-amber-400 focus:border-amber-400
+            disabled:opacity-50 disabled:bg-slate-700
             ${className}
           `}
           style={{ minHeight }}
         />
         
-        {/* Emoji button */}
         <button
           type="button"
           onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-          className="absolute right-3 top-3 text-sand-600 hover:text-spice-600 transition-colors"
+          className="absolute right-3 top-3 text-amber-400 hover:text-amber-300 transition-colors disabled:opacity-50"
           title="Add emoji"
           disabled={disabled}
         >
@@ -82,36 +95,33 @@ const EmojiTextArea: React.FC<EmojiTextAreaProps> = ({
         </button>
       </div>
 
-      {/* Emoji hint */}
-      {!disabled && (
-        <div className="mt-1 text-xs text-sand-500">
-          💡 Tip: Use keyboard shortcuts (Win + . or Win + ;) for more emojis
+      {!disabled && !className.includes('min-h-') && !className.includes('h-') && minHeight === '80px' &&
+        <div className="mt-1 text-xs text-slate-500">
+          💡 Tip: Use Win + . or Win + ; for system emoji picker.
         </div>
-      )}
+      }
 
-      {/* Emoji picker */}
       {showEmojiPicker && (
-        <div className="absolute right-0 top-full mt-2 z-50 bg-white border border-sand-300 rounded-lg shadow-lg p-3 w-64">
+        <div className="absolute right-0 top-full mt-2 z-50 bg-slate-800 border border-slate-700 shadow-lg p-3 w-64">
           <div className="grid grid-cols-10 gap-1">
             {commonEmojis.map((emoji, index) => (
               <button
                 key={index}
                 type="button"
                 onClick={() => insertEmoji(emoji)}
-                className="w-6 h-6 flex items-center justify-center hover:bg-sand-100 rounded text-sm transition-colors"
+                className="w-6 h-6 flex items-center justify-center hover:bg-slate-700 rounded text-sm transition-colors"
                 title={`Insert ${emoji}`}
               >
                 {emoji}
               </button>
             ))}
           </div>
-          <div className="mt-2 pt-2 border-t border-sand-200 text-xs text-sand-500">
-            Click an emoji to insert it
+          <div className="mt-2 pt-2 border-t border-slate-700 text-xs text-slate-400">
+            Click an emoji to insert.
           </div>
         </div>
       )}
 
-      {/* Click outside to close */}
       {showEmojiPicker && (
         <div 
           className="fixed inset-0 z-40" 

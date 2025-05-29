@@ -40,22 +40,22 @@ const PoiListItem: React.FC<PoiListItemProps> = ({
       case 'deep_desert':
         return {
           label: 'Deep Desert',
-          bgColor: 'bg-orange-100',
-          textColor: 'text-orange-800',
+          bgColor: 'bg-slate-700', // Dark theme
+          textColor: 'text-amber-300', // Dark theme
           icon: '🏜️'
         };
       case 'hagga_basin':
         return {
           label: 'Hagga Basin',
-          bgColor: 'bg-blue-100',
-          textColor: 'text-blue-800',
+          bgColor: 'bg-slate-700', // Dark theme
+          textColor: 'text-sky-300',   // Dark theme
           icon: '🏔️'
         };
       default:
         return {
           label: 'Unknown',
-          bgColor: 'bg-gray-100',
-          textColor: 'text-gray-800',
+          bgColor: 'bg-slate-600', // Dark theme
+          textColor: 'text-sand-300', // Dark theme
           icon: '❓'
         };
     }
@@ -91,15 +91,16 @@ const PoiListItem: React.FC<PoiListItemProps> = ({
   }, [poi.id]);
 
   return (
-    <div className="bg-white shadow-sm rounded-lg p-3 hover:shadow-md transition-shadow duration-150 flex items-center gap-3 border border-sand-200">
+    <div className="bg-night-900 p-3 flex items-center gap-3 border border-slate-700/50 hover:border-slate-600 transition-colors duration-150">
       {/* POI Type Icon */}
       <div 
-        className="w-10 h-10 flex-shrink-0 rounded flex items-center justify-center text-white text-lg"
+        className="w-10 h-10 flex-shrink-0 flex items-center justify-center text-sand-100 text-lg"
         style={{
           backgroundColor: 
             (isPoiTypeIconUrl(poiType?.icon) && poiType?.icon_has_transparent_background) 
             ? 'transparent' 
-            : (poiType?.color || 'rgba(0,0,0,0.7)')
+            : (poiType?.color || '#374151'), // Default to a dark gray if no color
+          borderRadius: '0' // Sharp edges
         }}
         title={poiType?.name || 'POI Type'}
       >
@@ -116,12 +117,12 @@ const PoiListItem: React.FC<PoiListItemProps> = ({
 
       {/* Main Info */}
       <div className="flex-grow cursor-pointer min-w-0" onClick={() => onClick(poi)}>
-        <h3 className="text-md font-semibold text-night-900 hover:text-spice-700 transition-colors truncate" title={poi.title}>{poi.title}</h3>
-        <div className="text-xs text-night-600 mt-1 space-y-0.5">
+        <h3 className="text-md font-semibold text-sand-100 hover:text-gold-300 transition-colors truncate" title={poi.title}>{poi.title}</h3>
+        <div className="text-xs text-sand-300 mt-1 space-y-0.5">
           <div className="flex items-center gap-2 flex-wrap">
             <span><span className="font-medium">Type:</span> {poiType?.name || 'N/A'} ({poiType?.category || 'Uncategorized'})</span>
             {/* Map Type Badge */}
-            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${mapTypeInfo.bgColor} ${mapTypeInfo.textColor}`}>
+            <span className={`inline-flex items-center px-2 py-0.5 text-xs font-medium ${mapTypeInfo.bgColor} ${mapTypeInfo.textColor}`}>
               <span className="mr-1">{mapTypeInfo.icon}</span>
               {mapTypeInfo.label}
             </span>
@@ -132,12 +133,12 @@ const PoiListItem: React.FC<PoiListItemProps> = ({
           {/* Engagement Stats */}
           <div className="flex items-center gap-3 mt-1">
             <div className="flex items-center gap-1">
-              <MessageSquare size={12} className="text-blue-500" />
-              <span className="text-blue-600 font-medium">{commentCount}</span>
+              <MessageSquare size={12} className="text-sky-400" />
+              <span className="text-sky-400 font-medium">{commentCount}</span>
             </div>
             <div className="flex items-center gap-1">
-              <Heart size={12} className="text-red-500" />
-              <span className="text-red-600 font-medium">{likeCount}</span>
+              <Heart size={12} className="text-rose-400" />
+              <span className="text-rose-400 font-medium">{likeCount}</span>
             </div>
           </div>
         </div>
@@ -148,25 +149,25 @@ const PoiListItem: React.FC<PoiListItemProps> = ({
         {/* Optional: Small thumbnail */}
         {onImageClick && hasScreenshots && (
           <div 
-            className="w-12 h-12 flex-shrink-0 bg-sand-100 rounded flex items-center justify-center cursor-pointer hover:bg-sand-200 order-first sm:order-none"
+            className="w-12 h-12 flex-shrink-0 bg-slate-800 flex items-center justify-center cursor-pointer hover:bg-slate-700 order-first sm:order-none border border-slate-700"
             onClick={(e) => {e.stopPropagation(); onImageClick(poi);}}
             title="View Screenshots"
           >
             {poi.screenshots?.[0]?.url ? (
-                <img src={poi.screenshots[0].url} alt={poi.title} className="w-full h-full object-cover rounded" />
+                <img src={poi.screenshots[0].url} alt={poi.title} className="w-full h-full object-cover" />
             ) : (
               <ImageIcon size={20} className="text-sand-500" />
             )}
           </div>
         )}
         {!onImageClick && !hasScreenshots && (
-           <div className="w-12 h-12 flex-shrink-0 bg-sand-100 rounded flex items-center justify-center order-first sm:order-none" title="No screenshots">
+           <div className="w-12 h-12 flex-shrink-0 bg-slate-800 flex items-center justify-center order-first sm:order-none border border-slate-700" title="No screenshots">
               <ImageIcon size={20} className="text-sand-400" />
           </div>
         )} 
 
         <div className="sm:text-right space-y-0.5">
-          <div className="flex items-center justify-between text-xs text-sand-600">
+          <div className="flex items-center justify-between text-xs text-sand-400">
             <span className="truncate" title={creator?.username || 'Unknown'}>
               By {creator?.username || 'Unknown'}
             </span>
@@ -177,14 +178,14 @@ const PoiListItem: React.FC<PoiListItemProps> = ({
           <div className="mt-1 flex gap-2 justify-start sm:justify-end">
             <button 
               onClick={(e) => { e.stopPropagation(); onEdit(poi.id); }}
-              className="btn btn-outline btn-xs p-1.5 text-xs"
+              className="p-1.5 text-sand-300 hover:bg-slate-700/50 focus:outline-none focus:ring-1 focus:ring-gold-400"
               title="Edit POI"
             >
               <Edit2 size={14} />
             </button>
             <button 
               onClick={(e) => { e.stopPropagation(); onDelete(poi.id); }}
-              className="btn btn-danger btn-xs p-1.5 text-xs"
+              className="p-1.5 text-red-500 hover:bg-slate-700/50 focus:outline-none focus:ring-1 focus:ring-gold-400"
               title="Delete POI"
             >
               <Trash2 size={14} />

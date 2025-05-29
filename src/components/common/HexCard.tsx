@@ -2,7 +2,7 @@ import React from 'react';
 import DiamondIcon from './DiamondIcon'; // Import DiamondIcon
 
 interface HexCardProps {
-  children: React.ReactNode;
+  children?: React.ReactNode;
   icon?: React.ReactNode;
   title?: string;
   subtitle?: string;

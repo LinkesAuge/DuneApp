@@ -10,6 +10,7 @@ import PoisPage from './pages/Pois';
 import HaggaBasinPage from './pages/HaggaBasinPage';
 import AdminPanel from './components/admin/AdminPanel';
 import GridPage from './pages/GridPage';
+import UITestPage from './pages/UITestPage';
 import { useAuth } from './components/auth/AuthProvider';
 import { AlertTriangle } from 'lucide-react';
 
@@ -130,6 +131,10 @@ const AppRoutes: React.FC = () => {
             <AdminPanel />
           </AdminRoute>
         } 
+      />
+      <Route 
+        path="/ui-test" 
+        element={<UITestPage />}
       />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
