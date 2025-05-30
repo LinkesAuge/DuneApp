@@ -1,8 +1,24 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../auth/AuthProvider';
-import { User, UserRole, PoiType, ScheduledAdminTask } from '../../types';
-import { Shield, Users, Database, Download, Upload, Trash2, AlertTriangle, Map, CalendarClock, Trash, ListChecks, RefreshCw, Pencil } from 'lucide-react';
+import { 
+  Users, 
+  Database, 
+  Shield, 
+  Download, 
+  Upload, 
+  RefreshCw, 
+  Trash2, 
+  AlertTriangle,
+  Pencil,
+  Map,
+  ListChecks,
+  Settings,
+  Clock,
+  Calendar,
+  Monitor
+} from 'lucide-react';
+import DiamondIcon from '../common/DiamondIcon';
 import { useNavigate } from 'react-router-dom';
 import PoiTypeManager from './PoiTypeManager';
 import BaseMapUploader from './BaseMapUploader';
@@ -1240,7 +1256,7 @@ const AdminPanel: React.FC = () => {
       {/* Currently Scheduled Tasks List */}
       <section className="p-6 border border-sand-200 rounded-lg bg-white shadow-sm">
         <h3 className="text-xl font-semibold text-night-700 mb-6 flex items-center">
-          <CalendarClock className="mr-3 text-night-600" /> Currently Scheduled Tasks
+          <Calendar className="mr-3 text-night-600" /> Currently Scheduled Tasks
         </h3>
           {error && <p className="text-sm text-red-500 mb-2">Error loading scheduled tasks: {error}</p>} 
           {scheduledTasks.length === 0 && !error ? (
@@ -1601,7 +1617,7 @@ const AdminPanel: React.FC = () => {
             <AlertTriangle className="mr-3 text-red-600" />
             🚨 DANGER ZONE 🚨
         </h3>
-          <div className="p-4 bg-red-100 border border-red-300 rounded-md">
+          <div className="p-4 bg-red-100 border border-red-300 rounded-md mb-4">
             <p className="text-red-800 font-semibold mb-2">⚠️ CRITICAL WARNING ⚠️</p>
             <p className="text-red-700 text-sm mb-2">
               Reset operations will <strong>PERMANENTLY DELETE ALL DATA</strong> for the selected map. 
@@ -1696,284 +1712,420 @@ const AdminPanel: React.FC = () => {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="text-3xl font-bold text-night-800 flex items-center">
-          <Shield className="mr-3 text-spice-600" />
-          Admin Panel
-        </h1>
-      </div>
+    <div className="min-h-screen">
+      {/* Multi-layer background system */}
+      <div className="fixed inset-0 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950" />
+      <div className="fixed inset-0 bg-gradient-to-b from-slate-900/90 via-slate-800/60 to-slate-900/90" />
       
-      {error && (
-        <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6">
-          <p>{error}</p>
-        </div>
-      )}
-      
-      <div className="space-y-6">
-        <div className="border-b border-sand-200">
-          <nav className="-mb-px flex space-x-8">
-            {[
-              { id: 'users', label: 'Users', icon: Users },
-              { id: 'database', label: 'Database', icon: Database },
-              { id: 'poi-types', label: 'POI Types', icon: Shield },
-              { id: 'maps', label: 'Map Settings', icon: Map }
-            ].map(({ id, label, icon: Icon }) => (
-          <button
-                key={id}
-                onClick={() => setActiveTab(id as any)}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === id
-                    ? 'border-spice-500 text-spice-600'
-                    : 'border-transparent text-night-500 hover:text-night-700 hover:border-night-300'
-                }`}
-              >
-                <Icon className="inline mr-2" size={16} />
-                {label}
-          </button>
-            ))}
-          </nav>
+      {/* Content container */}
+      <div className="relative z-10 max-w-7xl mx-auto px-6 py-8">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-4">
+            <DiamondIcon
+              icon={<Shield size={20} strokeWidth={1.5} />}
+              size="lg"
+              bgColor="bg-void-950"
+              actualBorderColor="bg-gold-300"
+              borderThickness={2}
+              iconColor="text-gold-300"
+            />
+            <h1 className="text-4xl font-light tracking-[0.2em] text-amber-200"
+                style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+              COMMAND INTERFACE
+            </h1>
+          </div>
         </div>
         
-              {isLoading ? (
-          <div className="flex justify-center items-center h-64">
-            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-spice-600"></div>
+        {error && (
+          <div className="group relative mb-6">
+            <div className="absolute inset-0 bg-gradient-to-r from-red-950 via-red-900 to-red-950 rounded-lg" />
+            <div className="relative p-4 rounded-lg border border-red-400/30">
+              <div className="flex items-center gap-3">
+                <DiamondIcon
+                  icon={<AlertTriangle size={16} strokeWidth={1.5} />}
+                  size="sm"
+                  bgColor="bg-red-900"
+                  actualBorderColor="bg-red-400"
+                  borderThickness={1}
+                  iconColor="text-red-400"
+                />
+                <p className="text-red-300 font-light tracking-wide">{error}</p>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        <div className="space-y-8">
+          {/* Tab Navigation */}
+          <div className="group relative">
+            <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 rounded-lg" />
+            <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-800/40 to-slate-900/60 rounded-lg" />
+            
+            <div className="relative p-6 rounded-lg border border-amber-400/20">
+              <nav className="flex space-x-1">
+                {[
+                  { id: 'users', label: 'Users', icon: Users },
+                  { id: 'database', label: 'Database', icon: Database },
+                  { id: 'poi-types', label: 'POI Types', icon: Settings },
+                  { id: 'maps', label: 'Map Settings', icon: Map }
+                ].map(({ id, label, icon: Icon }) => (
+                  <button
+                    key={id}
+                    onClick={() => setActiveTab(id as any)}
+                    className={`group/tab relative flex items-center gap-2 px-6 py-3 transition-all duration-300 ${
+                      activeTab === id ? 'z-10' : ''
+                    }`}
+                  >
+                    {/* Tab background */}
+                    <div className={`absolute inset-0 transition-all duration-300 ${
+                      activeTab === id 
+                        ? 'bg-gradient-to-r from-amber-500/20 via-amber-400/30 to-amber-500/20' 
+                        : 'bg-gradient-to-r from-transparent via-transparent to-transparent group-hover/tab:from-violet-600/10 group-hover/tab:via-violet-500/15 group-hover/tab:to-violet-600/10'
+                    } rounded-lg`} />
+                    
+                    {/* Tab border */}
+                    <div className={`absolute inset-0 rounded-lg border transition-all duration-300 ${
+                      activeTab === id 
+                        ? 'border-amber-400/50' 
+                        : 'border-transparent group-hover/tab:border-violet-400/30'
+                    }`} />
+                    
+                    {/* Tab content */}
+                    <div className="relative flex items-center gap-2">
+                      <Icon size={16} className={`transition-all duration-300 ${
+                        activeTab === id 
+                          ? 'text-amber-300' 
+                          : 'text-amber-400/70 group-hover/tab:text-amber-200'
+                      }`} />
+                      <span className={`font-light text-sm tracking-wide transition-all duration-300 ${
+                        activeTab === id 
+                          ? 'text-amber-200' 
+                          : 'text-amber-300/70 group-hover/tab:text-amber-100'
+                      }`}
+                      style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                        {label}
+                      </span>
+                    </div>
+                    
+                    {/* Active tab underline */}
+                    <div className={`absolute bottom-0 left-0 h-0.5 bg-gradient-to-r from-transparent via-amber-400 to-transparent transition-all duration-700 ease-out ${
+                      activeTab === id ? 'w-full shadow-md shadow-amber-400/50' : 'w-0'
+                    }`} />
+                  </button>
+                ))}
+              </nav>
+            </div>
+          </div>
+          
+          {/* Tab Content */}
+          {isLoading ? (
+            <div className="group relative">
+              <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 rounded-lg" />
+              <div className="relative flex justify-center items-center h-64 rounded-lg border border-amber-400/20">
+                <div className="text-center">
+                  <DiamondIcon
+                    icon={<Monitor size={20} strokeWidth={1.5} />}
+                    size="lg"
+                    bgColor="bg-void-950"
+                    actualBorderColor="bg-gold-300"
+                    borderThickness={2}
+                    iconColor="text-gold-300"
+                    className="mx-auto mb-4 animate-pulse"
+                  />
+                  <p className="text-amber-300/80 font-light tracking-wide"
+                     style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                    Loading command interface...
+                  </p>
                 </div>
-              ) : (
-                  <div>
-            {activeTab === 'users' && (
-              <div className="space-y-6">
-                <h2 className="text-2xl font-semibold text-night-800">User Management</h2>
-                <div className="bg-white rounded-lg shadow overflow-hidden">
-                  <table className="min-w-full divide-y divide-sand-200">
-                    <thead className="bg-sand-50">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-night-500 uppercase tracking-wider">Username</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-night-500 uppercase tracking-wider">Email</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-night-500 uppercase tracking-wider">Role</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-night-500 uppercase tracking-wider">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-sand-200">
-                  {profiles.map((profile) => (
-                        <tr key={profile.id}>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-night-900">
-                            {profile.username}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-night-500">
-                            {profile.email}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-night-500">
-                        <select
-                          value={profile.role}
-                          onChange={(e) => handleRoleChange(profile.id, e.target.value as UserRole)}
-                              className="border border-sand-300 rounded-md px-2 py-1 text-sm"
-                          disabled={profile.id === user?.id}
-                        >
-                              <option value="user">User</option>
-                              <option value="moderator">Moderator</option>
-                          <option value="admin">Admin</option>
-                        </select>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                          <button
-                            onClick={() => handleOpenEditModal(profile)}
-                              className="text-blue-600 hover:text-blue-500 p-1 rounded-full transition duration-150 ease-in-out"
-                            title="Edit User"
-                          >
-                              <Pencil size={16} />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteUser(profile.id, profile.username)}
-                            disabled={profile.id === user?.id || isDeletingUser === profile.id}
-                              className="text-red-600 hover:text-red-500 p-1 rounded-full transition duration-150 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed"
-                              title={profile.id === user?.id ? "Cannot delete your own account" : "Delete User"}
-                            >
-                              {isDeletingUser === profile.id ? (
-                                <RefreshCw size={16} className="animate-spin" />
-                              ) : (
-                                <Trash2 size={16} />
-                              )}
-                          </button>
-                          </td>
-                        </tr>
-                  ))}
-                    </tbody>
-                  </table>
-                </div>
+              </div>
+            </div>
+          ) : (
+            <div>
+              {activeTab === 'users' && (
+                <div className="space-y-6">
+                  {/* Section Header */}
+                  <div className="flex items-center gap-4">
+                    <DiamondIcon
+                      icon={<Users size={18} strokeWidth={1.5} />}
+                      size="md"
+                      bgColor="bg-void-950"
+                      actualBorderColor="bg-gold-300"
+                      borderThickness={2}
+                      iconColor="text-gold-300"
+                    />
+                    <h2 className="text-2xl font-light tracking-[0.15em] text-amber-200"
+                        style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                      USER MANAGEMENT
+                    </h2>
+                  </div>
+                  
+                  {/* Users Table */}
+                  <div className="group relative">
+                    <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 rounded-lg" />
+                    <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-800/40 to-slate-900/60 rounded-lg" />
+                    
+                    <div className="relative rounded-lg border border-amber-400/20 overflow-hidden">
+                      <table className="min-w-full">
+                        <thead>
+                          <tr className="border-b border-amber-400/20">
+                            <th className="px-6 py-4 text-left text-xs font-light uppercase tracking-[0.2em] text-amber-300/80"
+                                style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                              Username
+                            </th>
+                            <th className="px-6 py-4 text-left text-xs font-light uppercase tracking-[0.2em] text-amber-300/80"
+                                style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                              Email
+                            </th>
+                            <th className="px-6 py-4 text-left text-xs font-light uppercase tracking-[0.2em] text-amber-300/80"
+                                style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                              Role
+                            </th>
+                            <th className="px-6 py-4 text-left text-xs font-light uppercase tracking-[0.2em] text-amber-300/80"
+                                style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                              Actions
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {profiles.map((profile) => (
+                            <tr key={profile.id} className="group/row border-b border-amber-400/10 hover:bg-gradient-to-r hover:from-violet-600/5 hover:via-violet-500/10 hover:to-violet-600/5 transition-all duration-300">
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <span className="text-sm font-light text-amber-100 tracking-wide"
+                                      style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                                  {profile.username}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <span className="text-sm text-amber-200/70 tracking-wide"
+                                      style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                                  {profile.email}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="relative">
+                                  <select
+                                    value={profile.role}
+                                    onChange={(e) => handleRoleChange(profile.id, e.target.value as UserRole)}
+                                    className="bg-gradient-to-r from-slate-900 to-slate-800 border border-amber-400/30 rounded-md px-3 py-1.5 text-sm text-amber-200 focus:outline-none focus:ring-2 focus:ring-amber-400/50 focus:border-amber-400/70 transition-all duration-300 disabled:opacity-50"
+                                    style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
+                                    disabled={profile.id === user?.id}
+                                  >
+                                    <option value="user" className="bg-slate-900 text-amber-200">User</option>
+                                    <option value="moderator" className="bg-slate-900 text-amber-200">Moderator</option>
+                                    <option value="admin" className="bg-slate-900 text-amber-200">Admin</option>
+                                  </select>
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="flex items-center space-x-2">
+                                  {/* Edit Button */}
+                                  <button
+                                    onClick={() => handleOpenEditModal(profile)}
+                                    className="group/btn relative p-2 transition-all duration-300"
+                                    title="Edit User"
+                                  >
+                                    <div className="absolute inset-0 bg-gradient-to-r from-blue-600/20 to-blue-500/20 rounded-lg opacity-0 group-hover/btn:opacity-100 transition-all duration-300" />
+                                    <div className="absolute inset-0 border border-blue-400/30 rounded-lg opacity-0 group-hover/btn:opacity-100 transition-all duration-300" />
+                                    <Pencil size={16} className="relative text-blue-400 group-hover/btn:text-blue-300 transition-all duration-300" />
+                                  </button>
+                                  
+                                  {/* Delete Button */}
+                                  <button
+                                    onClick={() => handleDeleteUser(profile.id, profile.username)}
+                                    disabled={profile.id === user?.id || isDeletingUser === profile.id}
+                                    className="group/btn relative p-2 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    title={profile.id === user?.id ? "Cannot delete your own account" : "Delete User"}
+                                  >
+                                    <div className="absolute inset-0 bg-gradient-to-r from-red-600/20 to-red-500/20 rounded-lg opacity-0 group-hover/btn:opacity-100 transition-all duration-300" />
+                                    <div className="absolute inset-0 border border-red-400/30 rounded-lg opacity-0 group-hover/btn:opacity-100 transition-all duration-300" />
+                                    {isDeletingUser === profile.id ? (
+                                      <RefreshCw size={16} className="relative text-red-400 animate-spin" />
+                                    ) : (
+                                      <Trash2 size={16} className="relative text-red-400 group-hover/btn:text-red-300 transition-all duration-300" />
+                                    )}
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
                 </div>
               )}
 
-            {activeTab === 'database' && <DatabaseTab />}
+              {activeTab === 'database' && <DatabaseTab />}
 
-            {activeTab === 'poi-types' && (
-              <div className="space-y-6">
-                <h2 className="text-2xl font-semibold text-night-800">POI Type Management</h2>
-            <PoiTypeManager 
-              poiTypes={poiTypes}
-                  onPoiTypesChange={() => fetchPoiTypesForAdmin()}
-            />
-              </div>
-            )}
+              {activeTab === 'poi-types' && (
+                <div className="space-y-6">
+                  <h2 className="text-2xl font-semibold text-night-800">POI Type Management</h2>
+              <PoiTypeManager 
+                poiTypes={poiTypes}
+                    onPoiTypesChange={() => fetchPoiTypesForAdmin()}
+              />
+                </div>
+              )}
 
-            {activeTab === 'maps' && (
-              <div className="space-y-8">
-                <h2 className="text-2xl font-semibold text-night-800">Map Configuration</h2>
+              {activeTab === 'maps' && (
+                <div className="space-y-8">
+                  <h2 className="text-2xl font-semibold text-night-800">Map Configuration</h2>
+                  
+                  {/* Base Maps Section */}
+                  <section className="p-6 border border-sand-200 rounded-lg bg-white shadow-sm">
+                    <h3 className="text-xl font-semibold text-night-700 mb-6">Base Map Images</h3>
+                    <BaseMapUploader />
+                  </section>
                 
-                {/* Base Maps Section */}
-                <section className="p-6 border border-sand-200 rounded-lg bg-white shadow-sm">
-                  <h3 className="text-xl font-semibold text-night-700 mb-6">Base Map Images</h3>
-                  <BaseMapUploader />
-                </section>
-              
-              {/* Hagga Basin Settings */}
-                <section className="p-6 border border-sand-200 rounded-lg bg-white shadow-sm">
-                  <h3 className="text-xl font-semibold text-night-700 mb-6 flex items-center">
-                    <Map className="mr-3 text-sky-600" />
-                  Hagga Basin Settings
-                </h3>
-                
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    {/* Icon Size Settings */}
-                  <div className="space-y-4">
-                      <h4 className="text-lg font-medium text-night-600">Icon Size Configuration</h4>
-                      
-                      <div>
-                        <label htmlFor="iconBaseSize" className="block text-sm font-medium text-night-600 mb-1">
-                          Base Icon Size (px)
-                        </label>
-                        <input
-                          type="number"
-                          id="iconBaseSize"
-                          min="16"
-                          max="256"
-                          value={mapSettings.iconBaseSize}
-                          onChange={(e) => setMapSettings(prev => ({
-                            ...prev,
-                            iconBaseSize: parseInt(e.target.value) || 64
-                          }))}
-                          className="w-full p-2 border border-sand-300 rounded-md focus:ring-spice-500 focus:border-spice-500"
-                        />
+                {/* Hagga Basin Settings */}
+                  <section className="p-6 border border-sand-200 rounded-lg bg-white shadow-sm">
+                    <h3 className="text-xl font-semibold text-night-700 mb-6 flex items-center">
+                      <Map className="mr-3 text-sky-600" />
+                    Hagga Basin Settings
+                  </h3>
+                  
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                      {/* Icon Size Settings */}
+                    <div className="space-y-4">
+                        <h4 className="text-lg font-medium text-night-600">Icon Size Configuration</h4>
+                        
+                        <div>
+                          <label htmlFor="iconBaseSize" className="block text-sm font-medium text-night-600 mb-1">
+                            Base Icon Size (px)
+                          </label>
+                          <input
+                            type="number"
+                            id="iconBaseSize"
+                            min="16"
+                            max="256"
+                            value={mapSettings.iconBaseSize}
+                            onChange={(e) => setMapSettings(prev => ({
+                              ...prev,
+                              iconBaseSize: parseInt(e.target.value) || 64
+                            }))}
+                            className="w-full p-2 border border-sand-300 rounded-md focus:ring-spice-500 focus:border-spice-500"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label htmlFor="iconMinSize" className="block text-sm font-medium text-night-600 mb-1">
+                            Minimum Icon Size (px)
+                          </label>
+                          <input
+                            type="number"
+                            id="iconMinSize"
+                            min="8"
+                            max="128"
+                            value={mapSettings.iconMinSize}
+                            onChange={(e) => setMapSettings(prev => ({
+                              ...prev,
+                              iconMinSize: parseInt(e.target.value) || 32
+                            }))}
+                            className="w-full p-2 border border-sand-300 rounded-md focus:ring-spice-500 focus:border-spice-500"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label htmlFor="iconMaxSize" className="block text-sm font-medium text-night-600 mb-1">
+                            Maximum Icon Size (px)
+                          </label>
+                          <input
+                            type="number"
+                            id="iconMaxSize"
+                            min="32"
+                            max="512"
+                            value={mapSettings.iconMaxSize}
+                            onChange={(e) => setMapSettings(prev => ({
+                              ...prev,
+                              iconMaxSize: parseInt(e.target.value) || 128
+                            }))}
+                            className="w-full p-2 border border-sand-300 rounded-md focus:ring-spice-500 focus:border-spice-500"
+                          />
                       </div>
-                      
-                      <div>
-                        <label htmlFor="iconMinSize" className="block text-sm font-medium text-night-600 mb-1">
-                          Minimum Icon Size (px)
-                        </label>
-                        <input
-                          type="number"
-                          id="iconMinSize"
-                          min="8"
-                          max="128"
-                          value={mapSettings.iconMinSize}
-                          onChange={(e) => setMapSettings(prev => ({
-                            ...prev,
-                            iconMinSize: parseInt(e.target.value) || 32
-                          }))}
-                          className="w-full p-2 border border-sand-300 rounded-md focus:ring-spice-500 focus:border-spice-500"
-                        />
+                    </div>
+                    
+                      {/* Interaction Settings */}
+                    <div className="space-y-4">
+                        <h4 className="text-lg font-medium text-night-600">Map Interaction Settings</h4>
+                        
+                      <div className="space-y-3">
+                          <label className="flex items-center">
+                          <input
+                            type="checkbox"
+                            checked={mapSettings.showTooltips}
+                            onChange={(e) => setMapSettings(prev => ({
+                              ...prev,
+                              showTooltips: e.target.checked
+                            }))}
+                              className="mr-2 h-4 w-4 text-spice-600 focus:ring-spice-500 border-sand-300 rounded"
+                            />
+                            <span className="text-sm text-night-600">Show POI tooltips on hover</span>
+                          </label>
+                          
+                          <label className="flex items-center">
+                          <input
+                            type="checkbox"
+                            checked={mapSettings.enablePositionChange}
+                            onChange={(e) => setMapSettings(prev => ({
+                              ...prev,
+                              enablePositionChange: e.target.checked
+                            }))}
+                              className="mr-2 h-4 w-4 text-spice-600 focus:ring-spice-500 border-sand-300 rounded"
+                            />
+                            <span className="text-sm text-night-600">Allow POI position changes</span>
+                          </label>
+                          
+                          <label className="flex items-center">
+                            <input
+                              type="checkbox"
+                              checked={mapSettings.enableAdvancedFiltering}
+                              onChange={(e) => setMapSettings(prev => ({ 
+                                ...prev, 
+                                enableAdvancedFiltering: e.target.checked
+                              }))}
+                              className="mr-2 h-4 w-4 text-spice-600 focus:ring-spice-500 border-sand-300 rounded"
+                            />
+                            <span className="text-sm text-night-600">Enable advanced POI filtering</span>
+                          </label>
+                          
+                          <label className="flex items-center">
+                            <input
+                              type="checkbox"
+                              checked={mapSettings.showSharedIndicators}
+                              onChange={(e) => setMapSettings(prev => ({ 
+                                ...prev, 
+                                showSharedIndicators: e.target.checked
+                              }))}
+                              className="mr-2 h-4 w-4 text-spice-600 focus:ring-spice-500 border-sand-300 rounded"
+                            />
+                            <span className="text-sm text-night-600">Show shared POI indicators</span>
+                          </label>
                       </div>
-                      
-                      <div>
-                        <label htmlFor="iconMaxSize" className="block text-sm font-medium text-night-600 mb-1">
-                          Maximum Icon Size (px)
-                        </label>
-                        <input
-                          type="number"
-                          id="iconMaxSize"
-                          min="32"
-                          max="512"
-                          value={mapSettings.iconMaxSize}
-                          onChange={(e) => setMapSettings(prev => ({
-                            ...prev,
-                            iconMaxSize: parseInt(e.target.value) || 128
-                          }))}
-                          className="w-full p-2 border border-sand-300 rounded-md focus:ring-spice-500 focus:border-spice-500"
-                        />
                     </div>
                   </div>
                   
-                    {/* Interaction Settings */}
-                  <div className="space-y-4">
-                      <h4 className="text-lg font-medium text-night-600">Map Interaction Settings</h4>
-                      
-                    <div className="space-y-3">
-                        <label className="flex items-center">
-                        <input
-                          type="checkbox"
-                          checked={mapSettings.showTooltips}
-                          onChange={(e) => setMapSettings(prev => ({
-                            ...prev,
-                            showTooltips: e.target.checked
-                          }))}
-                            className="mr-2 h-4 w-4 text-spice-600 focus:ring-spice-500 border-sand-300 rounded"
-                          />
-                          <span className="text-sm text-night-600">Show POI tooltips on hover</span>
-                        </label>
-                        
-                        <label className="flex items-center">
-                        <input
-                          type="checkbox"
-                          checked={mapSettings.enablePositionChange}
-                          onChange={(e) => setMapSettings(prev => ({
-                            ...prev,
-                            enablePositionChange: e.target.checked
-                          }))}
-                            className="mr-2 h-4 w-4 text-spice-600 focus:ring-spice-500 border-sand-300 rounded"
-                          />
-                          <span className="text-sm text-night-600">Allow POI position changes</span>
-                        </label>
-                        
-                        <label className="flex items-center">
-                          <input
-                            type="checkbox"
-                            checked={mapSettings.enableAdvancedFiltering}
-                            onChange={(e) => setMapSettings(prev => ({ 
-                              ...prev, 
-                              enableAdvancedFiltering: e.target.checked
-                            }))}
-                            className="mr-2 h-4 w-4 text-spice-600 focus:ring-spice-500 border-sand-300 rounded"
-                          />
-                          <span className="text-sm text-night-600">Enable advanced POI filtering</span>
-                        </label>
-                        
-                        <label className="flex items-center">
-                          <input
-                            type="checkbox"
-                            checked={mapSettings.showSharedIndicators}
-                            onChange={(e) => setMapSettings(prev => ({ 
-                              ...prev, 
-                              showSharedIndicators: e.target.checked
-                            }))}
-                            className="mr-2 h-4 w-4 text-spice-600 focus:ring-spice-500 border-sand-300 rounded"
-                          />
-                          <span className="text-sm text-night-600">Show shared POI indicators</span>
-                        </label>
-                    </div>
+                    {/* Save/Reset Buttons */}
+                    <div className="mt-8 flex space-x-4">
+                    <button 
+                        onClick={saveMapSettings}
+                        className="px-6 py-2 bg-spice-600 text-white rounded-md hover:bg-spice-700 focus:outline-none focus:ring-2 focus:ring-spice-500 focus:ring-offset-2"
+                    >
+                        Save Settings
+                    </button>
+                    <button 
+                        onClick={resetMapSettings}
+                        className="px-6 py-2 bg-sand-300 text-night-700 rounded-md hover:bg-sand-400 focus:outline-none focus:ring-2 focus:ring-sand-500 focus:ring-offset-2"
+                    >
+                        Reset to Defaults
+                    </button>
                   </div>
-                </div>
+                  </section>
                 
-                  {/* Save/Reset Buttons */}
-                  <div className="mt-8 flex space-x-4">
-                  <button 
-                      onClick={saveMapSettings}
-                      className="px-6 py-2 bg-spice-600 text-white rounded-md hover:bg-spice-700 focus:outline-none focus:ring-2 focus:ring-spice-500 focus:ring-offset-2"
-                  >
-                      Save Settings
-                  </button>
-                  <button 
-                      onClick={resetMapSettings}
-                      className="px-6 py-2 bg-sand-300 text-night-700 rounded-md hover:bg-sand-400 focus:outline-none focus:ring-2 focus:ring-sand-500 focus:ring-offset-2"
-                  >
-                      Reset to Defaults
-                  </button>
-                </div>
-                </section>
-              
-              {/* Deep Desert Settings */}
-                <section className="p-6 border border-sand-200 rounded-lg bg-white shadow-sm">
-                  <h3 className="text-xl font-semibold text-night-700 mb-6 flex items-center">
-                    <Map className="mr-3 text-spice-600" />
+                {/* Deep Desert Settings */}
+                  <section className="p-6 border border-sand-200 rounded-lg bg-white shadow-sm">
+                    <h3 className="text-xl font-semibold text-night-700 mb-6 flex items-center">
+                      <Map className="mr-3 text-spice-600" />
                     Deep Desert Settings
                 </h3>
                 
@@ -2076,69 +2228,131 @@ const AdminPanel: React.FC = () => {
                 </section>
               </div>
             )}
-              </div>
-          )}
+          </div>
+        )}
       </div>
+      </div> {/* Close content container: relative z-10 max-w-7xl mx-auto px-6 py-8 */}
 
       {/* User Edit Modal */}
       {isEditModalOpen && editingUser && (
-        <div className="fixed inset-0 bg-night-950 bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h3 className="text-lg font-medium text-night-800 mb-4">
-              Edit User: {editingUser.username}
-            </h3>
+        <div className="fixed inset-0 bg-slate-950/90 flex items-center justify-center z-50 p-4">
+          <div className="group relative max-w-md w-full">
+            {/* Multi-layer background system */}
+            <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 rounded-lg" />
+            <div className="absolute inset-0 bg-gradient-to-b from-slate-900/90 via-slate-800/60 to-slate-900/90 rounded-lg" />
             
-            {editError && (
-              <div className="bg-red-100 border border-red-400 text-red-700 px-3 py-2 rounded mb-4">
-                {editError}
-              </div>
-            )}
-            
-            <div className="space-y-4">
-              <div>
-                <label htmlFor="editUsername" className="block text-sm font-medium text-night-600 mb-1">
-                  Username
-                </label>
-                <input 
-                  type="text" 
-                  id="editUsername" 
-                  value={editUsername}
-                  onChange={(e) => setEditUsername(e.target.value)}
-                  className="w-full p-2 border border-sand-300 rounded-md focus:ring-spice-500 focus:border-spice-500"
-                  disabled={isUpdatingUser}
+            <div className="relative p-6 rounded-lg border border-amber-400/30">
+              {/* Modal Header */}
+              <div className="flex items-center gap-4 mb-6">
+                <DiamondIcon
+                  icon={<Pencil size={16} strokeWidth={1.5} />}
+                  size="md"
+                  bgColor="bg-void-950"
+                  actualBorderColor="bg-gold-300"
+                  borderThickness={2}
+                  iconColor="text-gold-300"
                 />
+                <h3 className="text-xl font-light tracking-[0.15em] text-amber-200"
+                    style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                  EDIT USER
+                </h3>
               </div>
-              
-              <div>
-                <label htmlFor="editEmail" className="block text-sm font-medium text-night-600 mb-1">
-                  Email
-                </label>
-                <input 
-                  type="email" 
-                  id="editEmail" 
-                  value={editEmail}
-                  onChange={(e) => setEditEmail(e.target.value)}
-                  className="w-full p-2 border border-sand-300 rounded-md focus:ring-spice-500 focus:border-spice-500"
+
+              {editError && (
+                <div className="group/error relative mb-4">
+                  <div className="absolute inset-0 bg-gradient-to-r from-red-950 via-red-900 to-red-950 rounded-lg" />
+                  <div className="relative p-3 rounded-lg border border-red-400/30">
+                    <div className="flex items-center gap-2">
+                      <DiamondIcon
+                        icon={<AlertTriangle size={14} strokeWidth={1.5} />}
+                        size="sm"
+                        bgColor="bg-red-900"
+                        actualBorderColor="bg-red-400"
+                        borderThickness={1}
+                        iconColor="text-red-400"
+                      />
+                      <p className="text-red-300 text-sm font-light tracking-wide">{editError}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Form Fields */}
+              <div className="space-y-4 mb-6">
+                <div>
+                  <label htmlFor="edit-username" className="block text-sm font-light tracking-wide text-amber-300/80 mb-2"
+                         style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                    Username
+                  </label>
+                  <input
+                    type="text"
+                    id="edit-username"
+                    value={editUsername}
+                    onChange={(e) => setEditUsername(e.target.value)}
+                    className="w-full p-3 bg-gradient-to-r from-slate-900 to-slate-800 border border-amber-400/30 rounded-lg text-amber-200 focus:outline-none focus:ring-2 focus:ring-amber-400/50 focus:border-amber-400/70 transition-all duration-300"
+                    style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
+                    disabled={isUpdatingUser}
+                  />
+                </div>
+                
+                <div>
+                  <label htmlFor="edit-email" className="block text-sm font-light tracking-wide text-amber-300/80 mb-2"
+                         style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    id="edit-email"
+                    value={editEmail}
+                    onChange={(e) => setEditEmail(e.target.value)}
+                    className="w-full p-3 bg-gradient-to-r from-slate-900 to-slate-800 border border-amber-400/30 rounded-lg text-amber-200 focus:outline-none focus:ring-2 focus:ring-amber-400/50 focus:border-amber-400/70 transition-all duration-300"
+                    style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
+                    disabled={isUpdatingUser}
+                  />
+                </div>
+              </div>
+
+              {/* Modal Actions */}
+              <div className="flex space-x-3">
+                {/* Update Button */}
+                <button
+                  onClick={handleUpdateUser}
                   disabled={isUpdatingUser}
-                />
+                  className="group/btn relative flex-1 px-4 py-3 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-green-600/20 via-green-500/30 to-green-600/20 rounded-lg" />
+                  <div className="absolute inset-0 border border-green-400/40 rounded-lg" />
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-transparent group-hover/btn:from-violet-600/10 group-hover/btn:via-violet-500/15 group-hover/btn:to-violet-600/10 rounded-lg transition-all duration-300" />
+                  
+                  <span className="relative text-green-300 font-light tracking-wide flex items-center justify-center gap-2"
+                        style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                    {isUpdatingUser ? (
+                      <>
+                        <RefreshCw size={16} className="animate-spin" />
+                        Updating...
+                      </>
+                    ) : (
+                      'Update User'
+                    )}
+                  </span>
+                </button>
+                
+                {/* Cancel Button */}
+                <button 
+                  onClick={handleCloseEditModal} 
+                  disabled={isUpdatingUser}
+                  className="group/btn relative flex-1 px-4 py-3 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-slate-800/40 via-slate-700/50 to-slate-800/40 rounded-lg" />
+                  <div className="absolute inset-0 border border-amber-400/30 rounded-lg" />
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-transparent group-hover/btn:from-violet-600/10 group-hover/btn:via-violet-500/15 group-hover/btn:to-violet-600/10 rounded-lg transition-all duration-300" />
+                  
+                  <span className="relative text-amber-200/80 font-light tracking-wide flex items-center justify-center"
+                        style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                    Cancel
+                  </span>
+                </button>
               </div>
-            </div>
-            
-            <div className="mt-6 flex space-x-3">
-              <button
-                onClick={handleUpdateUser}
-                disabled={isUpdatingUser}
-                className="flex-1 bg-spice-600 text-white px-4 py-2 rounded-md hover:bg-spice-700 focus:outline-none focus:ring-2 focus:ring-spice-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isUpdatingUser ? 'Updating...' : 'Update User'}
-              </button>
-              <button 
-                onClick={handleCloseEditModal} 
-                disabled={isUpdatingUser}
-                className="flex-1 bg-sand-300 text-night-700 px-4 py-2 rounded-md hover:bg-sand-400 focus:outline-none focus:ring-2 focus:ring-sand-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Cancel
-              </button>
             </div>
           </div>
         </div>
@@ -2146,62 +2360,86 @@ const AdminPanel: React.FC = () => {
 
       {/* Danger Zone Confirmation Modal */}
       {isDangerModalOpen && dangerAction && (
-        <div className="fixed inset-0 bg-night-950 bg-opacity-75 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg border-4 border-red-500 max-w-lg w-full">
-            <div className="p-6">
+        <div className="fixed inset-0 bg-slate-950/95 flex items-center justify-center z-50 p-4">
+          <div className="group relative max-w-lg w-full">
+            {/* Multi-layer background system with red accents */}
+            <div className="absolute inset-0 bg-gradient-to-r from-red-950 via-red-900 to-red-950 rounded-lg" />
+            <div className="absolute inset-0 bg-gradient-to-b from-red-900/90 via-red-800/60 to-red-900/90 rounded-lg" />
+            
+            <div className="relative p-6 rounded-lg border-2 border-red-400/50">
               {/* Modal Header */}
-              <div className="flex items-center mb-4">
-                <AlertTriangle className="text-red-600 mr-3" size={24} />
-                <h3 className="text-xl font-bold text-red-800">
+              <div className="flex items-center gap-4 mb-6">
+                <DiamondIcon
+                  icon={<AlertTriangle size={18} strokeWidth={1.5} />}
+                  size="lg"
+                  bgColor="bg-red-900"
+                  actualBorderColor="bg-red-400"
+                  borderThickness={2}
+                  iconColor="text-red-400"
+                />
+                <h3 className="text-xl font-light tracking-[0.15em] text-red-300"
+                    style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
                   🚨 CONFIRM DESTRUCTIVE ACTION 🚨
                 </h3>
               </div>
 
               {/* Warning Content */}
               <div className="mb-6">
-                <div className="p-4 bg-red-100 border-2 border-red-300 rounded-md mb-4">
-                  <p className="text-red-800 font-bold mb-2">⚠️ CRITICAL WARNING ⚠️</p>
-                  <p className="text-red-700 text-sm mb-2">
-                    You are about to <strong>PERMANENTLY DELETE ALL DATA</strong> for{' '}
-                    <strong>
-                      {dangerAction.mapType === 'deep_desert' ? 'Deep Desert' : 'Hagga Basin'}
-                    </strong>.
-                  </p>
-                  <p className="text-red-700 text-sm mb-2">
-                    This will delete:
-                  </p>
-                  <ul className="text-red-700 text-sm list-disc list-inside ml-4 mb-2">
-                    {dangerAction.mapType === 'deep_desert' && (
-                      <li>All grid squares (A1-I9) and their screenshots</li>
-                    )}
-                    <li>All POIs and their images</li>
-                    <li>All comments and comment screenshots</li>
-                    <li>All associated storage files</li>
-                  </ul>
-                  <p className="text-red-700 text-sm font-bold">
-                    THIS ACTION CANNOT BE UNDONE!
-                  </p>
-                  {dangerAction.backupFirst && (
-                    <p className="text-green-700 text-sm font-semibold mt-2">
-                      ✓ A backup will be created before deletion.
+                <div className="group/warning relative mb-4">
+                  <div className="absolute inset-0 bg-gradient-to-r from-red-950 via-red-900 to-red-950 rounded-lg" />
+                  <div className="relative p-4 rounded-lg border border-red-400/40">
+                    <p className="text-red-300 font-medium mb-2 tracking-wide"
+                       style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                      ⚠️ CRITICAL WARNING ⚠️
                     </p>
-                  )}
+                    <p className="text-red-200/90 text-sm mb-2 font-light tracking-wide"
+                       style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                      You are about to <strong>PERMANENTLY DELETE ALL DATA</strong> for{' '}
+                      <strong>
+                        {dangerAction.mapType === 'deep_desert' ? 'Deep Desert' : 'Hagga Basin'}
+                      </strong>.
+                    </p>
+                    <p className="text-red-200/80 text-sm mb-2 font-light">
+                      This will delete:
+                    </p>
+                    <ul className="text-red-200/80 text-sm list-disc list-inside ml-4 mb-2 space-y-1">
+                      {dangerAction.mapType === 'deep_desert' && (
+                        <li>All grid squares (A1-I9) and their screenshots</li>
+                      )}
+                      <li>All POIs and their images</li>
+                      <li>All comments and comment screenshots</li>
+                      <li>All associated storage files</li>
+                    </ul>
+                    <p className="text-red-300 text-sm font-medium tracking-wide"
+                       style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                      THIS ACTION CANNOT BE UNDONE!
+                    </p>
+                    {dangerAction.backupFirst && (
+                      <p className="text-green-300 text-sm font-medium mt-2 tracking-wide"
+                         style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                        ✓ A backup will be created before deletion.
+                      </p>
+                    )}
+                  </div>
                 </div>
 
                 {/* Confirmation Input */}
                 <div className="mb-4">
-                  <label className="block text-sm font-bold text-red-800 mb-2">
+                  <label className="block text-sm font-medium text-red-300/90 mb-2 tracking-wide"
+                         style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
                     To confirm this action, type the following text exactly:
                   </label>
-                  <div className="p-2 bg-gray-100 border rounded-md mb-2 font-mono text-sm">
-                    {dangerAction.confirmationText}
+                  <div className="p-3 bg-slate-900/60 border border-red-400/30 rounded-lg mb-3">
+                    <code className="text-red-200 font-mono text-sm tracking-wide">
+                      {dangerAction.confirmationText}
+                    </code>
                   </div>
                   <input
                     type="text"
                     value={dangerConfirmationInput}
                     onChange={(e) => setDangerConfirmationInput(e.target.value)}
                     placeholder="Type the confirmation text here..."
-                    className="w-full p-3 border-2 border-red-300 rounded-md focus:ring-red-500 focus:border-red-500 font-mono"
+                    className="w-full p-3 bg-gradient-to-r from-slate-900 to-slate-800 border border-red-400/40 rounded-lg text-red-200 placeholder-red-400/50 focus:outline-none focus:ring-2 focus:ring-red-400/50 focus:border-red-400/70 transition-all duration-300 font-mono"
                     autoFocus
                   />
                 </div>
@@ -2209,20 +2447,44 @@ const AdminPanel: React.FC = () => {
 
               {/* Modal Actions */}
               <div className="flex space-x-3">
-              <button 
+                {/* Confirm Button */}
+                <button 
                   onClick={handleDangerConfirmation}
                   disabled={dangerConfirmationInput !== dangerAction.confirmationText || isResetting}
-                  className="flex-1 bg-red-700 text-white px-4 py-3 rounded-md font-bold border-2 border-red-800 hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="group/btn relative flex-1 px-4 py-3 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {isResetting ? 'DELETING...' : 'CONFIRM DELETION'}
+                  <div className="absolute inset-0 bg-gradient-to-r from-red-700/60 via-red-600/70 to-red-700/60 rounded-lg" />
+                  <div className="absolute inset-0 border-2 border-red-500/60 rounded-lg" />
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-transparent group-hover/btn:from-red-500/20 group-hover/btn:via-red-400/30 group-hover/btn:to-red-500/20 rounded-lg transition-all duration-300" />
+                  
+                  <span className="relative text-red-100 font-medium tracking-wide flex items-center justify-center gap-2"
+                        style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                    {isResetting ? (
+                      <>
+                        <RefreshCw size={16} className="animate-spin" />
+                        DELETING...
+                      </>
+                    ) : (
+                      'CONFIRM DELETION'
+                    )}
+                  </span>
                 </button>
+                
+                {/* Cancel Button */}
                 <button
                   onClick={handleCloseDangerModal}
                   disabled={isResetting}
-                  className="flex-1 bg-gray-300 text-gray-700 px-4 py-3 rounded-md font-medium hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="group/btn relative flex-1 px-4 py-3 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Cancel
-              </button>
+                  <div className="absolute inset-0 bg-gradient-to-r from-slate-700/40 via-slate-600/50 to-slate-700/40 rounded-lg" />
+                  <div className="absolute inset-0 border border-slate-500/40 rounded-lg" />
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-transparent group-hover/btn:from-violet-600/10 group-hover/btn:via-violet-500/15 group-hover/btn:to-violet-600/10 rounded-lg transition-all duration-300" />
+                  
+                  <span className="relative text-slate-300 font-light tracking-wide flex items-center justify-center"
+                        style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                    Cancel
+                  </span>
+                </button>
               </div>
             </div>
           </div>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { ActivityItem } from '../../types';
+import DiamondIcon from '../common/DiamondIcon';
 import { 
   MapPin, 
   MessageSquare, 
@@ -54,7 +55,7 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ limit = 20 }) => {
             profile = data;
           }
 
-          // Get coordinate
+          // Get grid square coordinate if grid_square_id exists
           let gridSquare = null;
           if (poi.grid_square_id) {
             const { data } = await supabase
@@ -67,30 +68,23 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ limit = 20 }) => {
 
           poisWithDetails.push({
             ...poi,
-            profiles: { username: profile?.username || 'Unknown User' },
-            grid_squares: { coordinate: gridSquare?.coordinate || 'Unknown' }
+            profile,
+            grid_square: gridSquare
+          });
+        }
+
+        // Add POI activities
+        for (const poi of poisWithDetails) {
+          activities.push({
+            id: `poi-${poi.id}`,
+            type: 'poi_created',
+            title: `New POI: ${poi.title}`,
+            description: `Added by ${poi.profile?.username || 'Anonymous'}${poi.grid_square ? ` in ${poi.grid_square.coordinate}` : ''}`,
+            timestamp: poi.created_at,
+            icon: 'MapPin'
           });
         }
       }
-
-      if (poisError) throw poisError;
-
-      poisWithDetails?.forEach(poi => {
-        activities.push({
-          id: `poi_${poi.id}`,
-          type: 'poi_created',
-          title: 'New POI Created',
-          description: poi.title,
-          user: { username: poi.profiles?.username || 'Unknown User' },
-          timestamp: poi.created_at,
-          targetId: poi.id,
-          targetType: 'poi',
-          metadata: {
-            coordinate: poi.grid_squares?.coordinate,
-            poiTitle: poi.title
-          }
-        });
-      });
 
       // Fetch recent comments with manual joins
       const { data: recentComments, error: commentsError } = await supabase
@@ -99,245 +93,110 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ limit = 20 }) => {
           id,
           content,
           created_at,
-          created_by,
-          poi_id,
-          grid_square_id
+          author_id,
+          poi_id
         `)
         .order('created_at', { ascending: false })
         .limit(Math.ceil(limit / 4));
 
-      // Fetch additional details separately
       let commentsWithDetails = [];
       if (recentComments && !commentsError) {
         for (const comment of recentComments) {
-          // Get username only if created_by is not null
-          let profile = null;
-          if (comment.created_by) {
+          // Get author username
+          let author = null;
+          if (comment.author_id) {
             const { data } = await supabase
               .from('profiles')
               .select('username')
-              .eq('id', comment.created_by)
+              .eq('id', comment.author_id)
               .single();
-            profile = data;
+            author = data;
           }
 
-          // Get POI title if poi_id exists
-          let poiTitle = null;
+          // Get POI title
+          let poi = null;
           if (comment.poi_id) {
-            const { data: poi } = await supabase
+            const { data } = await supabase
               .from('pois')
               .select('title')
               .eq('id', comment.poi_id)
               .single();
-            poiTitle = poi?.title;
-          }
-
-          // Get grid coordinate if grid_square_id exists
-          let coordinate = null;
-          if (comment.grid_square_id) {
-            const { data: gridSquare } = await supabase
-              .from('grid_squares')
-              .select('coordinate')
-              .eq('id', comment.grid_square_id)
-              .single();
-            coordinate = gridSquare?.coordinate;
+            poi = data;
           }
 
           commentsWithDetails.push({
             ...comment,
-            profiles: { username: profile?.username || 'Unknown User' },
-            pois: poiTitle ? { title: poiTitle } : null,
-            grid_squares: coordinate ? { coordinate } : null
+            author,
+            poi
+          });
+        }
+
+        // Add comment activities
+        for (const comment of commentsWithDetails) {
+          activities.push({
+            id: `comment-${comment.id}`,
+            type: 'comment_added',
+            title: `New comment on ${comment.poi?.title || 'POI'}`,
+            description: `Comment by ${comment.author?.username || 'Anonymous'}: ${comment.content.substring(0, 100)}${comment.content.length > 100 ? '...' : ''}`,
+            timestamp: comment.created_at,
+            icon: 'MessageSquare'
           });
         }
       }
 
-      if (commentsError) throw commentsError;
-
-      commentsWithDetails?.forEach(comment => {
-        const target = comment.pois?.title || comment.grid_squares?.coordinate || 'Unknown';
-        const targetType = comment.poi_id ? 'poi' : 'grid_square';
-        
-        activities.push({
-          id: `comment_${comment.id}`,
-          type: 'comment_added',
-          title: 'New Comment',
-          description: comment.content.length > 100 ? 
-            comment.content.substring(0, 100) + '...' : 
-            comment.content,
-          user: { username: comment.profiles?.username || 'Unknown User' },
-          timestamp: comment.created_at,
-          targetId: comment.poi_id || comment.grid_square_id || '',
-          targetType: targetType,
-          metadata: {
-            coordinate: comment.grid_squares?.coordinate,
-            poiTitle: comment.pois?.title
-          }
-        });
-      });
-
-      // Fetch recent grid square explorations with manual joins
-      const { data: recentExplorations, error: explorationsError } = await supabase
+      // Fetch recent screenshots (grid squares with screenshots)
+      const { data: recentScreenshots, error: screenshotsError } = await supabase
         .from('grid_squares')
         .select(`
           id,
           coordinate,
-          upload_date,
-          uploaded_by
-        `)
-        .eq('is_explored', true)
-        .order('upload_date', { ascending: false })
-        .limit(Math.ceil(limit / 4));
-
-      // Fetch usernames separately
-      let explorationsWithDetails = [];
-      if (recentExplorations && !explorationsError) {
-        for (const exploration of recentExplorations) {
-          // Get username only if uploaded_by is not null
-          let profile = null;
-          if (exploration.uploaded_by) {
-            const { data } = await supabase
-              .from('profiles')
-              .select('username')
-              .eq('id', exploration.uploaded_by)
-              .single();
-            profile = data;
-          }
-
-          explorationsWithDetails.push({
-            ...exploration,
-            profiles: { username: profile?.username || 'Unknown User' }
-          });
-        }
-      }
-
-      if (explorationsError) throw explorationsError;
-
-      explorationsWithDetails?.forEach(grid => {
-        activities.push({
-          id: `grid_${grid.id}`,
-          type: 'grid_explored',
-          title: 'Grid Square Explored',
-          description: `Grid square ${grid.coordinate} marked as explored`,
-          user: { username: grid.profiles?.username || 'Unknown User' },
-          timestamp: grid.upload_date,
-          targetId: grid.id,
-          targetType: 'grid_square',
-          metadata: {
-            coordinate: grid.coordinate
-          }
-        });
-      });
-
-      // Fetch recent screenshots with manual joins
-      const { data: recentScreenshots, error: screenshotsError } = await supabase
-        .from('comment_screenshots')
-        .select(`
-          id,
-          url,
           created_at,
-          uploaded_by,
-          comment_id
+          uploader_id,
+          screenshot_url
         `)
+        .not('screenshot_url', 'is', null)
         .order('created_at', { ascending: false })
         .limit(Math.ceil(limit / 4));
 
-      // Fetch additional details separately
       let screenshotsWithDetails = [];
       if (recentScreenshots && !screenshotsError) {
         for (const screenshot of recentScreenshots) {
-          // Get username only if uploaded_by is not null
-          let profile = null;
-          if (screenshot.uploaded_by) {
+          // Get uploader username
+          let uploader = null;
+          if (screenshot.uploader_id) {
             const { data } = await supabase
               .from('profiles')
               .select('username')
-              .eq('id', screenshot.uploaded_by)
+              .eq('id', screenshot.uploader_id)
               .single();
-            profile = data;
-          }
-
-          // Get comment details
-          const { data: comment } = await supabase
-            .from('comments')
-            .select(`
-              poi_id,
-              grid_square_id
-            `)
-            .eq('id', screenshot.comment_id)
-            .single();
-
-          let poiTitle = null;
-          let coordinate = null;
-
-          if (comment) {
-            // Get POI title if poi_id exists
-            if (comment.poi_id) {
-              const { data: poi } = await supabase
-                .from('pois')
-                .select('title')
-                .eq('id', comment.poi_id)
-                .single();
-              poiTitle = poi?.title;
-            }
-
-            // Get grid coordinate if grid_square_id exists
-            if (comment.grid_square_id) {
-              const { data: gridSquare } = await supabase
-                .from('grid_squares')
-                .select('coordinate')
-                .eq('id', comment.grid_square_id)
-                .single();
-              coordinate = gridSquare?.coordinate;
-            }
+            uploader = data;
           }
 
           screenshotsWithDetails.push({
             ...screenshot,
-            profiles: { username: profile?.username || 'Unknown User' },
-            comments: {
-              poi_id: comment?.poi_id,
-              grid_square_id: comment?.grid_square_id,
-              pois: poiTitle ? { title: poiTitle } : null,
-              grid_squares: coordinate ? { coordinate } : null
-            }
+            uploader
+          });
+        }
+
+        // Add screenshot activities
+        for (const screenshot of screenshotsWithDetails) {
+          activities.push({
+            id: `screenshot-${screenshot.id}`,
+            type: 'screenshot_uploaded',
+            title: `Screenshot uploaded for ${screenshot.coordinate}`,
+            description: `Uploaded by ${screenshot.uploader?.username || 'Anonymous'}`,
+            timestamp: screenshot.created_at,
+            icon: 'Camera'
           });
         }
       }
 
-      if (screenshotsError) throw screenshotsError;
-
-      screenshotsWithDetails?.forEach(screenshot => {
-        const target = screenshot.comments?.pois?.title || 
-                      screenshot.comments?.grid_squares?.coordinate || 
-                      'Unknown';
-        const targetType = screenshot.comments?.poi_id ? 'poi' : 'grid_square';
-        
-        activities.push({
-          id: `screenshot_${screenshot.id}`,
-          type: 'screenshot_uploaded',
-          title: 'Screenshot Uploaded',
-          description: `New screenshot uploaded for ${target}`,
-          user: { username: screenshot.profiles?.username || 'Unknown User' },
-          timestamp: screenshot.created_at,
-          targetId: screenshot.comments?.poi_id || screenshot.comments?.grid_square_id || '',
-          targetType: targetType,
-          metadata: {
-            coordinate: screenshot.comments?.grid_squares?.coordinate,
-            poiTitle: screenshot.comments?.pois?.title,
-            screenshotUrl: screenshot.url
-          }
-        });
-      });
-
-      // Sort all activities by timestamp (most recent first)
+      // Sort all activities by timestamp and limit
       activities.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-      
-      // Limit to the requested number of activities
       setActivities(activities.slice(0, limit));
-    } catch (err: any) {
+    } catch (err) {
       console.error('Error fetching activities:', err);
-      setError(err.message);
+      setError('Failed to load activity feed');
     } finally {
       setIsLoading(false);
     }
@@ -347,156 +206,147 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ limit = 20 }) => {
     fetchActivities();
   }, [limit]);
 
-  const getActivityIcon = (type: ActivityItem['type']) => {
-    switch (type) {
-      case 'poi_created':
-        return MapPin;
-      case 'comment_added':
-        return MessageSquare;
-      case 'grid_explored':
-        return Eye;
-      case 'screenshot_uploaded':
-        return Camera;
-      default:
-        return User;
-    }
+  const getActivityIcon = (iconName: string) => {
+    const iconMap = {
+      MapPin: <MapPin size={14} strokeWidth={1.5} />,
+      MessageSquare: <MessageSquare size={14} strokeWidth={1.5} />,
+      Camera: <Camera size={14} strokeWidth={1.5} />,
+      Eye: <Eye size={14} strokeWidth={1.5} />,
+      User: <User size={14} strokeWidth={1.5} />,
+    };
+    return iconMap[iconName as keyof typeof iconMap] || <Clock size={14} strokeWidth={1.5} />;
   };
 
-  const getActivityColor = (type: ActivityItem['type']) => {
-    switch (type) {
-      case 'poi_created':
-        return 'text-blue-600 bg-blue-100';
-      case 'comment_added':
-        return 'text-green-600 bg-green-100';
-      case 'grid_explored':
-        return 'text-orange-600 bg-orange-100';
-      case 'screenshot_uploaded':
-        return 'text-purple-600 bg-purple-100';
-      default:
-        return 'text-sand-600 bg-sand-100';
-    }
-  };
-
-  const formatRelativeTime = (timestamp: string) => {
-    const date = new Date(timestamp);
+  const formatTimeAgo = (timestamp: string) => {
     const now = new Date();
-    const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
+    const past = new Date(timestamp);
+    const diffMs = now.getTime() - past.getTime();
+    const diffMins = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
-    if (diffInMinutes < 1) return 'Just now';
-    if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
-    if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h ago`;
-    if (diffInMinutes < 10080) return `${Math.floor(diffInMinutes / 1440)}d ago`;
-    
-    return date.toLocaleDateString();
+    if (diffMins < 1) return 'just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return past.toLocaleDateString();
   };
+
+  const ActivityItemComponent: React.FC<{ activity: ActivityItem }> = ({ activity }) => (
+    <div className="group relative">
+      {/* Multi-layer background system */}
+      <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 rounded-lg" />
+      <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-800/40 to-slate-900/60 rounded-lg" />
+      
+      {/* Interactive purple overlay */}
+      <div className="absolute inset-0 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 ease-in-out bg-gradient-to-r from-violet-600/5 via-violet-700/3 to-transparent" />
+      
+      {/* Content */}
+      <div className="relative p-4 rounded-lg border border-amber-400/10 hover:border-amber-300/20 transition-all duration-300">
+        <div className="flex items-start gap-3">
+          <DiamondIcon
+            icon={getActivityIcon(activity.icon)}
+            size="sm"
+            bgColor="bg-void-950"
+            actualBorderColor="bg-gold-300"
+            borderThickness={1}
+            iconColor="text-gold-300"
+          />
+          
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex-1 min-w-0">
+                <h3 className="text-sm font-light tracking-wide text-amber-200 truncate"
+                    style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                  {activity.title}
+                </h3>
+                <p className="text-xs font-thin text-amber-300/70 mt-1 line-clamp-2">
+                  {activity.description}
+                </p>
+              </div>
+              
+              <span className="text-xs font-light text-amber-300/50 tracking-wide whitespace-nowrap">
+                {formatTimeAgo(activity.timestamp)}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 
   if (isLoading) {
     return (
-      <div className="bg-white rounded-lg shadow-sm border border-sand-200">
-        <div className="p-6 border-b border-sand-200">
-          <h3 className="text-lg font-semibold text-night-900">Recent Activity</h3>
-        </div>
-        <div className="p-6">
-          <div className="space-y-4">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="flex items-start space-x-3 animate-pulse">
-                <div className="w-10 h-10 bg-sand-200 rounded-full"></div>
-                <div className="flex-1">
-                  <div className="h-4 bg-sand-200 rounded mb-2"></div>
-                  <div className="h-3 bg-sand-200 rounded w-3/4 mb-1"></div>
-                  <div className="h-3 bg-sand-200 rounded w-1/4"></div>
+      <div className="space-y-4">
+        {[...Array(5)].map((_, i) => (
+          <div key={i} className="group relative">
+            <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 rounded-lg" />
+            <div className="relative p-4 rounded-lg border border-amber-400/10">
+              <div className="flex items-start gap-3">
+                <div className="w-12 h-12 bg-amber-400/10 rounded-lg animate-pulse" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 bg-amber-400/10 rounded animate-pulse w-3/4" />
+                  <div className="h-3 bg-amber-400/10 rounded animate-pulse w-1/2" />
                 </div>
+                <div className="h-3 bg-amber-400/10 rounded animate-pulse w-16" />
               </div>
-            ))}
+            </div>
           </div>
-        </div>
+        ))}
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="bg-white rounded-lg shadow-sm border border-sand-200">
-        <div className="p-6 border-b border-sand-200">
-          <h3 className="text-lg font-semibold text-night-900">Recent Activity</h3>
+      <div className="group relative">
+        <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 rounded-lg" />
+        <div className="relative p-6 rounded-lg border border-red-400/20 text-center">
+          <DiamondIcon
+            icon={<Clock size={16} strokeWidth={1.5} />}
+            size="sm"
+            bgColor="bg-void-950"
+            actualBorderColor="bg-red-400"
+            borderThickness={1}
+            iconColor="text-red-400"
+            className="mx-auto mb-3"
+          />
+          <p className="text-red-300/80 font-light tracking-wide">{error}</p>
         </div>
-        <div className="p-6">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <p className="text-red-800">Error loading activities: {error}</p>
-            <button
-              onClick={fetchActivities}
-              className="mt-2 text-red-600 hover:text-red-800 underline"
-            >
-              Try again
-            </button>
-          </div>
+      </div>
+    );
+  }
+
+  if (activities.length === 0) {
+    return (
+      <div className="group relative">
+        <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 rounded-lg" />
+        <div className="relative p-8 rounded-lg border border-amber-400/10 text-center">
+          <DiamondIcon
+            icon={<Eye size={16} strokeWidth={1.5} />}
+            size="sm"
+            bgColor="bg-void-950"
+            actualBorderColor="bg-gold-300"
+            borderThickness={1}
+            iconColor="text-gold-300"
+            className="mx-auto mb-3"
+          />
+          <p className="text-amber-300/70 font-light tracking-wide">
+            No recent activity detected
+          </p>
+          <p className="text-xs text-amber-300/50 font-thin tracking-wide mt-1">
+            Operations will appear here as they occur
+          </p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-sand-200">
-      <div className="p-6 border-b border-sand-200">
-        <h3 className="text-lg font-semibold text-night-900">Recent Activity</h3>
-      </div>
-      <div className="p-6">
-        {activities.length === 0 ? (
-          <div className="text-center py-8">
-            <div className="text-sand-400 mb-2">
-              <Clock size={48} className="mx-auto" />
-            </div>
-            <p className="text-sand-600">No recent activity</p>
-            <p className="text-sm text-sand-500">Activity will appear here as users interact with the map</p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {activities.map((activity) => {
-              const Icon = getActivityIcon(activity.type);
-              const colorClasses = getActivityColor(activity.type);
-              
-              return (
-                <div key={activity.id} className="flex items-start space-x-3">
-                  <div className={`p-2 rounded-full ${colorClasses}`}>
-                    <Icon size={16} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-medium text-night-900">
-                        {activity.title}
-                      </p>
-                      <p className="text-xs text-sand-500">
-                        {formatRelativeTime(activity.timestamp)}
-                      </p>
-                    </div>
-                    <p className="text-sm text-sand-700 mb-1">
-                      {activity.description}
-                    </p>
-                    <div className="flex items-center space-x-2 text-xs text-sand-500">
-                      <span>by {activity.user.username}</span>
-                      {activity.metadata?.coordinate && (
-                        <>
-                          <span>•</span>
-                          <span>{activity.metadata.coordinate}</span>
-                        </>
-                      )}
-                    </div>
-                    {activity.metadata?.screenshotUrl && (
-                      <div className="mt-2">
-                        <img
-                          src={activity.metadata.screenshotUrl}
-                          alt="Activity screenshot"
-                          className="w-16 h-16 object-cover rounded border border-sand-200"
-                        />
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+    <div className="space-y-3">
+      {activities.map((activity) => (
+        <ActivityItemComponent key={activity.id} activity={activity} />
+      ))}
     </div>
   );
 };
