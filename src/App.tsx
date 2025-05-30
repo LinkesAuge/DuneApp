@@ -76,6 +76,7 @@ const AppRoutes: React.FC = () => {
     <Routes>
       <Route path="/" element={<Landing />} />
       <Route path="/auth" element={<Auth />} />
+      <Route path="/auth/callback" element={<Auth />} />
       <Route 
         path="/dashboard" 
         element={

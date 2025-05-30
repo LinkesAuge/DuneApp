@@ -11,42 +11,9 @@
   font-display: swap;
 }
 
-/* Default application font - Trebuchet MS as per ui_aesthetics.md */
-@font-face {
-  font-family: 'Trebuchet MS'; /* Referenced by Tailwind config */
-  src: local('Trebuchet MS'), /* Try local first */
-       url('/fonts/TrebuchetMS-Regular.ttf') format('truetype'); /* Fallback - ensure this path is correct or remove if system font is reliable */
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Trebuchet MS';
-  src: local('Trebuchet MS Bold'),
-       url('/fonts/TrebuchetMS-Bold.ttf') format('truetype');
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Trebuchet MS';
-  src: local('Trebuchet MS Italic'),
-       url('/fonts/TrebuchetMS-Italic.ttf') format('truetype');
-  font-weight: 400;
-  font-style: italic;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Trebuchet MS';
-  src: local('Trebuchet MS Bold Italic'),
-       url('/fonts/TrebuchetMS-BoldItalic.ttf') format('truetype');
-  font-weight: 700;
-  font-style: italic;
-  font-display: swap;
-}
+/* Trebuchet MS is a system font - no need for @font-face declarations */
+/* It's available on Windows, macOS, and most systems */
+/* The font-family declarations in components will fall back to it naturally */
 
 @tailwind base;
 @tailwind components;
