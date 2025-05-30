@@ -497,3 +497,62 @@ This document serves as a learning journal for the Dune Awakening Deep Desert Tr
     -   Consider the relationship between visual design and brand identity - interface aesthetics directly influence user perception of application quality and purpose.
 
 ---
+
+### 2025-01-27: Importance of Distinguishing Between Global Resources and Map-Specific Data in Admin Operations
+-   **Topic/Feature**: Admin Operations - Global vs. Map-Specific Data Handling.
+-   **Observation/Pattern**:
+    1.  Admin operations often involve handling both global resources (like user management, system settings) and map-specific data (like POI management, grid mapping).
+    2.  Proper separation of concerns is crucial to maintain system coherence and avoid conflicts.
+    3.  Mixing global and map-specific data handling can lead to inconsistencies and errors.
+-   **Decision/Action Taken**:
+    1.  **Separate Data Handling**: Implemented separate data handling logic for global resources and map-specific data.
+    2.  **Data Integrity**: Ensured data integrity by maintaining separate schemas and tables for global and map-specific data.
+    3.  **Consistency**: Maintained consistency by adhering to established data handling patterns and best practices.
+-   **Rationale**:
+    1.  To ensure system coherence and avoid conflicts between global and map-specific data handling.
+    2.  To maintain data integrity and prevent inconsistencies in data handling.
+    3.  To establish clear separation of concerns and maintain system coherence.
+-   **Impact/Outcome**:
+    -   **System Coherence**: Achieved clear separation of global and map-specific data handling.
+    -   **Data Integrity**: Ensured data integrity by maintaining separate schemas and tables for global and map-specific data.
+    -   **Consistency**: Maintained consistency by adhering to established data handling patterns and best practices.
+-   **Future Consideration**:
+    -   Always consider the separation of global and map-specific data handling when designing admin operations.
+    -   Implement data integrity checks and validation to prevent conflicts between global and map-specific data.
+    -   Document data handling patterns and best practices for future reference and consistency maintenance.
+    -   Plan for regular system audits to ensure data handling patterns are followed consistently.
+
+---
+
+### 2025-01-28: Database Management System Enhancement - Global vs Map-Specific Resource Management
+-   **Topic/Feature**: Admin Database Management - Separate Map Reset Functionality with Resource Protection.
+-   **Observation/Pattern**:
+    1.  User feedback identified the need for separate reset operations for Deep Desert and Hagga Basin maps rather than a single combined reset.
+    2.  Original reset warnings incorrectly mentioned deleting custom icons, which are actually global resources that should be preserved.
+    3.  Administrative operations needed better distinction between map-specific data and global application resources.
+    4.  Users needed more descriptive warnings that clearly explained what would be deleted during each specific reset operation.
+-   **Decision/Action Taken**:
+    1.  **Separated Reset Functionality**: Split single map reset into dedicated Deep Desert and Hagga Basin reset buttons with independent state management.
+    2.  **Corrected Resource Classification**: Verified and documented that custom icons and POI types are global resources NOT deleted during map resets.
+    3.  **Enhanced Warning System**: Implemented detailed, map-specific confirmation dialogs requiring exact text input ("DELETE DEEP DESERT" vs "DELETE HAGGA BASIN").
+    4.  **Backend Verification**: Confirmed `perform-map-reset` Edge Function only deletes map-specific data (grid squares, POIs, comments) and preserves global resources.
+    5.  **Independent Backup Options**: Added separate backup controls for each map type before reset operations.
+-   **Rationale**:
+    1.  To provide granular control over map data management, allowing users to reset specific maps without affecting others.
+    2.  To prevent user confusion and ensure accurate expectations about what data will be preserved vs deleted.
+    3.  To maintain data integrity by clearly separating global application resources from map-specific content.
+    4.  To enhance safety through detailed confirmation processes and comprehensive warnings.
+-   **Impact/Outcome**:
+    -   **Enhanced User Control**: Users can now reset specific maps independently with clear understanding of what gets deleted.
+    -   **Resource Protection**: Custom icons and user-created POI types are properly protected as global resources.
+    -   **Improved Safety**: Detailed warnings and confirmation requirements prevent accidental data loss.
+    -   **Better UX**: Clear visual separation and descriptive warnings improve user confidence in admin operations.
+    -   **System Clarity**: Proper distinction between global resources and map-specific data established throughout the system.
+-   **Future Consideration**:
+    -   When designing admin operations, always clearly categorize resources as either global (affecting entire application) or scope-specific (affecting particular features/areas).
+    -   For destructive operations, implement progressive confirmation systems with detailed descriptions of exactly what will be affected.
+    -   Regularly verify that warning text matches actual backend behavior to maintain user trust and prevent confusion.
+    -   Consider implementing audit logging for admin operations to track what resources are actually affected by each action.
+    -   Document resource categorization clearly so future developers understand which data should be preserved during various operations.
+
+---

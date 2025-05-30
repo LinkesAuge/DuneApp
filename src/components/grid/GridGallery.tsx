@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { GridSquare } from '../../types';
-import { X, ChevronLeft, ChevronRight, Clock } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Clock, User, MapPin } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { formatDateWithPreposition } from '../../lib/dateUtils';
 
 interface GridGalleryProps {
   squares: GridSquare[];
@@ -78,96 +79,157 @@ const GridGallery: React.FC<GridGalleryProps> = ({ squares, initialIndex, onClos
   const currentSquare = squares[currentIndex];
   const uploader = currentSquare.uploaded_by ? userInfo[currentSquare.uploaded_by] : null;
 
+  // Format metadata for screenshot
+  const screenshotMeta = uploader && currentSquare.upload_date 
+    ? `Screenshot by ${uploader.username} ${(() => {
+        const { date, useOn } = formatDateWithPreposition(currentSquare.upload_date);
+        return useOn ? `on ${date}` : date;
+      })()}`
+    : null;
+
+  // Format metadata for POI
+  const poiMeta = poiInfo?.created_by && userInfo[poiInfo.created_by] 
+    ? `POI created by ${userInfo[poiInfo.created_by].username} ${(() => {
+        const { date, useOn } = formatDateWithPreposition(poiInfo.created_at);
+        return useOn ? `on ${date}` : date;
+      })()}`
+    : null;
+
   return (
     <div 
-      className="fixed inset-0 bg-night-950/90 flex items-center justify-center z-[60] p-2"
+      className="fixed inset-0 flex items-center justify-center z-[60] p-4"
       onClick={(e) => {
         e.stopPropagation();
         onClose();
       }}
+      style={{
+        backgroundImage: `url('/images/main-bg.jpg')`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+      }}
     >
+      {/* Simple background overlay */}
+      <div className="absolute inset-0 bg-slate-950/90" />
+
       <div 
-        className="bg-sand-200 rounded-xl shadow-2xl w-[98vw] h-[96vh] overflow-hidden flex flex-col border border-night-700"
+        className="relative z-10 w-[98vw] h-[96vh] overflow-hidden flex flex-col rounded-xl"
         onClick={e => e.stopPropagation()}
+        style={{
+          background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.90) 50%, rgba(15, 23, 42, 0.95) 100%)',
+          backdropFilter: 'blur(10px)',
+          border: '1px solid rgba(251, 191, 36, 0.3)'
+        }}
       >
-        {/* Header */}
-        <div className="flex justify-between items-center px-6 py-4 border-b border-night-700 bg-night-900">
+        {/* Header with clean styling */}
+        <div className="flex justify-between items-center px-6 py-4 border-b border-amber-400/30">
           <div>
-            <h3 className="text-2xl font-bold text-white">
+            <h3 
+              className="text-2xl font-light text-amber-200 tracking-wide"
+              style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
+            >
               {poiInfo?.title || `Grid Square ${currentSquare.coordinate}`}
             </h3>
-            {uploader && currentSquare.upload_date && (
-              <div className="flex items-center text-sand-300 text-sm mt-1">
-                <Clock size={14} className="mr-1.5" />
-                <span>
-                  Screenshot by {uploader.username} on {new Date(currentSquare.upload_date).toLocaleDateString()}
+            {screenshotMeta && (
+              <div className="flex items-center text-amber-300/70 text-sm mt-1 tracking-wide">
+                <Clock size={14} className="mr-2 text-amber-400" />
+                <span style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                  {screenshotMeta}
                 </span>
               </div>
             )}
           </div>
+          
           <button 
             onClick={(e) => {
               e.stopPropagation();
               onClose();
             }}
-            className="text-sand-400 hover:text-white p-2 rounded-full hover:bg-night-700 transition-colors"
+            className="group p-3 rounded-xl transition-all duration-300 text-amber-300 hover:text-amber-100 hover:bg-slate-800/50"
           >
             <X size={24} />
           </button>
         </div>
 
-        {/* Image container */}
-        <div className="relative flex-1 flex items-center justify-center p-8 bg-sand-200">
-          {/* Navigation buttons */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handlePrevious();
-            }}
-            className="absolute left-4 bg-night-900 hover:bg-night-700 rounded-full p-3 text-white transition-all"
-          >
-            <ChevronLeft size={24} />
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleNext();
-            }}
-            className="absolute right-4 bg-night-900 hover:bg-night-700 rounded-full p-3 text-white transition-all"
-          >
-            <ChevronRight size={24} />
-          </button>
+        {/* Image container with clean styling */}
+        <div className="relative flex-1 flex items-center justify-center p-8">
+          {/* Navigation buttons with clean styling */}
+          {squares.length > 1 && (
+            <>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handlePrevious();
+                }}
+                className="absolute left-6 z-30 group p-4 rounded-full transition-all duration-300 bg-slate-900/80 hover:bg-slate-800/90 border border-amber-400/30 hover:border-amber-400/60"
+              >
+                <ChevronLeft size={28} className="text-amber-300 group-hover:text-amber-100" />
+              </button>
+              
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleNext();
+                }}
+                className="absolute right-6 z-30 group p-4 rounded-full transition-all duration-300 bg-slate-900/80 hover:bg-slate-800/90 border border-amber-400/30 hover:border-amber-400/60"
+              >
+                <ChevronRight size={28} className="text-amber-300 group-hover:text-amber-100" />
+              </button>
+            </>
+          )}
 
-          {/* Image */}
-          <img
-            src={currentSquare.screenshot_url || ''}
-            alt={`Screenshot ${currentIndex + 1} of ${squares.length}`}
-            className="max-h-[calc(96vh-16rem)] max-w-full object-contain"
-          />
+          {/* Image with clean presentation */}
+          <div className="relative z-20 max-h-[calc(96vh-20rem)] max-w-full">
+            <img
+              src={currentSquare.screenshot_url || ''}
+              alt={`Screenshot ${currentIndex + 1} of ${squares.length}`}
+              className="max-h-[calc(96vh-20rem)] max-w-full object-contain rounded-lg shadow-2xl"
+              style={{
+                border: '2px solid rgba(251, 191, 36, 0.2)'
+              }}
+            />
+          </div>
         </div>
 
-        {/* Footer */}
-        <div className="px-6 py-4 border-t border-night-700 bg-night-900">
+        {/* Footer with clean styling */}
+        <div className="px-6 py-4 border-t border-amber-400/30">
           <div className="flex justify-between items-start">
-            <div className="flex-1">
+            <div className="flex-1 space-y-2">
               {poiInfo && (
                 <>
-                  <p className="text-sand-300 mb-2">
+                  <p 
+                    className="text-amber-200/90 leading-relaxed font-light tracking-wide"
+                    style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
+                  >
                     {poiInfo.description || 'No description provided'}
                   </p>
-                  {poiInfo.created_by && userInfo[poiInfo.created_by] && (
-                    <div className="flex items-center text-sm text-sand-400">
-                      <Clock size={12} className="mr-1.5" />
-                      <span>
-                        POI added by {userInfo[poiInfo.created_by].username} on {new Date(poiInfo.created_at).toLocaleDateString()}
+                  {poiMeta && (
+                    <div className="flex items-center text-sm text-amber-300/70 tracking-wide">
+                      <User size={12} className="mr-2 text-amber-400" />
+                      <span style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                        {poiMeta}
                       </span>
                     </div>
                   )}
                 </>
               )}
             </div>
-            <div className="text-sm text-sand-300 ml-4">
-              Screenshot {currentIndex + 1} of {squares.length}
+            
+            <div className="ml-6 text-right space-y-1">
+              <div 
+                className="text-sm text-amber-300/80 font-light tracking-wide"
+                style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
+              >
+                Screenshot {currentIndex + 1} of {squares.length}
+              </div>
+              {currentSquare.coordinate && (
+                <div className="flex items-center text-xs text-amber-400/70 tracking-wider">
+                  <MapPin size={10} className="mr-1 text-amber-400" />
+                  <span style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                    {currentSquare.coordinate}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         </div>

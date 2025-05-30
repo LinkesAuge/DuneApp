@@ -706,12 +706,23 @@ const GridPage: React.FC = () => {
     if (gridSquare && gridSquare.id) {
       supabase
         .from('pois')
-        .select('*')
+        .select(`
+          *,
+          grid_squares (
+            id,
+            coordinate
+          )
+        `)
         .eq('grid_square_id', gridSquare.id)
         .order('created_at', { ascending: false })
         .then(({ data, error }) => {
           if (!error && data) {
-            setPois(data);
+            // Transform the data to match PoiWithGridSquare interface
+            const poisWithGridSquares = data.map(poi => ({
+              ...poi,
+              grid_square: poi.grid_squares
+            }));
+            setPois(poisWithGridSquares);
           }
         });
     }
@@ -766,12 +777,23 @@ const GridPage: React.FC = () => {
         if (gridSquareData.id) {
           const { data, error: poisError } = await supabase
             .from('pois')
-            .select('*')
+            .select(`
+              *,
+              grid_squares (
+                id,
+                coordinate
+              )
+            `)
             .eq('grid_square_id', gridSquareData.id)
             .order('created_at', { ascending: false });
 
           if (poisError) throw poisError;
-          poisData = data || [];
+          
+          // Transform the data to match PoiWithGridSquare interface
+          poisData = (data || []).map(poi => ({
+            ...poi,
+            grid_square: poi.grid_squares
+          }));
         }
         setPois(poisData);
 
@@ -1260,9 +1282,6 @@ const GridPage: React.FC = () => {
           }}
         />
         
-        {/* Dark overlay for better contrast */}
-        <div className="absolute inset-0 bg-slate-950/70" />
-        
         <div className="relative text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-500 mx-auto mb-4"></div>
           <div className="text-amber-200 font-light" style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
@@ -1284,9 +1303,6 @@ const GridPage: React.FC = () => {
             backgroundImage: `url(/images/main-bg.jpg)`
           }}
         />
-        
-        {/* Dark overlay for better contrast */}
-        <div className="absolute inset-0 bg-slate-950/70" />
         
         <div className="relative text-center">
           <div className="text-red-400 mb-4 font-light">{error}</div>
@@ -1310,9 +1326,6 @@ const GridPage: React.FC = () => {
           backgroundImage: `url(/images/main-bg.jpg)`
         }}
       />
-      
-      {/* Dark overlay for better contrast */}
-      <div className="absolute inset-0 bg-slate-950/70" />
 
       {/* Header Bar */}
       <div className="relative bg-slate-900/90 border-b border-slate-700/50 backdrop-blur-sm px-4 py-3 flex items-center justify-center">

@@ -216,3 +216,28 @@ This document tracks known issues, their states, context, and resolutions encoun
 -   **Lesson Learned**: When implementing cropping modals: (1) Don't preselect cropping tools unless there's a specific business requirement - let users choose their preferred method, (2) Use flexible CSS constraints (like `max-h-full`) that work with flex layouts rather than fixed viewport units that may not utilize available space efficiently, (3) Consider the aspect ratio and available space when constraining image previews - tall images need more height allowance than fixed vh units typically provide.
 
 ---
+
+-   **Date**: YYYY-MM-DD <!-- User should replace with current date -->
+-   **Error Description**: Inaccurate warning text in database management interface stating that custom icons would be deleted during map resets when they are actually preserved as global resources.
+-   **Context/Symptoms**: 
+    1. DatabaseManagement component warning text mentioned that custom icons would be deleted during map reset operations
+    2. User expressed concern about custom icons being deleted during Deep Desert or Hagga Basin resets
+    3. Backend verification revealed that custom icons are actually global resources NOT deleted during map resets
+    4. Single combined reset button created confusion about what data would be affected for each map type
+-   **Investigation/Diagnosis**:
+    -   **Warning Text Analysis**: Review of DatabaseManagement component showed generic warning text that incorrectly included custom icons
+    -   **Backend Code Review**: Analysis of `perform-map-reset` Edge Function confirmed it only deletes map-specific data (grid_squares, pois, comments)
+    -   **Resource Classification**: Custom icons stored in `screenshots/icons/` and `custom_icons` table are global resources used across both maps
+    -   **User Experience Issue**: Single reset button with generic warnings didn't provide clear information about what each map reset would affect
+-   **Solution/Fix**:
+    1.  **Separated Reset Functionality**: Split single reset button into dedicated Deep Desert and Hagga Basin reset buttons
+    2.  **Corrected Warning Text**: Updated warning descriptions to accurately reflect what gets deleted for each map type
+    3.  **Removed Custom Icons from Warnings**: Eliminated mention of custom icons being deleted since they are preserved global resources
+    4.  **Enhanced Confirmation Flow**: Each reset type now requires specific confirmation text ("DELETE DEEP DESERT" vs "DELETE HAGGA BASIN")
+    5.  **Backend Verification**: Confirmed that `perform-map-reset` function preserves custom icons and only deletes map-specific data
+-   **Files Affected**:
+    -   `src/components/admin/DatabaseManagement.tsx` (Enhanced reset functionality and corrected warnings)
+    -   `src/types/admin.ts` (Updated DangerAction type for separate reset actions)
+-   **Lesson Learned**: Always verify that user-facing warning text accurately reflects actual backend behavior. For admin operations involving destructive actions: (1) Clearly categorize what data is global vs scope-specific, (2) Implement separate operations for different scopes when appropriate, (3) Provide detailed, accurate descriptions of what will be affected, (4) Regularly audit warning text against actual system behavior, (5) Test destructive operations to ensure they behave as advertised to users.
+
+---

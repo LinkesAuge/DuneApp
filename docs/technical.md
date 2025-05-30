@@ -25,6 +25,27 @@
 - **State Synchronization**: Local and database state remain synchronized across all operations
 - **File Storage Cleanup**: Comprehensive cleanup of both current and original screenshot files
 
+### **Latest Enhancement: Enhanced Database Management System - COMPLETED** ✅
+**Date**: January 28, 2025
+
+#### **✅ Separate Map Reset Functionality**
+- **Independent Reset Operations**: DatabaseManagement component now provides separate reset buttons for Deep Desert and Hagga Basin maps
+- **Map-Specific Warnings**: Each reset type shows detailed descriptions of exactly what will be deleted for that specific map
+- **Enhanced Safety**: Requires specific confirmation text ("DELETE DEEP DESERT" vs "DELETE HAGGA BASIN") for each operation
+- **Independent Backup Options**: Each map type can have its own backup created before reset
+
+#### **✅ Custom Icons Preservation Enhancement**
+- **Global Resource Protection**: Confirmed that custom POI types and icons are NOT deleted during map resets
+- **Resource Categorization**: Custom icons stored in `screenshots/icons/` and `custom_icons` table remain untouched
+- **User Asset Safety**: User-created POI types and custom icons are preserved across all reset operations
+- **Backend Verification**: Verified `perform-map-reset` Edge Function only deletes map-specific data
+
+#### **✅ Database Management UI Improvements**
+- **Separate State Management**: Individual loading states and backup options for each map type (`isResettingDeepDesert`, `isResettingHaggaBasin`)
+- **Enhanced User Experience**: Clear visual separation between Deep Desert and Hagga Basin reset sections
+- **Detailed Warnings**: Comprehensive descriptions of what gets deleted during each reset operation
+- **Type Safety**: Updated `DangerAction` type to support separate reset actions
+
 ### **Implementation Achievements** ✅
 - **Frontend**: Complete React + TypeScript application with professional UI/UX polish
 - **Backend**: Comprehensive Supabase integration with all services operational  
@@ -437,7 +458,7 @@ The backup system has been enhanced to include not only database records but als
   - `id` (UUID, Primary Key, references auth.users)
   - `username` (TEXT, unique)
   - `email` (TEXT)
-  - `role` (user_role ENUM: 'user', 'moderator', 'admin')
+  - `role` (user_role ENUM: 'member', 'editor', 'admin')
   - `avatar_url` (TEXT, optional)
   - `created_at` (TIMESTAMP)
 
@@ -714,7 +735,7 @@ const ComponentName: React.FC = () => {
 ### Supabase Auth Integration
 - **Email/Password Authentication**: Standard email-based authentication
 - **Row Level Security (RLS)**: Database-level access control
-- **Role-based Authorization**: User, Moderator, Admin roles
+- **Role-based Authorization**: Member, Editor, Admin roles
 - **Session Management**: Automatic token refresh and validation
 
 ### Security Policies
@@ -736,7 +757,7 @@ CREATE POLICY "POIs are viewable based on privacy" ON pois
     FOR SELECT USING (
         is_public = true OR 
         creator_id = auth.uid() OR 
-        EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('moderator', 'admin'))
+        EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('editor', 'admin'))
     );
 
 -- Only creators can update their POIs

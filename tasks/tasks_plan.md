@@ -1,5 +1,26 @@
 # Task Plan: Dune Awakening Deep Desert Tracker
 
+## **✅ LATEST COMPLETED TASK: DATABASE MANAGEMENT SYSTEM ENHANCEMENTS (January 28, 2025)**
+
+**Goal**: Enhance the DatabaseManagement component to provide separate reset functionality for Deep Desert and Hagga Basin maps with improved user experience and safety measures.
+**Result**: **SUCCESS** - Separate map reset buttons implemented with detailed warnings and confirmed preservation of global resources.
+
+### **✅ Key Achievements:**
+- **Separate Reset Functionality**: Split single reset button into dedicated Deep Desert and Hagga Basin reset operations
+- **Enhanced Warning System**: Implemented detailed, map-specific confirmation dialogs with precise descriptions
+- **Custom Icons Preservation**: Confirmed and documented that custom icons are NOT deleted during map resets (global resources)
+- **Improved Confirmation Flow**: Each reset type requires specific text confirmation ("DELETE DEEP DESERT" vs "DELETE HAGGA BASIN")
+- **Backend Verification**: Verified `perform-map-reset` Edge Function properly preserves custom icons and user-created POI types
+
+### **✅ Technical Implementation:**
+- **Component Updates**: Enhanced `DatabaseManagement.tsx` with separate state management for each map type
+- **Type Safety**: Updated `DangerAction` type to support 'reset_deep_desert' and 'reset_hagga_basin'
+- **User Experience**: Independent backup options for each map type before reset
+- **Resource Protection**: Confirmed backend functions only delete map-specific data (grid squares, POIs, comments)
+- **Safety Mechanisms**: Progressive warning system with exact text matching for confirmation
+
+---
+
 ## **🚧 CURRENT MAJOR TASK: GLOBALLY APPLY LANDING PAGE AESTHETIC 🚧**
 
 **Overall Goal**: To refactor the entire application's UI to consistently use the newly established "Dune-inspired" aesthetic. This involves updating color palettes, typography, and incorporating core UI components like `DiamondIcon` and `HexCard` (or their stylistic principles) across all relevant pages and components, guided by `docs/ui_aesthetics.md`.

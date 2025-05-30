@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { X, Edit, Trash2, Share, MapPin, Clock, Users, Lock, Eye, User, Image as ImageIcon } from 'lucide-react';
+import { X, Edit, Trash2, Share, MapPin, Clock, Users, Lock, Eye, User, Image as ImageIcon, Heart, Mountain, Pyramid } from 'lucide-react';
 import { Poi, PoiType, CustomIcon } from '../../types';
 import { useAuth } from '../auth/AuthProvider';
 import { supabase } from '../../lib/supabase';
 import { formatCompactDateTime, wasUpdated, formatDateWithPreposition } from '../../lib/dateUtils';
 import CommentsList from '../comments/CommentsList';
-import DiamondIcon from '../common/DiamondIcon';
 
 interface POICardProps {
   poi: Poi;
@@ -87,6 +86,7 @@ const POICard: React.FC<POICardProps> = ({
   const [creatorInfo, setCreatorInfo] = useState<{ username: string } | null>(null);
   const [editorInfo, setEditorInfo] = useState<{ username: string } | null>(null);
   const [loadingUserInfo, setLoadingUserInfo] = useState(true);
+  const [commentCount, setCommentCount] = useState(0);
   
   const imageUrl = getDisplayImageUrl(poi, poiType, customIcons);
   const PrivacyIcon = privacyIcons[poi.privacy_level];
@@ -96,59 +96,53 @@ const POICard: React.FC<POICardProps> = ({
   // Check if POI was edited
   const isEdited = wasUpdated(poi.created_at, poi.updated_at);
   
-  // Fetch user information for creator and editor
+  // Fetch user information and comment count
   useEffect(() => {
-    const fetchUserInfo = async () => {
+    const fetchData = async () => {
       try {
         setLoadingUserInfo(true);
+        
+        // Fetch user information
         const userIds = [poi.created_by];
         if (poi.updated_by && poi.updated_by !== poi.created_by) {
           userIds.push(poi.updated_by);
         }
         
-        const { data: userData, error } = await supabase
+        const { data: userData, error: userError } = await supabase
           .from('profiles')
           .select('id, username')
           .in('id', userIds);
         
-        if (error) throw error;
+        if (userError) throw userError;
         
         const creatorData = userData?.find(u => u.id === poi.created_by);
         const editorData = userData?.find(u => u.id === poi.updated_by);
         
         setCreatorInfo(creatorData ? { username: creatorData.username } : null);
         setEditorInfo(editorData ? { username: editorData.username } : null);
+        
+        // Fetch comment count
+        const { count, error: commentError } = await supabase
+          .from('comments')
+          .select('*', { count: 'exact', head: true })
+          .eq('poi_id', poi.id);
+        
+        if (!commentError) {
+          setCommentCount(count || 0);
+        }
       } catch (error) {
-        console.error('Error fetching user info:', error);
+        console.error('Error fetching data:', error);
       } finally {
         setLoadingUserInfo(false);
       }
     };
     
     if (isOpen && poi) {
-      fetchUserInfo();
+      fetchData();
     }
-  }, [isOpen, poi.created_by, poi.updated_by]);
+  }, [isOpen, poi.created_by, poi.updated_by, poi.id]);
 
   if (!isOpen) return null;
-
-  // Create icon for DiamondIcon header
-  let poiTypeRenderIcon: React.ReactNode;
-  if (imageUrl) {
-    poiTypeRenderIcon = <img src={imageUrl} alt={poiType.name} className="w-6 h-6 object-contain" />;
-  } else {
-    poiTypeRenderIcon = <span className="text-2xl">{poiType.icon}</span>;
-  }
-
-  const poiTypeHeaderIcon = (
-    <DiamondIcon 
-      icon={poiTypeRenderIcon} 
-      size="md"
-      bgColor="bg-void-950"
-      actualBorderColor="bg-gold-400"
-      borderThickness={2}
-    />
-  );
 
   // Format metadata text
   let metaText = `Created by ${creatorInfo?.username || 'Loading...'} ${(() => {
@@ -158,174 +152,237 @@ const POICard: React.FC<POICardProps> = ({
   
   if (poi.updated_at && new Date(poi.updated_at).getTime() !== new Date(poi.created_at).getTime()) {
     const { date: updatedDate, useOn: updatedUseOn } = formatDateWithPreposition(poi.updated_at);
-    metaText += ` (Updated: ${updatedUseOn ? `on ${updatedDate}` : updatedDate})`;
+    metaText += ` • Updated ${updatedUseOn ? `on ${updatedDate}` : updatedDate}`;
   }
 
   return (
-    <div className="fixed inset-0 bg-black/70 z-[60] flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black/60 z-[55] flex items-center justify-center p-4">
       <div 
-        className="bg-slate-900 rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden border border-gold-500"
+        className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="bg-slate-900 border-b border-gold-500 px-6 py-5 flex items-center justify-between">
-          <div className="flex items-center space-x-4 min-w-0 flex-1">
-            {poiTypeHeaderIcon}
+        {/* Header - Compact POI Modal Style */}
+        <div className="bg-slate-800/50 px-4 py-3 border-b border-slate-700 flex items-center justify-between">
+          <div className="flex items-center space-x-3 min-w-0 flex-1">
+            {/* POI Icon */}
+            <div className="w-10 h-10 flex items-center justify-center rounded-lg bg-slate-700 border border-slate-600 flex-shrink-0">
+              {imageUrl ? (
+                <img src={imageUrl} alt={poiType.name} className="w-6 h-6 object-contain" />
+              ) : (
+                <span className="text-lg">{poiType.icon}</span>
+              )}
+            </div>
+            
             <div className="min-w-0 flex-1">
-              <h2 className="text-2xl font-bold text-gold-300 mb-2">{poi.title}</h2>
-              <div className="flex items-center space-x-3 flex-wrap">
-                <span className="badge badge-primary">{poiType.name}</span>
-                <div className="flex items-center text-sm">
-                  <PrivacyIcon className={`w-4 h-4 mr-1 ${privacyColor}`} />
-                  <span className={privacyColor}>{privacyLabel}</span>
+              <h2 className="text-lg font-bold text-amber-200 truncate" style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                {poi.title}
+              </h2>
+              <div className="flex items-center space-x-2 text-xs">
+                <span className="px-2 py-0.5 bg-slate-700 text-amber-300 rounded">{poiType.category}</span>
+                
+                {/* Map Type with Icons */}
+                <span className={`px-2 py-0.5 rounded flex items-center space-x-1 ${
+                  poi.map_type === 'deep_desert' 
+                    ? 'bg-orange-200 text-orange-900' 
+                    : 'bg-blue-600/70 text-blue-200'
+                }`}>
+                  {poi.map_type === 'hagga_basin' ? (
+                    <Mountain className="w-3 h-3" />
+                  ) : (
+                    <Pyramid className="w-3 h-3" />
+                  )}
+                  <span className="capitalize">
+                    {poi.map_type?.replace('_', ' ') || 'Unknown'}
+                    {poi.map_type === 'deep_desert' && poi.grid_square?.coordinate && (
+                      <span className="ml-1">({poi.grid_square.coordinate})</span>
+                    )}
+                  </span>
+                </span>
+                
+                <div className="flex items-center">
+                  <PrivacyIcon className={`w-3 h-3 mr-1 ${privacyColor}`} />
+                  <span className={`${privacyColor} text-xs`}>{privacyLabel}</span>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center space-x-2">
-            {/* Action Buttons */}
+          {/* Action Buttons - Compact */}
+          <div className="flex items-center space-x-1 flex-shrink-0">
             {poi.screenshots && poi.screenshots.length > 0 && onImageClick && (
               <button
                 onClick={onImageClick}
-                className="p-2 text-amber-300 hover:text-amber-100 hover:bg-slate-700 rounded-lg transition-colors"
+                className="p-1.5 text-amber-300 hover:text-amber-100 hover:bg-slate-700/50 rounded transition-colors"
                 title="View Gallery"
               >
-                <ImageIcon className="w-5 h-5" />
+                <ImageIcon className="w-4 h-4" />
               </button>
             )}
 
-            {canModify && (
-              <>
-                {onEdit && (
-                  <button
-                    onClick={onEdit}
-                    className="p-2 text-blue-300 hover:text-blue-100 hover:bg-slate-700 rounded-lg transition-colors"
-                    title="Edit POI"
-                  >
-                    <Edit className="w-5 h-5" />
-                  </button>
-                )}
-                
-                {onDelete && (
-                  <button
-                    onClick={onDelete}
-                    className="p-2 text-red-300 hover:text-red-100 hover:bg-slate-700 rounded-lg transition-colors"
-                    title="Delete POI"
-                  >
-                    <Trash2 className="w-5 h-5" />
-                  </button>
-                )}
-              </>
+            {canModify && onEdit && (
+              <button
+                onClick={onEdit}
+                className="p-1.5 text-blue-300 hover:text-blue-100 hover:bg-slate-700/50 rounded transition-colors"
+                title="Edit POI"
+              >
+                <Edit className="w-4 h-4" />
+              </button>
+            )}
+            
+            {canModify && onDelete && (
+              <button
+                onClick={onDelete}
+                className="p-1.5 text-red-300 hover:text-red-100 hover:bg-slate-700/50 rounded transition-colors"
+                title="Delete POI"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
             )}
 
             {onShare && (
               <button
                 onClick={onShare}
-                className="p-2 text-green-300 hover:text-green-100 hover:bg-slate-700 rounded-lg transition-colors"
+                className="p-1.5 text-green-300 hover:text-green-100 hover:bg-slate-700/50 rounded transition-colors"
                 title="Share POI"
               >
-                <Share className="w-5 h-5" />
+                <Share className="w-4 h-4" />
               </button>
             )}
 
             <button
               onClick={onClose}
-              className="p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-700 rounded-lg transition-colors"
+              className="p-1.5 text-slate-400 hover:text-amber-300 hover:bg-slate-700/50 rounded transition-colors"
               title="Close"
             >
-              <X className="w-6 h-6" />
+              <X className="w-4 h-4" />
             </button>
           </div>
         </div>
 
-        {/* Content */}
-        <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
-          {/* POI Images */}
+        {/* Content - Compact */}
+        <div className="overflow-y-auto max-h-[calc(90vh-120px)]">
+          {/* Screenshot Preview - Compact */}
           {poi.screenshots && poi.screenshots.length > 0 && (
-            <div className="mb-6">
-              <div className="grid gap-3" style={{ 
+            <div className="p-4 border-b border-slate-700">
+              <div className="grid gap-2" style={{ 
                 gridTemplateColumns: poi.screenshots.length === 1 
                   ? '1fr' 
                   : poi.screenshots.length === 2 
                     ? 'repeat(2, 1fr)' 
                     : 'repeat(3, 1fr)'
               }}>
-                {poi.screenshots.slice(0, 6).map((screenshot, index) => (
-                  <div key={screenshot.id || index} className="relative group aspect-video">
-                    <img
-                      src={screenshot.url}
-                      alt={`POI screenshot ${index + 1}`}
-                      className="w-full h-full object-cover rounded-lg cursor-pointer transition-opacity group-hover:opacity-90"
-                      onClick={() => onImageClick && onImageClick()}
-                    />
-                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100">
-                      <Eye className="w-6 h-6 text-white drop-shadow-lg" />
+                {poi.screenshots.slice(0, 3).map((screenshot, index) => {
+                  return (
+                    <div 
+                      key={screenshot.id || index} 
+                      className="relative group aspect-video"
+                    >
+                      <img
+                        src={screenshot.url}
+                        alt={`POI screenshot ${index + 1}`}
+                        className="w-full h-full object-cover rounded cursor-pointer transition-opacity group-hover:opacity-90"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          console.log(`Image clicked for screenshot ${index + 1}`);
+                          if (onImageClick) {
+                            console.log('Calling onImageClick function');
+                            onImageClick();
+                          } else {
+                            console.log('No onImageClick function provided');
+                          }
+                        }}
+                      />
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded flex items-center justify-center opacity-0 group-hover:opacity-100 pointer-events-none">
+                        <Eye className="w-4 h-4 text-white drop-shadow-lg" />
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
               
-              {poi.screenshots.length > 6 && (
-                <div className="mt-3 text-sm text-slate-400 text-center">
-                  +{poi.screenshots.length - 6} more screenshots
+              {poi.screenshots.length > 3 && (
+                <div className="mt-2 text-xs text-slate-400 text-center">
+                  +{poi.screenshots.length - 3} more screenshots • Click to view all
                 </div>
               )}
             </div>
           )}
 
-          {/* POI Description */}
+          {/* Description - Compact */}
           {poi.description && (
-            <div className="mb-6">
-              <h3 className="text-lg font-semibold text-gold-300 mb-3">Description</h3>
-              <div className="prose prose-sm prose-invert max-w-none">
-                <p className="text-slate-300 leading-relaxed whitespace-pre-wrap">{poi.description}</p>
-              </div>
+            <div className="p-4 border-b border-slate-700">
+              <h3 className="text-sm font-medium text-amber-200 mb-2">Description</h3>
+              <p className="text-sm text-slate-300 leading-relaxed overflow-hidden" style={{ 
+                display: '-webkit-box', 
+                WebkitLineClamp: 3, 
+                WebkitBoxOrient: 'vertical' 
+              }}>
+                {poi.description}
+              </p>
             </div>
           )}
 
-          {/* POI Details */}
-          <div className="mb-6">
-            <h3 className="text-lg font-semibold text-gold-300 mb-3">Details</h3>
-            <div className="bg-slate-800/60 rounded-lg p-4 space-y-3">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+          {/* Details - Compact */}
+          <div className="p-4 border-b border-slate-700">
+            <h3 className="text-sm font-medium text-amber-200 mb-2">Details</h3>
+            <div className="bg-slate-800 border border-slate-600 rounded-lg p-3 space-y-2">
+              <div className="grid grid-cols-2 gap-2 text-xs">
                 <div>
                   <span className="text-slate-400">Category:</span>
-                  <span className="text-slate-200 ml-2">{poiType.category}</span>
+                  <span className="text-slate-200 ml-1">{poiType.category}</span>
                 </div>
                 <div>
                   <span className="text-slate-400">Type:</span>
-                  <span className="text-slate-200 ml-2">{poiType.name}</span>
+                  <span className="text-slate-200 ml-1">{poiType.name}</span>
                 </div>
-                {poi.grid_square?.coordinate && (
+                {poi.map_type === 'deep_desert' && poi.grid_square?.coordinate && (
                   <div>
                     <span className="text-slate-400">Grid:</span>
-                    <span className="text-slate-200 ml-2">{poi.grid_square.coordinate}</span>
+                    <span className="text-slate-200 ml-1">{poi.grid_square.coordinate}</span>
                   </div>
                 )}
                 <div>
                   <span className="text-slate-400">Map:</span>
-                  <span className="text-slate-200 ml-2 capitalize">
-                    {poi.map_type?.replace('_', ' ') || 'Unknown'}
+                  <span className="text-slate-200 ml-1 flex items-center space-x-1">
+                    {poi.map_type === 'hagga_basin' ? (
+                      <Mountain className="w-3 h-3 text-blue-400" />
+                    ) : (
+                      <Pyramid className="w-3 h-3 text-orange-400" />
+                    )}
+                    <span className="capitalize">
+                      {poi.map_type?.replace('_', ' ') || 'Unknown'}
+                      {poi.map_type === 'deep_desert' && poi.grid_square?.coordinate && (
+                        <span className="text-green-400 ml-1">({poi.grid_square.coordinate})</span>
+                      )}
+                    </span>
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-400">Coordinates:</span>
+                  <span className="text-slate-200 ml-1">
+                    {poi.coordinates_x && poi.coordinates_y 
+                      ? `${poi.coordinates_x.toFixed(0)}, ${poi.coordinates_y.toFixed(0)}`
+                      : 'N/A'
+                    }
                   </span>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Metadata */}
-          <div className="mb-6 text-sm text-slate-400 text-center border-t border-slate-700 pt-4">
+          {/* Metadata - Compact */}
+          <div className="p-3 border-b border-slate-700 text-xs text-slate-400 text-center">
             {metaText}
           </div>
 
-          {/* Comments Section */}
-          <div>
+          {/* Comments Section - Direct CommentsList */}
+          <div className="p-3">
             <CommentsList 
               poiId={poi.id} 
               showLikeButton={true}
               likeTargetType="poi"
               likeTargetId={poi.id}
-              initiallyExpanded={true}
+              initiallyExpanded={false}
             />
           </div>
         </div>

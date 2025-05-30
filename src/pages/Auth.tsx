@@ -20,23 +20,16 @@ const Auth: React.FC = () => {
 
   return (
     <div className="min-h-screen relative overflow-hidden">
-      {/* Multi-layer background system */}
-      <div className="fixed inset-0 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950" />
-      <div className="fixed inset-0 bg-gradient-to-b from-slate-900/90 via-slate-800/60 to-slate-900/90" />
-      
-      {/* Advanced purple overlay pattern */}
-      <div className="fixed inset-0 bg-gradient-to-br from-violet-600/5 via-transparent to-violet-800/10" />
-      
-      {/* Subtle radial gradient for depth */}
+      {/* Main background image */}
       <div 
-        className="fixed inset-0 opacity-30"
+        className="fixed inset-0 bg-cover bg-center bg-no-repeat"
         style={{
-          background: `radial-gradient(ellipse at center top, rgba(139, 92, 246, 0.08) 0%, rgba(124, 58, 237, 0.04) 40%, transparent 70%)`
+          backgroundImage: `url(/images/main-bg.jpg)`
         }}
       />
       
-      {/* Content container */}
-      <div className="relative z-10 min-h-screen flex flex-col items-center justify-center p-4">
+      {/* Content with backdrop blur for readability */}
+      <div className="relative z-10 backdrop-blur-sm bg-slate-950/20 min-h-screen flex items-center justify-center">
         <div className="w-full max-w-md">
           {/* Header section with DiamondIcon */}
           <div className="text-center mb-8">

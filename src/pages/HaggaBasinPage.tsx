@@ -526,9 +526,6 @@ const HaggaBasinPage: React.FC = () => {
           }}
         />
         
-        {/* Dark overlay for better contrast */}
-        <div className="absolute inset-0 bg-slate-950/70" />
-        
         <div className="relative text-center">
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-amber-500 mx-auto"></div>
           <p className="mt-4 text-amber-200 font-light" style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
@@ -549,9 +546,6 @@ const HaggaBasinPage: React.FC = () => {
             backgroundImage: `url(/images/main-bg.jpg)`
           }}
         />
-        
-        {/* Dark overlay for better contrast */}
-        <div className="absolute inset-0 bg-slate-950/70" />
         
         <div className="relative text-center">
           <div className="text-red-400 text-xl mb-4 font-light" style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
@@ -578,9 +572,6 @@ const HaggaBasinPage: React.FC = () => {
           backgroundImage: `url(/images/main-bg.jpg)`
         }}
       />
-      
-      {/* Dark overlay for better contrast */}
-      <div className="absolute inset-0 bg-slate-950/70" />
 
       {/* Left Sidebar */}
       <MapControlPanel 

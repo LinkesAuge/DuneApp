@@ -259,10 +259,10 @@ const Navbar: React.FC = () => {
                   <img 
                     src={`/images/dune-log.png?v=${Date.now()}`}
                     alt="DUNE AWAKENING TRACKER" 
-                    className="h-10 w-auto object-contain transition-all duration-300 group-hover:scale-105 drop-shadow-sm"
+                    className="h-12 w-auto object-contain transition-all duration-300 group-hover:scale-105 drop-shadow-sm"
                     style={{ 
                       filter: 'brightness(1.1) contrast(1.05)',
-                      maxWidth: '200px'
+                      maxWidth: '250px'
                     }}
                   />
                   {/* If "DUNE AWAKENING TRACKER" text is separate and needs styling: */}
