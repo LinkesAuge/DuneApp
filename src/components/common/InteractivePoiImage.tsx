@@ -25,6 +25,7 @@ interface InteractivePoiImageProps {
   mapSettings?: any;
   mapType?: 'deep_desert' | 'hagga_basin';
   gridSquareId?: string;
+  highlightedPoiId?: string | null;
 }
 
 interface PlacementCoordinates {
@@ -69,7 +70,8 @@ const InteractivePoiImage: React.FC<InteractivePoiImageProps> = ({
   onPlacementModeChange,
   mapSettings,
   mapType = 'hagga_basin',
-  gridSquareId
+  gridSquareId,
+  highlightedPoiId
 }) => {
   const [currentZoom, setCurrentZoom] = useState(0.8);
   const [imageLoaded, setImageLoaded] = useState(false);
@@ -325,6 +327,7 @@ const InteractivePoiImage: React.FC<InteractivePoiImageProps> = ({
                     onDelete={onPoiDeleted}
                     onShare={onPoiShare}
                     onImageClick={() => onPoiGalleryOpen?.(poi)}
+                    isHighlighted={poi.id === highlightedPoiId}
                   />
                 </div>
               );

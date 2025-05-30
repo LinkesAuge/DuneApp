@@ -133,8 +133,22 @@ const RegionalStatsPanel: React.FC<RegionalStatsPanelProps> = ({
       // Calculate exploration progress (only for Deep Desert)
       let explorationProgress = 0;
       if (region === 'deep_desert') {
-        // For grid system, could calculate based on explored squares
-        explorationProgress = Math.min((totalPois / 1000) * 100, 100);
+        try {
+          // Get total grid squares and explored grid squares
+          const [totalGridResult, exploredGridResult] = await Promise.all([
+            supabase.from('grid_squares').select('id', { count: 'exact', head: true }),
+            supabase.from('grid_squares').select('id', { count: 'exact', head: true }).eq('is_explored', true)
+          ]);
+
+          if (!totalGridResult.error && !exploredGridResult.error) {
+            const totalGrids = totalGridResult.count || 0;
+            const exploredGrids = exploredGridResult.count || 0;
+            explorationProgress = totalGrids > 0 ? (exploredGrids / totalGrids) * 100 : 0;
+          }
+        } catch (error) {
+          console.error('Error calculating exploration progress:', error);
+          explorationProgress = 0;
+        }
       }
 
       // Get user contributions count
@@ -224,23 +238,13 @@ const RegionalStatsPanel: React.FC<RegionalStatsPanelProps> = ({
           
           {/* Middle column - Exploration for Desert, Recent Activity for Basin */}
           {region === 'deep_desert' ? (
-            <div className="group relative">
-              <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 rounded-lg" />
-              <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-800/40 to-slate-900/60 rounded-lg" />
-              
-              <div className="relative p-2 rounded-lg border border-amber-400/20 flex flex-col justify-center text-center">
-                <div className="text-lg font-light text-amber-200 tracking-wide">
-                  {Math.round(stats.explorationProgress)}%
-                </div>
-                <div className="text-xs text-amber-300/80 mb-1 font-light tracking-wide">Exploration</div>
-                <div className="h-1 bg-slate-800/60 rounded-full overflow-hidden">
-                  <div 
-                    className={`h-full bg-gradient-to-r ${config.progressBar} transition-all duration-500`}
-                    style={{ width: `${stats.explorationProgress}%` }}
-                  />
-                </div>
-              </div>
-            </div>
+            <StatCard
+              title="Exploration"
+              value={Math.round(stats.explorationProgress)}
+              subtitle={`${Math.round(stats.explorationProgress)}% complete`}
+              color={theme === 'desert' ? 'orange' : 'blue'}
+              icon={Activity}
+            />
           ) : (
             <StatCard
               title="Recent POIs"

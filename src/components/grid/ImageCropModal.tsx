@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import ReactCrop, {
   centerCrop,
   makeAspectCrop,
@@ -333,8 +334,8 @@ const ImageCropModal: React.FC<ImageCropModalProps> = ({
     }
   };
   
-  return (
-    <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+  return createPortal(
+    <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
       <div className="bg-gradient-to-b from-slate-900 to-slate-800 rounded-lg shadow-2xl max-w-5xl max-h-[90vh] w-full mx-4 flex flex-col border border-slate-700">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-slate-700">
@@ -475,7 +476,8 @@ const ImageCropModal: React.FC<ImageCropModalProps> = ({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

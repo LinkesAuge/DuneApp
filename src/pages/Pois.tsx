@@ -324,10 +324,14 @@ const PoisPage: React.FC = () => {
   };
 
   const handleGalleryOpen = (poi: PoiWithGridSquare, index?: number) => {
+    console.log('handleGalleryOpen called with POI:', poi.title, 'Screenshots:', poi.screenshots?.length);
     if (poi.screenshots?.length) {
+      console.log('Opening gallery for POI:', poi.title);
       setSelectedPoi(poi);
       setGalleryIndex(index !== undefined && index < poi.screenshots.length ? index : 0); // Use provided index or default to 0
       setShowGallery(true);
+    } else {
+      console.log('No screenshots found for POI:', poi.title);
     }
   };
 
@@ -727,11 +731,12 @@ const PoisPage: React.FC = () => {
               <POIPreviewCard
                 key={poi.id}
                 poi={poi}
-                poiType={poiType}
+                poiTypes={poiTypes}
                 customIcons={customIcons}
                 userInfo={userInfo}
                 layout={displayMode}
                 onClick={() => setSelectedPoiId(poi.id)}
+                onImageClick={() => handleGalleryOpen(poi)}
               />
             );
           })}

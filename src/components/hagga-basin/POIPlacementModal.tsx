@@ -402,15 +402,30 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
       
       if (totalScreenshots > 0) {
         try {
-          const screenshotUrls = await savePoi();
-          
-          // Create screenshot objects in the format expected by the database
-          finalScreenshots = screenshotUrls.map((url, index) => ({
-            id: `${poi.id}_${Date.now()}_${index}`,
-            url,
-            uploaded_by: user.id,
-            upload_date: new Date().toISOString()
-          }));
+          // Upload screenshots one by one
+          for (const screenshot of screenshots) {
+            if (screenshot.isNew) { // Only upload new files
+              const fileName = `${user.id}/${uuidv4()}-${screenshot.file.name}`;
+              const filePath = `poi-screenshots/${fileName}`;
+              
+              const { data: uploadData, error: uploadError } = await supabase.storage
+                .from('screenshots')
+                .upload(filePath, screenshot.file, { upsert: false });
+
+              if (uploadError) {
+                console.error('Error uploading screenshot:', uploadError);
+                throw new Error(`Failed to upload screenshot: ${screenshot.file.name}`);
+              }
+              
+              const publicURL = supabase.storage.from('screenshots').getPublicUrl(filePath).data.publicUrl;
+              finalScreenshots.push({
+                id: `${poi.id}_${Date.now()}_${finalScreenshots.length}`,
+                url: publicURL,
+                uploaded_by: user.id,
+                upload_date: new Date().toISOString()
+              });
+            }
+          }
 
           // Update the POI with screenshots in JSONB[] format
           const { error: screenshotError } = await supabase
@@ -709,49 +724,35 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
             </div>
           </div>
 
-          {/* Screenshots */}
+          {/* Screenshots - Matching Edit Modal Style */}
           <div>
-            <label className="block text-sm font-medium text-amber-200 mb-2">
-              Screenshots (Optional, Max 5)
+            <label className="block text-sm font-medium text-amber-200 mb-3">
+              Screenshots ({screenshots.length + pendingFiles.length}/5)
             </label>
-            
-            {/* Screenshot Upload */}
-            <div className="mb-4">
-              <label htmlFor="screenshot-upload" className="block text-sm font-medium text-amber-300 mb-1">
-                Screenshots (Optional, Max 5)
-              </label>
-              <input
-                id="screenshot-upload"
-                type="file"
-                accept="image/*"
-                onChange={handleFileChange}
-                className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-amber-100 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-amber-600 file:text-slate-900 hover:file:bg-amber-500"
-                multiple
-                disabled={screenshots.length + pendingFiles.length >= 5}
-              />
-              {(screenshots.length + pendingFiles.length > 0) && (
-                <p className="text-xs text-slate-400 mt-1">
-                  {screenshots.length + pendingFiles.length}/5 screenshots
-                  {pendingFiles.length > 0 && ` • ${pendingFiles.length} pending crop`}
-                </p>
-              )}
-            </div>
-
-            {/* Display Selected/Uploaded Screenshots */}
-            {screenshots.length > 0 && (
-              <div className="mb-4">
-                <p className="text-sm text-amber-300 mb-1">Attached Screenshots:</p>
-                <div className="grid grid-cols-3 gap-2">
-                  {screenshots.map((sFile) => (
-                    <div key={sFile.id} className="relative group">
-                      <img src={sFile.previewUrl} alt="screenshot preview" className="w-full h-20 object-cover rounded border border-slate-600"/>
-                      <button
-                        onClick={() => removeScreenshot(sFile.id)}
-                        className="absolute top-1 right-1 bg-red-600/70 hover:bg-red-500 text-white p-0.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                        aria-label="Remove screenshot"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
+            <div className="space-y-3">
+              {/* Screenshots Grid - Matching POI Edit Modal */}
+              <div className="flex flex-wrap gap-2">
+                {/* Uploaded Screenshots */}
+                {screenshots.map((sFile) => (
+                  <div 
+                    key={sFile.id}
+                    className="w-20 h-20 relative rounded overflow-hidden border border-slate-600"
+                  >
+                    <img 
+                      src={sFile.previewUrl} 
+                      alt="POI Screenshot" 
+                      className="w-full h-full object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeScreenshot(sFile.id)}
+                      className="absolute top-0 right-0 bg-red-600 text-white w-5 h-5 flex items-center justify-center hover:bg-red-700 transition-colors"
+                      title="Remove screenshot"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                    {/* Screenshot label */}
+                    <div className="absolute bottom-1 left-1">
                       {(() => {
                         const label = getScreenshotLabel(true, sFile.cropDetails);
                         return (
@@ -759,10 +760,29 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
                         );
                       })()}
                     </div>
-                  ))}
-                </div>
+                  </div>
+                ))}
+
+                {/* Upload Button - Matching Edit Modal */}
+                {(screenshots.length + pendingFiles.length) < 5 && (
+                  <label className="w-20 h-20 border-2 border-dashed border-slate-600 rounded flex flex-col items-center justify-center text-slate-400 hover:text-amber-300 hover:border-amber-500 cursor-pointer transition-colors">
+                    <Upload className="w-5 h-5" />
+                    <span className="text-xs mt-1">Add</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFileChange}
+                      multiple
+                      className="hidden"
+                    />
+                  </label>
+                )}
               </div>
-            )}
+              
+              <p className="text-xs text-slate-400">
+                Upload up to 5 screenshots total. Each image must be under 10MB. PNG, JPG formats supported.
+              </p>
+            </div>
           </div>
 
           {/* Error Display */}

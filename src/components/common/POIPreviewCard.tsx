@@ -10,7 +10,7 @@ import CommentsList from '../comments/CommentsList';
 
 interface POIPreviewCardProps {
   poi: Poi;
-  poiType: PoiType;
+  poiTypes: PoiType[];
   customIcons: CustomIcon[];
   userInfo?: { [key: string]: { username: string; display_name?: string | null; custom_avatar_url?: string | null; discord_avatar_url?: string | null; use_discord_avatar?: boolean } };
   layout?: 'grid' | 'list';
@@ -20,6 +20,7 @@ interface POIPreviewCardProps {
   onDelete?: () => void;
   onShare?: () => void;
   onImageClick?: () => void;
+  onHighlight?: () => void;
 }
 
 // Helper function to determine if an icon is a URL or emoji
@@ -29,16 +30,19 @@ const isIconUrl = (icon: string): boolean => {
 
 // Helper function to get display image URL for POI icons
 const getDisplayImageUrl = (poi: Poi, poiType: PoiType, customIcons: CustomIcon[]): string | null => {
+  // Handle case where customIcons is undefined
+  const safeCustomIcons = customIcons || [];
+  
   // First priority: Check if POI has a custom icon reference
   if (poi.custom_icon_id) {
-    const customIcon = customIcons.find(ci => ci.id === poi.custom_icon_id);
+    const customIcon = safeCustomIcons.find(ci => ci.id === poi.custom_icon_id);
     if (customIcon) {
       return customIcon.image_url;
     }
   }
   
   // Second priority: Check if POI type icon is a custom icon reference
-  const customIconByPoiType = customIcons.find(ci => ci.id === poiType.icon || ci.name === poiType.icon);
+  const customIconByPoiType = safeCustomIcons.find(ci => ci.id === poiType.icon || ci.name === poiType.icon);
   if (customIconByPoiType) {
     return customIconByPoiType.image_url;
   }
@@ -74,7 +78,7 @@ const privacyLabels = {
 
 const POIPreviewCard: React.FC<POIPreviewCardProps> = ({
   poi,
-  poiType,
+  poiTypes,
   customIcons,
   userInfo = {},
   layout = 'grid',
@@ -83,55 +87,113 @@ const POIPreviewCard: React.FC<POIPreviewCardProps> = ({
   onEdit,
   onDelete,
   onShare,
-  onImageClick
+  onImageClick,
+  onHighlight
 }) => {
   const { user } = useAuth();
+  
+  // Handle case where poiTypes is undefined or empty
+  if (!poiTypes || !Array.isArray(poiTypes)) {
+    console.error('poiTypes is undefined or not an array in POIPreviewCard');
+    return (
+      <div className="bg-red-900/20 border border-red-800/50 rounded-lg p-3">
+        <p className="text-red-300 text-sm">POI types data missing</p>
+        <p className="text-red-400/70 text-xs">POI: {poi.title}</p>
+      </div>
+    );
+  }
+  
+  // Find the POI type for this POI
+  const poiType = poiTypes.find(type => type.id === poi.poi_type_id);
+  
+  // If no POI type found, render error state or skip
+  if (!poiType) {
+    console.error('POI type not found for POI:', poi.id, 'poi_type_id:', poi.poi_type_id);
+    return (
+      <div className="bg-red-900/20 border border-red-800/50 rounded-lg p-3">
+        <p className="text-red-300 text-sm">POI type not found</p>
+        <p className="text-red-400/70 text-xs">POI: {poi.title}</p>
+      </div>
+    );
+  }
+  
+  // Check if current user can modify this POI
   const canModify = user && (user.id === poi.created_by || user.role === 'admin' || user.role === 'editor');
   
-  // State for additional data
+  // State for user information and comments
+  const [creatorInfo, setCreatorInfo] = useState<{ username: string; display_name?: string | null; custom_avatar_url?: string | null; discord_avatar_url?: string | null; use_discord_avatar?: boolean } | null>(null);
+  const [editorInfo, setEditorInfo] = useState<{ username: string; display_name?: string | null; custom_avatar_url?: string | null; discord_avatar_url?: string | null; use_discord_avatar?: boolean } | null>(null);
+  const [loadingUserInfo, setLoadingUserInfo] = useState(true);
   const [commentCount, setCommentCount] = useState(0);
-  const [showComments, setShowComments] = useState(false);
+
   const [expanded, setExpanded] = useState(false);
   
-  const creator = userInfo[poi.created_by] || (poi.created_by ? undefined : { username: 'Deleted User' });
-  const imageUrl = getDisplayImageUrl(poi, poiType, customIcons);
+  const imageUrl = getDisplayImageUrl(poi, poiType, customIcons || []);
   const PrivacyIcon = privacyIcons[poi.privacy_level];
   const privacyColor = privacyColors[poi.privacy_level];
   const privacyLabel = privacyLabels[poi.privacy_level];
   
-  // Format the date with proper grammar
-  const { date, useOn } = formatDateWithPreposition(poi.created_at);
-  const formattedDate = useOn ? `on ${date}` : date;
-  
   // Check if POI was edited
   const isEdited = wasUpdated(poi.created_at, poi.updated_at);
   
-  // Fetch comment count
+  // Fetch user information and comment count
   useEffect(() => {
-    const fetchCommentCount = async () => {
+    const fetchData = async () => {
       try {
-        const { count, error } = await supabase
+        setLoadingUserInfo(true);
+        
+        // Fetch user information - Filter out null values to avoid UUID errors
+        const userIds = [poi.created_by, poi.updated_by].filter(id => id !== null && id !== undefined);
+        
+        if (userIds.length > 0) {
+          const { data: userData, error: userError } = await supabase
+            .from('profiles')
+            .select('id, username, display_name, custom_avatar_url, discord_avatar_url, use_discord_avatar')
+            .in('id', userIds);
+          
+          if (userError) throw userError;
+          
+          const creatorData = userData?.find(u => u.id === poi.created_by);
+          const editorData = userData?.find(u => u.id === poi.updated_by);
+          
+          setCreatorInfo(creatorData ? { 
+            username: creatorData.username, 
+            display_name: creatorData.display_name, 
+            custom_avatar_url: creatorData.custom_avatar_url, 
+            discord_avatar_url: creatorData.discord_avatar_url,
+            use_discord_avatar: creatorData.use_discord_avatar
+          } : null);
+          setEditorInfo(editorData ? { 
+            username: editorData.username, 
+            display_name: editorData.display_name, 
+            custom_avatar_url: editorData.custom_avatar_url, 
+            discord_avatar_url: editorData.discord_avatar_url,
+            use_discord_avatar: editorData.use_discord_avatar
+          } : null);
+        } else {
+          // No valid user IDs, set to null
+          setCreatorInfo(null);
+          setEditorInfo(null);
+        }
+        
+        // Fetch comment count
+        const { count, error: commentError } = await supabase
           .from('comments')
           .select('*', { count: 'exact', head: true })
           .eq('poi_id', poi.id);
         
-        if (!error) {
+        if (!commentError) {
           setCommentCount(count || 0);
         }
       } catch (error) {
-        console.error('Error fetching comment count:', error);
+        console.error('Error fetching data:', error);
+      } finally {
+        setLoadingUserInfo(false);
       }
     };
     
-    fetchCommentCount();
-  }, [poi.id]);
-
-  // Format metadata text
-  let metaText = `Created by ${getDisplayNameFromProfile(creator) || 'Unknown'} ${formattedDate}`;
-  if (isEdited && poi.updated_at) {
-    const { date: updatedDate, useOn: updatedUseOn } = formatDateWithPreposition(poi.updated_at);
-    metaText += ` • Updated ${updatedUseOn ? `on ${updatedDate}` : updatedDate}`;
-  }
+    fetchData();
+  }, [poi.created_by, poi.updated_by, poi.id, poi.updated_at]); // Add updated_at to trigger refresh on edits
 
   // Handle actions
   const handleEdit = (e: React.MouseEvent) => {
@@ -151,7 +213,10 @@ const POIPreviewCard: React.FC<POIPreviewCardProps> = ({
 
   const handleImageClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (onImageClick) onImageClick();
+    e.preventDefault();
+    if (onImageClick) {
+      onImageClick();
+    }
   };
 
   const handleToggleExpanded = (e: React.MouseEvent) => {
@@ -159,21 +224,17 @@ const POIPreviewCard: React.FC<POIPreviewCardProps> = ({
     setExpanded(!expanded);
   };
 
-  const handleToggleComments = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setShowComments(!showComments);
-  };
+
 
   if (layout === 'list') {
     return (
-      <div className={`bg-slate-900 border border-slate-700 rounded-lg overflow-hidden ${className}`}>
-        {/* Header - Compact POI Modal Style */}
-        <div 
-          className="bg-slate-800/50 px-4 py-3 border-b border-slate-700 flex items-center justify-between cursor-pointer hover:bg-slate-800/70 transition-colors"
+      <div className={`bg-slate-900 border border-slate-700 rounded-xl shadow-lg overflow-hidden ${className}`}>
+        {/* Header - Identical to POI Modal Style */}
+        <div className="bg-slate-800/50 px-4 py-3 border-b border-slate-700 flex items-center justify-between cursor-pointer hover:bg-slate-800/70 transition-colors"
           onClick={expanded ? undefined : onClick}
         >
           <div className="flex items-center space-x-3 min-w-0 flex-1">
-            {/* POI Icon */}
+            {/* POI Icon - Identical to Modal */}
             <div className="w-10 h-10 flex items-center justify-center rounded-lg bg-slate-700 border border-slate-600 flex-shrink-0">
               {imageUrl ? (
                 <img src={imageUrl} alt={poiType.name} className="w-6 h-6 object-contain" />
@@ -183,13 +244,13 @@ const POIPreviewCard: React.FC<POIPreviewCardProps> = ({
             </div>
             
             <div className="min-w-0 flex-1">
-              <h3 className="text-lg font-bold text-amber-200 truncate" style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+              <h2 className="text-lg font-bold text-amber-200 truncate" style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
                 {poi.title}
-              </h3>
+              </h2>
               <div className="flex items-center space-x-2 text-xs">
-                <span className="px-2 py-0.5 bg-slate-700 text-amber-300 rounded">{poiType.name}</span>
+                <span className="px-2 py-0.5 bg-slate-700 text-amber-300 rounded">{poiType.category}</span>
                 
-                {/* Map Type with Icons */}
+                {/* Map Type with Icons - Identical to Modal */}
                 <span className={`px-2 py-0.5 rounded flex items-center space-x-1 ${
                   poi.map_type === 'deep_desert' 
                     ? 'bg-orange-200 text-orange-900' 
@@ -212,14 +273,11 @@ const POIPreviewCard: React.FC<POIPreviewCardProps> = ({
                   <PrivacyIcon className={`w-3 h-3 mr-1 ${privacyColor}`} />
                   <span className={`${privacyColor} text-xs`}>{privacyLabel}</span>
                 </div>
-                {poi.screenshots && poi.screenshots.length > 0 && (
-                  <span className="text-xs text-amber-400">📷 {poi.screenshots.length}</span>
-                )}
               </div>
             </div>
           </div>
 
-          {/* Action Buttons - Compact */}
+          {/* Action Buttons - Identical to Modal */}
           <div className="flex items-center space-x-1 flex-shrink-0">
             <button
               onClick={handleToggleExpanded}
@@ -271,10 +329,10 @@ const POIPreviewCard: React.FC<POIPreviewCardProps> = ({
           </div>
         </div>
 
-        {/* Expanded Content */}
+        {/* Expanded Content - Identical to Modal Structure */}
         {expanded && (
-          <div className="overflow-y-auto max-h-[400px]">
-            {/* Screenshot Preview - Compact */}
+          <div className="overflow-y-auto max-h-[500px]">
+            {/* Screenshot Preview - Identical to Modal */}
             {poi.screenshots && poi.screenshots.length > 0 && (
               <div className="p-4 border-b border-slate-700">
                 <div className="grid gap-2" style={{ 
@@ -284,19 +342,24 @@ const POIPreviewCard: React.FC<POIPreviewCardProps> = ({
                       ? 'repeat(2, 1fr)' 
                       : 'repeat(3, 1fr)'
                 }}>
-                  {poi.screenshots.slice(0, 3).map((screenshot, index) => (
-                    <div key={screenshot.id || index} className="relative group aspect-video">
-                      <img
-                        src={screenshot.url}
-                        alt={`POI screenshot ${index + 1}`}
-                        className="w-full h-full object-cover rounded cursor-pointer transition-opacity group-hover:opacity-90"
-                        onClick={handleImageClick}
-                      />
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded flex items-center justify-center opacity-0 group-hover:opacity-100">
-                        <Eye className="w-4 h-4 text-white drop-shadow-lg" />
+                  {poi.screenshots.slice(0, 3).map((screenshot, index) => {
+                    return (
+                      <div 
+                        key={screenshot.id || index} 
+                        className="relative group aspect-video"
+                      >
+                        <img
+                          src={screenshot.url}
+                          alt={`POI screenshot ${index + 1}`}
+                          className="w-full h-full object-cover rounded cursor-pointer transition-opacity group-hover:opacity-90"
+                          onClick={handleImageClick}
+                        />
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded flex items-center justify-center opacity-0 group-hover:opacity-100 pointer-events-none">
+                          <Eye className="w-4 h-4 text-white drop-shadow-lg" />
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
                 
                 {poi.screenshots.length > 3 && (
@@ -307,19 +370,23 @@ const POIPreviewCard: React.FC<POIPreviewCardProps> = ({
               </div>
             )}
 
-            {/* Description - Compact */}
+            {/* Description - Identical to Modal */}
             {poi.description && (
               <div className="p-4 border-b border-slate-700">
-                <h4 className="text-sm font-medium text-amber-200 mb-2">Description</h4>
-                <p className="text-sm text-slate-300 leading-relaxed">
+                <h3 className="text-sm font-medium text-amber-200 mb-2">Description</h3>
+                <p className="text-sm text-slate-300 leading-relaxed overflow-hidden" style={{ 
+                  display: '-webkit-box', 
+                  WebkitLineClamp: 3, 
+                  WebkitBoxOrient: 'vertical' 
+                }}>
                   {poi.description}
                 </p>
               </div>
             )}
 
-            {/* Details - Compact */}
+            {/* Details - Identical to Modal */}
             <div className="p-4 border-b border-slate-700">
-              <h4 className="text-sm font-medium text-amber-200 mb-2">Details</h4>
+              <h3 className="text-sm font-medium text-amber-200 mb-2">Details</h3>
               <div className="bg-slate-800 border border-slate-600 rounded-lg p-3 space-y-2">
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div>
@@ -352,67 +419,79 @@ const POIPreviewCard: React.FC<POIPreviewCardProps> = ({
                       </span>
                     </span>
                   </div>
+                  <div>
+                    <span className="text-slate-400">Coordinates:</span>
+                    <span className="text-slate-200 ml-1">
+                      {poi.coordinates_x && poi.coordinates_y 
+                        ? `${poi.coordinates_x.toFixed(0)}, ${poi.coordinates_y.toFixed(0)}`
+                        : 'N/A'
+                      }
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Metadata - Enhanced with Avatars */}
+            {/* Metadata - Identical to Modal with Avatars */}
             <div className="p-3 border-b border-slate-700">
-              <div className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2">
+              <div className="space-y-2">
+                {/* Creator Information */}
+                <div className="flex items-center gap-2 text-xs">
                   <UserAvatar 
                     user={{ 
-                      custom_avatar_url: creator?.custom_avatar_url, 
-                      discord_avatar_url: creator?.discord_avatar_url,
-                      use_discord_avatar: creator?.use_discord_avatar
+                      custom_avatar_url: creatorInfo?.custom_avatar_url, 
+                      discord_avatar_url: creatorInfo?.discord_avatar_url,
+                      use_discord_avatar: creatorInfo?.use_discord_avatar
                     }} 
                     size="xs" 
                   />
                   <span className="text-slate-400">Created by</span>
                   <span className="text-amber-300 font-medium">
-                    {getDisplayNameFromProfile(creator) || 'Unknown'}
+                    {getDisplayNameFromProfile(creatorInfo) || (poi.created_by ? 'Loading...' : 'Deleted User')}
                   </span>
-                  <span className="text-slate-400">{formattedDate}</span>
+                  <span className="text-slate-400">
+                    {(() => {
+                      const { date, useOn } = formatDateWithPreposition(poi.created_at);
+                      return useOn ? `on ${date}` : date;
+                    })()}
+                  </span>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <PrivacyIcon size={12} className={privacyColor} />
-                  <span className={privacyColor}>{privacyLabel}</span>
-                </div>
+                
+                {/* Editor Information */}
+                {isEdited && (
+                  <div className="flex items-center gap-2 text-xs">
+                    <UserAvatar 
+                      user={{ 
+                        custom_avatar_url: editorInfo?.custom_avatar_url, 
+                        discord_avatar_url: editorInfo?.discord_avatar_url,
+                        use_discord_avatar: editorInfo?.use_discord_avatar
+                      }} 
+                      size="xs" 
+                    />
+                    <span className="text-slate-400">Edited by</span>
+                    <span className="text-amber-300 font-medium">
+                      {editorInfo ? getDisplayNameFromProfile(editorInfo) : 'Deleted User'}
+                    </span>
+                    <span className="text-slate-400">
+                      {(() => {
+                        const { date: editDate, useOn: editUseOn } = formatDateWithPreposition(poi.updated_at);
+                        return editUseOn ? `on ${editDate}` : editDate;
+                      })()}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Comments Toggle - Compact */}
+            {/* Comments Section - Identical to Modal */}
             <div className="p-3">
-              <button
-                onClick={handleToggleComments}
-                className="w-full flex items-center justify-between text-sm text-amber-200 hover:text-amber-100 transition-colors bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-lg px-3 py-2"
-              >
-                <div className="flex items-center space-x-2">
-                  <MessageCircle className="w-4 h-4" />
-                  <span>Comments</span>
-                  {commentCount > 0 && (
-                    <span className="bg-amber-600 text-slate-900 text-xs rounded-full px-1.5 py-0.5 min-w-[1.25rem] text-center">
-                      {commentCount}
-                    </span>
-                  )}
-                </div>
-                <span className="text-xs text-slate-400">
-                  {showComments ? 'Hide' : 'Show'}
-                </span>
-              </button>
-              
-              {/* Comments Section - Collapsible */}
-              {showComments && (
-                <div className="mt-3">
-                  <CommentsList 
-                    poiId={poi.id} 
-                    showLikeButton={true}
-                    likeTargetType="poi"
-                    likeTargetId={poi.id}
-                    initiallyExpanded={true}
-                  />
-                </div>
-              )}
+              <CommentsList 
+                poiId={poi.id} 
+                showLikeButton={true}
+                likeTargetType="poi"
+                likeTargetId={poi.id}
+                initiallyExpanded={false}
+              />
             </div>
           </div>
         )}
@@ -420,76 +499,195 @@ const POIPreviewCard: React.FC<POIPreviewCardProps> = ({
     );
   }
 
-  // Grid layout - Compact card
+  // Grid layout - Compact version of modal
   return (
     <div
-      className={`bg-slate-900 border border-slate-700 rounded-lg p-4 cursor-pointer hover:border-amber-500 transition-colors ${className}`}
+      className={`bg-slate-900 border border-slate-700 rounded-xl shadow-lg overflow-hidden cursor-pointer hover:border-amber-500 transition-all duration-300 hover:shadow-xl ${className}`}
       onClick={onClick}
     >
-      <div className="flex items-start space-x-3">
-        {/* POI Type Icon */}
-        <div className="w-10 h-10 flex items-center justify-center rounded-lg bg-slate-700 border border-slate-600 flex-shrink-0">
-          {imageUrl ? (
-            <img src={imageUrl} alt={poiType.name} className="w-6 h-6 object-contain" />
-          ) : (
-            <span className="text-lg">{poiType.icon}</span>
-          )}
-        </div>
-
-        {/* POI Content */}
-        <div className="flex-1 min-w-0">
-          <h4 className="text-amber-200 font-semibold truncate" style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-            {poi.title}
-          </h4>
-          <div className="flex items-center space-x-2 text-xs mt-1">
-            <span className="px-2 py-0.5 bg-slate-700 text-amber-300 rounded">{poiType.name}</span>
-            
-            {/* Map Type with Icons */}
-            <span className={`px-2 py-0.5 rounded flex items-center space-x-1 ${
-              poi.map_type === 'deep_desert' 
-                ? 'bg-orange-200 text-orange-900' 
-                : 'bg-blue-600/70 text-blue-200'
-            }`}>
-              {poi.map_type === 'hagga_basin' ? (
-                <Mountain className="w-3 h-3" />
-              ) : (
-                <Pyramid className="w-3 h-3" />
-              )}
-              <span className="capitalize">
-                {poi.map_type?.replace('_', ' ') || 'Unknown'}
-                {poi.map_type === 'deep_desert' && poi.grid_square?.coordinate && (
-                  <span className="ml-1">({poi.grid_square.coordinate})</span>
-                )}
-              </span>
-            </span>
-            
-            <div className="flex items-center">
-              <PrivacyIcon className={`w-3 h-3 mr-1 ${privacyColor}`} />
-              <span className={`${privacyColor}`}>{privacyLabel}</span>
-            </div>
-            {poi.screenshots && poi.screenshots.length > 0 && (
-              <span className="text-xs text-amber-400 mt-1">📷 {poi.screenshots.length} screenshots</span>
+      {/* Header - Compact POI Modal Style */}
+      <div className="bg-slate-800/50 px-3 py-2 border-b border-slate-700 flex items-center justify-between">
+        <div className="flex items-center space-x-2 min-w-0 flex-1">
+          {/* POI Icon - Compact */}
+          <div className="w-8 h-8 flex items-center justify-center rounded-lg bg-slate-700 border border-slate-600 flex-shrink-0">
+            {imageUrl ? (
+              <img src={imageUrl} alt={poiType.name} className="w-5 h-5 object-contain" />
+            ) : (
+              <span className="text-sm">{poiType.icon}</span>
             )}
           </div>
           
-          {poi.description && (
-            <p className="text-sm text-slate-300 mt-2 overflow-hidden" style={{ 
+          <div className="min-w-0 flex-1">
+            <h3 className="text-sm font-bold text-amber-200 truncate" style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+              {poi.title}
+            </h3>
+            <div className="flex items-center space-x-1 text-xs">
+              <span className="px-1.5 py-0.5 bg-slate-700 text-amber-300 rounded text-xs">{poiType.category}</span>
+              
+              {/* Map Type - Compact */}
+              <span className={`px-1.5 py-0.5 rounded flex items-center space-x-1 text-xs ${
+                poi.map_type === 'deep_desert' 
+                  ? 'bg-orange-200 text-orange-900' 
+                  : 'bg-blue-600/70 text-blue-200'
+              }`}>
+                {poi.map_type === 'hagga_basin' ? (
+                  <Mountain className="w-2.5 h-2.5" />
+                ) : (
+                  <Pyramid className="w-2.5 h-2.5" />
+                )}
+                <span className="capitalize">
+                  {poi.map_type?.replace('_', ' ') || 'Unknown'}
+                  {poi.map_type === 'deep_desert' && poi.grid_square?.coordinate && (
+                    <span className="ml-1">({poi.grid_square.coordinate})</span>
+                  )}
+                </span>
+              </span>
+              
+              <div className="flex items-center">
+                <PrivacyIcon className={`w-2.5 h-2.5 mr-0.5 ${privacyColor}`} />
+                <span className={`${privacyColor} text-xs`}>{privacyLabel}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Action Buttons - Compact */}
+        <div className="flex items-center space-x-0.5 flex-shrink-0">
+          {poi.screenshots && poi.screenshots.length > 0 && onImageClick && (
+            <button
+              onClick={handleImageClick}
+              className="p-1 text-amber-300 hover:text-amber-100 hover:bg-slate-700/50 rounded transition-colors"
+              title="View Gallery"
+            >
+              <ImageIcon className="w-3.5 h-3.5" />
+            </button>
+          )}
+
+          {canModify && onEdit && (
+            <button
+              onClick={handleEdit}
+              className="p-1 text-blue-300 hover:text-blue-100 hover:bg-slate-700/50 rounded transition-colors"
+              title="Edit POI"
+            >
+              <Edit className="w-3.5 h-3.5" />
+            </button>
+          )}
+          
+          {canModify && onDelete && (
+            <button
+              onClick={handleDelete}
+              className="p-1 text-red-300 hover:text-red-100 hover:bg-slate-700/50 rounded transition-colors"
+              title="Delete POI"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          )}
+
+          {onShare && (
+            <button
+              onClick={handleShare}
+              className="p-1 text-green-300 hover:text-green-100 hover:bg-slate-700/50 rounded transition-colors"
+              title="Share POI"
+            >
+              <Share className="w-3.5 h-3.5" />
+            </button>
+          )}
+
+
+        </div>
+      </div>
+      
+      {/* Content - Compact */}
+      <div className="p-3">
+        {/* Screenshot Preview - Compact */}
+        {poi.screenshots && poi.screenshots.length > 0 && (
+          <div className="mb-3">
+            <div className="grid gap-1" style={{ 
+              gridTemplateColumns: poi.screenshots.length === 1 
+                ? '1fr' 
+                : poi.screenshots.length === 2 
+                  ? 'repeat(2, 1fr)' 
+                  : 'repeat(3, 1fr)'
+            }}>
+              {poi.screenshots.slice(0, 3).map((screenshot, index) => {
+                return (
+                  <div 
+                    key={screenshot.id || index} 
+                    className="relative group aspect-video"
+                  >
+                    <img
+                      src={screenshot.url}
+                      alt={`POI screenshot ${index + 1}`}
+                      className="w-full h-full object-cover rounded cursor-pointer transition-opacity group-hover:opacity-90"
+                      onClick={handleImageClick}
+                    />
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded flex items-center justify-center opacity-0 group-hover:opacity-100 pointer-events-none">
+                      <Eye className="w-3 h-3 text-white drop-shadow-lg" />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            
+            {poi.screenshots.length > 3 && (
+              <div className="mt-1 text-xs text-slate-400 text-center">
+                +{poi.screenshots.length - 3} more
+              </div>
+            )}
+          </div>
+        )}
+        
+        {/* Description - Compact */}
+        {poi.description && (
+          <div className="mb-3">
+            <p className="text-xs text-slate-300 leading-relaxed overflow-hidden" style={{ 
               display: '-webkit-box', 
               WebkitLineClamp: 2, 
               WebkitBoxOrient: 'vertical' 
             }}>
               {poi.description}
             </p>
-          )}
-          
-          <div className="flex justify-between items-center text-xs text-slate-400 mt-2">
-            <span>Created by {getDisplayNameFromProfile(creator) || 'Unknown'}</span>
-            <span>{formattedDate}</span>
           </div>
-          
-          {commentCount > 0 && (
-            <div className="text-xs text-amber-400 mt-1">💬 {commentCount} comments</div>
-          )}
+        )}
+        
+        {/* Metadata - Compact with Avatars */}
+        <div className="border-t border-slate-700/50 pt-2">
+          <div className="flex items-center gap-2 text-xs">
+            <UserAvatar 
+              user={{ 
+                custom_avatar_url: creatorInfo?.custom_avatar_url, 
+                discord_avatar_url: creatorInfo?.discord_avatar_url,
+                use_discord_avatar: creatorInfo?.use_discord_avatar
+              }} 
+              size="xs" 
+            />
+            <span className="text-slate-400">By</span>
+            <span className="text-amber-300 font-medium">
+              {getDisplayNameFromProfile(creatorInfo) || (poi.created_by ? 'Loading...' : 'Deleted User')}
+            </span>
+            <span className="text-slate-400">
+              {(() => {
+                const { date, useOn } = formatDateWithPreposition(poi.created_at);
+                return useOn ? `on ${date}` : date;
+              })()}
+            </span>
+            {isEdited && (
+              <span className="text-amber-400 px-1 py-0.5 bg-amber-400/10 rounded text-xs">
+                Edited
+              </span>
+            )}
+          </div>
+        </div>
+        
+        {/* Comments Section for Grid View - Always Visible, Collapsed by Default */}
+        <div className="mt-3 pt-3 border-t border-slate-700/50">
+          <CommentsList
+            poiId={poi.id}
+            showLikeButton={true}
+            likeTargetType="poi"
+            likeTargetId={poi.id}
+            initiallyExpanded={false}
+          />
         </div>
       </div>
     </div>

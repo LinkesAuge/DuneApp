@@ -399,6 +399,7 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
       privacy_level: privacyLevel,
       coordinates_x: coordinatesX,
       coordinates_y: coordinatesY,
+      updated_by: user!.id, // Set who is making the edit
     };
 
     try {

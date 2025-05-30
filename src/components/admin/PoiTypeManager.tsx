@@ -444,7 +444,7 @@ const initialFormState: PoiTypeFormData = {
   icon_has_transparent_background: false,
 };
 
-const PoiDefinitionManager: React.FC<PoiTypeManagerProps> = ({
+const PoiTypeManager: React.FC<PoiTypeManagerProps> = ({
   poiTypes: externalPoiTypes,
   onError: externalOnError,
   onSuccess: externalOnSuccess,
@@ -1441,4 +1441,4 @@ const PoiDefinitionManager: React.FC<PoiTypeManagerProps> = ({
   );
 };
 
-export default PoiDefinitionManager;
+export default PoiTypeManager;

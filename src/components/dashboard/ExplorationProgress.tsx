@@ -1,15 +1,17 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import DiamondIcon from '../common/DiamondIcon';
-import { Eye, Target, Grid3X3 } from 'lucide-react';
+import { Eye, Target, Grid3X3, Mountain, ArrowRight, Compass, Map } from 'lucide-react';
 import { useExplorationChangeListener } from '../../lib/explorationEvents';
 
 interface ExplorationData {
   totalGridSquares: number;
   exploredGridSquares: number;
   percentage: number;
-  recentExplorations: number; // explored in last 7 days
-  exploredGrids: string[]; // list of explored grid coordinates
+  recentExplorations: number;
+  exploredGrids: string[];
+  haggaBasinPois: number;
 }
 
 const ExplorationProgress: React.FC = () => {
@@ -19,34 +21,49 @@ const ExplorationProgress: React.FC = () => {
   const fetchExplorationData = async () => {
     setIsLoading(true);
     try {
-      const [totalResult, exploredResult, exploredListResult, recentResult] = await Promise.all([
+      // Simplified parallel queries to avoid database issues
+      const [totalResult, exploredResult, exploredListResult, haggaBasinResult] = await Promise.all([
         supabase.from('grid_squares').select('id', { count: 'exact', head: true }),
         supabase.from('grid_squares').select('id', { count: 'exact', head: true }).eq('is_explored', true),
         supabase.from('grid_squares').select('coordinate').eq('is_explored', true).order('coordinate'),
-        supabase
-          .from('grid_squares')
-          .select('id', { count: 'exact', head: true })
-          .eq('is_explored', true)
-          .gte('upload_date', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
+        supabase.from('pois').select('id', { count: 'exact', head: true }).eq('map_type', 'hagga_basin')
       ]);
 
       if (totalResult.error) throw totalResult.error;
       if (exploredResult.error) throw exploredResult.error;
       if (exploredListResult.error) throw exploredListResult.error;
-      if (recentResult.error) throw recentResult.error;
+      if (haggaBasinResult.error) throw haggaBasinResult.error;
 
       const total = totalResult.count || 0;
       const explored = exploredResult.count || 0;
-      const recent = recentResult.count || 0;
       const percentage = total > 0 ? (explored / total) * 100 : 0;
       const exploredGrids = exploredListResult.data?.map(grid => grid.coordinate) || [];
+      const haggaBasinPois = haggaBasinResult.count || 0;
+
+      // For recent explorations, we'll use a simpler approach to avoid date/column issues
+      let recent = 0;
+      try {
+        const recentResult = await supabase
+          .from('grid_squares')
+          .select('id', { count: 'exact', head: true })
+          .eq('is_explored', true)
+          .gte('upload_date', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
+        
+        if (!recentResult.error) {
+          recent = recentResult.count || 0;
+        }
+      } catch (error) {
+        console.log('Could not fetch recent explorations, using 0');
+        recent = 0;
+      }
 
       setData({
         totalGridSquares: total,
         exploredGridSquares: explored,
         percentage,
         recentExplorations: recent,
-        exploredGrids
+        exploredGrids,
+        haggaBasinPois
       });
     } catch (error) {
       console.error('Error fetching exploration data:', error);
@@ -62,114 +79,222 @@ const ExplorationProgress: React.FC = () => {
   // Listen for exploration status changes
   useExplorationChangeListener((details) => {
     console.log('ExplorationProgress: Received exploration change:', details);
-    fetchExplorationData(); // Refresh data when exploration status changes
+    fetchExplorationData();
   });
 
   if (isLoading) {
     return (
-      <div className="space-y-4 animate-pulse">
-        <div>
-          <div className="flex justify-between text-sm mb-2">
-            <div className="h-4 bg-slate-700/40 rounded w-24"></div>
-            <div className="h-4 bg-slate-700/40 rounded w-16"></div>
+      <div className="space-y-6">
+        {[...Array(3)].map((_, i) => (
+          <div key={i} className="group relative">
+            <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 rounded-lg" />
+            <div className="relative p-4 rounded-lg border border-amber-400/10">
+              <div className="animate-pulse space-y-3">
+                <div className="h-4 bg-amber-400/10 rounded w-3/4" />
+                <div className="h-2 bg-amber-400/10 rounded" />
+                <div className="h-3 bg-amber-400/10 rounded w-1/2" />
+              </div>
+            </div>
           </div>
-          <div className="w-full bg-slate-700/40 rounded-full h-2">
-            <div className="bg-slate-600/40 h-2 rounded-full w-1/3"></div>
-          </div>
-        </div>
-        <div className="h-3 bg-slate-700/40 rounded w-3/4"></div>
+        ))}
       </div>
     );
   }
 
-  if (!data) return null;
+  if (!data) {
+    return (
+      <div className="group relative">
+        <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 rounded-lg" />
+        <div className="relative p-6 rounded-lg border border-red-400/20 text-center">
+          <p className="text-red-300/80 font-light tracking-wide">Failed to load exploration data</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-3">
-      {/* Header */}
-      <div className="flex items-center gap-2 mb-3">
-        <DiamondIcon
-          icon={<Grid3X3 size={12} strokeWidth={1.5} />}
-          size="sm"
-          bgColor="bg-void-950"
-          actualBorderColor="bg-gold-300"
-          borderThickness={1}
-          iconColor="text-gold-300"
-        />
-        <h4 className="text-xs font-light tracking-widest text-amber-200 uppercase"
-            style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-          Grid Exploration
-        </h4>
-      </div>
-
-      {/* Progress Bar */}
-      <div>
-        <div className="flex justify-between text-xs mb-2">
-          <span className="text-amber-300/80 font-light tracking-wide">Coverage</span>
-          <span className="font-light text-amber-200 tracking-wide">
-            {data.percentage.toFixed(1)}%
-          </span>
-        </div>
-        <div className="w-full bg-slate-800/60 rounded-full h-1.5">
-          <div 
-            className="bg-gradient-to-r from-amber-500 to-amber-400 h-1.5 rounded-full transition-all duration-300"
-            style={{ width: `${Math.min(data.percentage, 100)}%` }}
-          ></div>
-        </div>
-      </div>
-      
-      {/* Stats */}
-      <div className="grid grid-cols-2 gap-3 text-xs">
-        <div className="flex items-center gap-2">
-          <Target size={10} className="text-amber-400" />
-          <span className="text-amber-300/80 font-light">Total:</span>
-          <span className="font-light text-amber-200">{data.totalGridSquares}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <Eye size={10} className="text-green-400" />
-          <span className="text-amber-300/80 font-light">Found:</span>
-          <span className="font-light text-amber-200">{data.exploredGridSquares}</span>
-        </div>
-      </div>
-
-      {/* Recent Activity */}
-      {data.recentExplorations > 0 && (
-        <div className="group relative">
-          <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-slate-850 to-slate-900 rounded-lg" />
-          <div className="absolute inset-0 bg-gradient-to-b from-amber-600/10 via-amber-500/5 to-transparent rounded-lg" />
-          
-          <div className="relative text-xs text-amber-300 p-2 rounded-lg border border-amber-400/30">
-            <span className="font-light tracking-wide">🔥 {data.recentExplorations} new this week</span>
-          </div>
-        </div>
-      )}
-
-      {/* Explored Grids List */}
-      {data.exploredGrids.length > 0 && (
-        <div className="group relative">
-          <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-slate-850 to-slate-900 rounded-lg" />
-          <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-800/40 to-slate-900/60 rounded-lg" />
-          
-          <div className="relative p-3 rounded-lg border border-amber-400/20">
-            <h5 className="text-xs font-light text-amber-200 mb-2 tracking-wide">Explored Squares:</h5>
-            <div className="flex flex-wrap gap-1">
-              {data.exploredGrids.slice(0, 8).map((grid) => (
-                <span
-                  key={grid}
-                  className="inline-block px-2 py-1 bg-amber-400/20 text-amber-300 text-xs rounded border border-amber-400/30 font-light tracking-wide"
+    <div className="space-y-6">
+      {/* Deep Desert Progress */}
+      <div className="group relative">
+        {/* Multi-layer background system */}
+        <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 rounded-lg" />
+        <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-800/40 to-slate-900/60 rounded-lg" />
+        
+        {/* Interactive purple overlay */}
+        <div className="absolute inset-0 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 ease-in-out bg-gradient-to-r from-violet-600/5 via-violet-700/3 to-transparent" />
+        
+        {/* Content */}
+        <div className="relative p-4 rounded-lg border border-amber-400/10 hover:border-amber-300/20 transition-all duration-300">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-3">
+              <DiamondIcon
+                icon={<Grid3X3 size={16} strokeWidth={1.5} />}
+                size="sm"
+                bgColor="bg-void-950"
+                actualBorderColor="bg-gold-300"
+                borderThickness={1}
+                iconColor="text-gold-300"
+              />
+              <div>
+                <h3 
+                  className="font-light text-amber-200 tracking-wide text-sm"
+                  style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
                 >
-                  {grid}
-                </span>
-              ))}
-              {data.exploredGrids.length > 8 && (
-                <span className="inline-block px-2 py-1 bg-slate-700/60 text-amber-300/80 text-xs rounded border border-slate-600/40 font-light">
-                  +{data.exploredGrids.length - 8}
-                </span>
-              )}
+                  Deep Desert Grid
+                </h3>
+                <p className="text-xs font-thin text-amber-300/60">
+                  {data.exploredGridSquares} of {data.totalGridSquares} sectors explored
+                </p>
+              </div>
+            </div>
+            
+            <div className="text-right">
+              <span 
+                className="text-lg font-light text-amber-200 tracking-wide"
+                style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
+              >
+                {Math.round(data.percentage)}%
+              </span>
             </div>
           </div>
+          
+          {/* Progress Bar */}
+          <div className="w-full bg-slate-800/50 rounded-full h-2 mb-3">
+            <div 
+              className="bg-gradient-to-r from-amber-500 to-amber-400 h-2 rounded-full transition-all duration-500 ease-out"
+              style={{ width: `${Math.min(data.percentage, 100)}%` }}
+            />
+          </div>
+          
+          {/* Action Button */}
+          <Link 
+            to="/deep-desert"
+            className="inline-flex items-center gap-2 text-xs font-light text-amber-300/80 hover:text-amber-200 transition-colors duration-200"
+            style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
+          >
+            <Eye size={12} strokeWidth={1.5} />
+            Explore Grid
+            <ArrowRight size={12} strokeWidth={1.5} />
+          </Link>
         </div>
-      )}
+      </div>
+
+      {/* Hagga Basin Progress */}
+      <div className="group relative">
+        {/* Multi-layer background system */}
+        <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 rounded-lg" />
+        <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-800/40 to-slate-900/60 rounded-lg" />
+        
+        {/* Interactive purple overlay */}
+        <div className="absolute inset-0 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 ease-in-out bg-gradient-to-r from-violet-600/5 via-violet-700/3 to-transparent" />
+        
+        {/* Content */}
+        <div className="relative p-4 rounded-lg border border-amber-400/10 hover:border-amber-300/20 transition-all duration-300">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-3">
+              <DiamondIcon
+                icon={<Mountain size={16} strokeWidth={1.5} />}
+                size="sm"
+                bgColor="bg-void-950"
+                actualBorderColor="bg-gold-300"
+                borderThickness={1}
+                iconColor="text-gold-300"
+              />
+              <div>
+                <h3 
+                  className="font-light text-amber-200 tracking-wide text-sm"
+                  style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
+                >
+                  Hagga Basin Map
+                </h3>
+                <p className="text-xs font-thin text-amber-300/60">
+                  {data.haggaBasinPois} POIs discovered
+                </p>
+              </div>
+            </div>
+            
+            <div className="text-right">
+              <span 
+                className="text-lg font-light text-amber-200 tracking-wide"
+                style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
+              >
+                {data.haggaBasinPois}
+              </span>
+            </div>
+          </div>
+          
+          {/* Progress Indicator - shows full bar since there's no defined limit for POIs */}
+          <div className="w-full bg-slate-800/50 rounded-full h-2 mb-3">
+            <div className="bg-gradient-to-r from-emerald-500 to-emerald-400 h-2 rounded-full transition-all duration-500 ease-out w-full" />
+          </div>
+          
+          {/* Action Button */}
+          <Link 
+            to="/hagga-basin"
+            className="inline-flex items-center gap-2 text-xs font-light text-amber-300/80 hover:text-amber-200 transition-colors duration-200"
+            style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
+          >
+            <Map size={12} strokeWidth={1.5} />
+            Explore Map
+            <ArrowRight size={12} strokeWidth={1.5} />
+          </Link>
+        </div>
+      </div>
+
+      {/* Combined Exploration Status */}
+      <div className="group relative">
+        {/* Multi-layer background system */}
+        <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 rounded-lg" />
+        <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-800/40 to-slate-900/60 rounded-lg" />
+        
+        {/* Interactive purple overlay */}
+        <div className="absolute inset-0 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 ease-in-out bg-gradient-to-r from-violet-600/5 via-violet-700/3 to-transparent" />
+        
+        {/* Content */}
+        <div className="relative p-4 rounded-lg border border-amber-400/10">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <DiamondIcon
+                icon={<Compass size={16} strokeWidth={1.5} />}
+                size="sm"
+                bgColor="bg-void-950"
+                actualBorderColor="bg-gold-300"
+                borderThickness={1}
+                iconColor="text-gold-300"
+              />
+              <div>
+                <h3 
+                  className="font-light text-amber-200 tracking-wide text-sm"
+                  style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
+                >
+                  Overall Progress
+                </h3>
+                <p className="text-xs font-thin text-amber-300/60">
+                  Expedition advancement across all regions
+                </p>
+              </div>
+            </div>
+            
+            <div className="text-right">
+              <span 
+                className="text-lg font-light text-amber-200 tracking-wide"
+                style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
+              >
+                {Math.round(data.percentage)}%
+              </span>
+            </div>
+          </div>
+          
+          {/* Recent Activity Indicator */}
+          {data.recentExplorations > 0 && (
+            <div className="mt-3 pt-3 border-t border-amber-400/10">
+              <span className="text-xs font-light text-amber-300/70">
+                🔥 {data.recentExplorations} new this week
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 };

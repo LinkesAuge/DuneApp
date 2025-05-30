@@ -299,13 +299,11 @@ export interface DashboardStats {
 
 export interface ActivityItem {
   id: string;
-  type: 'poi_created' | 'comment_added' | 'grid_explored' | 'screenshot_uploaded' | 'collection_created' | 'poi_shared';
+  type: 'poi_created' | 'poi_edited' | 'poi_deleted' | 'comment_added' | 'comment_edited' | 'comment_deleted' | 'grid_explored' | 'screenshot_uploaded' | 'screenshot_deleted' | 'collection_created' | 'poi_shared';
   title: string;
   description: string;
-  user: {
-    username: string;
-  };
   timestamp: string;
+  icon: string; // This matches how it's used in ActivityFeed.tsx
   targetId?: string;
   targetType?: 'poi' | 'grid_square' | 'comment' | 'collection';
   metadata?: {
@@ -314,6 +312,8 @@ export interface ActivityItem {
     screenshotUrl?: string;
     mapType?: MapType;
     collectionName?: string;
+    editedBy?: string;
+    deletedBy?: string;
   };
 }
 

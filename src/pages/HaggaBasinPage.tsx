@@ -337,17 +337,15 @@ const HaggaBasinPage: React.FC = () => {
       .map(type => type.id);
 
     if (checked) {
+      // Show all: Add category and ensure ALL types in category are selected
       setSelectedCategories(prev => [...prev, category]);
       setSelectedPoiTypes(prev => {
-        const newTypes = [...prev];
-        categoryTypeIds.forEach(typeId => {
-          if (!newTypes.includes(typeId)) {
-            newTypes.push(typeId);
-          }
-        });
-        return newTypes;
+        // Remove all category types first, then add them all back
+        const withoutCategory = prev.filter(typeId => !categoryTypeIds.includes(typeId));
+        return [...withoutCategory, ...categoryTypeIds];
       });
     } else {
+      // Hide all: Remove category and all its types
       setSelectedCategories(prev => prev.filter(c => c !== category));
       setSelectedPoiTypes(prev => prev.filter(typeId => !categoryTypeIds.includes(typeId)));
     }
@@ -743,10 +741,13 @@ const HaggaBasinPage: React.FC = () => {
         poiTypes={poiTypes}
         customIcons={customIcons}
         userInfo={userInfo}
-        onPoiClick={setSelectedPoiId}
+        onPoiClick={handlePoiClick}
+        onPoiEdit={handlePoiEdit}
+        onPoiDelete={handlePoiDeleted}
+        onPoiShare={handleSharePoi}
+        onPoiImageClick={handlePoiGalleryOpen}
         emptyStateMessage="No POIs found"
         emptyStateSubtitle="Add POIs to the map to see them here"
-        mode="map"
       />
 
       {/* Collection Modal */}

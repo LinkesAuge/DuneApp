@@ -57,17 +57,81 @@ const StatCard: React.FC<StatCardProps> = ({
 
   const config = colorConfig[color];
 
+  // Octagonal clip path matching HexCard
+  const octagonalClipPath = {
+    clipPath: "polygon(15px 0%, calc(100% - 15px) 0%, 100% 15px, 100% calc(100% - 15px), calc(100% - 15px) 100%, 15px 100%, 0% calc(100% - 15px), 0% 15px)"
+  };
+
   return (
-    <div className="group relative">
-      {/* Multi-layer background system */}
-      <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 rounded-lg" />
-      <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-800/40 to-slate-900/60 rounded-lg" />
-      <div className={`absolute inset-0 ${config.bg} rounded-lg`} />
+    <div 
+      className="group relative overflow-hidden"
+      style={octagonalClipPath}
+      onMouseEnter={(e) => {
+        // Purple overlay effect matching HexCard
+        const purpleOverlay = e.currentTarget.querySelector('.absolute.inset-0\\.5.transition-all') as HTMLElement;
+        if (purpleOverlay) {
+          purpleOverlay.style.background = 'radial-gradient(ellipse at center top, rgba(139, 92, 246, 0.15) 0%, rgba(124, 58, 237, 0.08) 40%, transparent 70%)';
+        }
+        
+        // Text glow effects
+        const titleElement = e.currentTarget.querySelector('.text-lg') as HTMLElement;
+        if (titleElement) {
+          titleElement.style.textShadow = '0 0 8px rgba(251, 191, 36, 0.6)';
+        }
+      }}
+      onMouseLeave={(e) => {
+        // Reset purple overlay
+        const purpleOverlay = e.currentTarget.querySelector('.absolute.inset-0\\.5.transition-all') as HTMLElement;
+        if (purpleOverlay) {
+          purpleOverlay.style.background = 'radial-gradient(ellipse at center top, rgba(139, 92, 246, 0) 0%, rgba(124, 58, 237, 0) 40%, transparent 70%)';
+        }
+        
+        // Reset text glow
+        const titleElement = e.currentTarget.querySelector('.text-lg') as HTMLElement;
+        if (titleElement) {
+          titleElement.style.textShadow = 'none';
+        }
+      }}
+    >
+      {/* Multi-layer background system with octagonal clip */}
+      <div 
+        className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950"
+        style={octagonalClipPath}
+      />
+      <div 
+        className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-800/40 to-slate-900/60"
+        style={octagonalClipPath}
+      />
+      <div 
+        className={`absolute inset-0 ${config.bg}`}
+        style={octagonalClipPath}
+      />
       
-      {/* Interactive purple overlay */}
-      <div className="absolute inset-0 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 ease-in-out bg-gradient-to-b from-violet-600/10 via-violet-700/5 to-transparent" />
+      {/* Elegant border with octagonal clip */}
+      <div 
+        className={`absolute inset-0 bg-gradient-to-r from-amber-400/55 via-amber-300/75 to-amber-400/55 group-hover:from-amber-300/75 group-hover:via-amber-200/85 group-hover:to-amber-300/75 transition-all duration-300`}
+        style={{
+          ...octagonalClipPath,
+          padding: '1px'
+        }}
+      />
       
-      <div className={`relative p-2 rounded-lg border ${config.border} hover:border-amber-300/30 transition-all duration-300 flex flex-col justify-center text-center min-h-[80px]`}>
+      {/* Inner background with octagonal clip */}
+      <div 
+        className="absolute inset-0.5 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950"
+        style={octagonalClipPath}
+      />
+      
+      {/* Interactive purple overlay matching HexCard */}
+      <div 
+        className="absolute inset-0.5 transition-all duration-300"
+        style={{
+          ...octagonalClipPath,
+          background: 'radial-gradient(ellipse at center top, rgba(139, 92, 246, 0) 0%, rgba(124, 58, 237, 0) 40%, transparent 70%)'
+        }}
+      />
+      
+      <div className="relative p-2 flex flex-col justify-center text-center min-h-[80px]">
         {/* Icon with trend indicator positioned at top */}
         <div className="flex items-center justify-center gap-1 mb-1">
           <Icon size={12} className={config.icon} strokeWidth={1.5} />
@@ -79,7 +143,7 @@ const StatCard: React.FC<StatCardProps> = ({
         </div>
         
         {/* Value - larger and prominent */}
-        <div className="text-lg font-light text-amber-200 tracking-wide mb-1">
+        <div className="text-lg font-light text-amber-200 tracking-wide mb-1 transition-all duration-300">
           {value.toLocaleString()}
         </div>
         

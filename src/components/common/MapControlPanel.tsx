@@ -1,6 +1,7 @@
 import React, { ReactNode } from 'react';
 import { Filter, Plus, Settings, Eye, Lock, Users, Edit, ChevronRight, FolderOpen } from 'lucide-react';
 import { Poi, PoiType, CustomIcon, PoiCollection } from '../../types';
+import { isIconUrl, getDisplayImageUrlFromIcon } from '../../lib/helpers';
 
 interface MapControlPanelProps {
   // Panel state
@@ -82,6 +83,28 @@ const MapControlPanel: React.FC<MapControlPanelProps> = ({
   additionalLayerContent,
   className = ''
 }) => {
+  // State for category collapse (default: false = uncollapsed)
+  const [collapsedCategories, setCollapsedCategories] = React.useState<Set<string>>(new Set());
+  
+  const toggleCategoryCollapse = (category: string) => {
+    setCollapsedCategories(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(category)) {
+        newSet.delete(category);
+      } else {
+        newSet.add(category);
+      }
+      return newSet;
+    });
+  };
+
+
+
+  // Helper function to get POI count for a type
+  const getPoiCountForType = (typeId: string) => {
+    return pois.filter(poi => poi.poi_type_id === typeId).length;
+  };
+
   // Get unique categories for filtering
   const categories = [...new Set(poiTypes.map(type => type.category))];
   
@@ -100,129 +123,85 @@ const MapControlPanel: React.FC<MapControlPanelProps> = ({
     
     // A category is "visible" if ANY of its types are selected (fixed bug)
     const categoryVisible = categoryTypeIds.length > 0 && categoryTypeIds.some(id => selectedPoiTypes.includes(id));
+    const isCollapsed = collapsedCategories.has(category);
     
     return (
       <div key={category} className="mb-4">
-        {/* Enhanced Category Header with Navbar-style Styling */}
-        <div className="relative overflow-hidden rounded-lg mb-3 group">
-          {/* Base background layer */}
-          <div className="absolute inset-0 bg-slate-800/60" />
-          
-          {/* Interactive purple overlay matching navbar */}
-          <div 
-            className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-            style={{
-              background: 'radial-gradient(ellipse at center top, rgba(139, 92, 246, 0.15) 0%, rgba(124, 58, 237, 0.08) 40%, transparent 70%)'
-            }}
-          />
-          
-          <div className="relative z-10 border border-amber-400/40 px-4 py-3 backdrop-blur-sm">
-            <div className="flex items-center justify-between">
-              <label className="flex items-center cursor-pointer group/label">
-                <input
-                  type="checkbox"
-                  checked={categoryVisible}
-                  onChange={(e) => onCategoryToggle(category, e.target.checked)}
-                  className="rounded border-amber-400/50 bg-slate-900/80 text-amber-500 focus:ring-amber-500/30 focus:ring-offset-0"
-                />
-                <span className="ml-3 text-sm font-light text-amber-200 capitalize group-hover/label:text-gold-300 transition-all duration-300 tracking-wide" style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-                  {category}
-                </span>
-              </label>
-              <span className="text-xs text-amber-300 font-light px-3 py-1 bg-slate-900/60 rounded border border-amber-400/30 shadow-sm">
-                {categoryTypes.length}
-              </span>
-            </div>
+        {/* Enhanced Category Header */}
+        <div className="flex items-center justify-between mb-2 px-3 py-2 rounded-lg bg-gradient-to-r from-slate-800/40 via-slate-700/30 to-slate-800/40 border border-amber-400/20">
+          <h4 className="text-sm font-medium text-amber-200 tracking-wide flex-1"
+              style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+            {category}
+          </h4>
+          <div className="flex items-center gap-1">
+            {/* Category Visibility Toggle */}
+            <button
+              onClick={() => onCategoryToggle(category, !categoryVisible)}
+              className={`p-1 rounded transition-all duration-200 ${
+                !categoryVisible 
+                  ? 'text-red-400 hover:text-red-300 hover:bg-red-500/10' 
+                  : 'text-amber-400/70 hover:text-amber-300 hover:bg-amber-500/10'
+              }`}
+              title={categoryVisible ? 'Hide category' : 'Show category'}
+            >
+              <Eye className="w-3 h-3" />
+            </button>
+            {/* Category Collapse Toggle */}
+            <button
+              onClick={() => toggleCategoryCollapse(category)}
+              className="p-1 text-amber-400/70 hover:text-amber-300 hover:bg-amber-500/10 rounded transition-all duration-200"
+              title={isCollapsed ? 'Expand category' : 'Collapse category'}
+            >
+              <ChevronRight className={`w-3 h-3 transition-transform duration-200 ${isCollapsed ? '' : 'rotate-90'}`} />
+            </button>
           </div>
         </div>
-        
-        {/* Enhanced Individual POI Types in Category */}
-        <div className="space-y-1">
-          {categoryTypes.map(type => {
-            const typePoiCount = filteredPois.filter(poi => poi.poi_type_id === type.id).length;
-            const isTypeSelected = selectedPoiTypes.includes(type.id);
-            
-            return (
-              <label 
-                key={type.id} 
-                className={`flex items-center justify-between cursor-pointer group px-4 py-3 rounded-lg transition-all duration-300 relative overflow-hidden border ${
-                  isTypeSelected 
-                    ? 'border-amber-400/50 bg-slate-800/70 hover:bg-slate-700/80' 
-                    : 'border-slate-700/40 bg-slate-900/40 hover:bg-slate-800/50 hover:border-amber-400/30'
-                }`}
-              >
-                {/* Background layers for selected items */}
-                {isTypeSelected && (
-                  <>
-                    <div className="absolute inset-0 bg-gradient-to-r from-amber-600/10 via-amber-500/5 to-amber-600/10" />
-                    <div className="absolute inset-0 bg-gradient-to-b from-amber-400/5 via-transparent to-amber-700/10" />
-                  </>
-                )}
-                
-                {/* Interactive purple overlay */}
-                <div 
-                  className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                  style={{
-                    background: 'radial-gradient(ellipse at center top, rgba(139, 92, 246, 0.1) 0%, rgba(124, 58, 237, 0.05) 40%, transparent 70%)'
-                  }}
-                />
-                
-                <div className="flex items-center relative z-10">
-                  <input
-                    type="checkbox"
-                    checked={isTypeSelected}
-                    onChange={() => onTypeToggle(type.id)}
-                    className="rounded border-amber-400/50 bg-slate-900/80 text-amber-500 focus:ring-amber-500/30 focus:ring-offset-0 w-4 h-4"
-                  />
-                  
-                  {/* Enhanced POI Type Icon */}
-                  <div className="ml-4 mr-3 flex items-center justify-center flex-shrink-0">
+
+        {/* Category Types */}
+        {!isCollapsed && (
+          <div className="space-y-1 ml-2">
+            {categoryTypes.map(type => {
+              const isSelected = selectedPoiTypes.includes(type.id);
+              const poiCount = getPoiCountForType(type.id);
+              const displayIcon = getDisplayImageUrlFromIcon(type.icon);
+              
+              return (
+                <button
+                  key={type.id}
+                  onClick={() => onTypeToggle(type.id)}
+                  className={`w-full flex items-center gap-2 px-2 py-1.5 rounded transition-all duration-200 text-left ${
+                    isSelected
+                      ? 'bg-gradient-to-r from-slate-800/60 to-slate-700/40 text-amber-200 border border-amber-400/40 shadow-sm'
+                      : 'text-amber-300/80 hover:bg-slate-800/30 hover:text-amber-200'
+                  }`}
+                >
+                  {/* Type Icon */}
+                  <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
                     {isIconUrl(type.icon) ? (
-                      <img
-                        src={getDisplayImageUrl(type.icon)}
+                      <img 
+                        src={displayIcon} 
                         alt={type.name}
-                        className="w-8 h-8 object-contain"
-                        style={{
-                          filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.4))'
-                        }}
+                        className="w-4 h-4 object-contain"
                       />
                     ) : (
                       <span 
-                        className="text-2xl leading-none font-medium"
-                        style={{ 
-                          color: type.color,
-                          textShadow: '0 2px 4px rgba(0,0,0,0.4)'
-                        }}
+                        className="text-sm leading-none"
+                        style={{ color: type.color }}
                       >
                         {type.icon}
                       </span>
                     )}
                   </div>
                   
-                  <span 
-                    className={`text-sm transition-all duration-300 font-light tracking-wide ${
-                      isTypeSelected 
-                        ? 'text-gold-300 group-hover:text-gold-200' 
-                        : 'text-amber-200/80 group-hover:text-amber-200'
-                    }`}
-                    style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
-                  >
-                    {type.name}
+                  {/* Type Name with Count */}
+                  <span className="text-xs font-light tracking-wide flex-1">
+                    {type.name} ({poiCount})
                   </span>
-                </div>
-                
-                {/* Enhanced count badge */}
-                <span className={`text-xs relative z-10 px-3 py-1 rounded border ml-auto shadow-sm transition-all duration-300 ${
-                  isTypeSelected 
-                    ? 'text-amber-300 bg-slate-900/70 border-amber-400/50' 
-                    : 'text-amber-300/70 bg-slate-800/60 border-slate-600/40 group-hover:text-amber-300 group-hover:border-amber-400/30'
-                }`}>
-                  {typePoiCount}
-                </span>
-              </label>
-            );
-          })}
-        </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
     );
   };
@@ -353,46 +332,78 @@ const MapControlPanel: React.FC<MapControlPanelProps> = ({
               {/* Filters Tab */}
               {activeTab === 'filters' && (
                 <div className="space-y-4">
-                  {/* Add POI Button */}
-                  <div>
+                  {/* Add POI Button - Elegant hexagonal style inspired by landing page */}
+                  <div className="flex justify-center mb-4">
                     <button
                       onClick={onAddPOI}
-                      className="w-full flex items-center justify-center gap-3 px-4 py-3 rounded-lg font-medium transition-all duration-300 relative group overflow-hidden"
-                      style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
+                      className="group relative inline-flex items-center justify-center h-12 px-6 min-w-[140px] transition-all duration-300 overflow-hidden"
+                      style={{ 
+                        clipPath: "polygon(12px 0%, calc(100% - 12px) 0%, 100% 50%, calc(100% - 12px) 100%, 12px 100%, 0% 50%)",
+                        fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif"
+                      }}
+                      onMouseEnter={(e) => {
+                        const purpleOverlay = e.currentTarget.querySelector('.purple-overlay') as HTMLElement;
+                        if (purpleOverlay) {
+                          purpleOverlay.style.background = 'radial-gradient(ellipse at center top, rgba(139, 92, 246, 0.15) 0%, rgba(124, 58, 237, 0.08) 40%, transparent 70%)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        const purpleOverlay = e.currentTarget.querySelector('.purple-overlay') as HTMLElement;
+                        if (purpleOverlay) {
+                          purpleOverlay.style.background = 'radial-gradient(ellipse at center top, rgba(139, 92, 246, 0) 0%, rgba(124, 58, 237, 0) 40%, transparent 70%)';
+                        }
+                      }}
                     >
-                      {/* Background layers */}
-                      <div className="absolute inset-0 bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600" />
-                      <div className="absolute inset-0 bg-gradient-to-b from-amber-400/20 via-transparent to-amber-700/30" />
+                      {/* Dark background */}
+                      <div 
+                        className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950"
+                        style={{ clipPath: "polygon(12px 0%, calc(100% - 12px) 0%, 100% 50%, calc(100% - 12px) 100%, 12px 100%, 0% 50%)" }}
+                      />
                       
-                      {/* Interactive overlay */}
-                      <div className="absolute inset-0 bg-gradient-to-r from-violet-600/20 via-violet-500/10 to-violet-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                      {/* Amber border */}
+                      <div 
+                        className="absolute inset-0 bg-gradient-to-r from-amber-400/70 via-amber-300/90 to-amber-400/70 group-hover:from-amber-300/90 group-hover:via-amber-200/100 group-hover:to-amber-300/90 transition-all duration-300"
+                        style={{
+                          clipPath: "polygon(12px 0%, calc(100% - 12px) 0%, 100% 50%, calc(100% - 12px) 100%, 12px 100%, 0% 50%)",
+                          padding: '1px'
+                        }}
+                      />
+                      
+                      {/* Inner background */}
+                      <div 
+                        className="absolute inset-0.5 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950"
+                        style={{ clipPath: "polygon(12px 0%, calc(100% - 12px) 0%, 100% 50%, calc(100% - 12px) 100%, 12px 100%, 0% 50%)" }}
+                      />
+                      
+                      {/* Purple hover overlay */}
+                      <div 
+                        className="absolute inset-0.5 transition-all duration-300 purple-overlay"
+                        style={{
+                          clipPath: "polygon(12px 0%, calc(100% - 12px) 0%, 100% 50%, calc(100% - 12px) 100%, 12px 100%, 0% 50%)",
+                          background: 'radial-gradient(ellipse at center top, rgba(139, 92, 246, 0) 0%, rgba(124, 58, 237, 0) 40%, transparent 70%)'
+                        }}
+                      />
                       
                       {/* Content */}
-                      <div className="relative z-10 flex items-center gap-3 text-slate-900">
-                        <Plus className="w-5 h-5" />
-                        <span className="font-light tracking-wide">
-                          {mode === 'grid' ? `Add POI to ${currentLocation}` : 'Add Point of Interest'}
+                      <div className="relative z-10 flex items-center space-x-2">
+                        <Plus className="w-4 h-4 text-amber-300 group-hover:text-amber-100 transition-all duration-300" />
+                        <span className="text-sm font-light uppercase tracking-wide text-amber-200 group-hover:text-amber-50 transition-all duration-300">
+                          Add POI
                         </span>
                       </div>
                     </button>
                   </div>
 
-                  {/* Search */}
-                  <div>
-                    <label className="block text-sm font-light text-amber-200 mb-3 tracking-wide" style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-                      Search POIs
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        value={searchTerm}
-                        onChange={(e) => onSearchTermChange(e.target.value)}
-                        placeholder="Search by title..."
-                        className="w-full px-4 py-3 border border-amber-400/30 bg-slate-800/60 text-amber-100 placeholder-amber-300/50 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-400 transition-all duration-300"
-                        style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
-                      />
-                      <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-transparent via-amber-400/5 to-transparent pointer-events-none" />
-                    </div>
+                  {/* Search Input - More compact */}
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Search POIs..."
+                      value={searchTerm}
+                      onChange={(e) => onSearchTermChange(e.target.value)}
+                      className="w-full px-3 py-2 text-sm bg-slate-800/60 border border-amber-400/30 rounded-lg text-amber-200 placeholder-amber-300/50 focus:outline-none focus:border-amber-400/60 focus:bg-slate-800/80 transition-all duration-300"
+                      style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
+                    />
                   </div>
 
                   {/* Simple Stats Text */}

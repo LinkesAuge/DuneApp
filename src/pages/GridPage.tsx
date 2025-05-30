@@ -51,6 +51,7 @@ const GridPage: React.FC = () => {
   }
 
   const [gridSquare, setGridSquare] = useState<GridSquare | null>(null);
+  const [allGridSquares, setAllGridSquares] = useState<GridSquare[]>([]); // NEW: All grid squares for minimap
   const [pois, setPois] = useState<Poi[]>([]);
   const [poiTypes, setPoiTypes] = useState<PoiType[]>([]);
   const [customIcons, setCustomIcons] = useState<CustomIcon[]>([]);
@@ -796,7 +797,19 @@ const GridPage: React.FC = () => {
         // Load Deep Desert map settings first
         await loadDeepDesertSettings();
 
-        // Fetch grid square by coordinate (not by id)
+        // Fetch ALL grid squares for minimap (NEW)
+        const { data: allGridsData, error: allGridsError } = await supabase
+          .from('grid_squares')
+          .select('*')
+          .order('coordinate', { ascending: true });
+
+        if (allGridsError && allGridsError.code !== 'PGRST116') {
+          console.warn('Error fetching all grid squares:', allGridsError);
+        } else {
+          setAllGridSquares(allGridsData || []);
+        }
+
+        // Fetch current grid square by coordinate (not by id)
         const { data: gridData, error: gridError } = await supabase
           .from('grid_squares')
           .select('*')
@@ -1777,27 +1790,60 @@ const GridPage: React.FC = () => {
             </div>
             {showMiniMap && (
               <div className="p-3">
-                <div className="grid grid-cols-9 gap-1">
+                <div className="grid grid-cols-9 gap-1 mb-3">
                   {GRID_ROWS.slice().reverse().map((row) =>
                     GRID_COLS.map((col) => {
                       const cellId = row + col;
                       const isCurrent = cellId === gridId;
+                      const gridSquareData = allGridSquares.find(square => square.coordinate === cellId);
+                      const isExplored = gridSquareData?.is_explored || false;
+                      
+                      // Determine styling based on state
+                      let buttonClasses = 'w-6 h-6 text-xs rounded transition-colors ';
+                      let titleText = `Navigate to grid ${cellId}`;
+                      
+                      if (isCurrent) {
+                        // Current/active grid - amber
+                        buttonClasses += 'bg-amber-600 text-slate-900 font-bold';
+                        titleText += ' (current)';
+                      } else if (isExplored) {
+                        // Explored grid - green
+                        buttonClasses += 'bg-emerald-600/80 text-slate-900 font-medium hover:bg-emerald-500/80';
+                        titleText += ' (explored)';
+                      } else {
+                        // Unexplored grid - slate
+                        buttonClasses += 'bg-slate-800/70 text-amber-200 hover:bg-slate-700/70 hover:text-amber-100';
+                        titleText += ' (unexplored)';
+                      }
+                      
                       return (
                         <button
                           key={cellId}
                           onClick={() => handleNavigateToGrid(cellId)}
-                          className={`w-6 h-6 text-xs rounded transition-colors ${
-                            isCurrent
-                              ? 'bg-amber-600 text-slate-900 font-bold'
-                              : 'bg-slate-800/70 text-amber-200 hover:bg-slate-700/70 hover:text-amber-100'
-                          }`}
-                          title={`Navigate to grid ${cellId}`}
+                          className={buttonClasses}
+                          title={titleText}
                         >
                           {cellId}
                         </button>
                       );
                     })
                   )}
+                </div>
+                
+                {/* Legend */}
+                <div className="flex items-center justify-between text-xs text-slate-400">
+                  <div className="flex items-center gap-1">
+                    <div className="w-2 h-2 bg-amber-600 rounded"></div>
+                    <span className="text-xs">Current</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-2 h-2 bg-emerald-600/80 rounded"></div>
+                    <span className="text-xs">Explored</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-2 h-2 bg-slate-800/70 rounded"></div>
+                    <span className="text-xs">Unexplored</span>
+                  </div>
                 </div>
               </div>
             )}
@@ -1814,6 +1860,11 @@ const GridPage: React.FC = () => {
                 customIcons={customIcons}
                 userInfo={userInfo}
           onPoiClick={(poi) => setSelectedPoiId(poi.id)}
+          onPoiEdit={handlePoiEdit}
+          onPoiDelete={handlePoiDelete}
+          onPoiShare={handlePoiShare}
+          onPoiGalleryOpen={handlePoiGalleryOpen}
+          onPoiHighlight={setHighlightedPoiId}
           emptyStateMessage="No POIs found"
           emptyStateSubtitle="Add POIs to this grid square to see them here"
           mode="grid"

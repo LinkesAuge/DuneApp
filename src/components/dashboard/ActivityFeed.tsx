@@ -2,32 +2,66 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { ActivityItem } from '../../types';
 import DiamondIcon from '../common/DiamondIcon';
+import UserAvatar from '../common/UserAvatar';
 import { 
   MapPin, 
   MessageSquare, 
   Eye, 
   Camera,
   User,
-  Clock
+  Clock,
+  Edit,
+  Trash2,
+  AlertTriangle
 } from 'lucide-react';
 
 interface ActivityFeedProps {
   limit?: number;
 }
 
+// Enhanced interface for activities with user data
+interface EnhancedActivityItem extends ActivityItem {
+  user?: {
+    id: string;
+    username: string;
+    display_name?: string | null;
+    discord_username?: string | null;
+    custom_avatar_url?: string | null;
+    discord_avatar_url?: string | null;
+    use_discord_avatar?: boolean;
+  };
+}
+
 const ActivityFeed: React.FC<ActivityFeedProps> = ({ limit = 20 }) => {
-  const [activities, setActivities] = useState<ActivityItem[]>([]);
+  const [activities, setActivities] = useState<EnhancedActivityItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const fetchUserProfile = async (userId: string) => {
+    if (!userId) return null;
+    
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, username, display_name, discord_username, custom_avatar_url, discord_avatar_url, use_discord_avatar')
+      .eq('id', userId)
+      .single();
+    
+    if (error) {
+      console.error('Error fetching user profile:', error);
+      return null;
+    }
+    
+    return data;
+  };
 
   const fetchActivities = async () => {
     setIsLoading(true);
     setError(null);
 
     try {
-      const activities: ActivityItem[] = [];
+      const activities: EnhancedActivityItem[] = [];
 
-      // Fetch recent POIs with manual joins
+      // Fetch recent POI creations
       const { data: recentPois, error: poisError } = await supabase
         .from('pois')
         .select(`
@@ -35,27 +69,33 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ limit = 20 }) => {
           title,
           created_at,
           created_by,
+          updated_at,
+          updated_by,
           grid_square_id
         `)
         .order('created_at', { ascending: false })
         .limit(Math.ceil(limit / 4));
 
-      // Fetch usernames and coordinates separately
-      let poisWithDetails = [];
+      // Fetch recent POI updates (simpler approach - get recently updated POIs)
+      const { data: editedPois, error: editedPoisError } = await supabase
+        .from('pois')
+        .select(`
+          id,
+          title,
+          created_at,
+          updated_at,
+          updated_by,
+          grid_square_id
+        `)
+        .not('updated_by', 'is', null)
+        .order('updated_at', { ascending: false })
+        .limit(Math.ceil(limit / 4));
+
+      // Process POI creations
       if (recentPois && !poisError) {
         for (const poi of recentPois) {
-          // Get username only if created_by is not null
-          let profile = null;
-          if (poi.created_by) {
-            const { data } = await supabase
-              .from('profiles')
-              .select('username')
-              .eq('id', poi.created_by)
-              .single();
-            profile = data;
-          }
+          const profile = await fetchUserProfile(poi.created_by);
 
-          // Get grid square coordinate if grid_square_id exists
           let gridSquare = null;
           if (poi.grid_square_id) {
             const { data } = await supabase
@@ -66,27 +106,49 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ limit = 20 }) => {
             gridSquare = data;
           }
 
-          poisWithDetails.push({
-            ...poi,
-            profile,
-            grid_square: gridSquare
-          });
-        }
-
-        // Add POI activities
-        for (const poi of poisWithDetails) {
           activities.push({
-            id: `poi-${poi.id}`,
+            id: `poi-created-${poi.id}`,
             type: 'poi_created',
             title: `New POI: ${poi.title}`,
-            description: `Added by ${poi.profile?.username || 'Anonymous'}${poi.grid_square ? ` in ${poi.grid_square.coordinate}` : ''}`,
+            description: `${gridSquare ? `in ${gridSquare.coordinate}` : ''}`,
             timestamp: poi.created_at,
-            icon: 'MapPin'
+            icon: 'MapPin',
+            user: profile
           });
         }
       }
 
-      // Fetch recent comments with manual joins
+      // Process POI edits (filter client-side to avoid column comparison issues)
+      if (editedPois && !editedPoisError) {
+        for (const poi of editedPois) {
+          // Only include if it was actually edited (updated_at != created_at and has updated_by)
+          if (poi.updated_by && poi.updated_at && poi.updated_at !== poi.created_at) {
+            const profile = await fetchUserProfile(poi.updated_by);
+
+            let gridSquare = null;
+            if (poi.grid_square_id) {
+              const { data } = await supabase
+                .from('grid_squares')
+                .select('coordinate')
+                .eq('id', poi.grid_square_id)
+                .single();
+              gridSquare = data;
+            }
+
+            activities.push({
+              id: `poi-edited-${poi.id}-${poi.updated_at}`,
+              type: 'poi_edited',
+              title: `POI Updated: ${poi.title}`,
+              description: `${gridSquare ? `in ${gridSquare.coordinate}` : ''}`,
+              timestamp: poi.updated_at,
+              icon: 'Edit',
+              user: profile
+            });
+          }
+        }
+      }
+
+      // Fetch recent comments
       const { data: recentComments, error: commentsError } = await supabase
         .from('comments')
         .select(`
@@ -94,26 +156,33 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ limit = 20 }) => {
           content,
           created_at,
           created_by,
+          updated_at,
+          updated_by,
           poi_id
         `)
         .order('created_at', { ascending: false })
         .limit(Math.ceil(limit / 4));
 
-      let commentsWithDetails = [];
+      // Fetch recently updated comments
+      const { data: editedComments, error: editedCommentsError } = await supabase
+        .from('comments')
+        .select(`
+          id,
+          content,
+          created_at,
+          updated_at,
+          updated_by,
+          poi_id
+        `)
+        .not('updated_by', 'is', null)
+        .order('updated_at', { ascending: false })
+        .limit(Math.ceil(limit / 4));
+
+      // Process comment creations
       if (recentComments && !commentsError) {
         for (const comment of recentComments) {
-          // Get author username
-          let author = null;
-          if (comment.created_by) {
-            const { data } = await supabase
-              .from('profiles')
-              .select('username')
-              .eq('id', comment.created_by)
-              .single();
-            author = data;
-          }
+          const author = await fetchUserProfile(comment.created_by);
 
-          // Get POI title
           let poi = null;
           if (comment.poi_id) {
             const { data } = await supabase
@@ -124,23 +193,45 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ limit = 20 }) => {
             poi = data;
           }
 
-          commentsWithDetails.push({
-            ...comment,
-            author,
-            poi
+          activities.push({
+            id: `comment-created-${comment.id}`,
+            type: 'comment_added',
+            title: `New comment on ${poi?.title || 'POI'}`,
+            description: `${comment.content.substring(0, 80)}${comment.content.length > 80 ? '...' : ''}`,
+            timestamp: comment.created_at,
+            icon: 'MessageSquare',
+            user: author
           });
         }
+      }
 
-        // Add comment activities
-        for (const comment of commentsWithDetails) {
-          activities.push({
-            id: `comment-${comment.id}`,
-            type: 'comment_added',
-            title: `New comment on ${comment.poi?.title || 'POI'}`,
-            description: `Comment by ${comment.author?.username || 'Anonymous'}: ${comment.content.substring(0, 100)}${comment.content.length > 100 ? '...' : ''}`,
-            timestamp: comment.created_at,
-            icon: 'MessageSquare'
-          });
+      // Process comment edits (filter client-side)
+      if (editedComments && !editedCommentsError) {
+        for (const comment of editedComments) {
+          // Only include if it was actually edited
+          if (comment.updated_by && comment.updated_at && comment.updated_at !== comment.created_at) {
+            const editor = await fetchUserProfile(comment.updated_by);
+
+            let poi = null;
+            if (comment.poi_id) {
+              const { data } = await supabase
+                .from('pois')
+                .select('title')
+                .eq('id', comment.poi_id)
+                .single();
+              poi = data;
+            }
+
+            activities.push({
+              id: `comment-edited-${comment.id}-${comment.updated_at}`,
+              type: 'comment_edited',
+              title: `Comment updated on ${poi?.title || 'POI'}`,
+              description: `${comment.content.substring(0, 80)}${comment.content.length > 80 ? '...' : ''}`,
+              timestamp: comment.updated_at,
+              icon: 'Edit',
+              user: editor
+            });
+          }
         }
       }
 
@@ -158,35 +249,19 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ limit = 20 }) => {
         .order('upload_date', { ascending: false })
         .limit(Math.ceil(limit / 4));
 
-      let screenshotsWithDetails = [];
+      // Process screenshot uploads
       if (recentScreenshots && !screenshotsError) {
         for (const screenshot of recentScreenshots) {
-          // Get uploader username
-          let uploader = null;
-          if (screenshot.uploaded_by) {
-            const { data } = await supabase
-              .from('profiles')
-              .select('username')
-              .eq('id', screenshot.uploaded_by)
-              .single();
-            uploader = data;
-          }
+          const uploader = await fetchUserProfile(screenshot.uploaded_by);
 
-          screenshotsWithDetails.push({
-            ...screenshot,
-            uploader
-          });
-        }
-
-        // Add screenshot activities
-        for (const screenshot of screenshotsWithDetails) {
           activities.push({
             id: `screenshot-${screenshot.id}`,
             type: 'screenshot_uploaded',
             title: `Screenshot uploaded for ${screenshot.coordinate}`,
-            description: `Uploaded by ${screenshot.uploader?.username || 'Anonymous'}`,
+            description: 'Grid exploration screenshot',
             timestamp: screenshot.upload_date,
-            icon: 'Camera'
+            icon: 'Camera',
+            user: uploader
           });
         }
       }
@@ -213,6 +288,9 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ limit = 20 }) => {
       Camera: <Camera size={14} strokeWidth={1.5} />,
       Eye: <Eye size={14} strokeWidth={1.5} />,
       User: <User size={14} strokeWidth={1.5} />,
+      Edit: <Edit size={14} strokeWidth={1.5} />,
+      Trash2: <Trash2 size={14} strokeWidth={1.5} />,
+      AlertTriangle: <AlertTriangle size={14} strokeWidth={1.5} />,
     };
     return iconMap[iconName as keyof typeof iconMap] || <Clock size={14} strokeWidth={1.5} />;
   };
@@ -232,7 +310,7 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ limit = 20 }) => {
     return past.toLocaleDateString();
   };
 
-  const ActivityItemComponent: React.FC<{ activity: ActivityItem }> = ({ activity }) => (
+  const ActivityItemComponent: React.FC<{ activity: EnhancedActivityItem }> = ({ activity }) => (
     <div className="group relative">
       {/* Multi-layer background system */}
       <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 rounded-lg" />
@@ -260,9 +338,36 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ limit = 20 }) => {
                     style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
                   {activity.title}
                 </h3>
-                <p className="text-xs font-thin text-amber-300/70 mt-1 line-clamp-2">
-                  {activity.description}
-                </p>
+                
+                {/* User info and description */}
+                <div className="flex items-center gap-2 mt-1">
+                  {activity.user && (
+                    <>
+                      <UserAvatar 
+                        user={activity.user}
+                        size="xs"
+                        className="flex-shrink-0"
+                      />
+                      <span className="text-xs font-medium text-amber-100 tracking-wide"
+                            style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                        {activity.user.display_name || activity.user.discord_username || activity.user.username}
+                      </span>
+                      {activity.description && (
+                        <>
+                          <span className="text-amber-300/50">•</span>
+                          <span className="text-xs font-thin text-amber-300/70">
+                            {activity.description}
+                          </span>
+                        </>
+                      )}
+                    </>
+                  )}
+                  {!activity.user && activity.description && (
+                    <span className="text-xs font-thin text-amber-300/70">
+                      {activity.description}
+                    </span>
+                  )}
+                </div>
               </div>
               
               <span className="text-xs font-light text-amber-300/50 tracking-wide whitespace-nowrap">
