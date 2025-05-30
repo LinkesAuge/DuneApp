@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Users, Pencil, Trash2, RefreshCw, Shield, AlertCircle } from 'lucide-react';
+import { Users, Pencil, Trash2, RefreshCw, Shield, AlertCircle, Award } from 'lucide-react';
 import { Profile, UserRole } from '../../types/admin';
+import { Rank } from '../../types/profile';
 
 interface UserManagementProps {
   profiles: Profile[];
@@ -26,8 +27,76 @@ const UserManagement: React.FC<UserManagementProps> = ({
   const [editUserData, setEditUserData] = useState({
     username: '',
     email: '',
-    role: 'member' as UserRole
+    role: 'member' as UserRole,
+    rankId: '' as string
   });
+
+  // Rank management state
+  const [ranks, setRanks] = useState<Rank[]>([]);
+  const [isLoadingRanks, setIsLoadingRanks] = useState(true);
+  const [enhancedProfiles, setEnhancedProfiles] = useState<(Profile & { rank?: Rank | null })[]>([]);
+
+  // Fetch ranks on component mount
+  useEffect(() => {
+    const fetchRanks = async () => {
+      try {
+        setIsLoadingRanks(true);
+        const { data, error } = await supabase
+          .from('ranks')
+          .select('*')
+          .order('display_order', { ascending: true });
+
+        if (error) throw error;
+        setRanks(data || []);
+      } catch (error: any) {
+        console.error('Error fetching ranks:', error);
+        onError('Failed to load ranks: ' + error.message);
+      } finally {
+        setIsLoadingRanks(false);
+      }
+    };
+
+    fetchRanks();
+  }, [onError]);
+
+  // Enhance profiles with rank information
+  useEffect(() => {
+    const enhanceProfilesWithRanks = async () => {
+      if (!profiles.length || !ranks.length) {
+        setEnhancedProfiles(profiles.map(p => ({ ...p, rank: null })));
+        return;
+      }
+
+      try {
+        // Fetch enhanced profiles with rank information
+        const { data: enhancedData, error } = await supabase
+          .from('profiles')
+          .select(`
+            *,
+            rank:ranks(*)
+          `)
+          .in('id', profiles.map(p => p.id));
+
+        if (error) throw error;
+
+        // Merge the enhanced data with the existing profiles
+        const enhanced = profiles.map(profile => {
+          const enhancedProfile = enhancedData?.find(ep => ep.id === profile.id);
+          return {
+            ...profile,
+            rank: enhancedProfile?.rank || null
+          };
+        });
+
+        setEnhancedProfiles(enhanced);
+      } catch (error: any) {
+        console.error('Error enhancing profiles with ranks:', error);
+        setEnhancedProfiles(profiles.map(p => ({ ...p, rank: null })));
+      }
+    };
+
+    enhanceProfilesWithRanks();
+  }, [profiles, ranks]);
 
   const handleRoleChange = async (profileId: string, newRole: UserRole) => {
     try {
@@ -53,38 +122,52 @@ const UserManagement: React.FC<UserManagementProps> = ({
   };
 
   const handleDeleteUser = async (userId: string, username: string) => {
-    if (!confirm(`Are you sure you want to delete user "${username}"? This action cannot be undone.`)) {
+    if (!confirm(`Are you sure you want to delete user "${username}"? This action cannot be undone. Their POIs and screenshots will be preserved but marked as "Deleted User".`)) {
       return;
     }
 
     setIsDeletingUser(userId);
     try {
+      console.log('Attempting to delete user:', userId);
       const { data, error } = await supabase.functions.invoke('delete-user', {
-        body: { userId }
+        body: { userIdToDelete: userId }
       });
 
-      if (error) throw error;
+      console.log('Delete function response:', { data, error });
+
+      if (error) {
+        console.error('Supabase function invoke error:', error);
+        throw error;
+      }
 
       if (data?.success) {
         onRefreshProfiles();
-        onSuccess(`User "${username}" has been deleted`);
+        onSuccess(`User "${username}" has been deleted. Their contributions have been preserved.`);
       } else {
+        console.error('Function returned non-success response:', data);
         throw new Error(data?.error || 'Delete failed');
       }
     } catch (error: any) {
       console.error('Delete user error:', error);
+      console.error('Error details:', {
+        message: error.message,
+        status: error.status,
+        statusText: error.statusText,
+        body: error.body
+      });
       onError('Failed to delete user: ' + (error.message || 'Unknown error'));
     } finally {
       setIsDeletingUser(null);
     }
   };
 
-  const handleOpenEditModal = (profile: Profile) => {
+  const handleOpenEditModal = (profile: Profile & { rank?: Rank | null }) => {
     setEditingUser(profile);
     setEditUserData({
       username: profile.username,
       email: profile.email,
-      role: profile.role
+      role: profile.role,
+      rankId: profile.rank?.id || ''
     });
     setIsEditModalOpen(true);
   };
@@ -95,7 +178,8 @@ const UserManagement: React.FC<UserManagementProps> = ({
     setEditUserData({
       username: '',
       email: '',
-      role: 'member'
+      role: 'member',
+      rankId: ''
     });
   };
 
@@ -103,13 +187,20 @@ const UserManagement: React.FC<UserManagementProps> = ({
     if (!editingUser) return;
 
     try {
+      const updateData: any = {
+        userId: editingUser.id,
+        username: editUserData.username,
+        email: editUserData.email,
+        role: editUserData.role
+      };
+
+      // Add rank assignment if a rank is selected
+      if (editUserData.rankId) {
+        updateData.rankId = editUserData.rankId;
+      }
+
       const { data, error } = await supabase.functions.invoke('update-user', {
-        body: {
-          userId: editingUser.id,
-          username: editUserData.username,
-          email: editUserData.email,
-          role: editUserData.role
-        }
+        body: updateData
       });
 
       if (error) throw error;
@@ -124,6 +215,31 @@ const UserManagement: React.FC<UserManagementProps> = ({
     } catch (error: any) {
       console.error('Update user error:', error);
       onError('Failed to update user: ' + (error.message || 'Unknown error'));
+    }
+  };
+
+  // Handle rank assignment from table
+  const handleRankAssignment = async (profileId: string, rankId: string | null) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('update-user', {
+        body: {
+          userId: profileId,
+          rankId: rankId || null
+        }
+      });
+
+      if (error) throw error;
+
+      if (data?.success) {
+        onRefreshProfiles();
+        const rankName = ranks.find(r => r.id === rankId)?.name || 'No rank';
+        onSuccess(`User rank updated to ${rankName}`);
+      } else {
+        throw new Error(data?.error || 'Rank assignment failed');
+      }
+    } catch (error: any) {
+      console.error('Rank assignment error:', error);
+      onError('Failed to assign rank: ' + (error.message || 'Unknown error'));
     }
   };
 
@@ -180,6 +296,31 @@ const UserManagement: React.FC<UserManagementProps> = ({
     }
   };
 
+  // Rank Badge Component
+  const RankBadge: React.FC<{ rank?: Rank | null; className?: string }> = ({ rank, className = '' }) => {
+    if (!rank) {
+      return (
+        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-900/50 text-gray-400 border border-gray-600/40 ${className}`}>
+          No rank
+        </span>
+      );
+    }
+
+    return (
+      <span 
+        className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${className}`}
+        style={{ 
+          backgroundColor: rank.color, 
+          color: rank.text_color,
+          border: `1px solid ${rank.color}40`
+        }}
+      >
+        <Award className="w-3 h-3 mr-1" />
+        {rank.name}
+      </span>
+    );
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -221,7 +362,10 @@ const UserManagement: React.FC<UserManagementProps> = ({
             style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
           <Users className="mr-4 text-amber-200" size={28} />
           U S E R  M A N A G E M E N T
-          <span className="ml-4 text-lg text-amber-200/70">({profiles.length} users)</span>
+          <span className="ml-4 text-lg text-amber-200/70">
+            ({enhancedProfiles.length} users)
+            {isLoadingRanks && <span className="ml-2 text-sm text-gold-300/60">Loading ranks...</span>}
+          </span>
         </h3>
         <button
           onClick={onRefreshProfiles}
@@ -249,6 +393,10 @@ const UserManagement: React.FC<UserManagementProps> = ({
                 </th>
                 <th className="px-6 py-4 text-left text-sm font-light text-gold-300 uppercase tracking-[0.1em]"
                     style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                  Rank
+                </th>
+                <th className="px-6 py-4 text-left text-sm font-light text-gold-300 uppercase tracking-[0.1em]"
+                    style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
                   Joined
                 </th>
                 <th className="px-6 py-4 text-right text-sm font-light text-gold-300 uppercase tracking-[0.1em]"
@@ -258,7 +406,7 @@ const UserManagement: React.FC<UserManagementProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-gold-300/10">
-              {profiles.map((profile) => (
+              {enhancedProfiles.map((profile) => (
                 <tr key={profile.id} className="hover:bg-gold-300/5 transition-colors duration-300">
                   <td className="px-6 py-5 whitespace-nowrap">
                     <div>
@@ -284,6 +432,26 @@ const UserManagement: React.FC<UserManagementProps> = ({
                       <option value="editor">Editor</option>
                       <option value="admin">Admin</option>
                     </select>
+                  </td>
+                  <td className="px-6 py-5 whitespace-nowrap text-sm text-amber-200/70 font-light"
+                      style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                    <div className="flex items-center space-x-2">
+                      <RankBadge rank={profile.rank} />
+                      <select
+                        value={profile.rank?.id || ''}
+                        onChange={(e) => handleRankAssignment(profile.id, e.target.value || null)}
+                        className="ml-2 text-xs bg-void-950/60 border border-gold-300/30 rounded px-2 py-1 
+                                 text-amber-200 focus:ring-2 focus:ring-gold-300/50 focus:outline-none cursor-pointer
+                                 transition-all duration-300 hover:bg-void-900/60"
+                        style={{ fontFamily: "'Trebuchet MS', sans-serif" }}
+                        title="Quick rank assignment"
+                      >
+                        <option value="">No rank</option>
+                        {ranks.map((rank) => (
+                          <option key={rank.id} value={rank.id}>{rank.name}</option>
+                        ))}
+                      </select>
+                    </div>
                   </td>
                   <td className="px-6 py-5 whitespace-nowrap text-sm text-amber-200/70 font-light"
                       style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
@@ -318,7 +486,7 @@ const UserManagement: React.FC<UserManagementProps> = ({
           </table>
         </div>
 
-        {profiles.length === 0 && (
+        {enhancedProfiles.length === 0 && (
           <div className="text-center py-12">
             <div className="inline-block p-4 rounded-full border border-amber-200/50 mb-4"
                  style={{ backgroundColor: 'rgba(42, 36, 56, 0.8)' }}>
@@ -402,6 +570,28 @@ const UserManagement: React.FC<UserManagementProps> = ({
                   <option value="member">Member</option>
                   <option value="editor">Editor</option>
                   <option value="admin">Admin</option>
+                </select>
+              </div>
+
+              {/* Rank */}
+              <div>
+                <label className="block text-sm font-medium text-gold-300 mb-2 tracking-wide"
+                       style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                  Rank
+                </label>
+                <select
+                  value={editUserData.rankId}
+                  onChange={(e) => setEditUserData(prev => ({ ...prev, rankId: e.target.value }))}
+                  className="w-full px-4 py-3 bg-void-950/60 border border-gold-300/30 rounded-md 
+                           text-amber-200 backdrop-blur-sm
+                           focus:outline-none focus:ring-2 focus:ring-gold-300/50 focus:border-gold-300/60
+                           transition-all duration-300"
+                  style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
+                >
+                  <option value="">Select a rank</option>
+                  {ranks.map((rank) => (
+                    <option key={rank.id} value={rank.id}>{rank.name}</option>
+                  ))}
                 </select>
               </div>
             </div>

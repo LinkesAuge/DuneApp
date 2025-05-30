@@ -117,20 +117,26 @@ const PoisPage: React.FC = () => {
 
         // Fetch user info
         if (poisData) {
-          const userIds = [...new Set(poisData.map(poi => poi.created_by))];
-          const { data: userData, error: userError } = await supabase
-            .from('profiles')
-            .select('id, username')
-            .in('id', userIds);
+          // Filter out null/undefined values to avoid UUID errors
+          const userIds = [...new Set(poisData.map(poi => poi.created_by).filter(id => id !== null && id !== undefined))];
+          
+          if (userIds.length > 0) {
+            const { data: userData, error: userError } = await supabase
+              .from('profiles')
+              .select('id, username')
+              .in('id', userIds);
 
-          if (userError) throw userError;
+            if (userError) throw userError;
 
-          const userInfoMap = userData.reduce((acc, user) => {
-            acc[user.id] = { username: user.username };
-          return acc;
-          }, {} as { [key: string]: { username: string } });
+            const userInfoMap = userData.reduce((acc, user) => {
+              acc[user.id] = { username: user.username };
+              return acc;
+            }, {} as { [key: string]: { username: string } });
 
-          setUserInfo(userInfoMap);
+            setUserInfo(userInfoMap);
+          } else {
+            setUserInfo({});
+          }
         }
       } catch (err: any) {
         console.error('Error fetching data:', err);

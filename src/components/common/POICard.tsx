@@ -102,24 +102,27 @@ const POICard: React.FC<POICardProps> = ({
       try {
         setLoadingUserInfo(true);
         
-        // Fetch user information
-        const userIds = [poi.created_by];
-        if (poi.updated_by && poi.updated_by !== poi.created_by) {
-          userIds.push(poi.updated_by);
+        // Fetch user information - Filter out null values to avoid UUID errors
+        const userIds = [poi.created_by, poi.updated_by].filter(id => id !== null && id !== undefined);
+        
+        if (userIds.length > 0) {
+          const { data: userData, error: userError } = await supabase
+            .from('profiles')
+            .select('id, username')
+            .in('id', userIds);
+          
+          if (userError) throw userError;
+          
+          const creatorData = userData?.find(u => u.id === poi.created_by);
+          const editorData = userData?.find(u => u.id === poi.updated_by);
+          
+          setCreatorInfo(creatorData ? { username: creatorData.username } : null);
+          setEditorInfo(editorData ? { username: editorData.username } : null);
+        } else {
+          // No valid user IDs, set to null
+          setCreatorInfo(null);
+          setEditorInfo(null);
         }
-        
-        const { data: userData, error: userError } = await supabase
-          .from('profiles')
-          .select('id, username')
-          .in('id', userIds);
-        
-        if (userError) throw userError;
-        
-        const creatorData = userData?.find(u => u.id === poi.created_by);
-        const editorData = userData?.find(u => u.id === poi.updated_by);
-        
-        setCreatorInfo(creatorData ? { username: creatorData.username } : null);
-        setEditorInfo(editorData ? { username: editorData.username } : null);
         
         // Fetch comment count
         const { count, error: commentError } = await supabase
@@ -145,14 +148,17 @@ const POICard: React.FC<POICardProps> = ({
   if (!isOpen) return null;
 
   // Format metadata text
-  let metaText = `Created by ${creatorInfo?.username || 'Loading...'} ${(() => {
+  let metaText = `Created by ${creatorInfo?.username || (poi.created_by ? 'Loading...' : 'Deleted User')} ${(() => {
     const { date, useOn } = formatDateWithPreposition(poi.created_at);
     return useOn ? `on ${date}` : date;
   })()}`;
   
-  if (poi.updated_at && new Date(poi.updated_at).getTime() !== new Date(poi.created_at).getTime()) {
-    const { date: updatedDate, useOn: updatedUseOn } = formatDateWithPreposition(poi.updated_at);
-    metaText += ` • Updated ${updatedUseOn ? `on ${updatedDate}` : updatedDate}`;
+  if (isEdited && editorInfo) {
+    const { date: editDate, useOn: editUseOn } = formatDateWithPreposition(poi.updated_at);
+    metaText += ` • Edited by ${editorInfo.username} ${editUseOn ? `on ${editDate}` : editDate}`;
+  } else if (isEdited && poi.updated_by && !editorInfo && !loadingUserInfo) {
+    const { date: editDate, useOn: editUseOn } = formatDateWithPreposition(poi.updated_at);
+    metaText += ` • Edited by ${poi.updated_by ? 'Loading...' : 'Deleted User'} ${editUseOn ? `on ${editDate}` : editDate}`;
   }
 
   return (

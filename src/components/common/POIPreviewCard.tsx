@@ -91,7 +91,7 @@ const POIPreviewCard: React.FC<POIPreviewCardProps> = ({
   const [showComments, setShowComments] = useState(false);
   const [expanded, setExpanded] = useState(false);
   
-  const creator = userInfo[poi.created_by];
+  const creator = userInfo[poi.created_by] || (poi.created_by ? undefined : { username: 'Deleted User' });
   const imageUrl = getDisplayImageUrl(poi, poiType, customIcons);
   const PrivacyIcon = privacyIcons[poi.privacy_level];
   const privacyColor = privacyColors[poi.privacy_level];
@@ -356,7 +356,13 @@ const POIPreviewCard: React.FC<POIPreviewCardProps> = ({
 
             {/* Metadata - Compact */}
             <div className="p-3 border-b border-slate-700 text-xs text-slate-400 text-center">
-              {metaText}
+              <div className="flex items-center justify-between text-xs text-sand-600">
+                <span>Created by {creator?.username || 'Loading...'} {formattedDate}</span>
+                <div className="flex items-center space-x-2">
+                  <PrivacyIcon size={12} className={privacyColor} />
+                  <span className={privacyColor}>{privacyLabel}</span>
+                </div>
+              </div>
             </div>
 
             {/* Comments Toggle - Compact */}

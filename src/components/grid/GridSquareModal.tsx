@@ -195,8 +195,8 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
           setPoiTypes(typesResult.data || []);
           setCustomIcons(customIconsResult.data || []);
           
-          // Fetch user information for POI creators
-          const userIds = [...new Set((poisResult.data || []).map(poi => poi.created_by))];
+          // Fetch user information for POI creators - Filter out null values to avoid UUID errors
+          const userIds = [...new Set((poisResult.data || []).map(poi => poi.created_by).filter(id => id !== null && id !== undefined))];
           if (userIds.length > 0) {
             const { data: userProfiles, error: userError } = await supabase
               .from('profiles')
@@ -210,6 +210,8 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
               }, {} as Record<string, { username: string }>);
               setUserInfo(userInfoMap);
             }
+          } else {
+            setUserInfo({});
           }
           
           // Initialize filter setup

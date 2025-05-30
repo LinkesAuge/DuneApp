@@ -7,8 +7,6 @@ interface AuthContextType {
   isLoading: boolean;
   error: string | null;
   setError: (error: string | null) => void;
-  signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, username: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -30,7 +28,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const fetchUserProfile = async (userId: string) => {
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('username, role')
+      .select('username, role, discord_id, discord_username, discord_avatar_url')
       .eq('id', userId)
       .maybeSingle();
 
@@ -38,20 +36,56 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return profile;
   };
 
-  const createUserProfile = async (userId: string, username: string, email: string) => {
+  const createDiscordProfile = async (authUser: any) => {
+    // Extract Discord data from auth user metadata
+    const discordData = authUser.user_metadata || {};
+    const discordId = discordData.provider_id || authUser.id;
+    const discordUsername = discordData.full_name || discordData.name || discordData.user_name || 'Unknown User';
+    const discordAvatar = discordData.avatar_url || null;
+    const email = authUser.email || null;
+
+    // Generate username from Discord data
+    const username = discordUsername.toLowerCase().replace(/[^a-z0-9]/g, '_');
+
     const { data, error: profileError } = await supabase
       .from('profiles')
       .insert({
-        id: userId,
+        id: authUser.id,
         username,
         email,
         role: 'pending' as UserRole,
+        discord_id: discordId,
+        discord_username: discordUsername,
+        discord_avatar_url: discordAvatar,
       })
       .select()
       .single();
 
     if (profileError) throw profileError;
     if (!data) throw new Error('Failed to create profile');
+    return data;
+  };
+
+  const updateDiscordProfile = async (userId: string, authUser: any, existingProfile: any) => {
+    // Update Discord fields if they've changed
+    const discordData = authUser.user_metadata || {};
+    const discordId = discordData.provider_id || authUser.id;
+    const discordUsername = discordData.full_name || discordData.name || discordData.user_name || 'Unknown User';
+    const discordAvatar = discordData.avatar_url || null;
+
+    const { data, error: profileError } = await supabase
+      .from('profiles')
+      .update({
+        discord_id: discordId,
+        discord_username: discordUsername,
+        discord_avatar_url: discordAvatar,
+        email: authUser.email || existingProfile.email,
+      })
+      .eq('id', userId)
+      .select()
+      .single();
+
+    if (profileError) throw profileError;
     return data;
   };
 
@@ -62,14 +96,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
 
-      const profile = await fetchUserProfile(session.user.id);
-      if (!profile) throw new Error('Profile not found');
+      let profile = await fetchUserProfile(session.user.id);
+      
+      if (!profile) {
+        // Create new profile for Discord user
+        console.log('Creating new Discord profile for user:', session.user.id);
+        profile = await createDiscordProfile(session.user);
+      } else if (session.user.app_metadata?.provider === 'discord') {
+        // Update existing profile with latest Discord data
+        profile = await updateDiscordProfile(session.user.id, session.user, profile);
+      }
 
       setUser({
         id: session.user.id,
-        email: session.user.email || '',
+        email: session.user.email || profile.email || '',
         username: profile.username,
         role: profile.role as UserRole,
+        // Add Discord-specific fields to User type if needed
+        discordId: profile.discord_id,
+        discordUsername: profile.discord_username,
+        discordAvatarUrl: profile.discord_avatar_url,
       });
     } catch (err: any) {
       console.error('Error handling auth state change:', err);
@@ -92,7 +138,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      const event = _event as string; // Broaden type for comparison
+      const event = _event as string;
       if (!mounted) return;
 
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
@@ -108,71 +154,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-  const signIn = async (email: string, password: string) => {
-    setIsLoading(true);
-    setError(null);
-    
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) throw error;
-      if (!data.session) throw new Error('No session created');
-
-      await handleAuthStateChange(data.session);
-    } catch (error: any) {
-      console.error('Sign in error:', error);
-      setError(error.message);
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const signUp = async (email: string, password: string, username: string) => {
-    setIsLoading(true);
-    setError(null);
-    
-    try {
-      const { data: existingUser } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('username', username)
-        .maybeSingle();
-
-      if (existingUser) {
-        throw new Error('Username is already taken');
-      }
-
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email,
-        password,
-      });
-
-      if (authError) throw authError;
-      if (!authData.session || !authData.user) {
-        throw new Error('Failed to create user account');
-      }
-
-      const profile = await createUserProfile(authData.user.id, username, email);
-
-      setUser({
-        id: authData.user.id,
-        email: authData.user.email || '',
-        username: profile.username,
-        role: profile.role as UserRole,
-      });
-    } catch (error: any) {
-      console.error('Sign up error:', error);
-      setError(error.message);
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const signOut = async () => {
     setIsLoading(true);
     try {
@@ -185,7 +166,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, error, setError, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ user, isLoading, error, setError, signOut }}>
       {children}
     </AuthContext.Provider>
   );

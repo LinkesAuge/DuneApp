@@ -6,6 +6,19 @@ export interface Profile {
   email: string;
   role: UserRole;
   created_at: string;
+  discord_id?: string | null;
+  discord_username?: string | null;
+  discord_avatar_url?: string | null;
+  discord_discriminator?: string | null;
+  rank_id?: string | null;
+  rank?: {
+    id: string;
+    name: string;
+    description: string | null;
+    color: string;
+    text_color: string;
+    display_order: number;
+  } | null;
 }
 
 export interface StoredBackupFile {
@@ -63,4 +76,4 @@ export interface MapSettings {
 }
 
 export type ScheduledTaskFrequency = 'daily' | 'weekly';
-export type AdminTab = 'users' | 'database' | 'poi-types' | 'maps'; 
+export type AdminTab = 'users' | 'database' | 'poi-types' | 'settings' | 'tasks' | 'ranks'; 

@@ -83,7 +83,7 @@ serve(async (req: Request) => {
       });
     }
 
-    const { data: requestingUserProfile, error: requestingProfileError } = await supabaseAdmin // Use admin client to read any profile
+    const { data: requestingUserProfile, error: requestingProfileError } = await supabaseAdmin
       .from('profiles')
       .select('role')
       .eq('id', requestingUser.id)
@@ -101,10 +101,9 @@ serve(async (req: Request) => {
       console.warn(`User ${requestingUser.id} with role ${requestingUserProfile.role} attempted to delete a user.`);
       return new Response(JSON.stringify({ error: 'User not allowed to perform this action.' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 403, // Forbidden
+        status: 403,
       });
     }
-    // End Security Check
 
     const { userIdToDelete } = await req.json();
 
@@ -119,149 +118,132 @@ serve(async (req: Request) => {
         console.warn(`Admin user ${requestingUser.id} attempted to delete themselves.`);
         return new Response(JSON.stringify({ error: 'Admins cannot delete their own account through this function.' }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 400, // Bad Request or 403 Forbidden
+            status: 400,
         });
     }
 
     console.log(`Admin user ${requestingUser.id} attempting to delete user ${userIdToDelete}`);
 
-    // Storage cleanup: Collect all files uploaded by the user before deletion
-    console.log(`Starting storage cleanup for user ${userIdToDelete}...`);
-    const filesToDelete: string[] = [];
+    // DATA PRESERVATION APPROACH: Update user data to "Deleted User" instead of deleting
+    console.log(`Starting data preservation for user ${userIdToDelete}...`);
 
     try {
-      // 1. Collect POI screenshots created by the user
-      console.log('Collecting POI screenshots created by user...');
-      const { data: userPoisData, error: userPoisError } = await supabaseAdmin
+      // 1. Update POIs - preserve POIs but anonymize creator
+      console.log('Updating POIs created by user to "Deleted User"...');
+      const { error: updatePoisError } = await supabaseAdmin
         .from('pois')
-        .select('screenshots')
+        .update({ 
+          created_by: null,
+          // Note: If you have a creator_name field, update it too
+          // creator_name: 'Deleted User'
+        })
         .eq('created_by', userIdToDelete);
 
-      if (userPoisError) {
-        console.error('Error querying user POIs for storage cleanup:', userPoisError);
-      } else if (userPoisData) {
-        for (const poi of userPoisData) {
-          if (poi.screenshots && Array.isArray(poi.screenshots)) {
-            for (const screenshot of poi.screenshots) {
-              if (screenshot.url) {
-                const filePath = extractStorageFilePath(screenshot.url);
-                if (filePath) {
-                  filesToDelete.push(filePath);
-                }
-              }
-            }
-          }
-        }
-        console.log(`Found ${filesToDelete.length} POI screenshot files from user`);
+      if (updatePoisError) {
+        console.error('Error updating POIs:', updatePoisError);
+        // Continue with deletion even if POI update fails
+      } else {
+        console.log('Successfully updated POIs to preserve data');
       }
 
-      // 2. Collect grid square screenshots uploaded by the user
-      console.log('Collecting grid square screenshots uploaded by user...');
-      const { data: userGridSquaresData, error: userGridSquaresError } = await supabaseAdmin
+      // 2. Update grid squares - preserve screenshots but anonymize uploader
+      console.log('Updating grid squares uploaded by user...');
+      const { error: updateGridSquaresError } = await supabaseAdmin
         .from('grid_squares')
-        .select('screenshot_url, original_screenshot_url')
+        .update({ uploaded_by: null })
         .eq('uploaded_by', userIdToDelete);
 
-      if (userGridSquaresError) {
-        console.error('Error querying user grid squares for storage cleanup:', userGridSquaresError);
-      } else if (userGridSquaresData) {
-        const initialCount = filesToDelete.length;
-        for (const gridSquare of userGridSquaresData) {
-          // Add main screenshot
-          if (gridSquare.screenshot_url) {
-            const filePath = extractStorageFilePath(gridSquare.screenshot_url);
-            if (filePath && !filesToDelete.includes(filePath)) {
-              filesToDelete.push(filePath);
-            }
-          }
-          // Add original screenshot if different
-          if (gridSquare.original_screenshot_url && 
-              gridSquare.original_screenshot_url !== gridSquare.screenshot_url) {
-            const filePath = extractStorageFilePath(gridSquare.original_screenshot_url);
-            if (filePath && !filesToDelete.includes(filePath)) {
-              filesToDelete.push(filePath);
-            }
-          }
-        }
-        console.log(`Found ${filesToDelete.length - initialCount} additional grid square screenshot files from user`);
+      if (updateGridSquaresError) {
+        console.error('Error updating grid squares:', updateGridSquaresError);
+      } else {
+        console.log('Successfully updated grid squares to preserve data');
       }
 
-      // 3. Collect custom icons created by the user
-      console.log('Collecting custom icons created by user...');
-      const { data: userCustomIconsData, error: userCustomIconsError } = await supabaseAdmin
-        .from('custom_icons')
-        .select('image_url')
+      // 3. Update comments - preserve comments but anonymize author
+      console.log('Updating comments created by user...');
+      const { error: updateCommentsError } = await supabaseAdmin
+        .from('comments')
+        .update({ 
+          user_id: null,
+          // Note: If you have author_name or similar field, update it
+          // author_name: 'Deleted User'
+        })
         .eq('user_id', userIdToDelete);
 
-      if (userCustomIconsError) {
-        console.error('Error querying user custom icons for storage cleanup:', userCustomIconsError);
-      } else if (userCustomIconsData) {
-        const initialCount = filesToDelete.length;
-        for (const customIcon of userCustomIconsData) {
-          if (customIcon.image_url) {
-            const filePath = extractStorageFilePath(customIcon.image_url);
-            if (filePath && !filesToDelete.includes(filePath)) {
-              filesToDelete.push(filePath);
-            }
-          }
-        }
-        console.log(`Found ${filesToDelete.length - initialCount} custom icon files from user`);
-      }
-
-      // 4. Delete all collected files from storage
-      console.log(`Deleting ${filesToDelete.length} total files from storage for user ${userIdToDelete}...`);
-      if (filesToDelete.length > 0) {
-        await batchDeleteFiles(supabaseAdmin, 'screenshots', filesToDelete);
-        console.log('User storage cleanup completed successfully');
+      if (updateCommentsError) {
+        console.error('Error updating comments:', updateCommentsError);
       } else {
-        console.log('No files found to delete for user');
+        console.log('Successfully updated comments to preserve data');
       }
 
-    } catch (storageCleanupError) {
-      console.error('Error during user storage cleanup:', storageCleanupError);
-      // Continue with user deletion even if storage cleanup fails
+      // 4. Update custom icons - preserve icons but anonymize creator
+      console.log('Updating custom icons created by user...');
+      const { error: updateCustomIconsError } = await supabaseAdmin
+        .from('custom_icons')
+        .update({ user_id: null })
+        .eq('user_id', userIdToDelete);
+
+      if (updateCustomIconsError) {
+        console.error('Error updating custom icons:', updateCustomIconsError);
+      } else {
+        console.log('Successfully updated custom icons to preserve data');
+      }
+
+      // 5. Update POI types - preserve custom POI types but anonymize creator
+      console.log('Updating POI types created by user...');
+      const { error: updatePoiTypesError } = await supabaseAdmin
+        .from('poi_types')
+        .update({ created_by: null })
+        .eq('created_by', userIdToDelete);
+
+      if (updatePoiTypesError) {
+        console.error('Error updating POI types:', updatePoiTypesError);
+      } else {
+        console.log('Successfully updated POI types to preserve data');
+      }
+
+      console.log('Data preservation completed successfully');
+
+    } catch (dataPreservationError) {
+      console.error('Error during data preservation:', dataPreservationError);
+      // Continue with user deletion even if data preservation has issues
     }
 
-    // Proceed with user deletion from auth and database
+    // Now proceed with user account deletion
 
     // 1. Delete from auth.users
-    // Note: Supabase automatically handles cascading deletes to profiles if foreign key is set to CASCADE
+    console.log(`Deleting user ${userIdToDelete} from auth.users...`);
     const { data: deletedAuthUser, error: deleteAuthUserError } = await supabaseAdmin.auth.admin.deleteUser(userIdToDelete);
     
     if (deleteAuthUserError) {
       console.error(`Error deleting user ${userIdToDelete} from authentication:`, deleteAuthUserError);
       if (deleteAuthUserError.message.includes('User not found')) {
         console.warn(`User ${userIdToDelete} not found in auth. Assuming already deleted or never existed in auth.`);
-        // Proceed to ensure profile is also cleaned up if it exists
       } else {
-        // For other errors, rethrow
         throw new Error(`Failed to delete user from authentication: ${deleteAuthUserError.message}`);
       }
-    }
-    
-    if (deletedAuthUser) {
-        console.log(`User ${userIdToDelete} successfully deleted from auth.users.`);
+    } else {
+      console.log(`User ${userIdToDelete} successfully deleted from auth.users.`);
     }
 
-    // 2. Delete from public.profiles (as a fallback or if CASCADE isn't fully trusted/implemented)
-    // If your profiles_id_fkey has ON DELETE CASCADE, this step might be redundant but ensures cleanup.
+    // 2. Delete from public.profiles
+    console.log(`Deleting profile for user ${userIdToDelete}...`);
     const { error: deleteProfileError } = await supabaseAdmin
       .from('profiles')
       .delete()
-      .match({ id: userIdToDelete }); // Use match for safety, eq also works
+      .eq('id', userIdToDelete);
 
     if (deleteProfileError) {
-      // It's not necessarily an error if the profile doesn't exist, especially if auth user was also not found.
       console.warn(`Warning/Error trying to delete profile for user ${userIdToDelete}:`, deleteProfileError.message);
-      // Don't throw an error here if the main goal (auth user deletion) was achieved or user wasn't in auth.
-      // The user might have been in an inconsistent state.
-    }
-     else {
-        console.log(`Profile for user ${userIdToDelete} deleted from public.profiles (or was not found).`);
+    } else {
+      console.log(`Profile for user ${userIdToDelete} deleted from public.profiles.`);
     }
 
     return new Response(
-      JSON.stringify({ message: `User ${userIdToDelete} deletion process completed.` }),
+      JSON.stringify({ 
+        success: true,
+        message: `User ${userIdToDelete} deletion completed. All user contributions have been preserved and marked as "Deleted User".` 
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     );
 

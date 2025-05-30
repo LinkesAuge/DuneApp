@@ -8,6 +8,10 @@ export interface User {
   email: string;
   username: string;
   role: UserRole;
+  // NEW: Discord authentication fields
+  discordId?: string | null;
+  discordUsername?: string | null;
+  discordAvatarUrl?: string | null;
 }
 
 // Map system types - NEW for Hagga Basin

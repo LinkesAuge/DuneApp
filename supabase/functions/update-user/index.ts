@@ -73,34 +73,70 @@ serve(async (req: Request) => {
     }
     // End Security Check
 
-    const { userIdToUpdate, newUsername, newEmail } = await req.json()
+    // Parse request body - handle both old and new field names for compatibility
+    const requestBody = await req.json();
+    console.log('Request body received:', requestBody);
 
-    if (!userIdToUpdate || !newUsername || !newEmail) {
-      return new Response(JSON.stringify({ error: 'Missing required fields: userIdToUpdate, newUsername, newEmail' }), {
+    // Support both old format (userIdToUpdate, newUsername, newEmail) and new format (userId, username, email, role)
+    const userId = requestBody.userId || requestBody.userIdToUpdate;
+    const username = requestBody.username || requestBody.newUsername;
+    const email = requestBody.email || requestBody.newEmail;
+    const role = requestBody.role; // New field for role updates
+    const rankId = requestBody.rankId; // New field for rank assignments
+
+    if (!userId) {
+      return new Response(JSON.stringify({ 
+        error: 'Missing required field: userId'
+      }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400,
       })
     }
 
-    console.log(`Admin user ${requestingUser.id} attempting to update user ${userIdToUpdate}: new username '${newUsername}', new email '${newEmail}'`);
+    // Check if this is a rank-only update (for quick rank assignments from table)
+    const isRankOnlyUpdate = rankId !== undefined && !username && !email && !role;
+    
+    if (!isRankOnlyUpdate && (!username || !email)) {
+      return new Response(JSON.stringify({ 
+        error: 'Missing required fields: username, email (unless updating rank only)',
+        received: { userId: !!userId, username: !!username, email: !!email, rankId: rankId !== undefined }
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      })
+    }
 
-    // Step 1: Update email in auth.users if it has changed
-    const { data: { user: currentAuthUser }, error: getCurrentUserError } = await supabaseAdmin.auth.admin.getUserById(userIdToUpdate);
+    console.log(`Admin user ${requestingUser.id} attempting to update user ${userId}:`, {
+      username: username || '(unchanged)',
+      email: email || '(unchanged)', 
+      role: role || '(unchanged)',
+      rankId: rankId !== undefined ? rankId : '(unchanged)',
+      isRankOnlyUpdate
+    });
+
+    // For Discord OAuth users, we should be careful about updating email in auth.users
+    // Discord OAuth users have their email managed by Discord, not Supabase directly
+    const { data: { user: currentAuthUser }, error: getCurrentUserError } = await supabaseAdmin.auth.admin.getUserById(userId);
 
     if (getCurrentUserError) {
       console.error('Error fetching current auth user to be updated:', getCurrentUserError);
-      throw new Error(`Failed to fetch current auth data for user ${userIdToUpdate}: ${getCurrentUserError.message}`);
+      throw new Error(`Failed to fetch current auth data for user ${userId}: ${getCurrentUserError.message}`);
     }
 
     if (!currentAuthUser) {
-        throw new Error(`Auth user with ID ${userIdToUpdate} not found for update.`);
+        throw new Error(`Auth user with ID ${userId} not found for update.`);
     }
 
-    if (currentAuthUser.email !== newEmail) {
-      console.log(`Email for user ${userIdToUpdate} is changing from ${currentAuthUser.email} to ${newEmail}. Updating in auth.users.`);
+    // Check if this is a Discord OAuth user
+    const isDiscordUser = currentAuthUser.app_metadata?.provider === 'discord';
+    console.log(`User ${userId} is Discord OAuth user: ${isDiscordUser}`);
+
+    // Only update email in auth.users for non-Discord users
+    if (!isRankOnlyUpdate && !isDiscordUser && currentAuthUser.email !== email) {
+      console.log(`Email for user ${userId} is changing from ${currentAuthUser.email} to ${email}. Updating in auth.users.`);
       const { error: updateAuthEmailError } = await supabaseAdmin.auth.admin.updateUserById(
-        userIdToUpdate,
-        { email: newEmail }
+        userId,
+        { email: email }
       )
       if (updateAuthEmailError) {
         console.error('Error updating email in auth.users:', updateAuthEmailError);
@@ -109,15 +145,37 @@ serve(async (req: Request) => {
         }
         throw new Error(`Failed to update email in authentication: ${updateAuthEmailError.message}`)
       }
-      console.log(`Email updated in auth.users for ${userIdToUpdate}.`);
+      console.log(`Email updated in auth.users for ${userId}.`);
+    } else if (!isRankOnlyUpdate && isDiscordUser && currentAuthUser.email !== email) {
+      console.log(`User ${userId} is Discord OAuth user - skipping auth.users email update, updating only in profiles`);
     }
 
-    // Step 2: Update username and email in public.profiles
-    console.log(`Updating profile for user ${userIdToUpdate}.`);
+    // Update profile data - build update object based on what fields are provided
+    console.log(`Updating profile for user ${userId}.`);
+    const updateData: any = {};
+    
+    // Add fields to update based on what's provided
+    if (username) updateData.username = username;
+    if (email) updateData.email = email;
+    if (role) updateData.role = role;
+    if (rankId !== undefined) {
+      updateData.rank_id = rankId; // Handle null for rank removal
+    }
+
+    // Validate that there's something to update
+    if (Object.keys(updateData).length === 0) {
+      return new Response(JSON.stringify({ 
+        error: 'No fields provided to update'
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      })
+    }
+
     const { error: updateProfileError } = await supabaseAdmin
       .from('profiles')
-      .update({ username: newUsername, email: newEmail })
-      .eq('id', userIdToUpdate)
+      .update(updateData)
+      .eq('id', userId)
 
     if (updateProfileError) {
       console.error('Error updating profile:', updateProfileError);
@@ -126,15 +184,24 @@ serve(async (req: Request) => {
       }
       throw new Error(`Failed to update profile: ${updateProfileError.message}`)
     }
-    console.log(`Profile updated for user ${userIdToUpdate}.`);
+    console.log(`Profile updated for user ${userId}.`);
 
-    return new Response(JSON.stringify({ message: 'User updated successfully' }), {
+    return new Response(JSON.stringify({ 
+      success: true,
+      message: isRankOnlyUpdate ? 'User rank updated successfully' : 'User updated successfully',
+      updated: updateData,
+      isDiscordUser: isDiscordUser,
+      isRankOnlyUpdate: isRankOnlyUpdate
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     })
   } catch (error: any) {
     console.error('Unhandled error in update-user function:', error.message, error.stack ? { stack: error.stack } : {})
-    return new Response(JSON.stringify({ error: error.message || 'An unexpected error occurred' }), {
+    return new Response(JSON.stringify({ 
+      success: false,
+      error: error.message || 'An unexpected error occurred' 
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: error.status || 500,
     })

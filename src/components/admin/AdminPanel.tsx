@@ -6,10 +6,11 @@ import UserManagement from './UserManagement';
 import ScheduledTasks from './ScheduledTasks';
 import PoiTypeManager from './PoiTypeManager';
 import MapSettings from './MapSettings';
+import RankManagement from './RankManagement';
 import DiamondIcon from '../common/DiamondIcon';
 
 const AdminPanel: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'database' | 'users' | 'poi-types' | 'settings' | 'tasks'>('users');
+  const [activeTab, setActiveTab] = useState<'database' | 'users' | 'poi-types' | 'settings' | 'tasks' | 'ranks'>('users');
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -44,6 +45,7 @@ const AdminPanel: React.FC = () => {
 
   const tabs = [
     { id: 'users' as const, label: 'Users', icon: '👥' },
+    { id: 'ranks' as const, label: 'Ranks', icon: '🏆' },
     { id: 'poi-types' as const, label: 'POI Types', icon: '📍' },
     { id: 'settings' as const, label: 'Map Settings', icon: '⚙️' },
     { id: 'tasks' as const, label: 'Scheduled Tasks', icon: '⏰' },
@@ -262,6 +264,13 @@ const AdminPanel: React.FC = () => {
                 isLoading={isLoading}
                 error={error}
                 onRefreshTasks={refreshScheduledTasks}
+                onError={handleError}
+                onSuccess={handleSuccess}
+              />
+            )}
+
+            {activeTab === 'ranks' && (
+              <RankManagement
                 onError={handleError}
                 onSuccess={handleSuccess}
               />

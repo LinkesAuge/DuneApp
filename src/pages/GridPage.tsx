@@ -339,7 +339,14 @@ const GridPage: React.FC = () => {
   const fetchUserInfo = async (pois: Poi[]) => {
     if (pois.length === 0) return;
 
-    const userIds = [...new Set(pois.map(poi => poi.created_by))];
+    // Filter out null/undefined values to avoid UUID errors
+    const userIds = [...new Set(pois.map(poi => poi.created_by).filter(id => id !== null && id !== undefined))];
+    
+    if (userIds.length === 0) {
+      setUserInfo({});
+      return;
+    }
+
     const { data: userData, error: userError } = await supabase
       .from('profiles')
       .select('id, username')

@@ -1,5 +1,261 @@
 # Task Plan: Dune Awakening Deep Desert Tracker
 
+## **🚧 NEW MAJOR TASK: DISCORD-ONLY AUTHENTICATION MIGRATION 🚧**
+
+**Overall Goal**: Migrate from traditional email/password authentication to Discord-only OAuth authentication to better align with the gaming community and simplify user experience.
+
+**Status**: **Planning Phase** - Ready to Begin Implementation
+
+### **Strategic Rationale**
+- **Gaming Community Alignment**: Discord is the standard platform for gaming communities
+- **Simplified User Experience**: Eliminates password management and reduces friction
+- **Security Enhancement**: Leverages Discord's robust OAuth2 system
+- **Profile Integration**: Automatic access to Discord usernames and avatars
+- **Community Building**: Natural integration with existing Discord gaming servers
+
+### **Migration Strategy: Clean Slate Approach** ✅ **RECOMMENDED**
+Given the gaming community focus, implementing a complete reset for optimal Discord integration:
+- Export critical application data (POI collections, custom icons, custom POI types)
+- Reset user accounts while preserving global resources
+- Deploy Discord-only authentication
+- Allow users to re-register with Discord accounts
+- Manually restore admin roles to Discord accounts
+
+---
+
+## **📋 IMPLEMENTATION PHASES**
+
+### **Phase 1: Discord Application & Supabase Configuration** - *Pending*
+**Goal**: Set up Discord OAuth2 application and configure Supabase Auth provider
+**Estimated Time**: 2-3 hours
+
+**Technical Requirements:**
+- **Discord Developer Portal Setup**:
+  - Create new Discord OAuth2 application
+  - Configure redirect URLs: `https://[project].supabase.co/auth/v1/callback`
+  - Set required scopes: `identify`, `email`
+  - Generate Client ID and Client Secret
+
+- **Supabase Configuration**:
+  - Enable Discord provider in Authentication settings
+  - Configure Discord credentials (Client ID, Secret)
+  - Test OAuth flow in development environment
+  - Verify callback handling
+
+**Files to Create/Modify:**
+- Document Discord app credentials (secure storage)
+- Update Supabase project authentication settings
+
+---
+
+### **Phase 2: Database Schema Enhancement** - *Pending*
+**Goal**: Add Discord-specific fields to user profiles and prepare migration scripts
+**Estimated Time**: 1-2 hours
+
+**Technical Implementation:**
+```sql
+-- Add Discord-specific fields to profiles table
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS 
+  discord_id TEXT UNIQUE,
+  discord_username TEXT,
+  discord_avatar_url TEXT,
+  discord_discriminator TEXT;
+
+-- Create index for Discord ID lookups
+CREATE INDEX IF NOT EXISTS idx_profiles_discord_id ON public.profiles(discord_id);
+
+-- Create migration backup table
+CREATE TABLE IF NOT EXISTS profiles_backup_pre_discord AS 
+SELECT * FROM public.profiles;
+```
+
+**Key Considerations:**
+- Preserve existing user data structure
+- Add Discord-specific metadata fields
+- Maintain backward compatibility during transition
+- Create backup of existing user data
+
+**Files to Create:**
+- `add_discord_fields_to_profiles.sql`
+- `backup_users_pre_discord_migration.sql`
+
+---
+
+### **Phase 3: Frontend Authentication Components** - *Pending*
+**Goal**: Replace email/password authentication UI with Discord OAuth integration
+**Estimated Time**: 4-6 hours
+
+**Component Updates Required:**
+
+**A. Authentication Flow Components:**
+- **`src/components/auth/SignInForm.tsx`**: 
+  - Replace email/password form with Discord OAuth button
+  - Implement Discord sign-in flow
+  - Handle OAuth callback processing
+  - Add user profile creation on first login
+
+- **`src/lib/supabase.ts`**:
+  - Configure Discord auth provider
+  - Update auth helper functions
+  - Add Discord profile data processing
+
+- **`src/types/index.ts`**:
+  - Add Discord fields to Profile interface
+  - Update authentication-related types
+
+**B. User Profile Management:**
+- **Profile Display Components**: Update to show Discord usernames and avatars
+- **Admin User Management**: Modify to work with Discord IDs instead of emails
+
+**Key Implementation Details:**
+```typescript
+// Discord OAuth button implementation
+const handleDiscordSignIn = async () => {
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: 'discord',
+    options: {
+      redirectTo: `${window.location.origin}/auth/callback`
+    }
+  });
+};
+
+// Profile creation on Discord login
+const handleDiscordProfile = async (user) => {
+  const { data: profile } = await supabase
+    .from('profiles')
+    .upsert({
+      id: user.id,
+      discord_id: user.user_metadata.provider_id,
+      discord_username: user.user_metadata.full_name,
+      discord_avatar_url: user.user_metadata.avatar_url,
+      role: 'Member' // Default role for new users
+    });
+};
+```
+
+---
+
+### **Phase 4: Admin Interface Updates** - *Pending*
+**Goal**: Update admin user management to work with Discord-based users
+**Estimated Time**: 2-3 hours
+
+**Admin Component Updates:**
+- **`src/components/admin/UserManagement.tsx`**:
+  - Display Discord usernames instead of email addresses
+  - Show Discord avatars in user lists
+  - Update user search to work with Discord usernames
+  - Modify user deletion to handle Discord IDs
+
+- **Role Assignment Interface**:
+  - Update role assignment flows for Discord users
+  - Ensure admin can assign roles to Discord accounts
+  - Add Discord username/ID display in admin panels
+
+**Edge Function Updates:**
+- **`supabase/functions/delete-user/index.ts`**: Ensure compatibility with Discord users
+- **`supabase/functions/get-user-emails/index.ts`**: Update to return Discord usernames
+- **`supabase/functions/update-user/index.ts`**: Handle Discord profile updates
+
+---
+
+### **Phase 5: Migration Execution & User Communication** - *Pending*
+**Goal**: Execute the migration with proper user communication and data preservation
+**Estimated Time**: 2-4 hours
+
+**Pre-Migration Steps:**
+1. **Data Backup**: Create comprehensive backup of current user data
+2. **Admin Coordination**: Ensure admin users have Discord accounts ready
+3. **User Communication**: Notify users about upcoming Discord requirement
+
+**Migration Execution:**
+```sql
+-- Backup existing data
+INSERT INTO profiles_backup_pre_discord SELECT * FROM public.profiles;
+
+-- Clear user authentication (preserving global data)
+DELETE FROM auth.users; -- This will cascade to profiles due to foreign key
+
+-- Preserve global resources (POI types, custom icons, etc.)
+-- These remain intact as they're not user-dependent
+```
+
+**Post-Migration Steps:**
+1. **Admin Access Restoration**: First Discord user gets admin role
+2. **Testing**: Verify all authentication flows work correctly
+3. **User Onboarding**: Guide users through Discord registration process
+4. **Data Verification**: Ensure global resources (POIs, custom types) preserved
+
+---
+
+### **Phase 6: Testing & Validation** - *Pending*
+**Goal**: Comprehensive testing of Discord authentication system
+**Estimated Time**: 2-3 hours
+
+**Testing Checklist:**
+- ✅ Discord OAuth flow works correctly
+- ✅ User profile creation on first login
+- ✅ Role assignment system functions
+- ✅ Admin user management operational
+- ✅ POI creation/editing works with Discord users
+- ✅ Global resources (custom POI types, icons) preserved
+- ✅ Navigation and permissions work correctly
+- ✅ Mobile Discord authentication functional
+
+**Validation Criteria:**
+- All existing functionality works with Discord users
+- Admin panel can manage Discord-based users
+- POI and mapping features fully operational
+- Global application resources remain intact
+
+---
+
+## **🔧 TECHNICAL ARCHITECTURE IMPACT**
+
+### **Components Requiring Updates:**
+- ✅ **Authentication Components**: SignInForm, auth hooks, Supabase config
+- ✅ **User Profile Display**: All components showing user info
+- ✅ **Admin Interface**: User management, role assignment
+- ✅ **Database Schema**: Discord fields, proper indexing
+- ✅ **Edge Functions**: User management functions
+
+### **Components Remaining Unchanged:**
+- ✅ **POI Management**: All POI CRUD operations work as-is
+- ✅ **Map Interfaces**: Deep Desert and Hagga Basin functionality preserved
+- ✅ **Comment System**: Works with any authenticated users
+- ✅ **Global Resources**: Custom POI types, icons, collections preserved
+- ✅ **Admin Tools**: Database management, backup systems remain functional
+
+### **Migration Benefits:**
+- **Simplified Onboarding**: One-click Discord login
+- **Gaming Community Integration**: Natural fit for Dune Awakening players
+- **Reduced Security Liability**: No password storage or management
+- **Enhanced User Experience**: Familiar OAuth flow for gamers
+- **Profile Integration**: Automatic Discord avatars and usernames
+
+---
+
+## **🚨 RISK MITIGATION & SAFETY MEASURES**
+
+### **Data Protection:**
+- Complete backup of existing user data before migration
+- Preservation of all global resources (POIs, custom types, icons)
+- Admin access continuity planning
+- Rollback strategy if issues arise
+
+### **User Communication:**
+- Clear advance notice about Discord requirement
+- Migration timeline and instructions
+- Support for users without Discord accounts
+- Documentation for new Discord-based registration
+
+### **Technical Safety:**
+- Thorough testing in development environment
+- Staged deployment with monitoring
+- Emergency admin access method
+- Database backup verification
+
+---
+
 ## **✅ LATEST COMPLETED TASK: DATABASE MANAGEMENT SYSTEM ENHANCEMENTS (January 28, 2025)**
 
 **Goal**: Enhance the DatabaseManagement component to provide separate reset functionality for Deep Desert and Hagga Basin maps with improved user experience and safety measures.
@@ -21,20 +277,13 @@
 
 ---
 
-## **🚧 CURRENT MAJOR TASK: GLOBALLY APPLY LANDING PAGE AESTHETIC 🚧**
+## **🚧 PREVIOUS MAJOR TASK: GLOBALLY APPLY LANDING PAGE AESTHETIC 🚧**
 
 **Overall Goal**: To refactor the entire application's UI to consistently use the newly established "Dune-inspired" aesthetic. This involves updating color palettes, typography, and incorporating core UI components like `DiamondIcon` and `HexCard` (or their stylistic principles) across all relevant pages and components, guided by `docs/ui_aesthetics.md`.
 
-**Status**: **Planning & Initial Phase**
+**Status**: **Secondary Priority** (After Discord Migration)
 
-### **Phase 1: Navbar Styling Update** - *Pending*
--   **Goal**: Restyle the main application Navbar (`src/components/common/Navbar.tsx`) to match the landing page aesthetic.
--   **Key Actions**:
-    -   Update background colors/gradients (likely using `slate` and `void` shades).
-    -   Adjust typography for navigation links (font, weight, color - `gold`/`amber`).
-    -   Potentially incorporate `DiamondIcon` for the logo or key action buttons if stylistically appropriate.
-    -   Ensure hover/active states align with `docs/ui_aesthetics.md`.
--   **Files to Modify**: `src/components/common/Navbar.tsx`, potentially `tailwind.config.js` if new shared styles are needed.
+### **Phase 1: Navbar Styling Update** - *Deferred*
 
 ### **Phase 2: Common Components Styling** - *Pending*
 -   **Goal**: Update core reusable components (buttons, modals, input fields, etc.) to the new theme.
