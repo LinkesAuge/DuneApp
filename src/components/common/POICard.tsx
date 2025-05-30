@@ -4,6 +4,7 @@ import { Poi, PoiType, CustomIcon } from '../../types';
 import { useAuth } from '../auth/AuthProvider';
 import { supabase } from '../../lib/supabase';
 import { formatCompactDateTime, wasUpdated, formatDateWithPreposition } from '../../lib/dateUtils';
+import { getDisplayNameFromProfile } from '../../lib/utils';
 import CommentsList from '../comments/CommentsList';
 
 interface POICardProps {
@@ -83,8 +84,8 @@ const POICard: React.FC<POICardProps> = ({
   const canModify = user && (user.id === poi.created_by || user.role === 'admin' || user.role === 'editor');
   
   // State for user information
-  const [creatorInfo, setCreatorInfo] = useState<{ username: string } | null>(null);
-  const [editorInfo, setEditorInfo] = useState<{ username: string } | null>(null);
+  const [creatorInfo, setCreatorInfo] = useState<{ username: string; display_name?: string | null } | null>(null);
+  const [editorInfo, setEditorInfo] = useState<{ username: string; display_name?: string | null } | null>(null);
   const [loadingUserInfo, setLoadingUserInfo] = useState(true);
   const [commentCount, setCommentCount] = useState(0);
   
@@ -108,7 +109,7 @@ const POICard: React.FC<POICardProps> = ({
         if (userIds.length > 0) {
           const { data: userData, error: userError } = await supabase
             .from('profiles')
-            .select('id, username')
+            .select('id, username, display_name')
             .in('id', userIds);
           
           if (userError) throw userError;
@@ -116,8 +117,8 @@ const POICard: React.FC<POICardProps> = ({
           const creatorData = userData?.find(u => u.id === poi.created_by);
           const editorData = userData?.find(u => u.id === poi.updated_by);
           
-          setCreatorInfo(creatorData ? { username: creatorData.username } : null);
-          setEditorInfo(editorData ? { username: editorData.username } : null);
+          setCreatorInfo(creatorData ? { username: creatorData.username, display_name: creatorData.display_name } : null);
+          setEditorInfo(editorData ? { username: editorData.username, display_name: editorData.display_name } : null);
         } else {
           // No valid user IDs, set to null
           setCreatorInfo(null);
@@ -148,17 +149,17 @@ const POICard: React.FC<POICardProps> = ({
   if (!isOpen) return null;
 
   // Format metadata text
-  let metaText = `Created by ${creatorInfo?.username || (poi.created_by ? 'Loading...' : 'Deleted User')} ${(() => {
+  let metaText = `Created by ${getDisplayNameFromProfile(creatorInfo) || (poi.created_by ? 'Loading...' : 'Deleted User')} ${(() => {
     const { date, useOn } = formatDateWithPreposition(poi.created_at);
     return useOn ? `on ${date}` : date;
   })()}`;
   
   if (isEdited && editorInfo) {
     const { date: editDate, useOn: editUseOn } = formatDateWithPreposition(poi.updated_at);
-    metaText += ` • Edited by ${editorInfo.username} ${editUseOn ? `on ${editDate}` : editDate}`;
+    metaText += ` • Edited by ${getDisplayNameFromProfile(editorInfo)} ${editUseOn ? `on ${editDate}` : editDate}`;
   } else if (isEdited && poi.updated_by && !editorInfo && !loadingUserInfo) {
     const { date: editDate, useOn: editUseOn } = formatDateWithPreposition(poi.updated_at);
-    metaText += ` • Edited by ${poi.updated_by ? 'Loading...' : 'Deleted User'} ${editUseOn ? `on ${editDate}` : editDate}`;
+    metaText += ` • Edited by Deleted User ${editUseOn ? `on ${editDate}` : editDate}`;
   }
 
   return (

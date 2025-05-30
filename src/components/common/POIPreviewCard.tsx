@@ -4,13 +4,14 @@ import { Poi, PoiType, CustomIcon } from '../../types';
 import { useAuth } from '../auth/AuthProvider';
 import { supabase } from '../../lib/supabase';
 import { formatDateWithPreposition, wasUpdated } from '../../lib/dateUtils';
+import { getDisplayNameFromProfile } from '../../lib/utils';
 import CommentsList from '../comments/CommentsList';
 
 interface POIPreviewCardProps {
   poi: Poi;
   poiType: PoiType;
   customIcons: CustomIcon[];
-  userInfo?: { [key: string]: { username: string } };
+  userInfo?: { [key: string]: { username: string; display_name?: string | null } };
   layout?: 'grid' | 'list';
   onClick: () => void;
   className?: string;
@@ -125,7 +126,7 @@ const POIPreviewCard: React.FC<POIPreviewCardProps> = ({
   }, [poi.id]);
 
   // Format metadata text
-  let metaText = `Created by ${creator?.username || 'Unknown'} ${formattedDate}`;
+  let metaText = `Created by ${getDisplayNameFromProfile(creator) || 'Unknown'} ${formattedDate}`;
   if (isEdited && poi.updated_at) {
     const { date: updatedDate, useOn: updatedUseOn } = formatDateWithPreposition(poi.updated_at);
     metaText += ` • Updated ${updatedUseOn ? `on ${updatedDate}` : updatedDate}`;
@@ -357,7 +358,7 @@ const POIPreviewCard: React.FC<POIPreviewCardProps> = ({
             {/* Metadata - Compact */}
             <div className="p-3 border-b border-slate-700 text-xs text-slate-400 text-center">
               <div className="flex items-center justify-between text-xs text-sand-600">
-                <span>Created by {creator?.username || 'Loading...'} {formattedDate}</span>
+                <span>Created by {getDisplayNameFromProfile(creator) || 'Loading...'} {formattedDate}</span>
                 <div className="flex items-center space-x-2">
                   <PrivacyIcon size={12} className={privacyColor} />
                   <span className={privacyColor}>{privacyLabel}</span>
@@ -467,7 +468,7 @@ const POIPreviewCard: React.FC<POIPreviewCardProps> = ({
           )}
           
           <div className="flex justify-between items-center text-xs text-slate-400 mt-2">
-            <span>Created by {creator?.username || 'Unknown'}</span>
+            <span>Created by {getDisplayNameFromProfile(creator) || 'Unknown'}</span>
             <span>{formattedDate}</span>
           </div>
           

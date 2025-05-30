@@ -11,6 +11,7 @@ import HaggaBasinPage from './pages/HaggaBasinPage';
 import AdminPanel from './components/admin/AdminPanel';
 import GridPage from './pages/GridPage';
 import UITestPage from './pages/UITestPage';
+import ProfilePage from './pages/ProfilePage';
 import { useAuth } from './components/auth/AuthProvider';
 import { AlertTriangle } from 'lucide-react';
 
@@ -80,6 +81,14 @@ const AppRoutes: React.FC = () => {
         element={
           <ProtectedRoute>
             <Dashboard />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/profile" 
+        element={
+          <ProtectedRoute>
+            <ProfilePage />
           </ProtectedRoute>
         } 
       />

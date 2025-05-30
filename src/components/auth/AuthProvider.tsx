@@ -28,7 +28,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const fetchUserProfile = async (userId: string) => {
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('username, role, discord_id, discord_username, discord_avatar_url')
+      .select('username, role, discord_id, discord_username, discord_avatar_url, display_name')
       .eq('id', userId)
       .maybeSingle();
 
@@ -111,6 +111,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         id: session.user.id,
         email: session.user.email || profile.email || '',
         username: profile.username,
+        display_name: profile.display_name,
         role: profile.role as UserRole,
         // Add Discord-specific fields to User type if needed
         discordId: profile.discord_id,

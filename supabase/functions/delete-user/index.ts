@@ -134,23 +134,37 @@ serve(async (req: Request) => {
         .from('pois')
         .update({ 
           created_by: null,
-          // Note: If you have a creator_name field, update it too
-          // creator_name: 'Deleted User'
+          updated_by: null  // Also preserve who last updated the POI
         })
         .eq('created_by', userIdToDelete);
 
       if (updatePoisError) {
         console.error('Error updating POIs:', updatePoisError);
-        // Continue with deletion even if POI update fails
       } else {
         console.log('Successfully updated POIs to preserve data');
+      }
+
+      // Also update POIs where user was the last updater but not original creator
+      console.log('Updating POIs last updated by user...');
+      const { error: updatePoisUpdatedError } = await supabaseAdmin
+        .from('pois')
+        .update({ updated_by: null })
+        .eq('updated_by', userIdToDelete);
+
+      if (updatePoisUpdatedError) {
+        console.error('Error updating POIs updated_by:', updatePoisUpdatedError);
+      } else {
+        console.log('Successfully updated POIs updated_by to preserve data');
       }
 
       // 2. Update grid squares - preserve screenshots but anonymize uploader
       console.log('Updating grid squares uploaded by user...');
       const { error: updateGridSquaresError } = await supabaseAdmin
         .from('grid_squares')
-        .update({ uploaded_by: null })
+        .update({ 
+          uploaded_by: null,
+          updated_by: null  // Also preserve who last updated the grid square
+        })
         .eq('uploaded_by', userIdToDelete);
 
       if (updateGridSquaresError) {
@@ -159,14 +173,26 @@ serve(async (req: Request) => {
         console.log('Successfully updated grid squares to preserve data');
       }
 
+      // Also update grid squares where user was the last updater but not original uploader
+      console.log('Updating grid squares last updated by user...');
+      const { error: updateGridSquaresUpdatedError } = await supabaseAdmin
+        .from('grid_squares')
+        .update({ updated_by: null })
+        .eq('updated_by', userIdToDelete);
+
+      if (updateGridSquaresUpdatedError) {
+        console.error('Error updating grid squares updated_by:', updateGridSquaresUpdatedError);
+      } else {
+        console.log('Successfully updated grid squares updated_by to preserve data');
+      }
+
       // 3. Update comments - preserve comments but anonymize author
       console.log('Updating comments created by user...');
       const { error: updateCommentsError } = await supabaseAdmin
         .from('comments')
         .update({ 
           user_id: null,
-          // Note: If you have author_name or similar field, update it
-          // author_name: 'Deleted User'
+          updated_by: null  // Also preserve who last updated the comment
         })
         .eq('user_id', userIdToDelete);
 
@@ -174,6 +200,19 @@ serve(async (req: Request) => {
         console.error('Error updating comments:', updateCommentsError);
       } else {
         console.log('Successfully updated comments to preserve data');
+      }
+
+      // Also update comments where user was the last updater but not original author
+      console.log('Updating comments last updated by user...');
+      const { error: updateCommentsUpdatedError } = await supabaseAdmin
+        .from('comments')
+        .update({ updated_by: null })
+        .eq('updated_by', userIdToDelete);
+
+      if (updateCommentsUpdatedError) {
+        console.error('Error updating comments updated_by:', updateCommentsUpdatedError);
+      } else {
+        console.log('Successfully updated comments updated_by to preserve data');
       }
 
       // 4. Update custom icons - preserve icons but anonymize creator
@@ -200,6 +239,53 @@ serve(async (req: Request) => {
         console.error('Error updating POI types:', updatePoiTypesError);
       } else {
         console.log('Successfully updated POI types to preserve data');
+      }
+
+      // 6. Update POI collections - preserve collections but anonymize creator
+      console.log('Updating POI collections created by user...');
+      const { error: updateCollectionsError } = await supabaseAdmin
+        .from('poi_collections')
+        .update({ 
+          created_by: null,
+          updated_by: null  // Also preserve who last updated the collection
+        })
+        .eq('created_by', userIdToDelete);
+
+      if (updateCollectionsError) {
+        console.error('Error updating POI collections:', updateCollectionsError);
+      } else {
+        console.log('Successfully updated POI collections to preserve data');
+      }
+
+      // Also update collections where user was the last updater but not original creator
+      console.log('Updating POI collections last updated by user...');
+      const { error: updateCollectionsUpdatedError } = await supabaseAdmin
+        .from('poi_collections')
+        .update({ updated_by: null })
+        .eq('updated_by', userIdToDelete);
+
+      if (updateCollectionsUpdatedError) {
+        console.error('Error updating POI collections updated_by:', updateCollectionsUpdatedError);
+      } else {
+        console.log('Successfully updated POI collections updated_by to preserve data');
+      }
+
+      // 7. Delete POI shares involving the user (these don't need preservation)
+      console.log('Deleting POI shares involving user...');
+      const { error: deleteSharesError1 } = await supabaseAdmin
+        .from('poi_shares')
+        .delete()
+        .eq('shared_by_user_id', userIdToDelete);
+
+      const { error: deleteSharesError2 } = await supabaseAdmin
+        .from('poi_shares')
+        .delete()
+        .eq('shared_with_user_id', userIdToDelete);
+
+      if (deleteSharesError1 || deleteSharesError2) {
+        console.error('Error deleting POI shares:', deleteSharesError1 || deleteSharesError2);
+      } else {
+        console.log('Successfully deleted POI shares involving user');
       }
 
       console.log('Data preservation completed successfully');

@@ -48,7 +48,7 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
   const [pois, setPois] = useState<Poi[]>([]);
   const [poiTypes, setPoiTypes] = useState<PoiType[]>([]);
   const [customIcons, setCustomIcons] = useState<CustomIcon[]>([]);
-  const [userInfo, setUserInfo] = useState<Record<string, { username: string }>>({});
+  const [userInfo, setUserInfo] = useState<Record<string, { username: string; display_name?: string | null }>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [showAddPoiForm, setShowAddPoiForm] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -200,14 +200,14 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
           if (userIds.length > 0) {
             const { data: userProfiles, error: userError } = await supabase
               .from('profiles')
-              .select('id, username')
+              .select('id, username, display_name')
               .in('id', userIds);
             
             if (!userError && userProfiles) {
               const userInfoMap = userProfiles.reduce((acc, profile) => {
-                acc[profile.id] = { username: profile.username };
+                acc[profile.id] = { username: profile.username, display_name: profile.display_name };
                 return acc;
-              }, {} as Record<string, { username: string }>);
+              }, {} as Record<string, { username: string; display_name?: string | null }>);
               setUserInfo(userInfoMap);
             }
           } else {

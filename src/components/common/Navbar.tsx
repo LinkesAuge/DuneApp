@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
+import { getDisplayName } from '../../lib/utils';
 import { Menu, X, User, LogOut, Shield, LayoutDashboard, Mountain, MapPin, Pyramid } from 'lucide-react';
 
 const Navbar: React.FC = () => {
@@ -368,7 +369,7 @@ const Navbar: React.FC = () => {
                         e.currentTarget.style.textShadow = 'none';
                       }}
                       >
-                        {user.username}
+                        {getDisplayName(user)}
                       </span>
                       <User size={14} strokeWidth={1.5} className="relative z-10 text-amber-300 group-hover:text-amber-100 transition-all duration-300 group-hover:drop-shadow-lg" />
                       
@@ -386,7 +387,7 @@ const Navbar: React.FC = () => {
                           
                           {/* Header with gradient */}
                           <div className="px-4 py-3 border-b border-slate-600/20 bg-gradient-to-r from-amber-600/10 via-amber-500/5 to-amber-600/10">
-                            <p className="font-light text-amber-100 tracking-wide text-sm">{user.username}</p>
+                            <p className="font-light text-amber-100 tracking-wide text-sm">{getDisplayName(user)}</p>
                             <div className="flex items-center mt-1">
                               <span className="text-xs text-amber-200 mr-2 font-light">Role:</span>
                               <span className="px-2 py-1 text-xs font-light text-slate-900 bg-gradient-to-r from-amber-200 to-amber-300 tracking-wide">
@@ -395,6 +396,28 @@ const Navbar: React.FC = () => {
                             </div>
                           </div>
                           
+                          {/* Profile Management */}
+                          <Link
+                            to="/profile"
+                            onClick={() => setIsProfileOpen(false)}
+                            className="group relative flex items-center w-full text-left px-4 py-3 text-amber-200 hover:text-amber-50 transition-all duration-300"
+                          >
+                            <div className="absolute inset-0 bg-gradient-to-r from-violet-800/0 to-violet-700/0 group-hover:from-violet-800/20 group-hover:to-violet-700/20 transition-all duration-300" />
+                            
+                            <User size={14} strokeWidth={1.5} className="relative z-10 mr-3 text-amber-300 group-hover:text-amber-100 transition-all duration-300 group-hover:drop-shadow-lg" />
+                            <span className="relative z-10 font-light tracking-wide text-sm group-hover:drop-shadow-lg"
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.textShadow = '0 0 12px rgba(251, 191, 36, 0.8)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.textShadow = 'none';
+                            }}
+                            >Profile Settings</span>
+                            
+                            {/* Sleek expanding underline */}
+                            <div className="absolute bottom-0 left-0 w-0 h-px bg-gradient-to-r from-transparent via-violet-400 to-transparent group-hover:w-full transition-all duration-700 ease-out shadow-sm shadow-violet-400/40" />
+                          </Link>
+
                           {/* Sign Out */}
                           <button
                             onClick={() => {
@@ -530,6 +553,14 @@ const Navbar: React.FC = () => {
                 >
                   Points of Interest
                 </MobileNavButton>
+                <MobileNavButton
+                  to="/profile"
+                  icon={<User size={15} strokeWidth={1.5} />}
+                  isActive={location.pathname === '/profile'}
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  Profile Settings
+                </MobileNavButton>
                 {user.role === 'admin' && (
                   <MobileNavButton
                     to="/admin"
@@ -544,7 +575,7 @@ const Navbar: React.FC = () => {
                 {/* Mobile Profile */}
                 <div className="mt-6 pt-4 border-t border-slate-600/20">
                   <div className="mx-4 p-3 bg-gradient-to-r from-amber-600/8 via-amber-500/4 to-amber-600/8 border border-slate-600/30">
-                    <p className="font-light text-amber-100 tracking-wide text-sm">{user.username}</p>
+                    <p className="font-light text-amber-100 tracking-wide text-sm">{getDisplayName(user)}</p>
                     <div className="flex items-center mt-1">
                       <span className="text-xs text-amber-200 mr-2 font-light">Role:</span>
                       <span className="px-2 py-1 text-xs font-light text-slate-900 bg-gradient-to-r from-amber-200 to-amber-300 tracking-wide">
