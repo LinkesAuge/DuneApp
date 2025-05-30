@@ -30,7 +30,7 @@ const GridGallery: React.FC<GridGalleryProps> = ({ squares, initialIndex, onClos
         ...new Set([
           ...squares.map(square => square.uploaded_by),
           poiInfo?.created_by,
-        ].filter((id): id is string => id !== null))
+        ].filter((id): id is string => id !== null && id !== undefined && id !== ''))
       ];
 
       if (userIds.length === 0) return;

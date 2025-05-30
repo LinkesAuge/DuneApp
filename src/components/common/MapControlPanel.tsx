@@ -84,7 +84,15 @@ const MapControlPanel: React.FC<MapControlPanelProps> = ({
 }) => {
   // Get unique categories for filtering
   const categories = [...new Set(poiTypes.map(type => type.category))];
-
+  
+  // Get categories that should display in main panels from database settings
+  // Now we check if ANY type in a category has display_in_panel=true, meaning the category should be displayed
+  const displayCategories = [...new Set(
+    poiTypes
+      .filter(type => type.display_in_panel === true)
+      .map(type => type.category)
+  )];
+  
   // Helper function to render a category section
   const renderCategorySection = (category: string) => {
     const categoryTypes = poiTypes.filter(type => type.category === category);
@@ -95,26 +103,33 @@ const MapControlPanel: React.FC<MapControlPanelProps> = ({
     
     return (
       <div key={category} className="mb-4">
-        {/* Enhanced Category Header */}
-        <div className="relative overflow-hidden rounded-lg mb-3">
-          {/* Subtle background layers */}
-          <div className="absolute inset-0 bg-slate-800/30" />
-          <div className="absolute inset-0 bg-gradient-to-b from-slate-700/20 via-transparent to-slate-800/30" />
+        {/* Enhanced Category Header with Navbar-style Styling */}
+        <div className="relative overflow-hidden rounded-lg mb-3 group">
+          {/* Base background layer */}
+          <div className="absolute inset-0 bg-slate-800/60" />
           
-          <div className="relative z-10 border border-slate-600/40 px-4 py-3 backdrop-blur-sm">
+          {/* Interactive purple overlay matching navbar */}
+          <div 
+            className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+            style={{
+              background: 'radial-gradient(ellipse at center top, rgba(139, 92, 246, 0.15) 0%, rgba(124, 58, 237, 0.08) 40%, transparent 70%)'
+            }}
+          />
+          
+          <div className="relative z-10 border border-amber-400/40 px-4 py-3 backdrop-blur-sm">
             <div className="flex items-center justify-between">
-              <label className="flex items-center cursor-pointer group">
+              <label className="flex items-center cursor-pointer group/label">
                 <input
                   type="checkbox"
                   checked={categoryVisible}
                   onChange={(e) => onCategoryToggle(category, e.target.checked)}
-                  className="rounded border-slate-500/50 bg-slate-800/60 text-amber-500 focus:ring-amber-500/30 focus:ring-offset-0"
+                  className="rounded border-amber-400/50 bg-slate-900/80 text-amber-500 focus:ring-amber-500/30 focus:ring-offset-0"
                 />
-                <span className="ml-3 text-sm font-light text-amber-200 capitalize group-hover:text-amber-100 transition-all duration-300 tracking-wide" style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                <span className="ml-3 text-sm font-light text-amber-200 capitalize group-hover/label:text-gold-300 transition-all duration-300 tracking-wide" style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
                   {category}
                 </span>
               </label>
-              <span className="text-xs text-amber-300/70 font-light px-2 py-1 bg-slate-700/40 rounded border border-slate-600/30">
+              <span className="text-xs text-amber-300 font-light px-3 py-1 bg-slate-900/60 rounded border border-amber-400/30 shadow-sm">
                 {categoryTypes.length}
               </span>
             </div>
@@ -130,26 +145,37 @@ const MapControlPanel: React.FC<MapControlPanelProps> = ({
             return (
               <label 
                 key={type.id} 
-                className={`flex items-center justify-between cursor-pointer group px-3 py-2 rounded-lg transition-all duration-300 relative overflow-hidden ${
+                className={`flex items-center justify-between cursor-pointer group px-4 py-3 rounded-lg transition-all duration-300 relative overflow-hidden border ${
                   isTypeSelected 
-                    ? 'hover:bg-slate-700/30' 
-                    : 'opacity-60 hover:opacity-100 hover:bg-slate-800/20'
+                    ? 'border-amber-400/50 bg-slate-800/70 hover:bg-slate-700/80' 
+                    : 'border-slate-700/40 bg-slate-900/40 hover:bg-slate-800/50 hover:border-amber-400/30'
                 }`}
               >
-                {/* Subtle background for selected items */}
+                {/* Background layers for selected items */}
                 {isTypeSelected && (
-                  <div className="absolute inset-0 bg-slate-700/20" />
+                  <>
+                    <div className="absolute inset-0 bg-gradient-to-r from-amber-600/10 via-amber-500/5 to-amber-600/10" />
+                    <div className="absolute inset-0 bg-gradient-to-b from-amber-400/5 via-transparent to-amber-700/10" />
+                  </>
                 )}
+                
+                {/* Interactive purple overlay */}
+                <div 
+                  className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                  style={{
+                    background: 'radial-gradient(ellipse at center top, rgba(139, 92, 246, 0.1) 0%, rgba(124, 58, 237, 0.05) 40%, transparent 70%)'
+                  }}
+                />
                 
                 <div className="flex items-center relative z-10">
                   <input
                     type="checkbox"
                     checked={isTypeSelected}
                     onChange={() => onTypeToggle(type.id)}
-                    className="rounded border-slate-500/50 bg-slate-800/60 text-amber-500 focus:ring-amber-500/30 focus:ring-offset-0 w-3 h-3"
+                    className="rounded border-amber-400/50 bg-slate-900/80 text-amber-500 focus:ring-amber-500/30 focus:ring-offset-0 w-4 h-4"
                   />
                   
-                  {/* Enhanced POI Type Icon - Bigger without background shape */}
+                  {/* Enhanced POI Type Icon */}
                   <div className="ml-4 mr-3 flex items-center justify-center flex-shrink-0">
                     {isIconUrl(type.icon) ? (
                       <img
@@ -157,7 +183,7 @@ const MapControlPanel: React.FC<MapControlPanelProps> = ({
                         alt={type.name}
                         className="w-8 h-8 object-contain"
                         style={{
-                          filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))'
+                          filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.4))'
                         }}
                       />
                     ) : (
@@ -165,7 +191,7 @@ const MapControlPanel: React.FC<MapControlPanelProps> = ({
                         className="text-2xl leading-none font-medium"
                         style={{ 
                           color: type.color,
-                          textShadow: '0 1px 2px rgba(0,0,0,0.3)'
+                          textShadow: '0 2px 4px rgba(0,0,0,0.4)'
                         }}
                       >
                         {type.icon}
@@ -176,8 +202,8 @@ const MapControlPanel: React.FC<MapControlPanelProps> = ({
                   <span 
                     className={`text-sm transition-all duration-300 font-light tracking-wide ${
                       isTypeSelected 
-                        ? 'text-amber-200 group-hover:text-amber-100' 
-                        : 'text-amber-200/70 group-hover:text-amber-200'
+                        ? 'text-gold-300 group-hover:text-gold-200' 
+                        : 'text-amber-200/80 group-hover:text-amber-200'
                     }`}
                     style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
                   >
@@ -185,11 +211,11 @@ const MapControlPanel: React.FC<MapControlPanelProps> = ({
                   </span>
                 </div>
                 
-                {/* Right-aligned count */}
-                <span className={`text-xs relative z-10 px-2 py-1 rounded border ml-auto ${
+                {/* Enhanced count badge */}
+                <span className={`text-xs relative z-10 px-3 py-1 rounded border ml-auto shadow-sm transition-all duration-300 ${
                   isTypeSelected 
-                    ? 'text-amber-300 bg-slate-700/40 border-slate-600/40' 
-                    : 'text-amber-300/50 bg-slate-800/30 border-slate-600/30'
+                    ? 'text-amber-300 bg-slate-900/70 border-amber-400/50' 
+                    : 'text-amber-300/70 bg-slate-800/60 border-slate-600/40 group-hover:text-amber-300 group-hover:border-amber-400/30'
                 }`}>
                   {typePoiCount}
                 </span>
@@ -203,10 +229,8 @@ const MapControlPanel: React.FC<MapControlPanelProps> = ({
 
   return (
     <div className={`${showPanel ? 'w-[30rem]' : 'w-12'} relative flex flex-col transition-all duration-200 ${className}`}>
-      {/* Multi-layer background system */}
-      <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950" />
-      <div className="absolute inset-0 bg-gradient-to-b from-slate-950/90 via-slate-900/80 to-slate-800/60" />
-      <div className="absolute inset-0 bg-gradient-to-br from-void-950/20 via-transparent to-slate-900/40" />
+      {/* Simple background to match POI card */}
+      <div className="absolute inset-0 bg-slate-900" />
       
       {/* Content */}
       <div className="relative z-10 flex flex-col h-full backdrop-blur-sm border-r border-amber-400/30">
@@ -371,17 +395,9 @@ const MapControlPanel: React.FC<MapControlPanelProps> = ({
                     </div>
                   </div>
 
-                  {/* Stats */}
-                  <div className="relative overflow-hidden rounded-lg">
-                    {/* Background layers */}
-                    <div className="absolute inset-0 bg-gradient-to-r from-amber-600/20 via-amber-500/15 to-amber-600/20" />
-                    <div className="absolute inset-0 bg-gradient-to-b from-amber-400/10 via-transparent to-amber-700/20" />
-                    
-                    <div className="relative z-10 border border-amber-400/30 p-4 backdrop-blur-sm">
-                      <div className="text-sm font-light text-amber-200 tracking-wide" style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-                        Showing {filteredPois.length} of {pois.length} POIs
-                      </div>
-                    </div>
+                  {/* Simple Stats Text */}
+                  <div className="text-xs text-amber-300/70 font-light tracking-wide mb-4" style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                    Showing {filteredPois.length} of {pois.length} POIs
                   </div>
 
                   {/* POI Type Filters */}
@@ -406,23 +422,47 @@ const MapControlPanel: React.FC<MapControlPanelProps> = ({
                       </div>
                     </div>
                     
-                    {/* Two-Column Layout */}
+                    {/* Ordered Two-Column Layout for Display Categories */}
                     <div className="grid grid-cols-2 gap-3 mb-4">
-                      {/* Left Column: Base + Resources Types */}
+                      {/* Left Column - Column preference 1 */}
                       <div className="space-y-1">
-                        {categories.includes('Base') && renderCategorySection('Base')}
-                        {categories.includes('Resources') && renderCategorySection('Resources')}
+                        {displayCategories
+                          .filter(category => {
+                            const categoryTypes = poiTypes.filter(type => type.category === category);
+                            const firstType = categoryTypes[0];
+                            return firstType?.category_column_preference === 1;
+                          })
+                          .sort((a, b) => {
+                            const aTypes = poiTypes.filter(type => type.category === a);
+                            const bTypes = poiTypes.filter(type => type.category === b);
+                            const aOrder = aTypes[0]?.category_display_order || 0;
+                            const bOrder = bTypes[0]?.category_display_order || 0;
+                            return aOrder - bOrder;
+                          })
+                          .map(category => renderCategorySection(category))}
                       </div>
                       
-                      {/* Right Column: Locations + NPCs */}
+                      {/* Right Column - Column preference 2 */}
                       <div className="space-y-1">
-                        {categories.includes('Locations') && renderCategorySection('Locations')}
-                        {categories.includes('NPCs') && renderCategorySection('NPCs')}
+                        {displayCategories
+                          .filter(category => {
+                            const categoryTypes = poiTypes.filter(type => type.category === category);
+                            const firstType = categoryTypes[0];
+                            return firstType?.category_column_preference === 2;
+                          })
+                          .sort((a, b) => {
+                            const aTypes = poiTypes.filter(type => type.category === a);
+                            const bTypes = poiTypes.filter(type => type.category === b);
+                            const aOrder = aTypes[0]?.category_display_order || 0;
+                            const bOrder = bTypes[0]?.category_display_order || 0;
+                            return aOrder - bOrder;
+                          })
+                          .map(category => renderCategorySection(category))}
                       </div>
                     </div>
                     
                     {/* Other Categories (if any) */}
-                    {categories.filter(cat => !['Base', 'Resources', 'Locations', 'NPCs'].includes(cat)).length > 0 && (
+                    {categories.filter(cat => !displayCategories.includes(cat)).length > 0 && (
                       <div className="border-t border-slate-700/50 pt-3">
                         <div className="flex justify-between items-center mb-2">
                           <h4 className="text-sm font-medium text-amber-200">Other Types</h4>
@@ -432,8 +472,7 @@ const MapControlPanel: React.FC<MapControlPanelProps> = ({
                             title="Toggle All Other Types"
                           >
                             {(() => {
-                              const mainCategories = ['Base', 'Resources', 'Locations', 'NPCs'];
-                              const otherCategories = categories.filter(cat => !mainCategories.includes(cat));
+                              const otherCategories = categories.filter(cat => !displayCategories.includes(cat));
                               const otherTypeIds = poiTypes
                                 .filter(type => otherCategories.includes(type.category))
                                 .map(type => type.id);
@@ -444,7 +483,7 @@ const MapControlPanel: React.FC<MapControlPanelProps> = ({
                         </div>
                         <div className="space-y-1">
                           {categories
-                            .filter(cat => !['Base', 'Resources', 'Locations', 'NPCs'].includes(cat))
+                            .filter(cat => !displayCategories.includes(cat))
                             .map(category => renderCategorySection(category))}
                         </div>
                       </div>

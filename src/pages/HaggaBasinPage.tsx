@@ -87,6 +87,21 @@ const HaggaBasinPage: React.FC = () => {
     }
   }, [poiTypes, initialFilterSetup]);
 
+  // Listen for admin panel changes to refresh POI types
+  useEffect(() => {
+    const handleAdminDataUpdate = () => {
+      console.log('Admin data updated, refreshing POI types...');
+      fetchPoiTypes();
+    };
+
+    // Listen for custom events from admin panel
+    window.addEventListener('adminDataUpdated', handleAdminDataUpdate);
+
+    return () => {
+      window.removeEventListener('adminDataUpdated', handleAdminDataUpdate);
+    };
+  }, []);
+
   const initializeData = async () => {
     setLoading(true);
     setError(null);
@@ -105,6 +120,15 @@ const HaggaBasinPage: React.FC = () => {
       setError('Failed to load map data. Please try again.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Expose refresh function for POI types specifically
+  const refreshPoiTypes = async () => {
+    try {
+      await fetchPoiTypes();
+    } catch (err) {
+      console.error('Error refreshing POI types:', err);
     }
   };
 
@@ -232,7 +256,14 @@ const HaggaBasinPage: React.FC = () => {
   const fetchUserInfo = async (pois: Poi[]) => {
     if (pois.length === 0) return;
 
-    const userIds = [...new Set(pois.map(poi => poi.created_by))];
+    // Filter out null/undefined values to avoid UUID errors
+    const userIds = [...new Set(pois.map(poi => poi.created_by).filter(id => id !== null && id !== undefined && id !== ''))];
+    
+    if (userIds.length === 0) {
+      setUserInfo({});
+      return;
+    }
+
     const { data: userData, error: userError } = await supabase
       .from('profiles')
       .select('id, username, display_name, custom_avatar_url, discord_avatar_url, use_discord_avatar')
@@ -612,7 +643,6 @@ const HaggaBasinPage: React.FC = () => {
         }}
         isIconUrl={isIconUrl}
         getDisplayImageUrl={getDisplayImageUrl}
-        placementMode={placementMode}
         additionalLayerContent={
           <div className="space-y-2">
             {/* Base Map Layer */}
@@ -690,7 +720,7 @@ const HaggaBasinPage: React.FC = () => {
             highlightedPoiId={highlightedPoiId}
           />
         ) : (
-          <div className="h-full flex items-center justify-center bg-slate-900/30 backdrop-blur-sm">
+          <div className="h-full flex items-center justify-center">
             <div className="text-center">
               <MapPin className="w-16 h-16 text-amber-400/70 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-yellow-300 mb-2" style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>

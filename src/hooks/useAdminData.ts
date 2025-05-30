@@ -70,7 +70,10 @@ export const useAdminData = () => {
   // Load scheduled tasks
   const loadScheduledTasks = async () => {
     try {
+      console.log('Attempting to load scheduled tasks...');
       const { data, error } = await supabase.functions.invoke('get-scheduled-admin-tasks');
+
+      console.log('Scheduled tasks response:', { data, error });
 
       if (error) {
         console.warn('Edge Functions not available for scheduled tasks:', error);
@@ -78,10 +81,11 @@ export const useAdminData = () => {
         return;
       }
 
-      if (data?.success) {
+      if (data?.tasks) {
+        console.log('Successfully loaded scheduled tasks:', data.tasks);
         setScheduledTasks(data.tasks || []);
       } else {
-        console.warn('Failed to load scheduled tasks:', data?.error);
+        console.warn('Failed to load scheduled tasks, data structure:', data);
         setScheduledTasks([]);
       }
     } catch (error: any) {

@@ -261,7 +261,7 @@ const GridContainer: React.FC = () => {
       />
       
       {/* Dark overlay for better contrast */}
-      <div className="absolute inset-0 bg-slate-950/70" />
+      {/* <div className="absolute inset-0 bg-slate-950/70" /> */}
 
       <div className="relative container mx-auto px-4 py-8">
         {/* Header Section */}
@@ -453,12 +453,12 @@ const GridContainer: React.FC = () => {
         ) : (
           <div className="group relative">
             {/* Multi-layer background system for grid map */}
-            <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 rounded-lg" />
+            {/* <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 rounded-lg" />
             <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-800/40 to-slate-900/60 rounded-lg" />
-            <div className="absolute inset-0 bg-gradient-to-b from-amber-600/10 via-amber-500/5 to-transparent rounded-lg" />
+            <div className="absolute inset-0 bg-gradient-to-b from-amber-600/10 via-amber-500/5 to-transparent rounded-lg" /> */}
             
             {/* Interactive purple overlay */}
-            <div className="absolute inset-0 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 ease-in-out bg-gradient-to-b from-violet-600/10 via-violet-700/5 to-transparent" />
+            {/* <div className="absolute inset-0 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 ease-in-out bg-gradient-to-b from-violet-600/10 via-violet-700/5 to-transparent" /> */}
             
             <div className="relative rounded-lg border border-amber-400/20 overflow-hidden p-2">
               {/* Grid coordinates - top (numbers) */}

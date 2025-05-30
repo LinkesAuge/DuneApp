@@ -160,6 +160,45 @@ const GridPage: React.FC = () => {
     }
   }, [poiTypes, initialFilterSetup]);
 
+  // Listen for admin panel changes to refresh POI types
+  useEffect(() => {
+    const handleAdminDataUpdate = () => {
+      console.log('Admin data updated, refreshing POI types...');
+      fetchPoiTypes();
+    };
+
+    // Listen for custom events from admin panel
+    window.addEventListener('adminDataUpdated', handleAdminDataUpdate);
+
+    return () => {
+      window.removeEventListener('adminDataUpdated', handleAdminDataUpdate);
+    };
+  }, []);
+
+  // Load map settings for base categories
+  useEffect(() => {
+    loadMapSettings();
+  }, []);
+
+  const loadMapSettings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('app_settings')
+        .select('setting_value')
+        .eq('setting_key', 'map_settings')
+        .single();
+
+      if (error && error.code !== 'PGRST116') throw error;
+
+      if (data?.setting_value?.baseCategories) {
+        setBaseCategories(data.setting_value.baseCategories);
+      }
+    } catch (error: any) {
+      console.error('Error loading map settings:', error);
+      // Keep default categories if loading fails
+    }
+  };
+
   // Filter POIs based on current filter state - Same logic as Hagga Basin
   const filteredPois = pois.filter(poi => {
     // Search term filter
@@ -1462,7 +1501,7 @@ const GridPage: React.FC = () => {
         />
 
         {/* Center Panel - Interactive Screenshot */}
-        <div className="flex-1 bg-slate-900/30 backdrop-blur-sm flex items-center justify-center relative overflow-hidden">
+        <div className="flex-1 flex items-center justify-center relative overflow-hidden">
           {/* Placement Mode Indicator - Hagga Basin Style */}
           {placementMode && (
             <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-40 pointer-events-none">

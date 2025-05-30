@@ -53,91 +53,94 @@ serve(async (req: Request) => {
   });
 
   try {
-    const { taskType, time, startDate, frequency, backupBeforeReset, timezone } = await req.json();
+    const { taskName, edgeFunction, cronExpression, mapType } = await req.json();
 
     // Validate inputs
-    if (!taskType || !time || !startDate || !frequency || !timezone) {
+    if (!taskName || !edgeFunction || !cronExpression) {
       return new Response(
-        JSON.stringify({ error: "Missing required parameters: taskType, time, startDate, frequency, timezone" }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-      );
-    }
-    if (taskType === 'reset' && typeof backupBeforeReset !== 'boolean') {
-      return new Response(
-        JSON.stringify({ error: "Missing backupBeforeReset for reset task" }),
+        JSON.stringify({ error: "Missing required parameters: taskName, edgeFunction, cronExpression" }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       );
     }
 
-    console.log(`Scheduling task: ${taskType}, Time: ${time}, Start: ${startDate}, Freq: ${frequency}, TZ: ${timezone}`);
-
-    // Use the existing SQL function `convert_to_utc_components`
-    const { data: utcData, error: rpcError } = await supabaseAdmin.rpc('convert_to_utc_components', {
-      local_dt_str: `${startDate} ${time}:00`, // Append seconds for SQL timestamp compatibility
-      tz: timezone,
-    });
-
-    if (rpcError || !utcData || utcData.length === 0) {
-      console.error('Error converting to UTC components:', rpcError);
-      throw new Error('Failed to convert schedule time to UTC components: ' + (rpcError?.message || 'No data returned from RPC'));
+    // Validate edge function
+    const allowedFunctions = ['perform-map-backup', 'perform-map-reset'];
+    if (!allowedFunctions.includes(edgeFunction)) {
+      return new Response(
+        JSON.stringify({ error: `Invalid edge function. Allowed: ${allowedFunctions.join(', ')}` }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      );
     }
 
-    const { utc_hour, utc_minute, utc_day_of_week } = utcData[0];
-    console.log(`Converted UTC components: Hour=${utc_hour}, Minute=${utc_minute}, DayOfWeek=${utc_day_of_week}`);
-
-    let cronExpression = '';
-    if (frequency === 'daily') {
-      cronExpression = `${utc_minute} ${utc_hour} * * *`;
-    } else if (frequency === 'weekly') {
-      cronExpression = `${utc_minute} ${utc_hour} * * ${utc_day_of_week}`;
-    } else {
-      throw new Error('Invalid frequency specified.');
+    // Validate map type if provided
+    if (mapType && !['deep-desert', 'hagga-basin'].includes(mapType)) {
+      return new Response(
+        JSON.stringify({ error: "Invalid mapType. Must be 'deep-desert' or 'hagga-basin'" }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      );
     }
 
-    const jobName = `scheduled_${taskType}_${new Date(startDate).toISOString().split('T')[0]}_${time.replace(':','')}` + (taskType === 'reset' && backupBeforeReset ? '_with_backup' : '');
-    const functionToCall = taskType === 'backup' ? 'perform-map-backup' : (taskType === 'reset' ? 'perform-map-reset' : null);
-
-    if (!functionToCall) {
-      throw new Error('Invalid task type specified for scheduling.');
+    // Prevent reset operations on Hagga Basin
+    if (mapType === 'hagga-basin' && edgeFunction === 'perform-map-reset') {
+      return new Response(
+        JSON.stringify({ error: "Reset operations are not allowed on Hagga Basin" }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      );
     }
 
+    console.log(`Scheduling task: ${taskName}, Function: ${edgeFunction}, Map: ${mapType}, CRON: ${cronExpression}`);
+
+    // Create unique job name
+    const jobName = `scheduled_${edgeFunction}_${Date.now()}`;
+    
+    // Build the HTTP POST command for pg_cron
+    const functionPayload = mapType ? JSON.stringify({ mapType }) : '{}';
     const command = `SELECT net.http_post(
-      url:='${supabaseUrl}/functions/v1/${functionToCall}',
-      headers:='{\"Authorization\": \"Bearer ${supabaseServiceRoleKey}\", \"Content-Type\": \"application/json\"}'::jsonb,
-      body:='${taskType === 'reset' ? `{"backupBeforeReset": ${backupBeforeReset}}` : '{}'}'::jsonb
+      url:='${supabaseUrl}/functions/v1/${edgeFunction}',
+      headers:='{"Authorization": "Bearer ${supabaseServiceRoleKey}", "Content-Type": "application/json"}'::jsonb,
+      body:='${functionPayload}'::jsonb
     );`;
     
-    console.log(`Scheduling job: ${jobName} with CRON: ${cronExpression}`);
-    console.log(`Command: ${command}`);
+    console.log(`Scheduling job: ${jobName} with command: ${command}`);
 
-    // Use the existing SQL function `schedule_cron_job`
+    // Schedule the cron job using the schedule_cron_job RPC function
     const { error: scheduleError, data: scheduleData } = await supabaseAdmin.rpc('schedule_cron_job', {
       job_name: jobName,
       cron_expression: cronExpression,
       command: command,
-    })
+    });
 
     if (scheduleError) {
-      console.error('Error scheduling cron job via SQL function:', scheduleError)
-      throw new Error(`Database error scheduling job: ${scheduleError.message}`)
+      console.error('Error scheduling cron job:', scheduleError);
+      throw new Error(`Database error scheduling job: ${scheduleError.message}`);
     }
 
-    console.log('Cron job scheduled successfully via SQL function:', scheduleData);
+    console.log('Cron job scheduled successfully:', scheduleData);
 
     return new Response(JSON.stringify({ 
-        message: 'Task scheduled successfully', 
-        details: { jobName, cronExpression, scheduledUtcHour: utc_hour, scheduledUtcMinute: utc_minute, scheduledUtcDayOfWeek: utc_day_of_week }
+      success: true,
+      message: 'Task scheduled successfully', 
+      details: { 
+        jobName, 
+        cronExpression, 
+        edgeFunction,
+        mapType: mapType || 'all',
+        taskName 
+      }
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
-    })
+    });
 
   } catch (error: any) {
-    console.error('Error in schedule-admin-task function:', error)
-    return new Response(JSON.stringify({ error: error.message || 'An unexpected error occurred' }), {
+    console.error('Error in schedule-admin-task function:', error);
+    return new Response(JSON.stringify({ 
+      success: false,
+      error: error.message || 'An unexpected error occurred' 
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: error.status || 500, 
-    })
+    });
   }
 });
 

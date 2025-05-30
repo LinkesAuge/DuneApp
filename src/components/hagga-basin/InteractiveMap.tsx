@@ -306,7 +306,7 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
       />
       
       {/* Dark overlay for better contrast */}
-      <div className="absolute inset-0 bg-slate-950/70" />
+      {/* <div className="absolute inset-0 bg-slate-950/70" /> */}
 
       {/* Interactive Map Container */}
       <TransformWrapper

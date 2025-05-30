@@ -44,7 +44,7 @@ const POIPanel: React.FC<POIPanelProps> = ({
   const titleClass = mode === 'grid' ? 'text-yellow-300' : 'text-yellow-300';
 
   return (
-    <div className={`${showPanel ? 'w-[450px]' : 'w-12'} bg-slate-900/95 backdrop-blur-sm border-l border-slate-700/50 flex flex-col transition-all duration-200 ${className}`}>
+    <div className={`${showPanel ? 'w-[450px]' : 'w-12'} bg-slate-900 backdrop-blur-sm border-l border-slate-700/50 flex flex-col transition-all duration-200 ${className}`}>
       <div className="p-4 border-b border-slate-700/50 flex items-center justify-between">
         <button
           onClick={onTogglePanel}

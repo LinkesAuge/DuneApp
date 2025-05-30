@@ -60,8 +60,8 @@ const Dashboard: React.FC = () => {
         }}
       />
       
-      {/* Content with backdrop blur for readability */}
-      <div className="relative z-10 backdrop-blur-sm bg-slate-950/20">
+      {/* Content with clean background - no overlays */}
+      <div className="relative z-10">
         <div className="container mx-auto px-6 py-8">
           {/* Header */}
           <div className="mb-8">

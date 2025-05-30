@@ -93,7 +93,7 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ limit = 20 }) => {
           id,
           content,
           created_at,
-          author_id,
+          created_by,
           poi_id
         `)
         .order('created_at', { ascending: false })
@@ -104,11 +104,11 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ limit = 20 }) => {
         for (const comment of recentComments) {
           // Get author username
           let author = null;
-          if (comment.author_id) {
+          if (comment.created_by) {
             const { data } = await supabase
               .from('profiles')
               .select('username')
-              .eq('id', comment.author_id)
+              .eq('id', comment.created_by)
               .single();
             author = data;
           }
@@ -150,12 +150,12 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ limit = 20 }) => {
         .select(`
           id,
           coordinate,
-          created_at,
-          uploader_id,
+          upload_date,
+          uploaded_by,
           screenshot_url
         `)
         .not('screenshot_url', 'is', null)
-        .order('created_at', { ascending: false })
+        .order('upload_date', { ascending: false })
         .limit(Math.ceil(limit / 4));
 
       let screenshotsWithDetails = [];
@@ -163,11 +163,11 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ limit = 20 }) => {
         for (const screenshot of recentScreenshots) {
           // Get uploader username
           let uploader = null;
-          if (screenshot.uploader_id) {
+          if (screenshot.uploaded_by) {
             const { data } = await supabase
               .from('profiles')
               .select('username')
-              .eq('id', screenshot.uploader_id)
+              .eq('id', screenshot.uploaded_by)
               .single();
             uploader = data;
           }
@@ -185,7 +185,7 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ limit = 20 }) => {
             type: 'screenshot_uploaded',
             title: `Screenshot uploaded for ${screenshot.coordinate}`,
             description: `Uploaded by ${screenshot.uploader?.username || 'Anonymous'}`,
-            timestamp: screenshot.created_at,
+            timestamp: screenshot.upload_date,
             icon: 'Camera'
           });
         }

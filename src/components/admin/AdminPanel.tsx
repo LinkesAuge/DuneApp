@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { Shield, AlertCircle, CheckCircle } from 'lucide-react';
+import { Shield, AlertCircle, CheckCircle, Shapes } from 'lucide-react';
 import { useAdminData } from '../../hooks/useAdminData';
 import DatabaseManagement from './DatabaseManagement';
 import UserManagement from './UserManagement';
 import ScheduledTasks from './ScheduledTasks';
-import PoiTypeManager from './PoiTypeManager';
+import PoiDefinitionManager from './PoiTypeManager';
 import MapSettings from './MapSettings';
 import RankManagement from './RankManagement';
 import DiamondIcon from '../common/DiamondIcon';
@@ -46,7 +46,7 @@ const AdminPanel: React.FC = () => {
   const tabs = [
     { id: 'users' as const, label: 'Users', icon: '👥' },
     { id: 'ranks' as const, label: 'Ranks', icon: '🏆' },
-    { id: 'poi-types' as const, label: 'POI Types', icon: '📍' },
+    { id: 'poi-types' as const, label: 'POI Definitions', icon: '📍' },
     { id: 'settings' as const, label: 'Map Settings', icon: '⚙️' },
     { id: 'tasks' as const, label: 'Scheduled Tasks', icon: '⏰' },
     { id: 'database' as const, label: 'Database', icon: '💾' }
@@ -58,7 +58,7 @@ const AdminPanel: React.FC = () => {
         className="min-h-screen bg-cover bg-center bg-no-repeat relative"
         style={{ backgroundImage: 'url(/images/main-bg.jpg)' }}
       >
-        <div className="absolute inset-0 bg-void-950/80 backdrop-blur-sm" />
+        {/* <div className="absolute inset-0 bg-void-950/80 backdrop-blur-sm" /> */}
         <div className="relative z-10 flex items-center justify-center min-h-screen">
           <div className="relative p-12 rounded-lg border border-gold-300/30 backdrop-blur-md"
                style={{ backgroundColor: 'rgba(42, 36, 56, 0.9)' }}>
@@ -88,29 +88,29 @@ const AdminPanel: React.FC = () => {
       className="min-h-screen bg-cover bg-center bg-no-repeat relative"
       style={{ backgroundImage: 'url(/images/main-bg.jpg)' }}
     >
-      <div className="absolute inset-0 bg-void-950/70 backdrop-blur-sm" />
+      {/* <div className="absolute inset-0 bg-void-950/70 backdrop-blur-sm" /> */}
       <div className="relative z-10">
         <div className="max-w-7xl mx-auto px-6 py-8">
           {/* Header Section */}
-          <div className="relative mb-8 p-8 rounded-lg border border-gold-300/30 backdrop-blur-md"
+          <div className="relative mb-8 p-4 rounded-lg border border-gold-300/30 backdrop-blur-md"
                style={{ backgroundColor: 'rgba(42, 36, 56, 0.9)' }}>
-            <div className="flex items-center gap-6">
+            <div className="flex items-center gap-4">
               <DiamondIcon
-                icon={<Shield size={24} strokeWidth={1.5} />}
-                size="xl"
+                icon={<Shield size={20} strokeWidth={1.5} />}
+                size="lg"
                 bgColor="bg-void-950"
                 actualBorderColor="bg-gold-300"
                 borderThickness={2}
                 iconColor="text-gold-300"
               />
               <div>
-                <h1 className="text-4xl font-light tracking-[0.2em] text-gold-300 mb-3"
+                <h1 className="text-2xl font-light text-gold-300 mb-1"
                     style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-                  A D M I N  C O N T R O L  C E N T E R
+                  ADMIN CONTROL CENTER
                 </h1>
-                <p className="text-amber-200/80 text-lg font-light tracking-wide"
+                <p className="text-amber-200/80 text-sm font-light tracking-wide"
                    style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-                  System management for the Dune Awakening Deep Desert Tracker
+                  System management for the Dune Awakening Tracker
                 </p>
               </div>
             </div>
@@ -243,7 +243,7 @@ const AdminPanel: React.FC = () => {
             )}
 
             {activeTab === 'poi-types' && (
-              <PoiTypeManager 
+              <PoiDefinitionManager 
                 poiTypes={poiTypes}
                 onError={handleError}
                 onSuccess={handleSuccess}

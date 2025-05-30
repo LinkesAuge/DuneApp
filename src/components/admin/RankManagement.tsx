@@ -226,10 +226,10 @@ const RankManagement: React.FC<RankManagementProps> = ({ onError, onSuccess }) =
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h3 className="text-2xl font-light tracking-[0.15em] text-gold-300 flex items-center"
+        <h3 className="text-2xl font-light text-gold-300 flex items-center"
             style={{ fontFamily: "'Trebuchet MS', sans-serif" }}>
           <Award className="mr-4 text-amber-200" size={28} />
-          R A N K  M A N A G E M E N T
+          RANK MANAGEMENT
           <span className="ml-4 text-lg text-amber-200/70">({ranks.length} ranks)</span>
         </h3>
         <div className="flex gap-3">
@@ -256,10 +256,10 @@ const RankManagement: React.FC<RankManagementProps> = ({ onError, onSuccess }) =
         <div className="fixed inset-0 bg-void-950/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-void-900/95 border border-gold-300/30 rounded-lg p-6 max-w-md w-full backdrop-blur-sm"
                style={{ backgroundColor: 'rgba(42, 36, 56, 0.95)' }}>
-            <h3 className="text-xl font-light text-gold-300 mb-6 flex items-center tracking-[0.1em]"
+            <h3 className="text-xl font-light text-gold-300 mb-6 flex items-center"
                 style={{ fontFamily: "'Trebuchet MS', sans-serif" }}>
               <Plus className="mr-3 text-amber-200" size={20} />
-              C R E A T E  R A N K
+              CREATE RANK
             </h3>
 
             <div className="space-y-4">
@@ -481,10 +481,10 @@ const RankManagement: React.FC<RankManagementProps> = ({ onError, onSuccess }) =
         <div className="fixed inset-0 bg-void-950/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-void-900/95 border border-gold-300/30 rounded-lg p-6 max-w-md w-full backdrop-blur-sm"
                style={{ backgroundColor: 'rgba(42, 36, 56, 0.95)' }}>
-            <h3 className="text-xl font-light text-gold-300 mb-6 flex items-center tracking-[0.1em]"
+            <h3 className="text-xl font-light text-gold-300 mb-6 flex items-center"
                 style={{ fontFamily: "'Trebuchet MS', sans-serif" }}>
               <Pencil className="mr-3 text-amber-200" size={20} />
-              E D I T  R A N K
+              EDIT RANK
             </h3>
 
             <div className="space-y-4">

@@ -228,10 +228,10 @@ const DatabaseManagement: React.FC<DatabaseManagementProps> = ({
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h3 className="text-2xl font-light tracking-[0.15em] text-gold-300 flex items-center"
+        <h3 className="text-2xl font-light text-gold-300 flex items-center"
             style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
           <Database className="mr-4 text-amber-200" size={28} />
-          D A T A B A S E  M A N A G E M E N T
+          Database Management
         </h3>
         <button
           onClick={onRefreshBackups}
@@ -260,10 +260,10 @@ const DatabaseManagement: React.FC<DatabaseManagementProps> = ({
            style={{ backgroundColor: 'rgba(42, 36, 56, 0.6)' }}>
         <div className="p-4 border-b border-gold-300/20"
              style={{ backgroundColor: 'rgba(42, 36, 56, 0.8)' }}>
-          <h4 className="text-lg font-light text-gold-300 tracking-[0.1em] flex items-center"
+          <h4 className="text-lg font-light text-gold-300 flex items-center"
               style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
             <Archive className="mr-3 text-amber-200" size={20} />
-            B A C K U P  &  R E S T O R E
+            Backup & Restore
           </h4>
         </div>
 
@@ -392,10 +392,10 @@ const DatabaseManagement: React.FC<DatabaseManagementProps> = ({
            style={{ backgroundColor: 'rgba(42, 36, 56, 0.6)' }}>
         <div className="p-4 border-b border-gold-300/20"
              style={{ backgroundColor: 'rgba(42, 36, 56, 0.8)' }}>
-          <h4 className="text-lg font-light text-gold-300 tracking-[0.1em] flex items-center"
+          <h4 className="text-lg font-light text-gold-300 flex items-center"
               style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
             <Archive className="mr-3 text-amber-200" size={20} />
-            S T O R E D  B A C K U P S
+            Stored Backups
           </h4>
         </div>
 
@@ -472,10 +472,10 @@ const DatabaseManagement: React.FC<DatabaseManagementProps> = ({
            style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)' }}>
         <div className="p-4 border-b border-red-400/30"
              style={{ backgroundColor: 'rgba(239, 68, 68, 0.2)' }}>
-          <h4 className="text-lg font-light text-red-300 tracking-[0.1em] flex items-center"
+          <h4 className="text-lg font-light text-red-300 flex items-center"
               style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
             <AlertTriangle className="mr-3 text-red-400" size={20} />
-            D A N G E R  Z O N E
+            Danger Zone
           </h4>
         </div>
 

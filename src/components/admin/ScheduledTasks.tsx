@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Clock, Calendar, Trash2, RefreshCw, Plus, Hexagon } from 'lucide-react';
 import { ScheduledAdminTask } from '../../types/admin';
@@ -38,6 +38,7 @@ const ScheduledTasks: React.FC<ScheduledTasksProps> = ({
   // Form state
   const [taskName, setTaskName] = useState('');
   const [edgeFunction, setEdgeFunction] = useState('');
+  const [selectedMap, setSelectedMap] = useState<'deep-desert' | 'hagga-basin'>('deep-desert');
   const [scheduleType, setScheduleType] = useState<ScheduleType>('daily');
   const [minutesInterval, setMinutesInterval] = useState(30);
   const [dailyTime, setDailyTime] = useState('02:00');
@@ -47,10 +48,32 @@ const ScheduledTasks: React.FC<ScheduledTasksProps> = ({
   const [monthlyTime, setMonthlyTime] = useState('02:00');
   const [customCron, setCustomCron] = useState('0 2 * * *');
 
-  const availableFunctions = [
-    { value: 'perform-map-backup', label: 'Map Backup' },
-    { value: 'perform-map-reset', label: 'Map Reset' },
-  ];
+  // Reset function selection when map changes to prevent invalid combinations
+  useEffect(() => {
+    setEdgeFunction('');
+  }, [selectedMap]);
+
+  // Map-specific available functions
+  const getAvailableFunctions = () => {
+    const functions = [
+      { value: 'perform-map-backup', label: 'Map Backup' }
+    ];
+    
+    // Only allow reset for Deep Desert, not Hagga Basin
+    if (selectedMap === 'deep-desert') {
+      functions.push({ value: 'perform-map-reset', label: 'Map Reset' });
+    }
+    
+    return functions;
+  };
+
+  const getMapDisplayName = (map: string) => {
+    switch (map) {
+      case 'deep-desert': return 'Deep Desert';
+      case 'hagga-basin': return 'Hagga Basin';
+      default: return map;
+    }
+  };
 
   const generateCronExpression = (): string => {
     switch (scheduleType) {
@@ -134,16 +157,17 @@ const ScheduledTasks: React.FC<ScheduledTasksProps> = ({
       
       const { data, error } = await supabase.functions.invoke('schedule-admin-task', {
         body: {
-          taskName: taskName.trim(),
+          taskName: `${taskName.trim()} (${getMapDisplayName(selectedMap)})`,
           edgeFunction: edgeFunction.trim(),
-          cronExpression
+          cronExpression,
+          mapType: selectedMap
         }
       });
 
       if (error) throw error;
 
       if (data?.success) {
-        onSuccess(`Task "${taskName}" scheduled successfully`);
+        onSuccess(`Task "${taskName}" scheduled successfully for ${getMapDisplayName(selectedMap)}`);
         resetForm();
         onRefreshTasks();
       } else {
@@ -185,6 +209,7 @@ const ScheduledTasks: React.FC<ScheduledTasksProps> = ({
   const resetForm = () => {
     setTaskName('');
     setEdgeFunction('');
+    setSelectedMap('deep-desert');
     setScheduleType('daily');
     setMinutesInterval(30);
     setDailyTime('02:00');
@@ -218,10 +243,10 @@ const ScheduledTasks: React.FC<ScheduledTasksProps> = ({
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h3 className="text-2xl font-light tracking-[0.15em] text-gold-300 flex items-center"
+        <h3 className="text-2xl font-light text-gold-300 flex items-center"
             style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
           <Clock className="mr-4 text-amber-200" size={28} />
-          S C H E D U L E D  T A S K S
+          Scheduled Tasks
           <span className="ml-4 text-lg text-amber-200/70">({scheduledTasks.length} active)</span>
         </h3>
         {!isAddingTask && (
@@ -252,13 +277,46 @@ const ScheduledTasks: React.FC<ScheduledTasksProps> = ({
       {isAddingTask && (
         <div className="relative p-6 rounded-lg border border-gold-300/40 backdrop-blur-md"
              style={{ backgroundColor: 'rgba(42, 36, 56, 0.8)' }}>
-          <h4 className="text-lg font-light text-gold-300 mb-6 flex items-center tracking-[0.1em]"
+          <h4 className="text-lg font-light text-gold-300 mb-6 flex items-center"
               style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
             <Hexagon className="mr-3 text-amber-200" size={20} />
-            C R E A T E  S C H E D U L E D  T A S K
+            Create Scheduled Task
           </h4>
 
           <div className="space-y-6">
+            {/* Map Selection */}
+            <div>
+              <label className="block text-sm font-medium text-gold-300 mb-3 tracking-wide"
+                     style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                Target Map *
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { value: 'deep-desert', label: 'Deep Desert' },
+                  { value: 'hagga-basin', label: 'Hagga Basin' }
+                ].map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setSelectedMap(option.value as 'deep-desert' | 'hagga-basin')}
+                    className={`p-3 rounded-lg border transition-all duration-300 ${
+                      selectedMap === option.value
+                        ? 'bg-gold-300/20 border-gold-300/60 text-gold-300'
+                        : 'bg-void-950/40 border-gold-300/20 text-amber-200/70 hover:border-gold-300/40 hover:text-amber-200'
+                    }`}
+                    style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+              {selectedMap === 'hagga-basin' && (
+                <p className="text-amber-300/70 text-xs mt-2 italic">
+                  Note: Only backup functions are available for Hagga Basin
+                </p>
+              )}
+            </div>
+
             {/* Basic Info */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
@@ -294,7 +352,7 @@ const ScheduledTasks: React.FC<ScheduledTasksProps> = ({
                   style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
                 >
                   <option value="">Select a function...</option>
-                  {availableFunctions.map((func) => (
+                  {getAvailableFunctions().map((func) => (
                     <option key={func.value} value={func.value}>
                       {func.label}
                     </option>
@@ -535,10 +593,10 @@ const ScheduledTasks: React.FC<ScheduledTasksProps> = ({
         <div className="p-4 border-b border-gold-300/20"
              style={{ backgroundColor: 'rgba(42, 36, 56, 0.8)' }}>
           <div className="flex items-center justify-between">
-            <h4 className="text-lg font-light text-gold-300 tracking-[0.1em] flex items-center"
+            <h4 className="text-lg font-light text-gold-300 flex items-center"
                 style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
               <Calendar className="mr-3 text-amber-200" size={20} />
-              A C T I V E  T A S K S
+              ACTIVE TASKS
             </h4>
             <button
               onClick={onRefreshTasks}

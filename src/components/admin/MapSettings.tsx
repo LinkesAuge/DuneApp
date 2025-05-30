@@ -19,7 +19,7 @@ const MapSettings: React.FC<MapSettingsProps> = ({ onError, onSuccess }) => {
   const [mapSettings, setMapSettings] = useState<MapSettings>({
     showMapGrid: true,
     enableMapInteractions: true,
-    iconScaling: 1.0
+    iconScaling: 1.0,
   });
   
   const [isLoading, setIsLoading] = useState(true);
@@ -93,7 +93,7 @@ const MapSettings: React.FC<MapSettingsProps> = ({ onError, onSuccess }) => {
     setMapSettings({
       showMapGrid: true,
       enableMapInteractions: true,
-      iconScaling: 1.0
+      iconScaling: 1.0,
     });
   };
 
@@ -241,9 +241,9 @@ const MapSettings: React.FC<MapSettingsProps> = ({ onError, onSuccess }) => {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h3 className="text-2xl font-light tracking-[0.15em] text-gold-300 flex items-center" style={{ fontFamily: "'Trebuchet MS', sans-serif" }}>
+        <h3 className="text-2xl font-light text-gold-300 flex items-center" style={{ fontFamily: "'Trebuchet MS', sans-serif" }}>
           <Map className="mr-4 text-amber-200" size={28} />
-          M A P  S E T T I N G S
+          MAP SETTINGS
         </h3>
         <div className="flex items-center space-x-3">
           <button
@@ -275,9 +275,9 @@ const MapSettings: React.FC<MapSettingsProps> = ({ onError, onSuccess }) => {
       {/* General Settings */}
       <div className="rounded-lg border border-gold-300/30 backdrop-blur-md bg-void-950/60">
         <div className="p-4 border-b border-gold-300/20 bg-void-950/80">
-          <h4 className="text-lg font-light text-gold-300 tracking-[0.1em] flex items-center" style={{ fontFamily: "'Trebuchet MS', sans-serif" }}>
+          <h4 className="text-lg font-light text-gold-300 flex items-center" style={{ fontFamily: "'Trebuchet MS', sans-serif" }}>
             <Settings className="mr-3 text-amber-200" size={20} />
-            G E N E R A L  S E T T I N G S
+            GENERAL SETTINGS
           </h4>
         </div>
 
@@ -354,9 +354,9 @@ const MapSettings: React.FC<MapSettingsProps> = ({ onError, onSuccess }) => {
       {/* Base Map Upload */}
       <div className="rounded-lg border border-gold-300/30 backdrop-blur-md bg-void-950/60">
         <div className="p-4 border-b border-gold-300/20 bg-void-950/80">
-          <h4 className="text-lg font-light text-gold-300 tracking-[0.1em] flex items-center" style={{ fontFamily: "'Trebuchet MS', sans-serif" }}>
+          <h4 className="text-lg font-light text-gold-300 flex items-center" style={{ fontFamily: "'Trebuchet MS', sans-serif" }}>
             <Upload className="mr-3 text-amber-200" size={20} />
-            B A S E  M A P  U P L O A D
+            BASE MAP UPLOAD
           </h4>
         </div>
 

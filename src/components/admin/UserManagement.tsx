@@ -22,20 +22,11 @@ const UserManagement: React.FC<UserManagementProps> = ({
   onError,
   onSuccess
 }) => {
-  const [editingUser, setEditingUser] = useState<Profile | null>(null);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [isDeletingUser, setIsDeletingUser] = useState<string | null>(null);
-  const [editUserData, setEditUserData] = useState({
-    username: '',
-    email: '',
-    role: 'member' as UserRole,
-    rankId: '' as string
-  });
-
-  // Rank management state
+  // State
+  const [enhancedProfiles, setEnhancedProfiles] = useState<EnhancedProfile[]>([]);
   const [ranks, setRanks] = useState<Rank[]>([]);
   const [isLoadingRanks, setIsLoadingRanks] = useState(true);
-  const [enhancedProfiles, setEnhancedProfiles] = useState<(Profile & { rank?: Rank | null })[]>([]);
+  const [isDeletingUser, setIsDeletingUser] = useState<string | null>(null);
 
   // Fetch ranks on component mount
   useEffect(() => {
@@ -162,90 +153,32 @@ const UserManagement: React.FC<UserManagementProps> = ({
     }
   };
 
-  const handleOpenEditModal = (profile: Profile & { rank?: Rank | null }) => {
-    setEditingUser(profile);
-    setEditUserData({
-      username: profile.username,
-      email: profile.email,
-      role: profile.role,
-      rankId: profile.rank?.id || ''
-    });
-    setIsEditModalOpen(true);
-  };
-
-  const handleCloseEditModal = () => {
-    setIsEditModalOpen(false);
-    setEditingUser(null);
-    setEditUserData({
-      username: '',
-      email: '',
-      role: 'member',
-      rankId: ''
-    });
-  };
-
-  const handleUpdateUser = async () => {
-    if (!editingUser) return;
-
+  // Handle rank assignment
+  const handleRankAssignment = async (userId: string, rankId: string | null) => {
     try {
-      const updateData: any = {
-        userId: editingUser.id,
-        username: editUserData.username,
-        email: editUserData.email,
-        role: editUserData.role
-      };
-
-      // Add rank assignment if a rank is selected
-      if (editUserData.rankId) {
-        updateData.rankId = editUserData.rankId;
-      }
-
-      const { data, error } = await supabase.functions.invoke('update-user', {
-        body: updateData
-      });
+      const { error } = await supabase
+        .from('profiles')
+        .update({ rank_id: rankId })
+        .eq('id', userId);
 
       if (error) throw error;
 
-      if (data?.success) {
-        onRefreshProfiles();
-        handleCloseEditModal();
-        onSuccess('User updated successfully');
-      } else {
-        throw new Error(data?.error || 'Update failed');
-      }
+      // Update local state
+      setEnhancedProfiles(prev => prev.map(profile => 
+        profile.id === userId 
+          ? { ...profile, rank: rankId ? ranks.find(r => r.id === rankId) || null : null }
+          : profile
+      ));
+
+      onSuccess?.(`Rank ${rankId ? 'assigned' : 'removed'} successfully`);
     } catch (error: any) {
-      console.error('Update user error:', error);
-      onError('Failed to update user: ' + (error.message || 'Unknown error'));
-    }
-  };
-
-  // Handle rank assignment from table
-  const handleRankAssignment = async (profileId: string, rankId: string | null) => {
-    try {
-      const { data, error } = await supabase.functions.invoke('update-user', {
-        body: {
-          userId: profileId,
-          rankId: rankId || null
-        }
-      });
-
-      if (error) throw error;
-
-      if (data?.success) {
-        onRefreshProfiles();
-        const rankName = ranks.find(r => r.id === rankId)?.name || 'No rank';
-        onSuccess(`User rank updated to ${rankName}`);
-      } else {
-        throw new Error(data?.error || 'Rank assignment failed');
-      }
-    } catch (error: any) {
-      console.error('Rank assignment error:', error);
-      onError('Failed to assign rank: ' + (error.message || 'Unknown error'));
+      console.error('Error updating rank:', error);
+      onError?.(`Failed to update rank: ${error.message}`);
     }
   };
 
   const formatDate = (dateString: string | null | undefined): string => {
-    console.log('formatDate called with:', dateString, typeof dateString); // Debug log
+
     
     if (!dateString) {
       console.warn('Date string is null or undefined:', dateString);
@@ -278,7 +211,7 @@ const UserManagement: React.FC<UserManagementProps> = ({
         minute: '2-digit'
       }).format(date);
       
-      console.log('Formatted date result:', berlinTime); // Debug log
+  
       return `${berlinTime} (Berlin Time)`;
     } catch (error) {
       console.error('Date formatting error:', error, 'for input:', dateString);
@@ -357,277 +290,190 @@ const UserManagement: React.FC<UserManagementProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h3 className="text-2xl font-light tracking-[0.15em] text-gold-300 flex items-center"
+      {/* Enhanced Header Section */}
+      <div className="flex items-center justify-between mb-6">
+        <h3 className="text-2xl font-light text-gold-300 flex items-center"
             style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
           <Users className="mr-4 text-amber-200" size={28} />
-          U S E R  M A N A G E M E N T
-          <span className="ml-4 text-lg text-amber-200/70">
-            ({enhancedProfiles.length} users)
-            {isLoadingRanks && <span className="ml-2 text-sm text-gold-300/60">Loading ranks...</span>}
-          </span>
+          User Management
+          <span className="ml-4 text-lg text-amber-200/70">({enhancedProfiles.length} users)</span>
         </h3>
         <button
           onClick={onRefreshProfiles}
-          className="text-gold-300 hover:text-amber-200 transition-all duration-300 p-2 rounded-md border border-gold-300/30 hover:border-amber-200/40 hover:bg-amber-200/10"
-          title="Refresh users"
+          disabled={isLoading}
+          className="text-purple-300 hover:text-purple-200 transition-all duration-300 p-3 rounded-md 
+                   border border-purple-300/30 hover:border-purple-200/40 hover:bg-purple-200/10 
+                   flex items-center disabled:opacity-50"
         >
-          <RefreshCw size={18} />
+          <RefreshCw size={18} className={`mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+          <span className="text-sm font-light tracking-wide"
+                style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+            Refresh
+          </span>
         </button>
       </div>
 
-      {/* Users Table */}
-      <div className="relative rounded-lg border border-gold-300/30 backdrop-blur-md overflow-hidden"
-           style={{ backgroundColor: 'rgba(42, 36, 56, 0.6)' }}>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead style={{ backgroundColor: 'rgba(42, 36, 56, 0.8)' }}>
-              <tr className="border-b border-gold-300/20">
-                <th className="px-6 py-4 text-left text-sm font-light text-gold-300 uppercase tracking-[0.1em]"
-                    style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-                  User
-                </th>
-                <th className="px-6 py-4 text-left text-sm font-light text-gold-300 uppercase tracking-[0.1em]"
-                    style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-                  Role
-                </th>
-                <th className="px-6 py-4 text-left text-sm font-light text-gold-300 uppercase tracking-[0.1em]"
-                    style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-                  Rank
-                </th>
-                <th className="px-6 py-4 text-left text-sm font-light text-gold-300 uppercase tracking-[0.1em]"
-                    style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-                  Joined
-                </th>
-                <th className="px-6 py-4 text-right text-sm font-light text-gold-300 uppercase tracking-[0.1em]"
-                    style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gold-300/10">
-              {enhancedProfiles.map((profile) => (
-                <tr key={profile.id} className="hover:bg-gold-300/5 transition-colors duration-300">
-                  <td className="px-6 py-5 whitespace-nowrap">
-                    <div className="flex items-center gap-3">
-                      <UserAvatar 
-                        user={{ 
-                          custom_avatar_url: profile.custom_avatar_url, 
-                          discord_avatar_url: profile.discord_avatar_url,
-                          use_discord_avatar: profile.use_discord_avatar
-                        }} 
-                        size="sm" 
-                      />
-                      <div>
-                        <div className="text-sm font-light text-amber-200"
-                             style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-                          {profile.username}
+      {error && (
+        <div className="relative p-4 rounded-lg border border-red-400/40 backdrop-blur-md"
+             style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)' }}>
+          <div className="flex items-center gap-3">
+            <AlertCircle size={20} className="text-red-400" />
+            <span className="text-red-300 font-light tracking-wide"
+                  style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+              {error}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {isLoading ? (
+        <div className="text-center py-12">
+          <div className="inline-block p-4 rounded-full border border-gold-300/50 mb-6"
+               style={{ backgroundColor: 'rgba(42, 36, 56, 0.8)' }}>
+            <Users className="text-gold-300" size={24} />
+          </div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gold-300 mx-auto mb-4"></div>
+          <p className="text-gold-300 font-light tracking-wide"
+             style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+            Loading user data...
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {enhancedProfiles.map((profile) => (
+            <div key={profile.id} className="group relative">
+              <div className="relative p-4 rounded-lg border border-gold-300/20 bg-void-950/40 hover:bg-gold-300/5 transition-all duration-300">
+                {/* Purple hover overlay */}
+                <div 
+                  className="absolute inset-0 rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none"
+                  style={{
+                    background: 'radial-gradient(ellipse at center top, rgba(139, 92, 246, 0.15) 0%, rgba(124, 58, 237, 0.08) 40%, transparent 70%)'
+                  }}
+                />
+                
+                <div className="relative z-10">
+                  <div className="flex items-center justify-between">
+                    {/* Left side - User info in inline layout */}
+                    <div className="flex items-center space-x-4 flex-1">
+                      <UserAvatar profile={profile} size="md" />
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-4 mb-2">
+                          <h4 className="text-lg font-medium text-amber-200 tracking-wide"
+                              style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                            {profile.username}
+                          </h4>
+                          <span className="text-amber-200/70 text-sm"
+                                style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                            {profile.email}
+                          </span>
+                          <span className="text-amber-200/50 text-xs"
+                                style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                            Joined {new Date(profile.created_at).toLocaleDateString()}
+                          </span>
                         </div>
-                        <div className="text-sm text-amber-200/60 font-light">
-                          {profile.email}
+                        
+                        {/* Role and Rank badges inline */}
+                        <div className="flex items-center space-x-3">
+                          <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium tracking-wide border ${
+                            profile.role === 'admin' 
+                              ? 'border-red-400/30 bg-red-400/10 text-red-300' 
+                              : profile.role === 'moderator'
+                              ? 'border-yellow-400/30 bg-yellow-400/10 text-yellow-300'
+                              : 'border-blue-400/30 bg-blue-400/10 text-blue-300'
+                          }`}
+                                style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                            <Shield size={12} className="mr-1" />
+                            {profile.role.toUpperCase()}
+                          </span>
+                          
+                          {profile.rank && (
+                            <div className="flex items-center space-x-2 px-3 py-1 rounded-full border border-purple-300/30 bg-purple-300/10">
+                              <Award size={12} className="text-purple-300" />
+                              <span className="text-xs font-light text-purple-200 tracking-wide"
+                                    style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                                {profile.rank.name}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
-                  </td>
-                  <td className="px-6 py-5 whitespace-nowrap">
-                    <select
-                      value={profile.role}
-                      onChange={(e) => handleRoleChange(profile.id, e.target.value as UserRole)}
-                      className={`text-xs rounded-full px-3 py-1 font-medium ${getRoleBadgeColor(profile.role)} 
-                                bg-transparent focus:ring-2 focus:ring-gold-300/50 focus:outline-none cursor-pointer
-                                transition-all duration-300 hover:bg-opacity-80`}
-                      style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
-                    >
-                      <option value="member">Member</option>
-                      <option value="editor">Editor</option>
-                      <option value="admin">Admin</option>
-                    </select>
-                  </td>
-                  <td className="px-6 py-5 whitespace-nowrap text-sm text-amber-200/70 font-light"
-                      style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-                    <div className="flex items-center space-x-2">
-                      <RankBadge rank={profile.rank} />
-                      <select
-                        value={profile.rank?.id || ''}
-                        onChange={(e) => handleRankAssignment(profile.id, e.target.value || null)}
-                        className="ml-2 text-xs bg-void-950/60 border border-gold-300/30 rounded px-2 py-1 
-                                 text-amber-200 focus:ring-2 focus:ring-gold-300/50 focus:outline-none cursor-pointer
-                                 transition-all duration-300 hover:bg-void-900/60"
-                        style={{ fontFamily: "'Trebuchet MS', sans-serif" }}
-                        title="Quick rank assignment"
-                      >
-                        <option value="">No rank</option>
-                        {ranks.map((rank) => (
-                          <option key={rank.id} value={rank.id}>{rank.name}</option>
-                        ))}
-                      </select>
+
+                    {/* Right side - Controls */}
+                    <div className="flex items-center space-x-3">
+                      {/* Role Dropdown */}
+                      <div className="flex flex-col space-y-1">
+                        <label className="text-xs text-gold-300/70 font-light">Role</label>
+                        <select
+                          value={profile.role}
+                          onChange={(e) => handleRoleChange(profile.id, e.target.value as UserRole)}
+                          className="px-3 py-2 bg-void-950/60 border border-gold-300/30 rounded text-amber-200 
+                                   focus:outline-none focus:ring-2 focus:ring-gold-300/50 focus:border-gold-300/60
+                                   transition-all duration-300 text-sm min-w-[100px]"
+                          style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
+                        >
+                          <option value="member" className="bg-void-950 text-amber-200">Member</option>
+                          <option value="moderator" className="bg-void-950 text-amber-200">Moderator</option>
+                          <option value="admin" className="bg-void-950 text-amber-200">Admin</option>
+                        </select>
+                      </div>
+
+                      {/* Rank Dropdown */}
+                      <div className="flex flex-col space-y-1">
+                        <label className="text-xs text-gold-300/70 font-light">Rank</label>
+                        <select
+                          value={profile.rank?.id || ''}
+                          onChange={(e) => handleRankAssignment(profile.id, e.target.value || null)}
+                          className="px-3 py-2 bg-void-950/60 border border-gold-300/30 rounded text-amber-200 
+                                   focus:outline-none focus:ring-2 focus:ring-gold-300/50 focus:border-gold-300/60
+                                   transition-all duration-300 text-sm min-w-[120px]"
+                          style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
+                        >
+                          <option value="" className="bg-void-950 text-amber-200">No rank</option>
+                          {ranks.map(rank => (
+                            <option key={rank.id} value={rank.id} className="bg-void-950 text-amber-200">
+                              {rank.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Delete Button */}
+                      <div className="flex flex-col justify-end">
+                        <button
+                          onClick={() => handleDeleteUser(profile.id, profile.username)}
+                          disabled={isDeletingUser === profile.id}
+                          className="p-2 text-red-400 hover:text-red-300 transition-colors duration-300 rounded
+                                   disabled:opacity-50 disabled:cursor-not-allowed"
+                          title="Delete user"
+                        >
+                          {isDeletingUser === profile.id ? (
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-400"></div>
+                          ) : (
+                            <Trash2 size={16} />
+                          )}
+                        </button>
+                      </div>
                     </div>
-                  </td>
-                  <td className="px-6 py-5 whitespace-nowrap text-sm text-amber-200/70 font-light"
-                      style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-                    {formatDate(profile.created_at)}
-                  </td>
-                  <td className="px-6 py-5 whitespace-nowrap text-right text-sm font-medium">
-                    <div className="flex items-center justify-end space-x-3">
-                      <button
-                        onClick={() => handleOpenEditModal(profile)}
-                        className="text-amber-200 hover:text-gold-300 transition-all duration-300 p-2 rounded-md border border-amber-200/30 hover:border-gold-300/40 hover:bg-gold-300/10"
-                        title="Edit user"
-                      >
-                        <Pencil size={16} />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteUser(profile.id, profile.username)}
-                        disabled={isDeletingUser === profile.id}
-                        className="text-red-400 hover:text-red-300 transition-all duration-300 p-2 rounded-md border border-red-400/30 hover:border-red-300/40 hover:bg-red-300/10 disabled:opacity-50 disabled:cursor-not-allowed"
-                        title="Delete user"
-                      >
-                        {isDeletingUser === profile.id ? (
-                          <RefreshCw size={16} className="animate-spin" />
-                        ) : (
-                          <Trash2 size={16} />
-                        )}
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
+      )}
 
-        {enhancedProfiles.length === 0 && (
-          <div className="text-center py-12">
-            <div className="inline-block p-4 rounded-full border border-amber-200/50 mb-4"
-                 style={{ backgroundColor: 'rgba(42, 36, 56, 0.8)' }}>
-              <Users className="text-amber-200" size={24} />
-            </div>
-            <p className="text-amber-200/70 font-light tracking-wide"
-               style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-              No users found
-            </p>
+      {/* Empty State */}
+      {enhancedProfiles.length === 0 && !isLoading && (
+        <div className="text-center py-12">
+          <div className="inline-block p-4 rounded-full border border-amber-200/50 mb-4"
+               style={{ backgroundColor: 'rgba(42, 36, 56, 0.8)' }}>
+            <Users className="text-amber-200" size={24} />
           </div>
-        )}
-      </div>
-
-      {/* Enhanced Edit User Modal */}
-      {isEditModalOpen && editingUser && (
-        <div className="fixed inset-0 bg-void-950/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="relative max-w-md w-full p-8 rounded-lg border border-gold-300/30 backdrop-blur-md"
-               style={{ backgroundColor: 'rgba(42, 36, 56, 0.95)' }}>
-            <h3 className="text-xl font-light text-gold-300 mb-6 flex items-center tracking-[0.1em]"
-                style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-              <Pencil className="mr-3 text-amber-200" size={20} />
-              E D I T  U S E R
-            </h3>
-            <p className="text-amber-200/70 text-sm mb-6 font-light"
-               style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-              Editing: {editingUser.username}
-            </p>
-
-            <div className="space-y-6">
-              {/* Username */}
-              <div>
-                <label className="block text-sm font-medium text-gold-300 mb-2 tracking-wide"
-                       style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-                  Username
-                </label>
-                <input
-                  type="text"
-                  value={editUserData.username}
-                  onChange={(e) => setEditUserData(prev => ({ ...prev, username: e.target.value }))}
-                  className="w-full px-4 py-3 bg-void-950/60 border border-gold-300/30 rounded-md 
-                           text-amber-200 placeholder-amber-200/40 backdrop-blur-sm
-                           focus:outline-none focus:ring-2 focus:ring-gold-300/50 focus:border-gold-300/60
-                           transition-all duration-300"
-                  style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
-                />
-              </div>
-
-              {/* Email */}
-              <div>
-                <label className="block text-sm font-medium text-gold-300 mb-2 tracking-wide"
-                       style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-                  Email
-                </label>
-                <input
-                  type="email"
-                  value={editUserData.email}
-                  onChange={(e) => setEditUserData(prev => ({ ...prev, email: e.target.value }))}
-                  className="w-full px-4 py-3 bg-void-950/60 border border-gold-300/30 rounded-md 
-                           text-amber-200 placeholder-amber-200/40 backdrop-blur-sm
-                           focus:outline-none focus:ring-2 focus:ring-gold-300/50 focus:border-gold-300/60
-                           transition-all duration-300"
-                  style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
-                />
-              </div>
-
-              {/* Role */}
-              <div>
-                <label className="block text-sm font-medium text-gold-300 mb-2 tracking-wide"
-                       style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-                  Role
-                </label>
-                <select
-                  value={editUserData.role}
-                  onChange={(e) => setEditUserData(prev => ({ ...prev, role: e.target.value as UserRole }))}
-                  className="w-full px-4 py-3 bg-void-950/60 border border-gold-300/30 rounded-md 
-                           text-amber-200 backdrop-blur-sm
-                           focus:outline-none focus:ring-2 focus:ring-gold-300/50 focus:border-gold-300/60
-                           transition-all duration-300"
-                  style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
-                >
-                  <option value="member">Member</option>
-                  <option value="editor">Editor</option>
-                  <option value="admin">Admin</option>
-                </select>
-              </div>
-
-              {/* Rank */}
-              <div>
-                <label className="block text-sm font-medium text-gold-300 mb-2 tracking-wide"
-                       style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-                  Rank
-                </label>
-                <select
-                  value={editUserData.rankId}
-                  onChange={(e) => setEditUserData(prev => ({ ...prev, rankId: e.target.value }))}
-                  className="w-full px-4 py-3 bg-void-950/60 border border-gold-300/30 rounded-md 
-                           text-amber-200 backdrop-blur-sm
-                           focus:outline-none focus:ring-2 focus:ring-gold-300/50 focus:border-gold-300/60
-                           transition-all duration-300"
-                  style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
-                >
-                  <option value="">Select a rank</option>
-                  {ranks.map((rank) => (
-                    <option key={rank.id} value={rank.id}>{rank.name}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* Modal Actions */}
-            <div className="flex items-center justify-end space-x-4 mt-8 pt-6 border-t border-gold-300/20">
-              <button
-                onClick={handleCloseEditModal}
-                className="px-6 py-3 text-amber-200/70 hover:text-amber-200 transition-all duration-300 
-                         border border-amber-200/30 hover:border-amber-200/50 rounded-md font-light tracking-wide
-                         hover:bg-amber-200/5"
-                style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleUpdateUser}
-                className="px-6 py-3 bg-gold-300/90 hover:bg-gold-300 text-void-950 font-medium rounded-md 
-                         transition-all duration-300 flex items-center tracking-wide"
-                style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
-              >
-                Save Changes
-              </button>
-            </div>
-          </div>
+          <p className="text-amber-200/70 font-light tracking-wide"
+             style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+            No users found in the system.
+          </p>
         </div>
       )}
     </div>

@@ -60,6 +60,9 @@ export interface PoiType {
   default_description: string | null;
   icon_has_transparent_background?: boolean;
   created_by?: string | null; // NULL means system/admin created, user ID means user-created
+  display_in_panel?: boolean; // Whether this category appears in main POI filter panels
+  category_display_order?: number; // Order in which category appears (lower numbers first)
+  category_column_preference?: number; // Which column: 1=left, 2=right
 }
 
 export interface PoiScreenshot {
