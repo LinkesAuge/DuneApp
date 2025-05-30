@@ -637,17 +637,12 @@ const UITestPage: React.FC = () => {
               </>}
               bundleTitle="Contents:"
               bundleItems={["Stellar Cartography Data", "Water Conservation Notes", "Litany Against Fear (Fragment)"]}
-              headerBgColor="bg-transparent"
-              headerInlineStyle={{ backgroundColor: '#1b1d41' }}
-              headerEffectiveBorderColor="bg-gold-500" 
-              bodyBgColor="bg-night-950"
+              bodyBgColor="bg-void-950"
               descriptionBgColor="bg-transparent"
               descriptionInlineStyle={{ backgroundColor: '#1b1d41' }}
               bundleBgColor="bg-transparent"
               bundleInlineStyle={{ backgroundColor: '#1b1d41' }}
               accentColor="text-gold-400"
-              headerTitleColor="text-sand-50"
-              headerSubtitleColor="text-gold-300"
               textColor="text-sand-300"
               bundleTitleColor="text-gold-300"
             />
@@ -662,11 +657,7 @@ const UITestPage: React.FC = () => {
               description={<>
                 <p>Coordinates point to a narrow fissure, possibly leading to an uncharted Fremen Sietch.</p>
               </>}
-              headerBgColor="bg-slate-950" 
-              headerEffectiveBorderColor="bg-gold-400" 
               accentColor="text-gold-400" 
-              headerTitleColor="text-sand-100" 
-              headerSubtitleColor="text-gold-300" 
               bodyBgColor="bg-night-900"
               textColor="text-sand-200"
             />
@@ -683,12 +674,8 @@ const UITestPage: React.FC = () => {
               </>}
               bundleTitle="Estimated Yield:"
               bundleItems={["Approx. 500kg Melange", "Minor Contaminants", "High Fremen Activity"]}
-              headerBgColor="bg-slate-900"
-              headerEffectiveBorderColor="bg-gold-500"
               bodyBgColor="bg-night-800"
               accentColor="text-gold-400"
-              headerTitleColor="text-sand-50"
-              headerSubtitleColor="text-gold-300"
               textColor="text-sand-200"
               bundleTitleColor="text-amber-300"
             />

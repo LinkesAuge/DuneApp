@@ -1,15 +1,15 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { Poi, PoiType, GridSquare, PoiWithGridSquare, MapType, CustomIcon } from '../types';
-import { Search, Compass, LayoutGrid, List, Edit2, Trash2, ArrowDownUp, SortAsc, SortDesc, Image as ImageIconLucide, Share2, Bookmark, MessageSquare, MapPin } from 'lucide-react';
+import { Search, Compass, LayoutGrid, List, Edit2, Trash2, ArrowDownUp, SortAsc, SortDesc, Image as ImageIconLucide, Share2, Bookmark, MessageSquare, MapPin, Tag } from 'lucide-react';
 import GridGallery from '../components/grid/GridGallery';
 import POIEditModal from '../components/hagga-basin/POIEditModal';
-import PoiListItem from '../components/poi/PoiListItem';
-import POIPanel from '../components/common/POIPanel';
-import CommentsList from '../components/comments/CommentsList';
+import POICard from '../components/common/POICard';
+import POIPreviewCard from '../components/common/POIPreviewCard';
 import DiamondIcon from '../components/common/DiamondIcon';
 import { useAuth } from '../components/auth/AuthProvider';
 import { useNavigate } from 'react-router-dom';
+import POIFilters from '../components/filters/POIFilters';
 
 const isPoiTypeIconUrl = (iconValue: string | null | undefined): iconValue is string => 
   typeof iconValue === 'string' && (iconValue.startsWith('http://') || iconValue.startsWith('https://'));
@@ -25,6 +25,7 @@ const PoisPage: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [selectedType, setSelectedType] = useState<string>('');
   const [selectedMapType, setSelectedMapType] = useState<MapType | 'all'>('all');
+  const [selectedPoiId, setSelectedPoiId] = useState<string | null>(null);
   const [selectedPoi, setSelectedPoi] = useState<PoiWithGridSquare | null>(null);
   const [showGallery, setShowGallery] = useState(false);
   const [galleryIndex, setGalleryIndex] = useState(0);
@@ -313,24 +314,13 @@ const PoisPage: React.FC = () => {
   };
 
   const handleCardClick = (poi: PoiWithGridSquare) => {
-    // Navigate to appropriate map page based on POI type
-    if (poi.map_type === 'hagga_basin') {
-      // Navigate to Hagga Basin page with POI parameter
-      navigate(`/hagga-basin?poi=${poi.id}`);
-    } else if (poi.map_type === 'deep_desert' && poi.grid_square?.coordinate) {
-      // Navigate to Deep Desert grid page with POI parameter
-      navigate(`/deep-desert/grid/${poi.grid_square.coordinate}?poi=${poi.id}`);
-    } else {
-      // Fallback: if no proper map type or grid coordinate, show error
-      console.warn('Cannot navigate to POI: missing map type or grid coordinate', poi);
-      alert('Unable to navigate to this POI. Missing location information.');
-    }
+    setSelectedPoiId(poi.id);
   };
 
-  const handleGalleryOpen = (poi: PoiWithGridSquare) => {
+  const handleGalleryOpen = (poi: PoiWithGridSquare, index?: number) => {
     if (poi.screenshots?.length) {
       setSelectedPoi(poi);
-      setGalleryIndex(0);
+      setGalleryIndex(index !== undefined && index < poi.screenshots.length ? index : 0); // Use provided index or default to 0
       setShowGallery(true);
     }
   };
@@ -461,11 +451,11 @@ const PoisPage: React.FC = () => {
 
       {/* Search and Filters Section - now conditionally rendered without its own button wrapper*/}
       {isSearchBarOpen && (
-          <div className="bg-sand-200 rounded-lg shadow-md p-4 border border-sand-300 mb-6">
+          <div className="bg-night-900 p-4 md:p-6 border border-slate-700 mb-6">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
               {/* Search Term */}
               <div className="lg:col-span-1">
-                <label className="label" htmlFor="search">
+                <label className="block text-sm font-medium text-sand-300 mb-1" htmlFor="search">
                   Search Text
                 </label>
                 <div className="relative">
@@ -478,21 +468,21 @@ const PoisPage: React.FC = () => {
                     placeholder="By title or description"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="input pl-10"
+                    className="px-3 py-2 border border-slate-600 focus:outline-none focus:ring-1 focus:ring-amber-400 bg-slate-800 text-sand-100 placeholder-sand-500 w-full pl-10"
                   />
                 </div>
               </div>
 
               {/* Search by Map Type */}
               <div>
-                <label className="label" htmlFor="search-map-type">
+                <label className="block text-sm font-medium text-sand-300 mb-1" htmlFor="search-map-type">
                   Map Region
                 </label>
                 <select
                   id="search-map-type"
                   value={selectedMapType}
                   onChange={(e) => setSelectedMapType(e.target.value as MapType | 'all')}
-                  className="select"
+                  className="px-3 py-2 border border-slate-600 focus:outline-none focus:ring-1 focus:ring-amber-400 bg-slate-800 text-sand-100 placeholder-sand-500 w-full [&>option]:bg-slate-800 [&>option]:text-sand-100"
                 >
                   <option value="all">All Regions</option>
                   <option value="deep_desert">Deep Desert</option>
@@ -502,14 +492,14 @@ const PoisPage: React.FC = () => {
 
               {/* Search by Grid Coordinate */}
               <div>
-                <label className="label" htmlFor="search-grid">
+                <label className="block text-sm font-medium text-sand-300 mb-1" htmlFor="search-grid">
                   Search by Grid
                 </label>
                 <select
                   id="search-grid"
                   value={searchGridCoordinate}
                   onChange={(e) => setSearchGridCoordinate(e.target.value)}
-                  className="select"
+                  className="px-3 py-2 border border-slate-600 focus:outline-none focus:ring-1 focus:ring-amber-400 bg-slate-800 text-sand-100 placeholder-sand-500 w-full [&>option]:bg-slate-800 [&>option]:text-sand-100"
                 >
                   <option value="">All Grids</option>
                   {uniqueGridCoordinates.map(grid => (
@@ -522,7 +512,7 @@ const PoisPage: React.FC = () => {
 
               {/* Search by User */}
               <div>
-                <label className="label" htmlFor="search-user">
+                <label className="block text-sm font-medium text-sand-300 mb-1" htmlFor="search-user">
                   Search by Creator
                 </label>
                 <input
@@ -531,7 +521,7 @@ const PoisPage: React.FC = () => {
                   placeholder="Username"
                   value={searchUser}
                   onChange={(e) => setSearchUser(e.target.value)}
-                  className="input"
+                  className="px-3 py-2 border border-slate-600 focus:outline-none focus:ring-1 focus:ring-amber-400 bg-slate-800 text-sand-100 placeholder-sand-500 w-full"
                 />
               </div>
             </div>
@@ -539,7 +529,7 @@ const PoisPage: React.FC = () => {
             {/* Date Filters */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="label" htmlFor="search-date-start">
+                <label className="block text-sm font-medium text-sand-300 mb-1" htmlFor="search-date-start">
                   Created Date From
                 </label>
                 <input
@@ -547,11 +537,12 @@ const PoisPage: React.FC = () => {
                   type="date"
                   value={searchDateStart}
                   onChange={(e) => setSearchDateStart(e.target.value)}
-                  className="input"
+                  className="px-3 py-2 border border-slate-600 focus:outline-none focus:ring-1 focus:ring-amber-400 bg-slate-800 text-sand-100 placeholder-sand-500 w-full"
+                  style={{ colorScheme: 'dark' }}
                 />
               </div>
               <div>
-                <label className="label" htmlFor="search-date-end">
+                <label className="block text-sm font-medium text-sand-300 mb-1" htmlFor="search-date-end">
                   Created Date To
                 </label>
                 <input
@@ -559,8 +550,9 @@ const PoisPage: React.FC = () => {
                   type="date"
                   value={searchDateEnd}
                   onChange={(e) => setSearchDateEnd(e.target.value)}
-                  className="input"
+                  className="px-3 py-2 border border-slate-600 focus:outline-none focus:ring-1 focus:ring-amber-400 bg-slate-800 text-sand-100 placeholder-sand-500 w-full"
                   min={searchDateStart || undefined} // Prevent end date before start date
+                  style={{ colorScheme: 'dark' }}
                 />
               </div>
             </div>
@@ -569,10 +561,10 @@ const PoisPage: React.FC = () => {
 
       {/* Collapsible Tag Filters Section - now conditionally rendered without its own button wrapper*/}
       {isTagFilterOpen && (
-          <div className="bg-sand-50 p-4 rounded-lg border border-sand-300 shadow-sm mb-6">
+          <div className="bg-night-900 p-4 md:p-6 border border-slate-700 mb-6">
             {/* Map Type Filter Buttons */}
             <div className="mb-4">
-              <h3 className="text-sm font-semibold text-sand-800 mb-2">Filter by Map Region</h3>
+              <h3 className="text-base font-semibold text-gold-300 mb-2">Filter by Map Region</h3>
               <div className="flex flex-wrap gap-2">
                 <button
                   onClick={() => setSelectedMapType('all')}
@@ -597,7 +589,7 @@ const PoisPage: React.FC = () => {
 
             {/* Grid Coordinate Tags */}
             <div className="mb-4">
-              <h3 className="text-sm font-semibold text-sand-800 mb-2">Filter by Grid Tags</h3>
+              <h3 className="text-base font-semibold text-gold-300 mb-2">Filter by Grid Tags</h3>
               <div className="flex flex-wrap gap-2">
                 {uniqueGridCoordinates.map(grid => (
                   <button
@@ -618,7 +610,7 @@ const PoisPage: React.FC = () => {
 
             {/* Category Tags */}
             <div className="mb-4">
-              <h3 className="text-sm font-semibold text-sand-800 mb-2">Filter by Category Tags</h3>
+              <h3 className="text-base font-semibold text-gold-300 mb-2">Filter by Category Tags</h3>
               <div className="flex flex-wrap gap-2">
                 {categories.map(category => (
                   <button
@@ -640,7 +632,7 @@ const PoisPage: React.FC = () => {
 
             {/* POI Type Tags (grouped by category) */}
             <div>
-              <h3 className="text-sm font-semibold text-sand-800 mb-2">Filter by Type Tags</h3>
+              <h3 className="text-base font-semibold text-gold-300 mb-2">Filter by Type Tags</h3>
               {categories.map(category => {
                 const typesInCategory = poiTypes
                   .filter(pt => pt.category === category)
@@ -648,7 +640,7 @@ const PoisPage: React.FC = () => {
                 if (typesInCategory.length === 0) return null;
                 return (
                   <div key={category} className="mb-3">
-                    <h4 className="text-xs font-medium text-sand-600 mb-1">{category}</h4>
+                    <h4 className="text-sm font-medium text-sand-300 mb-1">{category}</h4>
                     <div className="flex flex-wrap gap-2">
                       {typesInCategory.map(type => (
                         <button
@@ -676,7 +668,7 @@ const PoisPage: React.FC = () => {
                 if (uncategorizedTypes.length === 0) return null;
                 return (
                   <div key="uncategorized-types" className="mb-3">
-                    <h4 className="text-xs font-medium text-sand-600 mb-1">Uncategorized</h4>
+                    <h4 className="text-sm font-medium text-sand-300 mb-1">Uncategorized</h4>
                     <div className="flex flex-wrap gap-2">
                       {uncategorizedTypes.map(type => (
                         <button
@@ -698,7 +690,7 @@ const PoisPage: React.FC = () => {
               })()} 
             </div>
             
-            <div className="mt-4 border-t border-sand-300 pt-4">
+            <div className="mt-4 border-t border-slate-700 pt-4">
               <button 
                 onClick={handleClearAllFilters}
                 className="btn btn-danger text-xs w-full md:w-auto"
@@ -723,156 +715,18 @@ const PoisPage: React.FC = () => {
         <div className={`gap-6 ${displayMode === 'grid' ? 'grid md:grid-cols-2 lg:grid-cols-3' : 'flex flex-col'}`}>
           {filteredPois.map(poi => {
             const poiType = getPoiType(poi.poi_type_id);
-            const creatorInfo = userInfo[poi.created_by];
-            const customIcon = customIcons.find(ci => ci.id === poi.custom_icon_id);
+            if (!poiType) return null;
 
-            // Logic to determine imageUrl for POIPanel
-            let panelImageUrl: string | undefined = undefined;
-            if (poi.screenshots && poi.screenshots.length > 0 && poi.screenshots[0].url) {
-              panelImageUrl = poi.screenshots[0].url;
-            } else if (customIcon?.url) {
-              panelImageUrl = customIcon.url;
-            } else if (poiType?.icon_url) {
-              panelImageUrl = poiType.icon_url;
-            }
-            // If panelImageUrl is still undefined, POIPanel will use its placeholder
-
-            // Prepare POI Type Icon for headerIcon prop
-            let poiTypeRenderIcon: React.ReactNode = <MapPin size={18} className="text-slate-400" />;
-            if (poiType?.icon) {
-              if (isPoiTypeIconUrl(poiType.icon)) {
-                poiTypeRenderIcon = <img src={poiType.icon} alt={poiType.name} className="w-5 h-5 object-contain" />;
-              } else {
-                poiTypeRenderIcon = <span className="text-xl">{poiType.icon}</span>;
-              }
-            }
-            const poiTypeHeaderIcon = (
-              <DiamondIcon 
-                icon={poiTypeRenderIcon} 
-                size="sm"
-                bgColor="bg-void-950"
-                actualBorderColor="bg-gold-400"
-                borderThickness={1.5}
-              />
-            );
-
-            const poiTypeForPanelIcon = poiTypes.find(pt => pt.id === poi.poi_type_id);
-            const panelPoiIcon = poiTypeForPanelIcon?.icon ? (
-              isPoiTypeIconUrl(poiTypeForPanelIcon.icon) ?
-                <img src={poiTypeForPanelIcon.icon} alt="" className="w-5 h-5 object-contain" /> :
-                <span className="text-xl">{poiTypeForPanelIcon.icon}</span>
-            ) : <MapPin size={18} className="text-slate-400" />;
-
-            const panelHeaderActions: React.ReactNode[] = [];
-
-            if (poi.screenshots && poi.screenshots.length > 0) {
-              panelHeaderActions.push(
-                <button 
-                  key="gallery"
-                  onClick={(e) => { e.stopPropagation(); handleGalleryOpen(poi); }} 
-                  className="p-1.5 hover:bg-slate-700 rounded-md transition-colors" 
-                  title="Open Gallery"
-                >
-                  <ImageIconLucide size={16} className="text-amber-300" />
-                </button>
-              );
-            }
-
-            // Conditionally add Edit and Delete buttons if user is creator or admin
-            if (user && (poi.created_by === user.id /* || userIsAdmin */)) {
-              panelHeaderActions.push(
-                <button 
-                  key="edit"
-                  onClick={(e) => { e.stopPropagation(); setEditingPoiId(poi.id); }} 
-                  className="p-1.5 hover:bg-slate-700 rounded-md transition-colors"
-                  title="Edit POI"
-                >
-                  <Edit2 size={16} className="text-amber-300" />
-                </button>
-              );
-              panelHeaderActions.push(
-                <button 
-                  key="delete"
-                  onClick={(e) => { e.stopPropagation(); handleDelete(poi.id); }} 
-                  className="p-1.5 hover:bg-slate-700 rounded-md transition-colors"
-                  title="Delete POI"
-                >
-                  <Trash2 size={16} className="text-red-400 hover:text-red-300" />
-                </button>
-              );
-            }
-
-            let metaText = `Created by ${creatorInfo?.username || 'Unknown'} on ${new Date(poi.created_at).toLocaleDateString()}`;
-            if (poi.updated_at && new Date(poi.updated_at).getTime() !== new Date(poi.created_at).getTime()) {
-              metaText += ` (Updated: ${new Date(poi.updated_at).toLocaleDateString()})`;
-            }
-
-            if (displayMode === 'list') {
-              return (
-                <PoiListItem
-                  key={poi.id}
-                  poi={poi}
-                  poiType={poiType}
-                  gridSquareCoordinate={poi.grid_square?.coordinate}
-                  creator={creatorInfo}
-                  onClick={() => handleCardClick(poi)}
-                  onImageClick={() => handleGalleryOpen(poi)}
-                  onEdit={() => setEditingPoiId(poi.id)}
-                  onDelete={() => handleDelete(poi.id)}
-                />
-              );
-            }
-            
-            // POIPanel for grid mode
             return (
-              <div key={poi.id} onClick={() => handleCardClick(poi)} className="cursor-pointer group">
-                <POIPanel
-                  headerIcon={poiTypeHeaderIcon}
-                  headerTitle={poi.title}
-                  imageUrl={panelImageUrl}
-                  imageAlt={poi.title}
-                  onImageClick={() => handleGalleryOpen(poi)}
-                  screenshotCount={poi.screenshots?.length || 0}
-                  description={(
-                    <div className="text-sm">
-                      <p className="line-clamp-3">{poi.description || 'No description available.'}</p>
-                    </div>
-                  )}
-                  bundleTitle="Details"
-                  bundleItems={[
-                    `Category: ${poiType?.category || 'Uncategorized'}`,
-                    `Type: ${poiType?.name || 'Unknown Type'}`,
-                    `Grid: ${poi.grid_square?.coordinate || 'N/A'}`,
-                    `Map: ${poi.map_type === 'deep_desert' ? 'Deep Desert' : 'Hagga Basin'}`
-                  ]}
-                  metaInfoText={metaText}
-                  headerBgColor="bg-slate-900"
-                  headerEffectiveBorderColor="bg-gold-500"
-                  bodyBgColor="bg-night-800"
-                  descriptionBgColor="bg-slate-900"
-                  bundleBgColor="bg-slate-900"
-                  accentColor="text-gold-400"
-                  headerTitleColor="text-gold-300"
-                  textColor="text-sand-200"
-                  bundleTitleColor="text-amber-300"
-                  imagePlaceholderIcon={<ImageIconLucide size={48} className="text-slate-500" />}
-                  actionsBarContent={(
-                    <div className="flex items-center justify-around w-full">
-                      {panelHeaderActions}
-                    </div>
-                  )}
-                  footerContent={(
-                    <div onClick={(e) => e.stopPropagation()}>
-                      <CommentsList 
-                        poiId={poi.id} 
-                        showLikeButton={true}
-                        likeTargetType="poi"
-                        likeTargetId={poi.id}
-                      />
-                    </div>
-                  )}
-                />
-              </div>
+              <POIPreviewCard
+                key={poi.id}
+                poi={poi}
+                poiType={poiType}
+                customIcons={customIcons}
+                userInfo={userInfo}
+                layout={displayMode}
+                onClick={() => setSelectedPoiId(poi.id)}
+              />
             );
           })}
         </div>
@@ -899,6 +753,35 @@ const PoisPage: React.FC = () => {
           }}
         />
       )}
+
+      {/* POI Card Modal */}
+      {selectedPoiId && (() => {
+        const selectedPoi = filteredPois.find(poi => poi.id === selectedPoiId);
+        const selectedPoiType = selectedPoi ? poiTypes.find(type => type.id === selectedPoi.poi_type_id) : null;
+        if (!selectedPoi || !selectedPoiType) return null;
+        
+        return (
+          <POICard
+            poi={selectedPoi}
+            poiType={selectedPoiType}
+            customIcons={customIcons}
+            isOpen={true}
+            onClose={() => setSelectedPoiId(null)}
+            onEdit={() => {
+              setEditingPoiId(selectedPoi.id);
+              setSelectedPoiId(null);
+            }}
+            onDelete={() => {
+              handleDelete(selectedPoi.id);
+              setSelectedPoiId(null);
+            }}
+            onImageClick={() => {
+              handleGalleryOpen(selectedPoi);
+              setSelectedPoiId(null);
+            }}
+          />
+        );
+      })()}
 
       {/* POI Edit Modal */}
       {editingPoiId && (

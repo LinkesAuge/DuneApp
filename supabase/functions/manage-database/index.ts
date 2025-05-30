@@ -1,6 +1,134 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.39.3';
 import { corsHeaders } from '../_shared/cors.ts';
 
+interface StorageFile {
+  path: string;
+  data: string; // base64 encoded
+  contentType: string;
+  originalUrl: string;
+}
+
+interface EnhancedBackupData {
+  timestamp: string;
+  mapType?: string;
+  // Old format support
+  grid_squares?: any[];
+  pois?: any[];
+  // New format support
+  database?: {
+    grid_squares: any[];
+    pois: any[];
+    comments: any[];
+  };
+  files?: {
+    grid_screenshots: StorageFile[];
+    poi_screenshots: StorageFile[];
+    comment_screenshots: StorageFile[];
+    custom_icons: StorageFile[];
+  };
+}
+
+// Upload files from backup to storage
+async function uploadBackupFiles(supabaseAdmin: any, files: {
+  grid_screenshots: StorageFile[];
+  poi_screenshots: StorageFile[];
+  comment_screenshots: StorageFile[];
+  custom_icons: StorageFile[];
+}): Promise<{[originalUrl: string]: string}> {
+  const urlMapping: {[originalUrl: string]: string} = {};
+  
+  console.log('Starting file restoration...');
+  
+  // Helper function to upload a single file
+  const uploadFile = async (file: StorageFile): Promise<void> => {
+    try {
+      // Convert base64 back to blob
+      const binaryString = atob(file.data);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      const blob = new Blob([bytes], { type: file.contentType });
+
+      // Upload to storage
+      const { data, error } = await supabaseAdmin.storage
+        .from('screenshots')
+        .upload(file.path, blob, {
+          contentType: file.contentType,
+          upsert: true // Overwrite if exists
+        });
+
+      if (error) {
+        console.warn(`Failed to upload ${file.path}:`, error);
+        return;
+      }
+
+      // Get new public URL
+      const { data: urlData } = supabaseAdmin.storage
+        .from('screenshots')
+        .getPublicUrl(file.path);
+
+      // Map old URL to new URL
+      urlMapping[file.originalUrl] = urlData.publicUrl;
+      console.log(`Restored file: ${file.path} -> ${urlData.publicUrl}`);
+    } catch (err) {
+      console.warn(`Error uploading file ${file.path}:`, err);
+    }
+  };
+
+  // Upload all file categories
+  const allFiles = [
+    ...files.grid_screenshots,
+    ...files.poi_screenshots,
+    ...files.comment_screenshots,
+    ...files.custom_icons
+  ];
+
+  console.log(`Uploading ${allFiles.length} files...`);
+  
+  // Upload files in batches to avoid overwhelming the system
+  const batchSize = 10;
+  for (let i = 0; i < allFiles.length; i += batchSize) {
+    const batch = allFiles.slice(i, i + batchSize);
+    await Promise.all(batch.map(uploadFile));
+    console.log(`Uploaded batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(allFiles.length/batchSize)}`);
+  }
+
+  console.log(`File restoration complete. ${Object.keys(urlMapping).length} files uploaded successfully.`);
+  return urlMapping;
+}
+
+// Update URLs in database records
+function updateUrlsInData(data: any[], urlMapping: {[originalUrl: string]: string}): any[] {
+  return data.map(record => {
+    const updatedRecord = { ...record };
+    
+    // Update screenshot URLs in grid squares
+    if (updatedRecord.screenshot_url && urlMapping[updatedRecord.screenshot_url]) {
+      updatedRecord.screenshot_url = urlMapping[updatedRecord.screenshot_url];
+    }
+    if (updatedRecord.original_screenshot_url && urlMapping[updatedRecord.original_screenshot_url]) {
+      updatedRecord.original_screenshot_url = urlMapping[updatedRecord.original_screenshot_url];
+    }
+    
+    // Update screenshot URLs in POIs
+    if (updatedRecord.screenshots && Array.isArray(updatedRecord.screenshots)) {
+      updatedRecord.screenshots = updatedRecord.screenshots.map(screenshot => {
+        const updatedScreenshot = { ...screenshot };
+        if (updatedScreenshot.url && urlMapping[updatedScreenshot.url]) {
+          updatedScreenshot.url = urlMapping[updatedScreenshot.url];
+        }
+        if (updatedScreenshot.original_url && urlMapping[updatedScreenshot.original_url]) {
+          updatedScreenshot.original_url = urlMapping[updatedScreenshot.original_url];
+        }
+        return updatedScreenshot;
+      });
+    }
+    
+    return updatedRecord;
+  });
+}
+
 Deno.serve(async (req) => {
   // Handle CORS preflight request
   if (req.method === 'OPTIONS') {
@@ -98,26 +226,76 @@ Deno.serve(async (req) => {
       );
     } 
     else if (operation === 'restore') {
-      if (!backupData || !backupData.grid_squares || !backupData.pois) {
-        throw new Error('Invalid backup data format');
+      const enhancedBackupData: EnhancedBackupData = backupData;
+      
+      // Support both old and new backup formats
+      let gridSquares: any[], pois: any[], comments: any[] = [];
+      
+      if (enhancedBackupData.database) {
+        // New enhanced format
+        gridSquares = enhancedBackupData.database.grid_squares || [];
+        pois = enhancedBackupData.database.pois || [];
+        comments = enhancedBackupData.database.comments || [];
+      } else {
+        // Old format (backward compatibility)
+        gridSquares = enhancedBackupData.grid_squares || [];
+        pois = enhancedBackupData.pois || [];
+      }
+
+      if (!gridSquares && !pois) {
+        throw new Error('Invalid backup data format - no data found');
+      }
+
+      console.log(`Starting restore process. Database records: ${gridSquares.length} grid squares, ${pois.length} POIs, ${comments.length} comments`);
+
+      // Restore files first if they exist
+      let urlMapping: {[originalUrl: string]: string} = {};
+      if (enhancedBackupData.files) {
+        console.log('Restoring storage files...');
+        urlMapping = await uploadBackupFiles(supabaseAdmin, enhancedBackupData.files);
+        console.log(`File restoration complete. ${Object.keys(urlMapping).length} URL mappings created.`);
       }
 
       // Delete existing data first
+      console.log('Clearing existing data...');
+
+      // Delete comments first (due to foreign key constraints)
+      const { error: commentsDeleteError } = await supabaseAdmin
+        .from('comments')
+        .delete()
+        .not('id', 'is', null);
+
+      if (commentsDeleteError) {
+        console.error('Failed to delete comments:', commentsDeleteError);
+        throw commentsDeleteError;
+      }
+
+      // Delete POIs (due to foreign key constraints)
       const { error: poisDeleteError } = await supabaseAdmin
         .from('pois')
         .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000');
+        .not('id', 'is', null);
 
-      if (poisDeleteError) throw poisDeleteError;
+      if (poisDeleteError) {
+        console.error('Failed to delete POIs:', poisDeleteError);
+        throw poisDeleteError;
+      }
 
+      // Delete grid squares
       const { error: gridDeleteError } = await supabaseAdmin
         .from('grid_squares')
         .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000');
+        .not('id', 'is', null);
 
-      if (gridDeleteError) throw gridDeleteError;
+      if (gridDeleteError) {
+        console.error('Failed to delete grid squares:', gridDeleteError);
+        throw gridDeleteError;
+      }
 
-      // Insert backup data
+      console.log('Existing data cleared successfully.');
+
+      // Insert backup data with updated URLs
+      
       // Fetch all current profile IDs to validate against
       const { data: existingProfiles, error: profilesError } = await supabaseAdmin
         .from('profiles')
@@ -130,28 +308,76 @@ Deno.serve(async (req) => {
 
       const existingProfileIds = new Set(existingProfiles.map(p => p.id));
       
-      const validGridSquares = backupData.grid_squares.map(gs => {
+      // Update URLs in grid squares data and handle missing user references
+      const validGridSquares = updateUrlsInData(gridSquares, urlMapping).map(gs => {
         if (gs.uploaded_by && !existingProfileIds.has(gs.uploaded_by)) {
           console.warn(`User ID ${gs.uploaded_by} not found for grid_square ${gs.id}. Setting uploaded_by to null.`);
           return { ...gs, uploaded_by: null };
         }
         return gs;
-      }).filter(gs => gs !== null); // In case we decide to filter out instead of nullifying
+      });
 
-      const { error: gridInsertError } = await supabaseAdmin
-        .from('grid_squares')
-        .insert(validGridSquares);
+      // Update URLs in POI data
+      const validPois = updateUrlsInData(pois, urlMapping);
 
-      if (gridInsertError) throw gridInsertError;
+      // Insert restored data
+      if (validGridSquares.length > 0) {
+        const { error: gridInsertError } = await supabaseAdmin
+          .from('grid_squares')
+          .insert(validGridSquares);
 
-      const { error: poisInsertError } = await supabaseAdmin
-        .from('pois')
-        .insert(backupData.pois);
+        if (gridInsertError) {
+          console.error('Failed to insert grid squares:', gridInsertError);
+          throw gridInsertError;
+        }
+        console.log(`Inserted ${validGridSquares.length} grid squares`);
+      }
 
-      if (poisInsertError) throw poisInsertError;
+      if (validPois.length > 0) {
+        const { error: poisInsertError } = await supabaseAdmin
+          .from('pois')
+          .insert(validPois);
+
+        if (poisInsertError) {
+          console.error('Failed to insert POIs:', poisInsertError);
+          throw poisInsertError;
+        }
+        console.log(`Inserted ${validPois.length} POIs`);
+      }
+
+      if (comments.length > 0) {
+        // Update URLs in comments data (for comment screenshots)
+        const validComments = updateUrlsInData(comments, urlMapping);
+        
+        const { error: commentsInsertError } = await supabaseAdmin
+          .from('comments')
+          .insert(validComments);
+
+        if (commentsInsertError) {
+          console.error('Failed to insert comments:', commentsInsertError);
+          throw commentsInsertError;
+        }
+        console.log(`Inserted ${validComments.length} comments`);
+      }
+
+      const totalFiles = Object.keys(urlMapping).length;
+      const message = totalFiles > 0 
+        ? `Backup restored successfully with ${validGridSquares.length + validPois.length + comments.length} database records and ${totalFiles} storage files.`
+        : `Backup restored successfully with ${validGridSquares.length + validPois.length + comments.length} database records.`;
 
       return new Response(
-        JSON.stringify({ success: true, message: 'Backup restored successfully' }),
+        JSON.stringify({ 
+          success: true, 
+          message,
+          stats: {
+            database: {
+              grid_squares: validGridSquares.length,
+              pois: validPois.length,
+              comments: comments.length
+            },
+            files: totalFiles
+          }
+        }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 200,

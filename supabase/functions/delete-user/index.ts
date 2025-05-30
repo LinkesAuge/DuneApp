@@ -5,6 +5,40 @@ import { corsHeaders } from '../_shared/cors.ts';
 
 console.log("Delete User function booting up!");
 
+// Helper function to extract file path from Supabase Storage URL
+const extractStorageFilePath = (url: string): string | null => {
+  try {
+    const urlObj = new URL(url);
+    // Extract path after '/storage/v1/object/public/{bucket}/'
+    const pathParts = urlObj.pathname.split('/');
+    const bucketIndex = pathParts.indexOf('public') + 1;
+    if (bucketIndex > 0 && bucketIndex < pathParts.length) {
+      return pathParts.slice(bucketIndex + 1).join('/'); // Skip bucket name too
+    }
+    return null;
+  } catch {
+    return null;
+  }
+};
+
+// Helper function to batch delete files from storage
+const batchDeleteFiles = async (supabase: SupabaseClient, bucket: string, filePaths: string[]): Promise<void> => {
+  if (filePaths.length === 0) return;
+  
+  // Delete in batches of 100 (Supabase limit)
+  const batchSize = 100;
+  for (let i = 0; i < filePaths.length; i += batchSize) {
+    const batch = filePaths.slice(i, i + batchSize);
+    const { error } = await supabase.storage.from(bucket).remove(batch);
+    if (error) {
+      console.error(`Error deleting batch ${i / batchSize + 1} from ${bucket}:`, error);
+      // Continue with other batches even if one fails
+    } else {
+      console.log(`Successfully deleted batch ${i / batchSize + 1} (${batch.length} files) from ${bucket}`);
+    }
+  }
+};
+
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -90,6 +124,105 @@ serve(async (req: Request) => {
     }
 
     console.log(`Admin user ${requestingUser.id} attempting to delete user ${userIdToDelete}`);
+
+    // Storage cleanup: Collect all files uploaded by the user before deletion
+    console.log(`Starting storage cleanup for user ${userIdToDelete}...`);
+    const filesToDelete: string[] = [];
+
+    try {
+      // 1. Collect POI screenshots created by the user
+      console.log('Collecting POI screenshots created by user...');
+      const { data: userPoisData, error: userPoisError } = await supabaseAdmin
+        .from('pois')
+        .select('screenshots')
+        .eq('created_by', userIdToDelete);
+
+      if (userPoisError) {
+        console.error('Error querying user POIs for storage cleanup:', userPoisError);
+      } else if (userPoisData) {
+        for (const poi of userPoisData) {
+          if (poi.screenshots && Array.isArray(poi.screenshots)) {
+            for (const screenshot of poi.screenshots) {
+              if (screenshot.url) {
+                const filePath = extractStorageFilePath(screenshot.url);
+                if (filePath) {
+                  filesToDelete.push(filePath);
+                }
+              }
+            }
+          }
+        }
+        console.log(`Found ${filesToDelete.length} POI screenshot files from user`);
+      }
+
+      // 2. Collect grid square screenshots uploaded by the user
+      console.log('Collecting grid square screenshots uploaded by user...');
+      const { data: userGridSquaresData, error: userGridSquaresError } = await supabaseAdmin
+        .from('grid_squares')
+        .select('screenshot_url, original_screenshot_url')
+        .eq('uploaded_by', userIdToDelete);
+
+      if (userGridSquaresError) {
+        console.error('Error querying user grid squares for storage cleanup:', userGridSquaresError);
+      } else if (userGridSquaresData) {
+        const initialCount = filesToDelete.length;
+        for (const gridSquare of userGridSquaresData) {
+          // Add main screenshot
+          if (gridSquare.screenshot_url) {
+            const filePath = extractStorageFilePath(gridSquare.screenshot_url);
+            if (filePath && !filesToDelete.includes(filePath)) {
+              filesToDelete.push(filePath);
+            }
+          }
+          // Add original screenshot if different
+          if (gridSquare.original_screenshot_url && 
+              gridSquare.original_screenshot_url !== gridSquare.screenshot_url) {
+            const filePath = extractStorageFilePath(gridSquare.original_screenshot_url);
+            if (filePath && !filesToDelete.includes(filePath)) {
+              filesToDelete.push(filePath);
+            }
+          }
+        }
+        console.log(`Found ${filesToDelete.length - initialCount} additional grid square screenshot files from user`);
+      }
+
+      // 3. Collect custom icons created by the user
+      console.log('Collecting custom icons created by user...');
+      const { data: userCustomIconsData, error: userCustomIconsError } = await supabaseAdmin
+        .from('custom_icons')
+        .select('image_url')
+        .eq('user_id', userIdToDelete);
+
+      if (userCustomIconsError) {
+        console.error('Error querying user custom icons for storage cleanup:', userCustomIconsError);
+      } else if (userCustomIconsData) {
+        const initialCount = filesToDelete.length;
+        for (const customIcon of userCustomIconsData) {
+          if (customIcon.image_url) {
+            const filePath = extractStorageFilePath(customIcon.image_url);
+            if (filePath && !filesToDelete.includes(filePath)) {
+              filesToDelete.push(filePath);
+            }
+          }
+        }
+        console.log(`Found ${filesToDelete.length - initialCount} custom icon files from user`);
+      }
+
+      // 4. Delete all collected files from storage
+      console.log(`Deleting ${filesToDelete.length} total files from storage for user ${userIdToDelete}...`);
+      if (filesToDelete.length > 0) {
+        await batchDeleteFiles(supabaseAdmin, 'screenshots', filesToDelete);
+        console.log('User storage cleanup completed successfully');
+      } else {
+        console.log('No files found to delete for user');
+      }
+
+    } catch (storageCleanupError) {
+      console.error('Error during user storage cleanup:', storageCleanupError);
+      // Continue with user deletion even if storage cleanup fails
+    }
+
+    // Proceed with user deletion from auth and database
 
     // 1. Delete from auth.users
     // Note: Supabase automatically handles cascading deletes to profiles if foreign key is set to CASCADE

@@ -2,16 +2,17 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { GridSquare as GridSquareType, Poi, PoiType, CustomIcon } from '../../types';
 import { useAuth } from '../auth/AuthProvider';
-import { Upload, X, Plus, Image, Trash2, Clock, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Target, Edit, Check } from 'lucide-react';
+import { Upload, X, Plus, Image, Trash2, Clock, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Target, Edit, Check, MapPin } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
-import PoiList from '../poi/PoiList';
 import AddPoiForm from '../poi/AddPoiForm';
 import CommentsList from '../comments/CommentsList';
 import PoiControlPanel from '../common/PoiControlPanel';
 import InteractivePoiImage from '../common/InteractivePoiImage';
 import ImageCropModal from './ImageCropModal';
+import POICard from '../common/POICard';
 import { PixelCrop } from 'react-image-crop';
 import { broadcastExplorationChange } from '../../lib/explorationEvents';
+import POIPreviewCard from '../common/POIPreviewCard';
 
 interface GridSquareModalProps {
   square: GridSquareType;
@@ -47,6 +48,7 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
   const [pois, setPois] = useState<Poi[]>([]);
   const [poiTypes, setPoiTypes] = useState<PoiType[]>([]);
   const [customIcons, setCustomIcons] = useState<CustomIcon[]>([]);
+  const [userInfo, setUserInfo] = useState<Record<string, { username: string }>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [showAddPoiForm, setShowAddPoiForm] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -60,6 +62,7 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
   const [selectedPoiTypes, setSelectedPoiTypes] = useState<string[]>([]);
   const [initialFilterSetup, setInitialFilterSetup] = useState(false);
   const [placementMode, setPlacementMode] = useState(false);
+  const [selectedPoiId, setSelectedPoiId] = useState<string | null>(null);
 
   // Image cropping state
   const [showCropModal, setShowCropModal] = useState(false);
@@ -192,6 +195,23 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
           setPoiTypes(typesResult.data || []);
           setCustomIcons(customIconsResult.data || []);
           
+          // Fetch user information for POI creators
+          const userIds = [...new Set((poisResult.data || []).map(poi => poi.created_by))];
+          if (userIds.length > 0) {
+            const { data: userProfiles, error: userError } = await supabase
+              .from('profiles')
+              .select('id, username')
+              .in('id', userIds);
+            
+            if (!userError && userProfiles) {
+              const userInfoMap = userProfiles.reduce((acc, profile) => {
+                acc[profile.id] = { username: profile.username };
+                return acc;
+              }, {} as Record<string, { username: string }>);
+              setUserInfo(userInfoMap);
+            }
+          }
+          
           // Initialize filter setup
           if (!initialFilterSetup && typesResult.data) {
             setSelectedPoiTypes(typesResult.data.map(type => type.id));
@@ -279,7 +299,7 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
   };
 
   // Handle crop completion and upload
-  const handleCropComplete = async (croppedImageBlob: Blob, cropData: PixelCrop) => {
+  const handleCropComplete = async (croppedImageBlob: Blob, cropData: PixelCrop, isFullImage: boolean) => {
     if (!tempImageFile || !user) return;
 
     setIsUploading(true);
@@ -289,51 +309,55 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
       const fileExt = tempImageFile.name.split('.').pop();
       const timestamp = Date.now();
       
-      // Upload original image
-      const originalFileName = `grid-${currentSquare.coordinate}-${timestamp}-original.${fileExt}`;
+      const originalFileName = `grid_originals/grid-${currentSquare.coordinate}-${timestamp}.${fileExt}`;
       const { error: originalUploadError } = await supabase.storage
         .from('screenshots')
         .upload(originalFileName, tempImageFile, { upsert: true });
 
       if (originalUploadError) throw originalUploadError;
-
-      // Upload cropped image
-      const croppedFileName = `grid-${currentSquare.coordinate}-${timestamp}-cropped.${fileExt}`;
-      const { error: croppedUploadError } = await supabase.storage
-        .from('screenshots')
-        .upload(croppedFileName, croppedImageBlob, { upsert: true });
-
-      if (croppedUploadError) throw croppedUploadError;
-
-      // Get public URLs
       const { data: originalUrlData } = supabase.storage
         .from('screenshots')
         .getPublicUrl(originalFileName);
 
-      const { data: croppedUrlData } = supabase.storage
-        .from('screenshots')
-        .getPublicUrl(croppedFileName);
+      let finalScreenshotUrl = originalUrlData.publicUrl;
+      let dbCropDataToSet = {};
 
-      // Round crop coordinates to integers for database storage
-      const roundedCropData = {
-        x: Math.round(cropData.x),
-        y: Math.round(cropData.y),
-        width: Math.round(cropData.width),
-        height: Math.round(cropData.height)
-      };
+      if (!isFullImage) {
+        const croppedFileName = `grid_cropped/grid-${currentSquare.coordinate}-${timestamp}.${fileExt}`;
+        const { error: croppedUploadError } = await supabase.storage
+          .from('screenshots')
+          .upload(croppedFileName, croppedImageBlob, { upsert: true });
+        if (croppedUploadError) throw croppedUploadError;
 
-      // Update grid square with both original and cropped URLs, plus crop metadata
+        const { data: croppedUrlData } = supabase.storage
+          .from('screenshots')
+          .getPublicUrl(croppedFileName);
+        finalScreenshotUrl = croppedUrlData.publicUrl;
+        dbCropDataToSet = {
+          crop_x: Math.round(cropData.x),
+          crop_y: Math.round(cropData.y),
+          crop_width: Math.round(cropData.width),
+          crop_height: Math.round(cropData.height),
+          crop_created_at: new Date().toISOString(),
+        };
+      } else {
+        // Full image: crop fields are null
+        dbCropDataToSet = {
+          crop_x: null,
+          crop_y: null,
+          crop_width: null,
+          crop_height: null,
+          crop_created_at: new Date().toISOString(), // Still mark when it became full image
+        };
+      }
+
       const { data, error } = await supabase
         .from('grid_squares')
         .upsert({
           coordinate: currentSquare.coordinate,
-          screenshot_url: croppedUrlData.publicUrl,
-          original_screenshot_url: originalUrlData.publicUrl,
-          crop_x: roundedCropData.x,
-          crop_y: roundedCropData.y,
-          crop_width: roundedCropData.width,
-          crop_height: roundedCropData.height,
-          crop_created_at: new Date().toISOString(),
+          screenshot_url: finalScreenshotUrl, // This is the cropped or original if isFullImage
+          original_screenshot_url: originalUrlData.publicUrl, // This is always the original
+          ...dbCropDataToSet,
           uploaded_by: user.id,
           upload_date: new Date().toISOString(),
           is_explored: true
@@ -347,7 +371,7 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
 
       setCurrentSquare(data);
       onUpdate(data);
-      setSuccess('Screenshot uploaded and cropped successfully');
+      setSuccess('Screenshot uploaded successfully');
       
       // Broadcast exploration status change globally
       broadcastExplorationChange({
@@ -458,83 +482,112 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
   // Handle editing existing screenshot crop
   const handleEditExistingCrop = () => {
     if (!currentSquare?.original_screenshot_url) {
-      setError('No original image available for editing');
+      setError('No original image available for editing. original_screenshot_url is missing.');
+      console.error('[GridSquareModal] handleEditExistingCrop: original_screenshot_url is missing for square:', currentSquare);
       return;
     }
 
-    console.log('Starting crop edit with original URL:', currentSquare.original_screenshot_url);
-    console.log('Current crop data:', {
+    console.log('[GridSquareModal] handleEditExistingCrop starting.');
+    console.log('[GridSquareModal] currentSquare.screenshot_url:', currentSquare.screenshot_url);
+    console.log('[GridSquareModal] currentSquare.original_screenshot_url:', currentSquare.original_screenshot_url);
+    console.log('[GridSquareModal] Current crop data from square:', {
       x: currentSquare.crop_x,
       y: currentSquare.crop_y,
       width: currentSquare.crop_width,
       height: currentSquare.crop_height
     });
 
-    // Create a new image URL with cache-busting to avoid CORS issues
-    const originalUrl = new URL(currentSquare.original_screenshot_url);
-    originalUrl.searchParams.set('t', Date.now().toString());
+    // Create a new image URL with cache-busting to avoid CORS issues with storage
+    const originalUrlToLoad = new URL(currentSquare.original_screenshot_url);
+    originalUrlToLoad.searchParams.set('t', Date.now().toString());
+    const urlString = originalUrlToLoad.toString();
+    console.log('[GridSquareModal] Setting tempImageUrl for ImageCropModal to:', urlString);
     
-    setTempImageUrl(originalUrl.toString());
+    setTempImageUrl(urlString);
     setIsEditingExisting(true);
+
+    // Set initialCrop for the modal based on currentSquare's crop data
+    // Ensure it's PixelCrop format and unit: 'px'
+    let cropToPassAsInitial: PixelCrop | undefined = undefined;
+    if (
+      currentSquare.crop_x !== null && currentSquare.crop_x !== undefined &&
+      currentSquare.crop_y !== null && currentSquare.crop_y !== undefined &&
+      currentSquare.crop_width !== null && currentSquare.crop_width !== undefined &&
+      currentSquare.crop_height !== null && currentSquare.crop_height !== undefined
+    ) {
+      cropToPassAsInitial = {
+        x: currentSquare.crop_x,
+        y: currentSquare.crop_y,
+        width: currentSquare.crop_width,
+        height: currentSquare.crop_height,
+        unit: 'px' // Important: react-image-crop internally might use %, but our DB stores px
+      };
+      console.log('[GridSquareModal] Passing initialCrop to ImageCropModal:', cropToPassAsInitial);
+    } else {
+      console.log('[GridSquareModal] No existing crop data, initialCrop will be undefined.');
+    }
+    // The initialCrop prop name in ImageCropModal is `initialCrop`
+    // No need to set a separate state here, just ensure it's passed correctly in JSX
+
     setShowCropModal(true);
   };
 
   // Handle recrop of existing image
-  const handleRecropComplete = async (croppedImageBlob: Blob, cropData: PixelCrop) => {
+  const handleRecropComplete = async (croppedImageBlob: Blob, cropData: PixelCrop, isFullImage: boolean) => {
     if (!user) return;
+    if (!currentSquare || !currentSquare.original_screenshot_url) {
+      setError("Cannot complete recrop: current square data or original image is missing.");
+      setIsUploading(false); 
+      return;
+    }
 
     setIsUploading(true);
     setError(null);
+    const previousCroppedStoragePath = currentSquare.screenshot_url && currentSquare.screenshot_url !== currentSquare.original_screenshot_url 
+      ? new URL(currentSquare.screenshot_url).pathname.split('/screenshots/')[1] 
+      : null;
 
     try {
-      // Upload new cropped version
-      const timestamp = Date.now();
-      const croppedFileName = `grid-${currentSquare.coordinate}-${timestamp}-recropped.jpg`;
-      
-      const { error: croppedUploadError } = await supabase.storage
-        .from('screenshots')
-        .upload(croppedFileName, croppedImageBlob, { upsert: true });
+      let newCroppedFileUrl = currentSquare.original_screenshot_url; 
+      let dbCropDataToSet = {};
+      let newCroppedStoragePath: string | null = null;
 
-      if (croppedUploadError) throw croppedUploadError;
+      if (!isFullImage) {
+        const fileExt = currentSquare.original_screenshot_url.split('.').pop()?.split('?')[0] || 'jpg';
+        const timestamp = Date.now();
+        // Ensure newCroppedFileName includes the subfolder for consistency
+        newCroppedStoragePath = `grid_cropped/grid-${currentSquare.coordinate}-${timestamp}.${fileExt}`;
+        
+        const { error: croppedUploadError } = await supabase.storage
+          .from('screenshots')
+          .upload(newCroppedStoragePath, croppedImageBlob, { upsert: true });
 
-      // Get public URL for new cropped image
-      const { data: croppedUrlData } = supabase.storage
-        .from('screenshots')
-        .getPublicUrl(croppedFileName);
-
-      // Delete old cropped image if it exists and is different from original
-      if (currentSquare.screenshot_url && 
-          currentSquare.screenshot_url !== currentSquare.original_screenshot_url) {
-        try {
-          const oldUrl = new URL(currentSquare.screenshot_url);
-          const oldFileName = oldUrl.pathname.split('/').pop();
-          if (oldFileName) {
-            await supabase.storage.from('screenshots').remove([oldFileName]);
-          }
-        } catch (deleteError) {
-          console.warn('Failed to delete old cropped image:', deleteError);
-        }
+        if (croppedUploadError) throw croppedUploadError;
+        const { data: croppedUrlData } = supabase.storage.from('screenshots').getPublicUrl(newCroppedStoragePath);
+        newCroppedFileUrl = croppedUrlData.publicUrl;
+        dbCropDataToSet = {
+          crop_x: Math.round(cropData.x),
+          crop_y: Math.round(cropData.y),
+          crop_width: Math.round(cropData.width),
+          crop_height: Math.round(cropData.height),
+          crop_created_at: new Date().toISOString(),
+        };
+      } else {
+        dbCropDataToSet = {
+          crop_x: null,
+          crop_y: null,
+          crop_width: null,
+          crop_height: null,
+          crop_created_at: new Date().toISOString(),
+        };
       }
 
-      // Round crop coordinates to integers for database storage
-      const roundedCropData = {
-        x: Math.round(cropData.x),
-        y: Math.round(cropData.y),
-        width: Math.round(cropData.width),
-        height: Math.round(cropData.height)
-      };
-
-      // Update grid square with new crop data
       const { data, error } = await supabase
         .from('grid_squares')
         .update({
-          screenshot_url: croppedUrlData.publicUrl,
-          crop_x: roundedCropData.x,
-          crop_y: roundedCropData.y,
-          crop_width: roundedCropData.width,
-          crop_height: roundedCropData.height,
-          crop_created_at: new Date().toISOString(),
-          is_explored: true
+          screenshot_url: newCroppedFileUrl, // This is the new cropped URL or original_screenshot_url if full image
+          ...dbCropDataToSet,
+          is_explored: true 
         })
         .eq('coordinate', currentSquare.coordinate)
         .select()
@@ -542,8 +595,24 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
 
       if (error) throw error;
 
-      setCurrentSquare(data);
-      onUpdate(data);
+      // Delete the *previous* cropped image if it existed and was different from the new one and original
+      if (previousCroppedStoragePath && previousCroppedStoragePath !== newCroppedStoragePath && previousCroppedStoragePath !== new URL(currentSquare.original_screenshot_url).pathname.split('/screenshots/')[1]) {
+        try {
+          console.log('Attempting to delete old cropped image from storage:', previousCroppedStoragePath);
+          await supabase.storage.from('screenshots').remove([previousCroppedStoragePath]);
+          console.log('Successfully deleted old cropped image:', previousCroppedStoragePath);
+        } catch (deleteError) {
+          console.warn('Failed to delete old cropped image:', deleteError);
+        }
+      }
+      
+      const updatedSquareData = {
+        ...data,
+        original_screenshot_url: currentSquare.original_screenshot_url 
+      };
+
+      setCurrentSquare(updatedSquareData);
+      onUpdate(updatedSquareData);
       setSuccess('Screenshot crop updated successfully');
       
       // Broadcast exploration status change globally
@@ -564,7 +633,7 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
       setTempImageUrl(null);
       setIsEditingExisting(false);
     } catch (err: any) {
-      console.error('Error updating crop:', err);
+      console.error('Error recropping screenshot:', err);
       setError(err.message);
     } finally {
       setIsUploading(false);
@@ -583,25 +652,50 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
   };
 
   const handleDeleteScreenshot = async () => {
-    if (!confirm('Are you sure you want to delete this screenshot?')) return;
+    if (!confirm('Are you sure you want to delete this screenshot? This action cannot be undone.')) return;
+
+    setIsUploading(true); // Consider renaming state if used for general processing
+    setError(null);
 
     try {
-      // Extract filename from URL to delete from storage
+      const filesToDelete = [];
       if (currentSquare.screenshot_url) {
-        const url = new URL(currentSquare.screenshot_url);
-        const fileName = url.pathname.split('/').pop();
-        if (fileName) {
-          await supabase.storage
-            .from('screenshots')
-            .remove([fileName]);
+        // Only add to delete list if it's not the same as the original_screenshot_url (if original exists)
+        // or if original_screenshot_url doesn't exist (meaning screenshot_url is the only one or was the original)
+        if (!currentSquare.original_screenshot_url || currentSquare.screenshot_url !== currentSquare.original_screenshot_url) {
+          const screenshotPath = new URL(currentSquare.screenshot_url).pathname.split('/screenshots/')[1];
+          if (screenshotPath) filesToDelete.push(screenshotPath);
         }
       }
 
-      // Update grid square to remove screenshot reference and mark as not explored
-      const { data, error } = await supabase
+      if (currentSquare.original_screenshot_url) {
+        const originalPath = new URL(currentSquare.original_screenshot_url).pathname.split('/screenshots/')[1];
+        if (originalPath && !filesToDelete.includes(originalPath)) { // Avoid double-adding if they were same
+             filesToDelete.push(originalPath);
+        }
+      }
+
+      if (filesToDelete.length > 0) {
+        console.log('Attempting to delete from storage:', filesToDelete);
+        const { error: deleteError } = await supabase.storage
+          .from('screenshots')
+          .remove(filesToDelete);
+        if (deleteError) {
+          console.warn('Some files might not have been deleted from storage:', deleteError);
+          // Potentially non-critical, proceed to update DB
+        }
+      }
+
+      const { data, error: dbError } = await supabase
         .from('grid_squares')
         .update({
           screenshot_url: null,
+          original_screenshot_url: null,
+          crop_x: null,
+          crop_y: null,
+          crop_width: null,
+          crop_height: null,
+          crop_created_at: null,
           uploaded_by: null,
           upload_date: null,
           is_explored: false
@@ -610,7 +704,7 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
         .select()
         .single();
 
-      if (error) throw error;
+      if (dbError) throw dbError;
 
       setCurrentSquare(data);
       onUpdate(data);
@@ -626,6 +720,8 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
     } catch (err: any) {
       console.error('Error deleting screenshot:', err);
       setError(err.message);
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -966,15 +1062,37 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
                 </button>
               </div>
             ) : (
-              <PoiList 
-                pois={pois} 
-                poiTypes={poiTypes}
-                customIcons={customIcons}
-                onDelete={handleDeletePoi}
-                onUpdate={handleUpdatePoi}
-                onViewScreenshot={() => {}}
-                onPoiGalleryOpen={onPoiGalleryOpen}
-              />
+              <div className="space-y-4">
+                <h4 className={`text-md font-semibold ${getThemedTextColor('primary')}`}>
+                  POIs in this Grid Square ({pois.filter(poi => selectedPoiTypes.includes(poi.poi_type_id)).length})
+                </h4>
+                {pois.filter(poi => selectedPoiTypes.includes(poi.poi_type_id)).length === 0 ? (
+                  <div className="text-center py-8">
+                    <MapPin className="w-12 h-12 text-slate-400 mx-auto mb-4" />
+                    <p className="text-slate-400 mb-2">No POIs found</p>
+                    <p className="text-slate-500 text-sm">Add a POI to this grid square to see it here</p>
+                  </div>
+                ) : (
+                  <div className="grid gap-3">
+                    {pois.filter(poi => selectedPoiTypes.includes(poi.poi_type_id)).map(poi => {
+                      const poiType = poiTypes.find(type => type.id === poi.poi_type_id);
+                      if (!poiType) return null;
+
+                      return (
+                        <POIPreviewCard
+                          key={poi.id}
+                          poi={poi}
+                          poiType={poiType}
+                          customIcons={customIcons}
+                          userInfo={userInfo}
+                          layout="grid"
+                          onClick={() => setSelectedPoiId(poi.id)}
+                        />
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             )}
 
             {/* Comments Section */}
@@ -985,17 +1103,59 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
         </div>
       </div>
       
+      {/* POI Card Modal */}
+      {selectedPoiId && (() => {
+        const selectedPoi = pois.find(poi => poi.id === selectedPoiId);
+        const selectedPoiType = selectedPoi ? poiTypes.find(type => type.id === selectedPoi.poi_type_id) : null;
+        if (!selectedPoi || !selectedPoiType) return null;
+        
+        return (
+          <POICard
+            poi={selectedPoi}
+            poiType={selectedPoiType}
+            customIcons={customIcons}
+            isOpen={true}
+            onClose={() => setSelectedPoiId(null)}
+            onEdit={() => {
+              // Handle edit - you may want to implement POI editing in grid square modal
+              setSelectedPoiId(null);
+            }}
+            onDelete={() => {
+              handleDeletePoi(selectedPoi.id);
+              setSelectedPoiId(null);
+            }}
+            onImageClick={() => {
+              if (onPoiGalleryOpen) {
+                onPoiGalleryOpen(selectedPoi);
+              }
+              setSelectedPoiId(null);
+            }}
+          />
+        );
+      })()}
+      
       {/* Image Crop Modal */}
-      {showCropModal && tempImageUrl && tempImageFile && (
+      {showCropModal && tempImageUrl && (
         <ImageCropModal
           imageUrl={tempImageUrl}
           onCropComplete={isEditingExisting ? handleRecropComplete : handleCropComplete}
           onClose={handleCloseCropModal}
           onSkip={handleSkipCrop}
-          onDelete={canDeleteScreenshot ? handleDeleteFromCrop : undefined}
+          onDelete={canDeleteScreenshot && currentSquare.screenshot_url ? handleDeleteFromCrop : undefined}
           title={isEditingExisting ? "Edit Screenshot Crop" : "Crop New Screenshot"}
-          defaultToSquare={true} // Or based on user setting
-          initialCrop={currentSquare.crop_data as PixelCrop || undefined}
+          defaultToSquare={true} 
+          initialCrop={
+            isEditingExisting && 
+            currentSquare.crop_x !== null && currentSquare.crop_y !== null && 
+            currentSquare.crop_width !== null && currentSquare.crop_height !== null ? 
+            {
+              x: currentSquare.crop_x,
+              y: currentSquare.crop_y,
+              width: currentSquare.crop_width,
+              height: currentSquare.crop_height,
+              unit: 'px'
+            } : undefined
+          }
         />
       )}
     </div>

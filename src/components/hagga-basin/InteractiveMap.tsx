@@ -14,7 +14,7 @@ import { useMapSettings } from '../../lib/useMapSettings';
 import MapPOIMarker from './MapPOIMarker';
 import POIPlacementModal from './POIPlacementModal';
 import POIEditModal from './POIEditModal';
-import HaggaBasinPoiCard from './HaggaBasinPoiCard';
+import POICard from '../common/POICard';
 
 interface InteractiveMapProps {
   baseMap: HaggaBasinBaseMap;
@@ -296,7 +296,18 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
   }, [highlightedPoiId, pois]);
 
   return (
-    <div className="w-full h-full relative bg-sand-100 overflow-hidden">
+    <div className="w-full h-full relative overflow-hidden">
+      {/* Main background image */}
+      <div 
+        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+        style={{
+          backgroundImage: `url(/images/main-bg.jpg)`
+        }}
+      />
+      
+      {/* Dark overlay for better contrast */}
+      <div className="absolute inset-0 bg-slate-950/70" />
+
       {/* Interactive Map Container */}
       <TransformWrapper
         ref={transformRef}
@@ -406,24 +417,24 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
       <div className="absolute top-4 left-4 z-40 flex flex-col space-y-2">
         <button
           onClick={zoomIn}
-          className="bg-white border border-sand-200 rounded-lg p-2 shadow-sm hover:shadow-md transition-shadow"
+          className="bg-slate-900/90 backdrop-blur-sm border border-slate-700/50 rounded-lg p-2 shadow-lg hover:bg-slate-800/90 transition-all"
           title="Zoom In"
         >
-          <ZoomIn className="w-5 h-5 text-sand-600" />
+          <ZoomIn className="w-5 h-5 text-amber-300" />
         </button>
         <button
           onClick={zoomOut}
-          className="bg-white border border-sand-200 rounded-lg p-2 shadow-sm hover:shadow-md transition-shadow"
+          className="bg-slate-900/90 backdrop-blur-sm border border-slate-700/50 rounded-lg p-2 shadow-lg hover:bg-slate-800/90 transition-all"
           title="Zoom Out"
         >
-          <ZoomOut className="w-5 h-5 text-sand-600" />
+          <ZoomOut className="w-5 h-5 text-amber-300" />
         </button>
         <button
           onClick={resetTransform}
-          className="bg-white border border-sand-200 rounded-lg p-2 shadow-sm hover:shadow-md transition-shadow"
+          className="bg-slate-900/90 backdrop-blur-sm border border-slate-700/50 rounded-lg p-2 shadow-lg hover:bg-slate-800/90 transition-all"
           title="Reset View"
         >
-          <RotateCcw className="w-5 h-5 text-sand-600" />
+          <RotateCcw className="w-5 h-5 text-amber-300" />
         </button>
         
         {/* Help Button with Tooltip */}
@@ -431,20 +442,20 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
           <button
             onMouseEnter={() => onHelpTooltipChange?.(true)}
             onMouseLeave={() => onHelpTooltipChange?.(false)}
-            className="bg-white border border-sand-200 rounded-lg p-2 shadow-sm hover:shadow-md transition-shadow"
+            className="bg-slate-900/90 backdrop-blur-sm border border-slate-700/50 rounded-lg p-2 shadow-lg hover:bg-slate-800/90 transition-all"
             title="Help & Tips"
           >
-            <HelpCircle className="w-5 h-5 text-sand-600" />
+            <HelpCircle className="w-5 h-5 text-amber-300" />
           </button>
           
           {/* Help Tooltip */}
           {showHelpTooltip && (
-            <div className="absolute left-full ml-3 top-0 w-80 bg-white border border-sand-200 rounded-lg shadow-lg p-4 z-50">
-              <h4 className="font-medium text-sand-800 mb-3 flex items-center gap-2">
+            <div className="absolute left-full ml-3 top-0 w-80 bg-slate-900/95 backdrop-blur-sm border border-slate-700/50 rounded-lg shadow-xl p-4 z-50">
+              <h4 className="font-medium text-amber-300 mb-3 flex items-center gap-2">
                 <HelpCircle className="w-4 h-4" />
                 Hagga Basin Controls & Tips
               </h4>
-              <div className="space-y-2 text-sm text-sand-600">
+              <div className="space-y-2 text-sm text-amber-200">
                 <div><strong>Map Controls:</strong></div>
                 <div className="ml-2 space-y-1">
                   <div>• Mouse wheel or +/- buttons to zoom</div>
@@ -520,7 +531,7 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
         if (!poiType) return null;
         
         return (
-          <HaggaBasinPoiCard
+          <POICard
             poi={selectedPoi}
             poiType={poiType}
             customIcons={customIcons}

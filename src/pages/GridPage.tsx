@@ -1,22 +1,29 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useParams, useNavigate, Navigate, useSearchParams } from 'react-router-dom';
 import { TransformWrapper, TransformComponent, ReactZoomPanPinchRef } from 'react-zoom-pan-pinch';
 import { supabase } from '../lib/supabase';
 import { GridSquare, Poi, PoiType, CustomIcon, PixelCoordinates, PoiCollection } from '../types';
-import { ArrowLeft, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Upload, Image, Plus, MapPin, Target, ZoomIn, ZoomOut, RotateCcw, Filter, Settings, FolderOpen, Share, Edit, Eye, Lock, Users, HelpCircle } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Upload, Image, Plus, MapPin, Target, ZoomIn, ZoomOut, RotateCcw, Filter, Settings, FolderOpen, Share, Edit, Eye, Lock, Users, HelpCircle, Map, ArrowUp, BarChart3, Grid3X3 } from 'lucide-react';
 import POIPlacementModal from '../components/hagga-basin/POIPlacementModal';
 import POIEditModal from '../components/hagga-basin/POIEditModal';
-import HaggaBasinPoiCard from '../components/hagga-basin/HaggaBasinPoiCard';
-import MapPOIMarker from '../components/hagga-basin/MapPOIMarker';
-import CollectionModal from '../components/hagga-basin/CollectionModal';
-import CustomPoiTypeModal from '../components/hagga-basin/CustomPoiTypeModal';
 import SharePoiModal from '../components/hagga-basin/SharePoiModal';
 import GridGallery from '../components/grid/GridGallery';
-import POIPanel from '../components/common/POIPanel';
+import CollectionModal from '../components/hagga-basin/CollectionModal';
+import CustomPoiTypeModal from '../components/hagga-basin/CustomPoiTypeModal';
+import MapPOIMarker from '../components/hagga-basin/MapPOIMarker';
 import { useAuth } from '../components/auth/AuthProvider';
+import { gridDisplayVariations } from '../lib/coordinates';
 import ImageCropModal from '../components/grid/ImageCropModal';
 import { PixelCrop } from 'react-image-crop';
+import { v4 as uuidv4 } from 'uuid';
 import { broadcastExplorationChange } from '../lib/explorationEvents';
+import { toast } from 'react-toastify';
+import POICard from '../components/common/POICard';
+import POIPreviewCard from '../components/common/POIPreviewCard';
+import GridSquareModal from '../components/grid/GridSquareModal';
+import { getMapDisplayInfo } from '../lib/coordinates';
+import MapControlPanel from '../components/common/MapControlPanel';
+import POIPanel from '../components/common/POIPanel';
 
 // Grid validation: A1-I9 pattern
 const VALID_GRID_PATTERN = /^[A-I][1-9]$/;
@@ -75,11 +82,11 @@ const GridPage: React.FC = () => {
   // POI placement state
   const [showPoiModal, setShowPoiModal] = useState(false);
   const [placementMode, setPlacementMode] = useState(false);
-  const [placementReady, setPlacementReady] = useState(false); // User clicked "Place Marker"
-  const [placementCoordinates, setPlacementCoordinates] = useState<PixelCoordinates | null>(null);
+  const [placementCoordinates, setPlacementCoordinates] = useState<{ x: number; y: number } | null>(null);
 
   // POI interaction state (same as Hagga Basin)
   const [selectedPoi, setSelectedPoi] = useState<Poi | null>(null);
+  const [selectedPoiId, setSelectedPoiId] = useState<string | null>(null);
   const [editingPoi, setEditingPoi] = useState<Poi | null>(null);
 
   // Modal state - Same as Hagga Basin
@@ -261,131 +268,17 @@ const GridPage: React.FC = () => {
   // Get unique categories for filtering
   const categories = [...new Set(poiTypes.map(type => type.category))];
 
-  // Helper function to check if an icon is a URL - Same as Hagga Basin
+  // Helper function to check if an icon is a URL
   const isIconUrl = (icon: string): boolean => {
     return icon.startsWith('http') || icon.startsWith('/') || icon.includes('.');
   };
 
-  // Helper function to get display image URL - Same as Hagga Basin
+  // Helper function to get display image URL
   const getDisplayImageUrl = (icon: string): string => {
     if (isIconUrl(icon)) {
       return icon;
     }
     return icon; // Return emoji as-is
-  };
-
-  // Helper function to render a category section - Exact same as Hagga Basin
-  const renderCategorySection = (category: string) => {
-    const categoryTypes = poiTypes.filter(type => type.category === category);
-    const categoryTypeIds = categoryTypes.map(type => type.id);
-    
-    // A category is "visible" if ALL its types are selected
-    const categoryVisible = categoryTypeIds.length > 0 && categoryTypeIds.every(id => selectedPoiTypes.includes(id));
-    
-    return (
-      <div key={category} className="mb-3">
-        {/* Category Header - More prominent styling */}
-        <div className="bg-sand-100 border border-sand-200 rounded-lg px-3 py-2 mb-2">
-          <div className="flex items-center justify-between">
-            <label className="flex items-center cursor-pointer group">
-              <input
-                type="checkbox"
-                checked={categoryVisible}
-                onChange={(e) => handleCategoryToggle(category, e.target.checked)}
-                className="rounded border-sand-300 text-spice-600 focus:ring-spice-500"
-              />
-              <span className="ml-2 text-sm font-semibold text-sand-900 capitalize group-hover:text-spice-700 transition-colors">
-                {category}
-              </span>
-            </label>
-            <span className="text-xs text-sand-600 font-medium">
-              {categoryTypes.length}
-            </span>
-          </div>
-        </div>
-        
-        {/* Individual POI Types in Category - No indentation, less spacing */}
-        <div className="space-y-0.5">
-          {categoryTypes.map(type => {
-            const typePoiCount = filteredPois.filter(poi => poi.poi_type_id === type.id).length;
-            const isTypeSelected = selectedPoiTypes.includes(type.id);
-            
-            return (
-              <label 
-                key={type.id} 
-                className={`flex items-center justify-between cursor-pointer group px-2 py-1 rounded transition-all ${
-                  !categoryVisible 
-                    ? 'opacity-40 cursor-not-allowed' 
-                    : isTypeSelected 
-                      ? 'hover:bg-spice-50' 
-                      : 'opacity-60 hover:opacity-80 hover:bg-sand-50'
-                }`}
-              >
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={isTypeSelected}
-                    onChange={() => handleTypeToggle(type.id)}
-                    disabled={!categoryVisible}
-                    className="rounded border-sand-300 text-spice-600 focus:ring-spice-500 w-3 h-3"
-                  />
-                  
-                  {/* POI Type Icon */}
-                  <div 
-                    className="w-4 h-4 rounded flex items-center justify-center ml-2 mr-2 flex-shrink-0"
-                    style={{
-                      backgroundColor: type.icon_has_transparent_background && isIconUrl(type.icon) 
-                        ? 'transparent' 
-                        : type.color
-                    }}
-                  >
-                    {isIconUrl(type.icon) ? (
-                      <img
-                        src={getDisplayImageUrl(type.icon)}
-                        alt={type.name}
-                        className="w-2.5 h-2.5 object-contain"
-                        style={{
-                          filter: type.icon_has_transparent_background ? 'none' : 'drop-shadow(0 1px 1px rgba(0,0,0,0.2))'
-                        }}
-                      />
-                    ) : (
-                      <span 
-                        className="text-xs leading-none"
-                        style={{ 
-                          color: type.icon_has_transparent_background ? type.color : 'white',
-                          textShadow: type.icon_has_transparent_background ? '0 1px 1px rgba(0,0,0,0.2)' : 'none'
-                        }}
-                      >
-                        {type.icon}
-                      </span>
-                    )}
-                  </div>
-                  
-                  <span className={`text-xs transition-colors ${
-                    !categoryVisible 
-                      ? 'text-sand-400' 
-                      : isTypeSelected 
-                        ? 'text-sand-800 group-hover:text-spice-800' 
-                        : 'text-sand-500 group-hover:text-sand-700'
-                  }`}>
-                    {type.name}
-                  </span>
-                </div>
-                <span className={`text-xs ${
-                  !categoryVisible 
-                    ? 'text-sand-300' 
-                    : isTypeSelected 
-                      ? 'text-sand-600' 
-                      : 'text-sand-400'
-                }`}>
-                  {typePoiCount}
-                </span>
-              </label>
-            );
-          })}
-        </div>
-      </div>
-    );
   };
 
   // Load Deep Desert map settings
@@ -560,8 +453,8 @@ const GridPage: React.FC = () => {
         setPlacementMode(true);
         setPlacementCoordinates(null);
       } else {
-        // No screenshot, open modal directly with center coordinates (center of 4000x4000 map)
-        setPlacementCoordinates({ x: 2000, y: 2000 });
+        // No screenshot, open modal directly with center coordinates (50%, 50%)
+        setPlacementCoordinates({ x: 50, y: 50 });
         setShowPoiModal(true);
       }
     } else {
@@ -571,7 +464,7 @@ const GridPage: React.FC = () => {
 
   // Handle placement mode - clicking on screenshot
   const handleScreenshotClick = (event: React.MouseEvent) => {
-    if (!placementMode || !placementReady) return;
+    if (!placementMode) return;
     
     event.preventDefault();
     event.stopPropagation();
@@ -580,35 +473,57 @@ const GridPage: React.FC = () => {
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
     
-    // Convert to pixel coordinates (0-4000) for database storage
-    // The database expects integer pixel coordinates, not percentages
-    const pixelX = Math.round((x / rect.width) * 4000);
-    const pixelY = Math.round((y / rect.height) * 4000);
+    // Calculate pixel coordinates for the 2000x2000 Deep Desert screenshot
+    const pixelX = (x / rect.width) * 2000;
+    const pixelY = (y / rect.height) * 2000;
     
     setPlacementCoordinates({ x: pixelX, y: pixelY });
     setPlacementMode(false);
-    setPlacementReady(false);
     setShowPoiModal(true);
   };
 
-  // Handle choosing to place marker
-  const handleChoosePlaceMarker = () => {
-    setPlacementReady(true);
+  // Handle Add POI button - enter placement mode
+  const handleAddPOI = async () => {
+    console.log('Add POI clicked');
+    
+    // Clear any existing errors
+    setError(null);
+    
+    // Check if user is authenticated
+    if (!user) {
+      setError('Please sign in to create POIs');
+      return;
+    }
+    
+    // Ensure we have a grid square in the database
+    const gridSquareData = await ensureGridSquareExists();
+    if (!gridSquareData) {
+      setError('Failed to create grid square. Please try again.');
+      return;
+    }
+    
+    if (gridSquareData.screenshot_url) {
+      // Enter simple placement mode like Hagga Basin
+      setPlacementMode(true);
+    } else {
+      // No screenshot, open modal directly with center coordinates (50%, 50%)
+      setPlacementCoordinates({ x: 50, y: 50 });
+      setShowPoiModal(true);
+    }
   };
 
-  // Handle exiting placement mode
-  const handleExitPlacementMode = () => {
+  // Handle ESC key to exit placement mode
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && placementMode) {
     setPlacementMode(false);
-    setPlacementReady(false);
     setPlacementCoordinates(null);
-  };
+      }
+    };
 
-  // Handle placement request from modal
-  const handleRequestPlacement = () => {
-    setShowPoiModal(false);
-    setPlacementMode(true);
-    setPlacementReady(false);
-  };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [placementMode]);
 
   // Handle modal callbacks
   const handleModalClose = () => {
@@ -656,22 +571,84 @@ const GridPage: React.FC = () => {
     setSelectedPoi(null);
   };
 
-  // Handle POI deletion
+  // Helper function to extract file path from Supabase Storage URL
+  const extractStorageFilePath = (url: string): string | null => {
+    try {
+      const urlObj = new URL(url);
+      // Extract path after '/storage/v1/object/public/{bucket}/'
+      const pathParts = urlObj.pathname.split('/');
+      const bucketIndex = pathParts.indexOf('public') + 1;
+      if (bucketIndex > 0 && bucketIndex < pathParts.length) {
+        return pathParts.slice(bucketIndex + 1).join('/'); // Skip bucket name too
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  };
+
+  // Handle POI deletion with storage cleanup
   const handlePoiDelete = async (poiId: string) => {
     try {
+      // First, get the POI data to extract screenshot URLs
+      const poiToDelete = pois.find(p => p.id === poiId);
+      if (!poiToDelete) {
+        setError('POI not found');
+        return;
+      }
+
+      // Collect screenshot files that need to be deleted
+      const filesToDelete: string[] = [];
+      if (poiToDelete.screenshots && Array.isArray(poiToDelete.screenshots)) {
+        for (const screenshot of poiToDelete.screenshots) {
+          if (screenshot.url) {
+            const filePath = extractStorageFilePath(screenshot.url);
+            if (filePath) {
+              filesToDelete.push(filePath);
+            }
+          }
+        }
+      }
+
+      // Delete screenshot files from storage first
+      if (filesToDelete.length > 0) {
+        console.log(`Deleting ${filesToDelete.length} screenshot files for POI ${poiId}`);
+        const { error: storageError } = await supabase.storage
+          .from('screenshots')
+          .remove(filesToDelete);
+        
+        if (storageError) {
+          console.error('Error deleting POI screenshots from storage:', storageError);
+          // Continue with POI deletion even if storage cleanup fails
+        } else {
+          console.log('POI screenshots deleted from storage successfully');
+        }
+      }
+
+      // Then delete the POI from the database
       const { error } = await supabase
         .from('pois')
         .delete()
         .eq('id', poiId);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error deleting POI:', error);
+        setError('Failed to delete POI');
+        return;
+      }
 
-      // Update local state
+      // Update local state to remove the deleted POI
       setPois(prev => prev.filter(p => p.id !== poiId));
-      setSelectedPoi(null);
+      
+      // Clear any highlighted POI if it was the deleted one
+      if (selectedPoiId === poiId) {
+        setSelectedPoiId(null);
+      }
+
+      console.log('POI deleted successfully');
     } catch (error) {
-      console.error('Error deleting POI:', error);
-      throw error;
+      console.error('Error in POI deletion:', error);
+      setError('Failed to delete POI');
     }
   };
 
@@ -743,7 +720,6 @@ const GridPage: React.FC = () => {
     setShowPoiModal(false);
     setPlacementCoordinates(null);
     setPlacementMode(false);
-    setPlacementReady(false);
   };
 
   // Initialize data on component mount
@@ -836,7 +812,7 @@ const GridPage: React.FC = () => {
     };
 
     fetchGridData();
-  }, [gridId]);
+  }, [gridId, user]);
 
   // Navigation handlers
   const handleBackToOverview = () => {
@@ -877,61 +853,36 @@ const GridPage: React.FC = () => {
   };
 
   // Handle crop completion and upload
-  const handleCropComplete = async (croppedImageBlob: Blob, cropData: PixelCrop) => {
-    if (!tempImageFile || !user) return;
-
+  const handleCropComplete = async (croppedImageBlob: Blob, cropData: PixelCrop, isFullImage: boolean) => {
+    if (!tempImageFile || !gridSquare) return;
     setUploading(true);
-    setError(null);
-
     try {
-      const fileExt = tempImageFile.name.split('.').pop();
-      const timestamp = Date.now();
-      
-      // Upload original image
-      const originalFileName = `grid-${gridId}-${timestamp}-original.${fileExt}`;
-      const { error: originalUploadError } = await supabase.storage
+      const user = (await supabase.auth.getUser()).data.user;
+      if (!user) throw new Error("User not authenticated");
+
+      const fileName = `${user.id}/${gridSquare.coordinate}-${Date.now()}.${tempImageFile.name.split('.').pop()}`;
+      const filePath = `grid-screenshots/${fileName}`;
+
+      const { data: uploadData, error: uploadError } = await supabase.storage
         .from('screenshots')
-        .upload(originalFileName, tempImageFile, { upsert: true });
+        .upload(filePath, croppedImageBlob, { upsert: true });
 
-      if (originalUploadError) throw originalUploadError;
+      if (uploadError) throw uploadError;
 
-      // Upload cropped image
-      const croppedFileName = `grid-${gridId}-${timestamp}-cropped.${fileExt}`;
-      const { error: croppedUploadError } = await supabase.storage
-        .from('screenshots')
-        .upload(croppedFileName, croppedImageBlob, { upsert: true });
+      const publicURL = supabase.storage.from('screenshots').getPublicUrl(filePath).data.publicUrl;
+      const cropDetailsForDb = isFullImage ? null : cropData;
+      const originalScreenshotUrlToStore = isFullImage ? publicURL : (gridSquare.original_screenshot_url || publicURL);
 
-      if (croppedUploadError) throw croppedUploadError;
-
-      // Get public URLs
-      const { data: originalUrlData } = supabase.storage
-        .from('screenshots')
-        .getPublicUrl(originalFileName);
-
-      const { data: croppedUrlData } = supabase.storage
-        .from('screenshots')
-        .getPublicUrl(croppedFileName);
-
-      // Round crop coordinates to integers for database storage
-      const roundedCropData = {
-        x: Math.round(cropData.x),
-        y: Math.round(cropData.y),
-        width: Math.round(cropData.width),
-        height: Math.round(cropData.height)
-      };
-
-      // Use upsert to handle both existing and new grid squares
-      const { data, error } = await supabase
+      const { data, error: updateError } = await supabase
         .from('grid_squares')
         .upsert({
           coordinate: gridId,
-          screenshot_url: croppedUrlData.publicUrl,
-          original_screenshot_url: originalUrlData.publicUrl,
-          crop_x: roundedCropData.x,
-          crop_y: roundedCropData.y,
-          crop_width: roundedCropData.width,
-          crop_height: roundedCropData.height,
-          crop_created_at: new Date().toISOString(),
+          screenshot_url: publicURL,
+          original_screenshot_url: originalScreenshotUrlToStore,
+          crop_x: isFullImage ? null : Math.round(cropData?.x || 0),
+          crop_y: isFullImage ? null : Math.round(cropData?.y || 0),
+          crop_width: isFullImage ? null : Math.round(cropData?.width || 0),
+          crop_height: isFullImage ? null : Math.round(cropData?.height || 0),
           uploaded_by: user.id,
           upload_date: new Date().toISOString(),
           updated_by: user.id,
@@ -942,17 +893,17 @@ const GridPage: React.FC = () => {
         .select()
         .single();
 
-      if (error) throw error;
+      if (updateError) throw updateError;
 
       setGridSquare(data);
-      console.log('Screenshot uploaded and cropped successfully');
+      console.log('Screenshot uploaded successfully');
       
       // Broadcast exploration status change globally
       broadcastExplorationChange({
         gridSquareId: data.id,
         coordinate: data.coordinate,
         isExplored: true,
-        source: 'crop'
+        source: 'upload'
       });
       
       // Clean up
@@ -963,8 +914,71 @@ const GridPage: React.FC = () => {
         setTempImageUrl(null);
       }
     } catch (err: any) {
-      console.error('Error uploading screenshot:', err);
-      setError(err.message);
+      console.error("Error during screenshot upload or DB update:", err);
+      setError(err.message || "Failed to upload screenshot.");
+    } finally {
+      setUploading(false);
+    }
+  };
+  
+  const handleRecropComplete = async (croppedImageBlob: Blob, cropData: PixelCrop, isFullImage: boolean) => {
+    if (!gridSquare || !gridSquare.screenshot_url) return;
+    setUploading(true);
+    try {
+      const user = (await supabase.auth.getUser()).data.user;
+      if (!user) throw new Error("User not authenticated");
+
+      const fileName = `${user.id}/${gridSquare.coordinate}-recrop-${Date.now()}.${gridSquare.screenshot_url.split('.').pop()?.split('?')[0]}`;
+      const filePath = `grid-screenshots/${fileName}`;
+
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('screenshots')
+        .upload(filePath, croppedImageBlob, { upsert: true });
+
+      if (uploadError) throw uploadError;
+      
+      const publicURL = supabase.storage.from('screenshots').getPublicUrl(filePath).data.publicUrl;
+      const cropDetailsForDb = isFullImage ? null : cropData;
+      const newOriginalScreenshotUrl = isFullImage ? publicURL : gridSquare.original_screenshot_url;
+
+      const { data, error: updateError } = await supabase
+        .from('grid_squares')
+        .update({
+          screenshot_url: publicURL,
+          original_screenshot_url: newOriginalScreenshotUrl,
+          crop_x: isFullImage ? null : Math.round(cropData?.x || 0),
+          crop_y: isFullImage ? null : Math.round(cropData?.y || 0),
+          crop_width: isFullImage ? null : Math.round(cropData?.width || 0),
+          crop_height: isFullImage ? null : Math.round(cropData?.height || 0),
+          updated_by: user.id,
+        })
+        .eq('coordinate', gridId)
+        .select()
+        .single();
+
+      if (updateError) throw updateError;
+
+      setGridSquare(data);
+      console.log('Screenshot updated successfully');
+      
+      // Broadcast exploration status change globally
+      broadcastExplorationChange({
+        gridSquareId: data.id,
+        coordinate: data.coordinate,
+        isExplored: true,
+        source: 'upload'
+      });
+      
+      // Clean up
+      setShowCropModal(false);
+      setTempImageFile(null);
+      if (tempImageUrl) {
+        URL.revokeObjectURL(tempImageUrl);
+        setTempImageUrl(null);
+      }
+    } catch (err: any) {
+      console.error("Error during screenshot recrop or DB update:", err);
+      setError(err.message || "Failed to update screenshot.");
     } finally {
       setUploading(false);
     }
@@ -1067,118 +1081,42 @@ const GridPage: React.FC = () => {
     setShowCropModal(true);
   };
 
-  // Handle recrop of existing image
-  const handleRecropComplete = async (croppedImageBlob: Blob, cropData: PixelCrop) => {
-    if (!user || !gridSquare) return;
-
-    setUploading(true);
-    setError(null);
-
-    try {
-      // Upload new cropped version
-      const timestamp = Date.now();
-      const croppedFileName = `grid-${gridId}-${timestamp}-recropped.jpg`;
-      
-      const { error: croppedUploadError } = await supabase.storage
-        .from('screenshots')
-        .upload(croppedFileName, croppedImageBlob, { upsert: true });
-
-      if (croppedUploadError) throw croppedUploadError;
-
-      // Get public URL for new cropped image
-      const { data: croppedUrlData } = supabase.storage
-        .from('screenshots')
-        .getPublicUrl(croppedFileName);
-
-      // Delete old cropped image if it exists and is different from original
-      if (gridSquare.screenshot_url && 
-          gridSquare.screenshot_url !== gridSquare.original_screenshot_url) {
-        try {
-          const oldUrl = new URL(gridSquare.screenshot_url);
-          const oldFileName = oldUrl.pathname.split('/').pop();
-          if (oldFileName) {
-            await supabase.storage.from('screenshots').remove([oldFileName]);
-          }
-        } catch (deleteError) {
-          console.warn('Failed to delete old cropped image:', deleteError);
-        }
-      }
-
-      // Round crop coordinates to integers for database storage
-      const roundedCropData = {
-        x: Math.round(cropData.x),
-        y: Math.round(cropData.y),
-        width: Math.round(cropData.width),
-        height: Math.round(cropData.height)
-      };
-
-      // Update grid square with new crop data
-      const { data, error } = await supabase
-        .from('grid_squares')
-        .update({
-          screenshot_url: croppedUrlData.publicUrl,
-          crop_x: roundedCropData.x,
-          crop_y: roundedCropData.y,
-          crop_width: roundedCropData.width,
-          crop_height: roundedCropData.height,
-          crop_created_at: new Date().toISOString(),
-          updated_by: user.id,
-          is_explored: true
-        })
-        .eq('coordinate', gridId)
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      setGridSquare(data);
-      console.log('Screenshot crop updated successfully');
-      
-      // Broadcast exploration status change globally
-      broadcastExplorationChange({
-        gridSquareId: data.id,
-        coordinate: data.coordinate,
-        isExplored: true,
-        source: 'recrop'
-      });
-      
-      // Clean up
-      setShowCropModal(false);
-      setTempImageUrl(null);
-      setIsEditingExisting(false);
-    } catch (err: any) {
-      console.error('Error updating crop:', err);
-      setError(err.message);
-    } finally {
-      setUploading(false);
-    }
-  };
-
   // Handle deleting screenshot from crop modal
   const handleDeleteFromCrop = async () => {
     if (!confirm('Are you sure you want to delete this screenshot?')) return;
 
     try {
-      // Extract filename from URL to delete from storage
+      // Extract file paths from URLs to delete from storage
+      const filesToDelete: string[] = [];
+      
       if (gridSquare?.screenshot_url) {
-        const url = new URL(gridSquare.screenshot_url);
-        const fileName = url.pathname.split('/').pop();
-        if (fileName) {
-          await supabase.storage
-            .from('screenshots')
-            .remove([fileName]);
+        const filePath = extractStorageFilePath(gridSquare.screenshot_url);
+        if (filePath) {
+          filesToDelete.push(filePath);
         }
       }
 
       // Also delete original if it's different
       if (gridSquare?.original_screenshot_url && 
           gridSquare.original_screenshot_url !== gridSquare.screenshot_url) {
-        const originalUrl = new URL(gridSquare.original_screenshot_url);
-        const originalFileName = originalUrl.pathname.split('/').pop();
-        if (originalFileName) {
-          await supabase.storage
+        const originalFilePath = extractStorageFilePath(gridSquare.original_screenshot_url);
+        if (originalFilePath && !filesToDelete.includes(originalFilePath)) {
+          filesToDelete.push(originalFilePath);
+        }
+      }
+
+      // Delete files from storage
+      if (filesToDelete.length > 0) {
+        console.log(`Deleting ${filesToDelete.length} screenshot files from storage:`, filesToDelete);
+        const { error: storageError } = await supabase.storage
             .from('screenshots')
-            .remove([originalFileName]);
+          .remove(filesToDelete);
+        
+        if (storageError) {
+          console.error('Error deleting screenshot files from storage:', storageError);
+          // Continue with database update even if storage deletion fails
+        } else {
+          console.log('Screenshot files deleted from storage successfully');
         }
       }
 
@@ -1205,7 +1143,7 @@ const GridPage: React.FC = () => {
       if (error) throw error;
 
       setGridSquare(data);
-      console.log('Screenshot deleted successfully');
+      console.log('Screenshot deleted successfully from database');
       
       // Broadcast exploration status change globally
       broadcastExplorationChange({
@@ -1313,10 +1251,23 @@ const GridPage: React.FC = () => {
   if (loading) {
     console.log('GridPage: Still loading data...');
     return (
-      <div className="min-h-screen flex items-center justify-center bg-sand-100">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-spice-600 mx-auto mb-4"></div>
-          <div className="text-night-600">Loading Grid {gridId}...</div>
+      <div className="min-h-screen flex items-center justify-center relative">
+        {/* Main background image */}
+        <div 
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          style={{
+            backgroundImage: `url(/images/main-bg.jpg)`
+          }}
+        />
+        
+        {/* Dark overlay for better contrast */}
+        <div className="absolute inset-0 bg-slate-950/70" />
+        
+        <div className="relative text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-500 mx-auto mb-4"></div>
+          <div className="text-amber-200 font-light" style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+            Loading Grid {gridId}...
+          </div>
         </div>
       </div>
     );
@@ -1325,12 +1276,23 @@ const GridPage: React.FC = () => {
   // Error state
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-sand-100">
-        <div className="text-center">
-          <div className="text-red-600 mb-4">{error}</div>
+      <div className="min-h-screen flex items-center justify-center relative">
+        {/* Main background image */}
+        <div 
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          style={{
+            backgroundImage: `url(/images/main-bg.jpg)`
+          }}
+        />
+        
+        {/* Dark overlay for better contrast */}
+        <div className="absolute inset-0 bg-slate-950/70" />
+        
+        <div className="relative text-center">
+          <div className="text-red-400 mb-4 font-light">{error}</div>
           <button 
             onClick={handleBackToOverview}
-            className="btn btn-primary"
+            className="bg-amber-600 hover:bg-amber-500 text-slate-900 font-medium py-2 px-4 rounded-lg transition-colors"
           >
             Back to Deep Desert
           </button>
@@ -1340,24 +1302,37 @@ const GridPage: React.FC = () => {
   }
 
   return (
-    <div className="h-screen bg-sand-100 flex flex-col overflow-hidden">
+    <div className="h-screen flex flex-col overflow-hidden relative">
+      {/* Main background image */}
+      <div 
+        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+        style={{
+          backgroundImage: `url(/images/main-bg.jpg)`
+        }}
+      />
+      
+      {/* Dark overlay for better contrast */}
+      <div className="absolute inset-0 bg-slate-950/70" />
+
       {/* Header Bar */}
-      <div className="bg-white border-b border-sand-200 px-4 py-3 flex items-center justify-center">
+      <div className="relative bg-slate-900/90 border-b border-slate-700/50 backdrop-blur-sm px-4 py-3 flex items-center justify-center">
         <div className="w-full max-w-6xl flex items-center justify-between">
           {/* Left Section - Back Button */}
           <div className="flex-1">
             <button
               onClick={handleBackToOverview}
-              className="flex items-center gap-2 text-night-600 hover:text-night-800 transition-colors"
+              className="flex items-center gap-2 text-amber-300 hover:text-amber-100 transition-colors"
             >
               <ArrowLeft className="w-5 h-5" />
+              <span className="font-light tracking-wide" style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
               Back to Deep Desert
+              </span>
             </button>
           </div>
 
           {/* Center Section - Title */}
           <div className="flex-1 flex justify-center">
-            <h1 className="text-xl font-bold text-night-800">
+            <h1 className="text-xl font-light text-yellow-300 tracking-wider" style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
               Grid Square {gridId}
             </h1>
           </div>
@@ -1368,33 +1343,33 @@ const GridPage: React.FC = () => {
               {/* Left/Right Navigation */}
               <button
                 onClick={() => handleNavigateToGrid(adjacentGrids.left)}
-                className="px-3 py-1 text-sm rounded bg-spice-100 text-spice-700 hover:bg-spice-200"
+                className="px-3 py-1 text-sm rounded bg-slate-800/90 text-amber-200 hover:bg-slate-700/90 hover:text-amber-100 border border-slate-600/50 transition-all"
                 title={`Go left to ${adjacentGrids.left}`}
               >
                 ← {adjacentGrids.left}
               </button>
               <button
                 onClick={() => handleNavigateToGrid(adjacentGrids.right)}
-                className="px-3 py-1 text-sm rounded bg-spice-100 text-spice-700 hover:bg-spice-200"
+                className="px-3 py-1 text-sm rounded bg-slate-800/90 text-amber-200 hover:bg-slate-700/90 hover:text-amber-100 border border-slate-600/50 transition-all"
                 title={`Go right to ${adjacentGrids.right}`}
               >
                 {adjacentGrids.right} →
               </button>
               
               {/* Vertical separator */}
-              <div className="h-6 w-px bg-sand-300 mx-1" />
+              <div className="h-6 w-px bg-slate-600/50 mx-1" />
               
               {/* Up/Down Navigation */}
               <button
                 onClick={() => handleNavigateToGrid(adjacentGrids.up)}
-                className="px-3 py-1 text-sm rounded bg-spice-100 text-spice-700 hover:bg-spice-200"
+                className="px-3 py-1 text-sm rounded bg-slate-800/90 text-amber-200 hover:bg-slate-700/90 hover:text-amber-100 border border-slate-600/50 transition-all"
                 title={`Go up to ${adjacentGrids.up}`}
               >
                 ↑ {adjacentGrids.up}
               </button>
               <button
                 onClick={() => handleNavigateToGrid(adjacentGrids.down)}
-                className="px-3 py-1 text-sm rounded bg-spice-100 text-spice-700 hover:bg-spice-200"
+                className="px-3 py-1 text-sm rounded bg-slate-800/90 text-amber-200 hover:bg-slate-700/90 hover:text-amber-100 border border-slate-600/50 transition-all"
                 title={`Go down to ${adjacentGrids.down}`}
               >
                 ↓ {adjacentGrids.down}
@@ -1405,351 +1380,41 @@ const GridPage: React.FC = () => {
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Left Panel - Filter/Customization/Layers */}
-        <div className={`${showLeftPanel ? 'w-96' : 'w-12'} bg-white border-r border-sand-200 flex flex-col transition-all duration-200`}>
-          {/* Panel Header with Collapse Button */}
-          <div className="p-4 border-b border-sand-200 flex items-center justify-between">
-            {showLeftPanel && (
-              <h2 className="text-lg font-semibold text-night-800">Map Controls</h2>
-            )}
-            <button
-              onClick={() => setShowLeftPanel(!showLeftPanel)}
-              className="text-sand-400 hover:text-sand-600"
-              title={showLeftPanel ? "Collapse panel" : "Expand panel"}
-            >
-              {showLeftPanel ? '✕' : <ChevronRight className="w-5 h-5" />}
-            </button>
-          </div>
-
-          {showLeftPanel && (
-            <>
-              {/* Tab Navigation - Exact same as Hagga Basin */}
-              <div className="flex mt-4 space-x-2">
-                <button
-                  onClick={() => setActiveTab('filters')}
-                  className={`px-3 py-1 text-sm rounded ${
-                    activeTab === 'filters' 
-                      ? 'bg-spice-100 text-spice-700' 
-                      : 'text-sand-600 hover:text-sand-800'
-                  }`}
-                >
-                  <Filter className="w-4 h-4 inline mr-1" />
-                  Filters
-                </button>
-                <button
-                  onClick={() => setActiveTab('customization')}
-                  className={`px-3 py-1 text-sm rounded ${
-                    activeTab === 'customization' 
-                      ? 'bg-spice-100 text-spice-700' 
-                      : 'text-sand-600 hover:text-sand-800'
-                  }`}
-                >
-                  <Plus className="w-4 h-4 inline mr-1" />
-                  Customization
-                </button>
-                <button
-                  onClick={() => setActiveTab('layers')}
-                  className={`px-3 py-1 text-sm rounded ${
-                    activeTab === 'layers' 
-                      ? 'bg-spice-100 text-spice-700' 
-                      : 'text-sand-600 hover:text-sand-800'
-                  }`}
-                >
-                  <Settings className="w-4 h-4 inline mr-1" />
-                  Layers
-                </button>
-              </div>
-
-              {/* Tab Content */}
-              <div className="flex-1 overflow-y-auto p-4">
-                {/* Filters Tab - Exact same as Hagga Basin */}
-                {activeTab === 'filters' && (
-                  <div className="space-y-4">
-                    {/* Add POI Button */}
-                    <div>
-                      <button
-                        onClick={handleOpenPoiModal}
-                        className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-medium transition-all bg-white border-2 border-spice-200 text-spice-700 hover:bg-spice-50 hover:border-spice-300"
-                      >
-                        <Plus className="w-5 h-5" />
-                        <span>
-                          {gridSquare?.screenshot_url ? 'Add POI to Grid' : 'Add Point of Interest'}
-                        </span>
-                      </button>
-                    </div>
-
-                    {/* Search */}
-                    <div>
-                      <label className="block text-sm font-medium text-sand-700 mb-2">
-                        Search POIs
-                      </label>
-                      <input
-                        type="text"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        placeholder="Search by title..."
-                        className="w-full px-3 py-2 border border-sand-300 rounded-md focus:outline-none focus:ring-2 focus:ring-spice-500"
-                      />
-                    </div>
-
-                    {/* Stats at the top */}
-                    <div className="bg-spice-50 border border-spice-200 p-3 rounded-lg">
-                      <div className="text-sm font-medium text-spice-800">
-                        Showing {filteredPois.length} of {pois.length} POIs
-                      </div>
-                    </div>
-
-                    {/* POI Type Filters */}
-                    <div>
-                      <div className="flex justify-between items-center mb-3">
-                        <label className="block text-sm font-medium text-sand-800">
-                          Points of Interests
-                        </label>
-                        <div className="flex gap-1">
-                          <button
-                            onClick={handleToggleAllPois}
-                            className="text-xs text-spice-600 hover:text-spice-700 font-medium"
-                            title="Toggle All POIs"
-                          >
-                            {(() => {
-                              const allTypeIds = poiTypes.map(type => type.id);
-                              const allTypesSelected = allTypeIds.length > 0 && allTypeIds.every(id => selectedPoiTypes.includes(id));
-                              const buttonText = allTypesSelected ? 'Hide All' : 'Show All';
-                              return buttonText;
-                            })()}
-                          </button>
-                        </div>
-                      </div>
-                      
-                      {/* Two-Column Layout */}
-                      <div className="grid grid-cols-2 gap-3 mb-4">
-                        {/* Left Column: Base + Resources Types */}
-                        <div className="space-y-1">
-                          {categories.includes('Base') && renderCategorySection('Base')}
-                          {categories.includes('Resources') && renderCategorySection('Resources')}
-                        </div>
-                        
-                        {/* Right Column: Locations + NPCs */}
-                        <div className="space-y-1">
-                          {categories.includes('Locations') && renderCategorySection('Locations')}
-                          {categories.includes('NPCs') && renderCategorySection('NPCs')}
-                        </div>
-                      </div>
-                      
-                      {/* Other Categories (if any) */}
-                      {categories.filter(cat => !['Base', 'Resources', 'Locations', 'NPCs'].includes(cat)).length > 0 && (
-                        <div className="border-t border-sand-200 pt-3">
-                          <div className="flex justify-between items-center mb-2">
-                            <h4 className="text-sm font-medium text-sand-800">Other Types</h4>
-                            <button
-                              onClick={handleOtherTypesToggle}
-                              className="text-xs text-spice-600 hover:text-spice-700 font-medium"
-                              title="Toggle All Other Types"
-                            >
-                              {(() => {
-                                const mainCategories = ['Base', 'Resources', 'Locations', 'NPCs'];
-                                const otherCategories = categories.filter(cat => !mainCategories.includes(cat));
-                                const otherTypeIds = poiTypes
-                                  .filter(type => otherCategories.includes(type.category))
-                                  .map(type => type.id);
-                                const anyOtherTypesSelected = otherTypeIds.some(id => selectedPoiTypes.includes(id));
-                                return anyOtherTypesSelected ? 'Hide All' : 'Show All';
-                              })()}
-                            </button>
-                          </div>
-                          <div className="space-y-1">
-                            {categories
-                              .filter(cat => !['Base', 'Resources', 'Locations', 'NPCs'].includes(cat))
-                              .map(category => renderCategorySection(category))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Additional Filters Section */}
-                    <div className="border-t border-sand-200 pt-4">
-                      <h4 className="text-sm font-medium text-sand-800 mb-3">Additional Filters</h4>
-                      
-                      {/* Visibility Presets */}
-                      <div>
-                        <label className="block text-sm font-medium text-sand-700 mb-2">
-                          Quick Visibility Filters
-                        </label>
-                        <div className="grid grid-cols-2 gap-2">
-                          <button
-                            onClick={() => setPrivacyFilter('public')}
-                            className={`px-3 py-2 text-xs rounded border flex items-center justify-center gap-1 ${
-                              privacyFilter === 'public'
-                                ? 'bg-spice-100 border-spice-300 text-spice-700'
-                                : 'bg-sand-50 border-sand-300 text-sand-600 hover:bg-sand-100'
-                            }`}
-                          >
-                            <Eye className="w-3 h-3 text-green-600" />
-                            Public Only
-                          </button>
-                          <button
-                            onClick={() => setPrivacyFilter('private')}
-                            className={`px-3 py-2 text-xs rounded border flex items-center justify-center gap-1 ${
-                              privacyFilter === 'private'
-                                ? 'bg-spice-100 border-spice-300 text-spice-700'
-                                : 'bg-sand-50 border-sand-300 text-sand-600 hover:bg-sand-100'
-                            }`}
-                          >
-                            <Lock className="w-3 h-3 text-red-600" />
-                            Private Only
-                          </button>
-                          <button
-                            onClick={() => setPrivacyFilter('shared')}
-                            className={`px-3 py-2 text-xs rounded border flex items-center justify-center gap-1 ${
-                              privacyFilter === 'shared'
-                                ? 'bg-spice-100 border-spice-300 text-spice-700'
-                                : 'bg-sand-50 border-sand-300 text-sand-600 hover:bg-sand-100'
-                            }`}
-                          >
-                            <Users className="w-3 h-3 text-blue-600" />
-                            Shared Only
-                          </button>
-                          <button
-                            onClick={() => setPrivacyFilter('all')}
-                            className={`px-3 py-2 text-xs rounded border flex items-center justify-center gap-1 ${
-                              privacyFilter === 'all'
-                                ? 'bg-spice-100 border-spice-300 text-spice-700'
-                                : 'bg-sand-50 border-sand-300 text-sand-600 hover:bg-sand-100'
-                            }`}
-                          >
-                            <Eye className="w-3 h-3 text-sand-600" />
-                            Show All
-                          </button>
-                        </div>
-                        <div className="mt-2 text-xs text-sand-500">
-                          Icons show privacy levels on map POIs: <Eye className="w-3 h-3 inline text-green-600" /> Public, <Lock className="w-3 h-3 inline text-red-600" /> Private, <Users className="w-3 h-3 inline text-blue-600" /> Shared
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Customization Tab - Exact same as Hagga Basin */}
-                {activeTab === 'customization' && (
-                  <div className="space-y-4">
-                    {/* Custom POI Types Section */}
-                    <div>
-                      <div className="flex justify-between items-center mb-3">
-                        <h4 className="text-sm font-medium text-sand-800">Custom POI Types</h4>
-                        <button 
-                          onClick={() => {
+      <div className="relative flex-1 flex overflow-hidden">
+        {/* Left Panel - Map Controls */}
+        <MapControlPanel 
+          showPanel={showLeftPanel}
+          onTogglePanel={() => setShowLeftPanel(!showLeftPanel)}
+          mode="grid"
+          currentLocation={gridId}
+          pois={pois}
+          filteredPois={filteredPois}
+          poiTypes={poiTypes}
+          customIcons={customIcons}
+          collections={collections}
+          userCreatedPoiTypes={userCreatedPoiTypes}
+          activeTab={activeTab}
+          onActiveTabChange={setActiveTab}
+          searchTerm={searchTerm}
+          onSearchTermChange={setSearchTerm}
+          selectedPoiTypes={selectedPoiTypes}
+          selectedCategories={selectedCategories}
+          privacyFilter={privacyFilter}
+          onPrivacyFilterChange={setPrivacyFilter}
+          onAddPOI={handleAddPOI}
+          onTypeToggle={handleTypeToggle}
+          onCategoryToggle={handleCategoryToggle}
+          onToggleAllPois={handleToggleAllPois}
+          onOtherTypesToggle={handleOtherTypesToggle}
+          onCustomPoiTypeEdit={handleCustomPoiTypeEdit}
+          onShowCollectionModal={() => setShowCollectionModal(true)}
+          onShowCustomPoiTypeModal={() => {
                             setEditingPoiType(null);
                             setShowCustomPoiTypeModal(true);
                           }}
-                          className="btn btn-sm btn-primary"
-                        >
-                          <Plus className="w-4 h-4 mr-1" />
-                          Create
-                        </button>
-                      </div>
-                      
-                      {userCreatedPoiTypes.length === 0 ? (
-                        <div className="text-center py-8">
-                          <Plus className="w-12 h-12 text-sand-400 mx-auto mb-4" />
-                          <p className="text-sand-600 mb-2">No custom POI types yet</p>
-                          <p className="text-sand-500 text-sm">Create custom POI types with your own icons and categories</p>
-                        </div>
-                      ) : (
-                        <div className="space-y-2">
-                          {userCreatedPoiTypes.map(poiType => (
-                            <div 
-                              key={poiType.id} 
-                              className="bg-sand-50 border border-sand-200 rounded-lg p-3"
-                            >
-                              <div className="flex items-center">
-                                <div 
-                                  className="w-8 h-8 rounded flex items-center justify-center mr-3 flex-shrink-0"
-                                  style={{
-                                    backgroundColor: poiType.icon_has_transparent_background && poiType.icon.startsWith('http') 
-                                      ? 'transparent' 
-                                      : poiType.color
-                                  }}
-                                >
-                                  {poiType.icon.startsWith('http') ? (
-                                    <img
-                                      src={poiType.icon}
-                                      alt={poiType.name}
-                                      className="w-5 h-5 object-contain"
-                                    />
-                                  ) : (
-                                    <span className="text-sm">{poiType.icon}</span>
-                                  )}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center">
-                                    <h4 className="font-medium text-sand-800 truncate">{poiType.name}</h4>
-                                    <span className="ml-2 px-2 py-0.5 bg-spice-100 text-spice-700 text-xs rounded capitalize">
-                                      {poiType.category}
-                                    </span>
-                                  </div>
-                                  {poiType.default_description && (
-                                    <p className="text-sm text-sand-600 mt-1 truncate">{poiType.default_description}</p>
-                                  )}
-                                </div>
-                                {/* Edit button for sidebar */}
-                                <button
-                                  onClick={() => handleCustomPoiTypeEdit(poiType)}
-                                  className="text-spice-400 hover:text-spice-600 transition-colors ml-2"
-                                  title="Edit POI type"
-                                >
-                                  <Edit className="w-4 h-4" />
-                                </button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Collections Section */}
-                    <div className="pt-4 border-t border-sand-200">
-                      <div className="flex justify-between items-center mb-3">
-                        <h4 className="text-sm font-medium text-sand-700">POI Collections</h4>
-                        <button 
-                          onClick={() => setShowCollectionModal(true)}
-                          className="btn btn-sm btn-outline"
-                        >
-                          <FolderOpen className="w-4 h-4 mr-1" />
-                          Manage
-                        </button>
-                      </div>
-                      <p className="text-xs text-sand-500 mb-3">
-                        {collections.length} collections • Organize and share groups of POIs
-                      </p>
-                      
-                      {collections.length > 0 && (
-                        <div className="space-y-2 max-h-32 overflow-y-auto">
-                          {collections.slice(0, 3).map(collection => (
-                            <div key={collection.id} className="flex items-center text-sm">
-                              <FolderOpen className="w-4 h-4 text-spice-600 mr-2 flex-shrink-0" />
-                              <span className="text-sand-700 truncate">{collection.name}</span>
-                              {collection.is_public && (
-                                <span className="ml-auto text-xs text-blue-600">Public</span>
-                              )}
-                            </div>
-                          ))}
-                          {collections.length > 3 && (
-                            <div className="text-xs text-sand-500 italic">
-                              +{collections.length - 3} more collections
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Layers Tab - Exact same as Hagga Basin */}
-                {activeTab === 'layers' && (
-                  <div className="space-y-4">
-                    <h3 className="text-sm font-medium text-sand-700">Map Layers</h3>
-                    
+          isIconUrl={isIconUrl}
+          getDisplayImageUrl={getDisplayImageUrl}
+          additionalLayerContent={
                     <div className="space-y-2">
                       {/* Grid Screenshot Layer */}
                       <div className="flex items-center justify-between">
@@ -1758,90 +1423,29 @@ const GridPage: React.FC = () => {
                             type="checkbox"
                             checked={gridSquare?.screenshot_url ? true : false}
                             disabled={true}
-                            className="rounded border-sand-300 text-spice-600 focus:ring-spice-500"
+                    className="rounded border-slate-600 bg-slate-800 text-amber-500 focus:ring-amber-500/30"
                           />
-                          <span className="ml-2 text-sm text-sand-700">Grid Screenshot</span>
+                  <span className="ml-2 text-sm text-amber-200">Grid Screenshot</span>
                         </label>
-                        <div className="text-xs text-sand-500">
+                <div className="text-xs text-amber-300/70">
                           {gridSquare?.screenshot_url ? 'Active' : 'None'}
                         </div>
                       </div>
-
-                      {/* POI Markers Layer */}
-                      <div className="flex items-center justify-between">
-                        <label className="flex items-center">
-                          <input
-                            type="checkbox"
-                            checked={true}
-                            disabled={true}
-                            className="rounded border-sand-300 text-spice-600 focus:ring-spice-500"
-                          />
-                          <span className="ml-2 text-sm text-sand-700">POI Markers</span>
-                        </label>
-                        <div className="text-xs text-sand-500">
-                          {filteredPois.length} visible
                         </div>
-                      </div>
-                    </div>
-
-                    <div className="text-sm text-sand-500 italic mt-4 text-center">
-                      No overlay layers available
-                    </div>
-                  </div>
-                )}
-              </div>
-            </>
-          )}
-        </div>
+          }
+        />
 
         {/* Center Panel - Interactive Screenshot */}
-        <div className="flex-1 bg-sand-50 flex items-center justify-center relative">
-          {/* Placement Mode Instructions - Top overlay */}
-          {placementMode && !placementReady && (
-            <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-20">
-              <div className="bg-white rounded-lg shadow-lg p-4 max-w-sm text-center border-2 border-spice-500">
-                <Target className="w-8 h-8 text-spice-600 mx-auto mb-2" />
-                <h3 className="text-sm font-semibold text-night-800 mb-2">
-                  📍 POI Placement Mode
-                </h3>
-                <p className="text-xs text-sand-600 mb-3">
-                  Choose how to place your POI marker:
-                </p>
-                <div className="flex gap-2 justify-center">
-                  <button
-                    onClick={handleChoosePlaceMarker}
-                    className="px-3 py-2 bg-spice-600 text-white text-xs rounded-lg hover:bg-spice-700 transition-colors flex items-center gap-1"
-                  >
-                    <MapPin className="w-3 h-3" />
-                    Place Marker
-                  </button>
-                  <button
-                    onClick={() => {
-                      setPlacementCoordinates({ x: 2000, y: 2000 });
-                      setPlacementMode(false);
-                      setShowPoiModal(true);
-                    }}
-                    className="px-3 py-2 bg-sand-200 text-sand-700 text-xs rounded-lg hover:bg-sand-300 transition-colors"
-                  >
-                    Skip Placement
-                  </button>
+        <div className="flex-1 bg-slate-900/30 backdrop-blur-sm flex items-center justify-center relative overflow-hidden">
+          {/* Placement Mode Indicator - Hagga Basin Style */}
+          {placementMode && (
+            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-40 pointer-events-none">
+              <div className="bg-amber-600/80 text-slate-900 px-4 py-2 rounded-lg shadow-lg">
+                <div className="text-center">
+                  <Plus className="w-6 h-6 mx-auto mb-1" />
+                  <div className="text-sm font-medium">Click on screenshot to place POI</div>
+                  <div className="text-xs opacity-90">Press ESC to cancel</div>
                 </div>
-                <button
-                  onClick={handleExitPlacementMode}
-                  className="mt-2 text-xs text-sand-500 hover:text-sand-700 underline"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Placement Mode - Ready to click indicator */}
-          {placementMode && placementReady && (
-            <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-20">
-              <div className="bg-spice-600 text-white px-4 py-2 rounded-lg shadow-lg text-sm flex items-center gap-2">
-                <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
-                Click anywhere on the screenshot to place POI
               </div>
             </div>
           )}
@@ -1852,24 +1456,24 @@ const GridPage: React.FC = () => {
               <div className="absolute top-4 left-4 z-30 flex flex-col gap-2">
                 <button
                   onClick={zoomIn}
-                  className="bg-white border border-sand-200 rounded-lg p-2 shadow-sm hover:shadow-md transition-shadow"
+                  className="bg-slate-900/90 backdrop-blur-sm border border-slate-700/50 rounded-lg p-2 shadow-lg hover:bg-slate-800/90 transition-all"
                   title="Zoom In"
                 >
-                  <ZoomIn className="w-5 h-5 text-sand-600" />
+                  <ZoomIn className="w-5 h-5 text-amber-300" />
                 </button>
                 <button
                   onClick={zoomOut}
-                  className="bg-white border border-sand-200 rounded-lg p-2 shadow-sm hover:shadow-md transition-shadow"
+                  className="bg-slate-900/90 backdrop-blur-sm border border-slate-700/50 rounded-lg p-2 shadow-lg hover:bg-slate-800/90 transition-all"
                   title="Zoom Out"
                 >
-                  <ZoomOut className="w-5 h-5 text-sand-600" />
+                  <ZoomOut className="w-5 h-5 text-amber-300" />
                 </button>
                 <button
                   onClick={resetTransform}
-                  className="bg-white border border-sand-200 rounded-lg p-2 shadow-sm hover:shadow-md transition-shadow"
+                  className="bg-slate-900/90 backdrop-blur-sm border border-slate-700/50 rounded-lg p-2 shadow-lg hover:bg-slate-800/90 transition-all"
                   title="Reset View"
                 >
-                  <RotateCcw className="w-5 h-5 text-sand-600" />
+                  <RotateCcw className="w-5 h-5 text-amber-300" />
                 </button>
                 
                 {/* Help Button with Tooltip */}
@@ -1877,38 +1481,38 @@ const GridPage: React.FC = () => {
                   <button
                     onMouseEnter={() => setShowHelpTooltip(true)}
                     onMouseLeave={() => setShowHelpTooltip(false)}
-                    className="bg-white border border-sand-200 rounded-lg p-2 shadow-sm hover:shadow-md transition-shadow"
+                    className="bg-slate-900/90 backdrop-blur-sm border border-slate-700/50 rounded-lg p-2 shadow-lg hover:bg-slate-800/90 transition-all"
                     title="Help & Tips"
                   >
-                    <HelpCircle className="w-5 h-5 text-sand-600" />
+                    <HelpCircle className="w-5 h-5 text-amber-300" />
                   </button>
                   
                   {/* Help Tooltip */}
                   {showHelpTooltip && (
-                    <div className="absolute left-full ml-3 top-0 w-80 bg-white border border-sand-200 rounded-lg shadow-lg p-4 z-50">
-                      <h4 className="font-medium text-sand-800 mb-3 flex items-center gap-2">
+                    <div className="absolute left-full ml-3 top-0 w-80 bg-slate-900/95 backdrop-blur-sm border border-slate-700/50 rounded-lg shadow-xl p-4 z-50">
+                      <h4 className="font-medium text-yellow-300 mb-3 flex items-center gap-2" style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
                         <HelpCircle className="w-4 h-4" />
                         Deep Desert Controls & Tips
                       </h4>
-                      <div className="space-y-2 text-sm text-sand-600">
-                        <div><strong>Map Controls:</strong></div>
-                        <div className="ml-2 space-y-1">
+                      <div className="space-y-2 text-sm text-amber-200">
+                        <div><strong className="text-amber-100">Map Controls:</strong></div>
+                        <div className="ml-2 space-y-1 text-amber-200/90">
                           <div>• Mouse wheel or +/- buttons to zoom</div>
                           <div>• Click and drag to pan around</div>
                           <div>• Double-click to zoom in quickly</div>
                           <div>• Reset button to restore original view</div>
                         </div>
                         
-                        <div className="mt-3"><strong>POI Management:</strong></div>
-                        <div className="ml-2 space-y-1">
+                        <div className="mt-3"><strong className="text-amber-100">POI Management:</strong></div>
+                        <div className="ml-2 space-y-1 text-amber-200/90">
                           <div>• Click on POI cards to view details and screenshots</div>
                           <div>• Use view toggle to switch between grid and list layouts</div>
                           <div>• Sort POIs by date, title, category, or type</div>
                           <div>• Filter POIs using the search and privacy controls</div>
                         </div>
                         
-                        <div className="mt-3"><strong>Deep Desert Features:</strong></div>
-                        <div className="ml-2 space-y-1">
+                        <div className="mt-3"><strong className="text-amber-100">Deep Desert Features:</strong></div>
+                        <div className="ml-2 space-y-1 text-amber-200/90">
                           <div>• Grid coordinates help identify exact locations</div>
                           <div>• Upload screenshots to enable precise POI placement</div>
                           <div>• Navigate between adjacent grids using arrows</div>
@@ -1923,7 +1527,7 @@ const GridPage: React.FC = () => {
                 {gridSquare?.original_screenshot_url && user && (
                   <button
                     onClick={handleEditExistingCrop}
-                    className="bg-amber-600 text-white border border-amber-700 rounded-lg p-2 shadow-sm hover:shadow-md hover:bg-amber-700 transition-all"
+                    className="bg-amber-600 text-slate-900 border border-amber-700 rounded-lg p-2 shadow-lg hover:bg-amber-500 transition-all"
                     title="Edit screenshot crop"
                   >
                     <Edit className="w-5 h-5" />
@@ -1953,20 +1557,21 @@ const GridPage: React.FC = () => {
               >
                 <TransformComponent 
                   wrapperStyle={{ width: '100%', height: '100%' }}
-                  contentStyle={{ width: '100%', height: '100%' }}
+                  contentStyle={{ width: '2000px', height: '2000px' }}
                 >
                   <div className="relative w-full h-full flex items-center justify-center">
                     <img
                       src={gridSquare.screenshot_url}
                       alt={`Grid ${gridId} screenshot`}
-                      className={`max-w-full max-h-full object-contain transition-all ${
-                        placementMode && placementReady
-                          ? 'border-4 border-spice-500 rounded shadow-lg' 
-                          : placementMode
-                          ? 'opacity-50'
+                      className={`transition-all ${
+                        placementMode
+                          ? 'cursor-crosshair' 
                           : ''
                       }`}
                       style={{ 
+                        width: '2000px',
+                        height: '2000px',
+                        objectFit: 'contain',
                         pointerEvents: 'none'
                       }}
                       draggable={false}
@@ -1974,7 +1579,7 @@ const GridPage: React.FC = () => {
                     />
                     
                     {/* Placement Click Overlay */}
-                    {placementMode && placementReady && (
+                    {placementMode && (
                       <div
                         className="absolute inset-0 cursor-crosshair z-20"
                         style={{ pointerEvents: 'auto' }}
@@ -1990,17 +1595,21 @@ const GridPage: React.FC = () => {
                       const poiType = poiTypes.find(type => type.id === poi.poi_type_id);
                       if (!poiType) return null;
 
-                      // Apply counter-scaling to neutralize the zoom effect
-                      const counterScale = 1 / currentZoom;
+                      // Calculate position as percentage of container for both map types
+                      // Deep Desert: pixel coordinates (0-2000) -> percentage (0-100%)
+                      // Hagga Basin: pixel coordinates (0-4000) -> percentage (0-100%)
+                      const maxCoordinate = poi.map_type === 'hagga_basin' ? 4000 : 2000;
+                      const leftPercent = (poi.coordinates_x / maxCoordinate) * 100;
+                      const topPercent = (poi.coordinates_y / maxCoordinate) * 100;
 
                       return (
                         <div
                           key={poi.id}
                           className="absolute"
                           style={{
-                            left: `${(poi.coordinates_x / 4000) * 100}%`,
-                            top: `${(poi.coordinates_y / 4000) * 100}%`,
-                            transform: `translate(-50%, -50%) scale(${counterScale})`,
+                            left: `${leftPercent}%`,
+                            top: `${topPercent}%`,
+                            transform: `translate(-50%, -50%) scale(${1 / currentZoom})`,
                             zIndex: 10,
                             pointerEvents: 'auto'
                           }}
@@ -2013,9 +1622,9 @@ const GridPage: React.FC = () => {
                             zoom={currentZoom}
                             mapSettings={deepDesertMapSettings}
                             onEdit={handlePoiEdit}
-                            onDelete={() => handlePoiDelete(poi.id)}
-                            onShare={() => handlePoiShare(poi)}
-                            onImageClick={() => handlePoiGalleryOpen(poi)}
+                            onDelete={handlePoiDelete}
+                            onShare={handlePoiShare}
+                            onImageClick={handlePoiGalleryOpen}
                             isHighlighted={highlightedPoiId === poi.id}
                           />
                         </div>
@@ -2031,8 +1640,8 @@ const GridPage: React.FC = () => {
                 <div
                   className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
                     dragActive
-                      ? 'border-spice-400 bg-spice-50'
-                      : 'border-sand-300 bg-white hover:border-sand-400'
+                      ? 'border-amber-400 bg-amber-500/10'
+                      : 'border-slate-600/50 bg-slate-900/30 hover:border-slate-500/50 hover:bg-slate-900/40'
                   } ${uploading ? 'opacity-50 pointer-events-none' : ''}`}
                   onDrop={handleDrop}
                   onDragOver={handleDragOver}
@@ -2048,17 +1657,17 @@ const GridPage: React.FC = () => {
                   
                   <div className="mb-4">
                     {uploading ? (
-                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-spice-600 mx-auto"></div>
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-500 mx-auto"></div>
                     ) : (
-                      <Image className="h-12 w-12 text-sand-400 mx-auto" />
+                      <Image className="h-12 w-12 text-amber-400/70 mx-auto" />
                     )}
                   </div>
                   
-                  <div className="text-lg font-medium text-night-800 mb-2">
+                  <div className="text-lg font-medium text-yellow-300 mb-2" style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
                     {uploading ? 'Uploading...' : 'Upload Screenshot'}
                   </div>
                   
-                  <div className="text-sand-600 mb-4">
+                  <div className="text-amber-200 mb-4">
                     {uploading
                       ? 'Processing your screenshot...'
                       : 'Drag and drop an image here, or click to select'
@@ -2068,14 +1677,14 @@ const GridPage: React.FC = () => {
                   {!uploading && (
                     <button
                       onClick={() => fileInputRef.current?.click()}
-                      className="btn btn-primary inline-flex items-center gap-2"
+                      className="bg-amber-600 hover:bg-amber-500 text-slate-900 font-medium py-2 px-4 rounded-lg transition-colors inline-flex items-center gap-2"
                     >
                       <Upload className="w-4 h-4" />
                       Choose File
                     </button>
                   )}
                   
-                  <div className="text-xs text-sand-500 mt-4">
+                  <div className="text-xs text-amber-300/70 mt-4">
                     Supported formats: JPG, PNG, GIF, WEBP
                   </div>
                 </div>
@@ -2084,19 +1693,21 @@ const GridPage: React.FC = () => {
           )}
           
           {/* Mini Map Panel */}
-          <div className={`absolute top-4 right-4 bg-white border border-sand-200 rounded-lg shadow-lg transition-all duration-200 ${
+          <div className={`absolute top-4 right-4 bg-slate-900/90 backdrop-blur-sm border border-slate-700/50 rounded-lg shadow-xl transition-all duration-200 ${
             showMiniMap ? 'w-64' : 'w-12'
           }`}>
-            <div className="p-3 border-b border-sand-200 flex items-center justify-between">
+            <div className="p-3 border-b border-slate-700/50 flex items-center justify-between">
               <button
                 onClick={() => setShowMiniMap(!showMiniMap)}
-                className="p-1 rounded hover:bg-sand-100 text-sand-600 hover:text-sand-800"
+                className="p-1 rounded hover:bg-slate-800/50 text-amber-300 hover:text-amber-100 transition-colors"
                 title={showMiniMap ? "Collapse mini map" : "Expand mini map"}
               >
                 {showMiniMap ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
               </button>
               {showMiniMap && (
-                <div className="text-sm font-semibold text-night-800">Grid Navigation</div>
+                <div className="text-sm font-semibold text-yellow-300" style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                  Grid Navigation
+                </div>
               )}
             </div>
             {showMiniMap && (
@@ -2112,8 +1723,8 @@ const GridPage: React.FC = () => {
                           onClick={() => handleNavigateToGrid(cellId)}
                           className={`w-6 h-6 text-xs rounded transition-colors ${
                             isCurrent
-                              ? 'bg-spice-600 text-white font-bold'
-                              : 'bg-sand-100 text-sand-700 hover:bg-sand-200'
+                              ? 'bg-amber-600 text-slate-900 font-bold'
+                              : 'bg-slate-800/70 text-amber-200 hover:bg-slate-700/70 hover:text-amber-100'
                           }`}
                           title={`Navigate to grid ${cellId}`}
                         >
@@ -2128,56 +1739,31 @@ const GridPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Right Panel - Enhanced POI Panel */}
-        <div className={`${showRightPanel ? 'w-[450px]' : 'w-12'} bg-white border-l border-sand-200 flex flex-col transition-all duration-200`}>
-          <div className="p-4 border-b border-sand-200 flex items-center justify-between">
-            <button
-              onClick={() => setShowRightPanel(!showRightPanel)}
-              className="text-sand-400 hover:text-sand-600"
-              title={showRightPanel ? "Collapse panel" : "Expand panel"}
-            >
-              {showRightPanel ? '✕' : <ChevronLeft className="w-5 h-5" />}
-            </button>
-            {showRightPanel && (
-              <h2 className="text-lg font-semibold text-night-800">POIs & Info</h2>
-            )}
-          </div>
-          {showRightPanel && (
-            <div className="flex-1 overflow-hidden">
+        {/* Right Panel - POI List */}
               <POIPanel
-                pois={pois}
+          showPanel={showRightPanel}
+          onTogglePanel={() => setShowRightPanel(!showRightPanel)}
+          title={`POIs in ${gridId}`}
+          pois={filteredPois}
                 poiTypes={poiTypes}
                 customIcons={customIcons}
-                searchTerm={searchTerm}
-                onSearchChange={setSearchTerm}
-                selectedPoiTypes={selectedPoiTypes}
-                onPoiTypeToggle={handleTypeToggle}
-                privacyFilter={privacyFilter}
-                onPrivacyFilterChange={setPrivacyFilter}
-                mapType="deep_desert"
-                gridSquares={gridSquare ? [gridSquare] : []}
                 userInfo={userInfo}
-                onPoiClick={(poi) => handlePoiClick(poi, {} as React.MouseEvent)}
-                onPoiHighlight={handlePoiHighlight}
-                onPoiEdit={handlePoiEdit}
-                onPoiDelete={handlePoiDelete}
-                onPoiShare={handlePoiShare}
-                onPoiGalleryOpen={handlePoiGalleryOpen}
-              />
-            </div>
-          )}
-        </div>
+          onPoiClick={(poi) => setSelectedPoiId(poi.id)}
+          emptyStateMessage="No POIs found"
+          emptyStateSubtitle="Add POIs to this grid square to see them here"
+          mode="grid"
+        />
       </div>
 
       {/* Error Display */}
       {error && (
-        <div className="mx-6 mt-4 p-3 bg-red-100 text-red-700 rounded-lg border border-red-300">
+        <div className="relative mx-6 mt-4 p-3 bg-red-900/80 backdrop-blur-sm text-red-200 rounded-lg border border-red-700/50">
           {error}
         </div>
       )}
 
       {/* POI Placement Modal */}
-      {showPoiModal && gridSquare && placementCoordinates && (
+      {showPoiModal && gridSquare && gridSquare.id && placementCoordinates && (
         <POIPlacementModal
           coordinates={placementCoordinates}
           poiTypes={poiTypes}
@@ -2186,7 +1772,6 @@ const GridPage: React.FC = () => {
           onClose={handleModalClose}
           mapType="deep_desert"
           gridSquareId={gridSquare.id}
-          onRequestPlacement={gridSquare.screenshot_url ? handleRequestPlacement : undefined}
         />
       )}
 
@@ -2196,25 +1781,46 @@ const GridPage: React.FC = () => {
         if (!poiType) return null;
         
         return (
-          <HaggaBasinPoiCard
+          <POICard
             poi={selectedPoi}
             poiType={poiType}
             customIcons={customIcons}
             isOpen={true}
             onClose={() => setSelectedPoi(null)}
             onEdit={() => handlePoiEdit(selectedPoi)}
-            onDelete={async () => {
-              if (window.confirm(`Are you sure you want to delete "${selectedPoi.title}"?`)) {
-                try {
-                  await handlePoiDelete(selectedPoi.id);
-                } catch (error) {
-                  console.error('Error deleting POI:', error);
-                  alert('Failed to delete POI. Please try again.');
-                }
-              }
-            }}
+            onDelete={() => handlePoiDelete(selectedPoi.id)}
             onShare={() => handlePoiShare(selectedPoi)}
             onImageClick={() => handlePoiGalleryOpen(selectedPoi)}
+          />
+        );
+      })()}
+
+      {/* POI Card Modal from POIPanel */}
+      {selectedPoiId && (() => {
+        const selectedPoiFromPanel = filteredPois.find(poi => poi.id === selectedPoiId);
+        const selectedPoiType = selectedPoiFromPanel ? poiTypes.find(type => type.id === selectedPoiFromPanel.poi_type_id) : null;
+        if (!selectedPoiFromPanel || !selectedPoiType) return null;
+        
+        return (
+          <POICard
+            poi={selectedPoiFromPanel}
+            poiType={selectedPoiType}
+            customIcons={customIcons}
+            isOpen={true}
+            onClose={() => setSelectedPoiId(null)}
+            onEdit={() => {
+              setEditingPoi(selectedPoiFromPanel);
+              setSelectedPoiId(null);
+            }}
+            onDelete={() => {
+              handlePoiDelete(selectedPoiFromPanel.id);
+              setSelectedPoiId(null);
+            }}
+            onShare={() => {
+              handlePoiShare(selectedPoiFromPanel);
+              setSelectedPoiId(null);
+            }}
+            onImageClick={() => handlePoiGalleryOpen(selectedPoiFromPanel)}
           />
         );
       })()}
@@ -2313,9 +1919,7 @@ const GridPage: React.FC = () => {
           imageUrl={tempImageUrl}
           onCropComplete={isEditingExisting ? handleRecropComplete : handleCropComplete}
           onClose={handleCloseCropModal}
-          onSkip={isEditingExisting ? undefined : handleSkipCrop}
           onDelete={isEditingExisting ? handleDeleteFromCrop : undefined}
-          title={isEditingExisting ? 'Edit Screenshot Crop' : 'Crop Your Screenshot'}
           defaultToSquare={true}
           initialCrop={
             isEditingExisting && gridSquare && 

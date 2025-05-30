@@ -24,20 +24,6 @@ interface StoredBackupFile {
   downloadUrl?: string; 
   fullPath: string; 
   mapType: 'deep_desert' | 'hagga_basin' | 'combined';
-  metadata?: {
-    database?: {
-      grid_squares?: number;
-      pois?: number;
-      comments?: number;
-    };
-    formatVersion?: string;
-    files?: {
-      grid_screenshots?: number;
-      poi_screenshots?: number;
-      comment_screenshots?: number;
-      custom_icons?: number;
-    };
-  };
 }
 
 interface BackupsByType {
@@ -498,8 +484,8 @@ const AdminPanel: React.FC = () => {
     const mapTypeName = mapType === 'deep_desert' ? 'Deep Desert' : 'Hagga Basin';
 
     try {
-    setIsResetting(true);
-    setError(null);
+      setIsResetting(true);
+      setError(null);
 
       const session = await supabase.auth.getSession();
       if (!session.data.session) {
@@ -908,7 +894,7 @@ const AdminPanel: React.FC = () => {
       loadMapSettings();
     }
   }, [user]);
-  
+
   const formatBytes = (bytes: number, decimals = 2) => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
@@ -945,108 +931,108 @@ const AdminPanel: React.FC = () => {
               {isBackingUp ? 'Creating Backup...' : 'Backup Deep Desert'}
             </button>
           </div>
-          </div>
+        </div>
 
         {/* Scheduled Deep Desert Operations */}
         <div className="p-5 bg-sand-50 rounded-md border border-sand-200">
           <h4 className="text-lg font-medium text-night-600 mb-4">Scheduled Deep Desert Operations</h4>
-            <p className="text-sm text-night-500 mb-4">
+          <p className="text-sm text-night-500 mb-4">
             <strong>Note:</strong> Scheduled resets are only available for Deep Desert to prevent accidental Hagga Basin data loss.
           </p>
           
           {/* Schedule Deep Desert Backup */}
           <div className="mb-6">
             <h5 className="text-md font-medium text-night-600 mb-3">Schedule Deep Desert Backup</h5>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-            <div>
-              <label htmlFor="backup-time" className="block text-sm font-medium text-night-600 mb-1">Time (Local)</label>
-              <input
-                type="time"
-                id="backup-time"
-                value={scheduledBackupTime}
-                onChange={(e) => setScheduledBackupTime(e.target.value)}
-                className="w-full p-2 rounded-md bg-white border-sand-300 text-night-700 focus:ring-spice-500 focus:border-spice-500 shadow-sm"
-              />
-            </div>
-            <div>
-              <label htmlFor="backup-start-date" className="block text-sm font-medium text-night-600 mb-1">Start Date</label>
-              <input
-                type="date"
-                id="backup-start-date"
-                value={scheduledBackupStartDate}
-                onChange={(e) => setScheduledBackupStartDate(e.target.value)}
-                min={new Date().toISOString().split('T')[0]}
-                className="w-full p-2 rounded-md bg-white border-sand-300 text-night-700 focus:ring-spice-500 focus:border-spice-500 shadow-sm"
-              />
-            </div>
-            <div>
-              <label htmlFor="backup-frequency" className="block text-sm font-medium text-night-600 mb-1">Frequency</label>
-              <select
-                id="backup-frequency"
-                value={scheduledBackupFrequency}
-                onChange={(e) => setScheduledBackupFrequency(e.target.value as ScheduledTaskFrequency)}
-                className="w-full p-2 rounded-md bg-white border-sand-300 text-night-700 focus:ring-spice-500 focus:border-spice-500 shadow-sm"
-              >
-                <option value="daily">Daily</option>
-                <option value="weekly">Weekly</option>
-              </select>
-            </div>
-            <button
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+              <div>
+                <label htmlFor="backup-time" className="block text-sm font-medium text-night-600 mb-1">Time (Local)</label>
+                <input
+                  type="time"
+                  id="backup-time"
+                  value={scheduledBackupTime}
+                  onChange={(e) => setScheduledBackupTime(e.target.value)}
+                  className="w-full p-2 rounded-md bg-white border-sand-300 text-night-700 focus:ring-spice-500 focus:border-spice-500 shadow-sm"
+                />
+              </div>
+              <div>
+                <label htmlFor="backup-start-date" className="block text-sm font-medium text-night-600 mb-1">Start Date</label>
+                <input
+                  type="date"
+                  id="backup-start-date"
+                  value={scheduledBackupStartDate}
+                  onChange={(e) => setScheduledBackupStartDate(e.target.value)}
+                  min={new Date().toISOString().split('T')[0]}
+                  className="w-full p-2 rounded-md bg-white border-sand-300 text-night-700 focus:ring-spice-500 focus:border-spice-500 shadow-sm"
+                />
+              </div>
+              <div>
+                <label htmlFor="backup-frequency" className="block text-sm font-medium text-night-600 mb-1">Frequency</label>
+                <select
+                  id="backup-frequency"
+                  value={scheduledBackupFrequency}
+                  onChange={(e) => setScheduledBackupFrequency(e.target.value as ScheduledTaskFrequency)}
+                  className="w-full p-2 rounded-md bg-white border-sand-300 text-night-700 focus:ring-spice-500 focus:border-spice-500 shadow-sm"
+                >
+                  <option value="daily">Daily</option>
+                  <option value="weekly">Weekly</option>
+                </select>
+              </div>
+              <button
                 onClick={() => handleScheduleBackup('deep_desert')}
-              disabled={isSchedulingBackup || isSchedulingReset}
-              className="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-2 px-4 rounded-md transition duration-150 ease-in-out flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isSchedulingBackup ? 'Scheduling...' : 'Schedule Backup'}
-            </button>
+                disabled={isSchedulingBackup || isSchedulingReset}
+                className="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-2 px-4 rounded-md transition duration-150 ease-in-out flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSchedulingBackup ? 'Scheduling...' : 'Schedule Backup'}
+              </button>
+            </div>
           </div>
-        </div>
 
           {/* Schedule Deep Desert Reset */}
           <div>
             <h5 className="text-md font-medium text-night-600 mb-3">Schedule Deep Desert Reset</h5>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-            <div>
-              <label htmlFor="reset-time" className="block text-sm font-medium text-night-600 mb-1">Time (Local)</label>
-              <input
-                type="time"
-                id="reset-time"
-                value={scheduledResetTime}
-                onChange={(e) => setScheduledResetTime(e.target.value)}
-                className="w-full p-2 rounded-md bg-white border-sand-300 text-night-700 focus:ring-spice-500 focus:border-spice-500 shadow-sm"
-              />
-            </div>
-            <div>
-              <label htmlFor="reset-start-date" className="block text-sm font-medium text-night-600 mb-1">Start Date</label>
-              <input
-                type="date"
-                id="reset-start-date"
-                value={scheduledResetStartDate}
-                onChange={(e) => setScheduledResetStartDate(e.target.value)}
-                min={new Date().toISOString().split('T')[0]}
-                className="w-full p-2 rounded-md bg-white border-sand-300 text-night-700 focus:ring-spice-500 focus:border-spice-500 shadow-sm"
-              />
-            </div>
-            <div>
-              <label htmlFor="reset-frequency" className="block text-sm font-medium text-night-600 mb-1">Frequency</label>
-              <select
-                id="reset-frequency"
-                value={scheduledResetFrequency}
-                onChange={(e) => setScheduledResetFrequency(e.target.value as ScheduledTaskFrequency)}
-                className="w-full p-2 rounded-md bg-white border-sand-300 text-night-700 focus:ring-spice-500 focus:border-spice-500 shadow-sm"
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+              <div>
+                <label htmlFor="reset-time" className="block text-sm font-medium text-night-600 mb-1">Time (Local)</label>
+                <input
+                  type="time"
+                  id="reset-time"
+                  value={scheduledResetTime}
+                  onChange={(e) => setScheduledResetTime(e.target.value)}
+                  className="w-full p-2 rounded-md bg-white border-sand-300 text-night-700 focus:ring-spice-500 focus:border-spice-500 shadow-sm"
+                />
+              </div>
+              <div>
+                <label htmlFor="reset-start-date" className="block text-sm font-medium text-night-600 mb-1">Start Date</label>
+                <input
+                  type="date"
+                  id="reset-start-date"
+                  value={scheduledResetStartDate}
+                  onChange={(e) => setScheduledResetStartDate(e.target.value)}
+                  min={new Date().toISOString().split('T')[0]}
+                  className="w-full p-2 rounded-md bg-white border-sand-300 text-night-700 focus:ring-spice-500 focus:border-spice-500 shadow-sm"
+                />
+              </div>
+              <div>
+                <label htmlFor="reset-frequency" className="block text-sm font-medium text-night-600 mb-1">Frequency</label>
+                <select
+                  id="reset-frequency"
+                  value={scheduledResetFrequency}
+                  onChange={(e) => setScheduledResetFrequency(e.target.value as ScheduledTaskFrequency)}
+                  className="w-full p-2 rounded-md bg-white border-sand-300 text-night-700 focus:ring-spice-500 focus:border-spice-500 shadow-sm"
+                >
+                  <option value="daily">Daily</option>
+                  <option value="weekly">Weekly</option>
+                </select>
+              </div>
+              <button
+                onClick={handleScheduleReset}
+                disabled={isSchedulingBackup || isSchedulingReset}
+                className="w-full bg-orange-600 hover:bg-orange-500 text-white font-semibold py-2 px-4 rounded-md transition duration-150 ease-in-out flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <option value="daily">Daily</option>
-                <option value="weekly">Weekly</option>
-              </select>
+                {isSchedulingReset ? 'Scheduling...' : 'Schedule Reset'}
+              </button>
             </div>
-            <button
-              onClick={handleScheduleReset}
-              disabled={isSchedulingBackup || isSchedulingReset}
-              className="w-full bg-orange-600 hover:bg-orange-500 text-white font-semibold py-2 px-4 rounded-md transition duration-150 ease-in-out flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isSchedulingReset ? 'Scheduling...' : 'Schedule Reset'}
-            </button>
-          </div>
-          <div className="mt-3">
+            <div className="mt-3">
               <label htmlFor="backup-before-reset" className="flex items-center text-sm text-night-600">
                 <input
                   type="checkbox"
@@ -1058,7 +1044,7 @@ const AdminPanel: React.FC = () => {
                 Perform a backup before resetting Deep Desert.
               </label>
             </div>
-        </div>
+          </div>
         </div>
       </section>
 
@@ -1097,7 +1083,7 @@ const AdminPanel: React.FC = () => {
           </p>
           
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-        <div>
+            <div>
               <label htmlFor="hagga-backup-time" className="block text-sm font-medium text-night-600 mb-1">Time (Local)</label>
               <input
                 type="time"
@@ -1242,50 +1228,50 @@ const AdminPanel: React.FC = () => {
         <h3 className="text-xl font-semibold text-night-700 mb-6 flex items-center">
           <CalendarClock className="mr-3 text-night-600" /> Currently Scheduled Tasks
         </h3>
-          {error && <p className="text-sm text-red-500 mb-2">Error loading scheduled tasks: {error}</p>} 
-          {scheduledTasks.length === 0 && !error ? (
-            <p className="text-night-500 italic">No tasks are currently scheduled.</p>
-          ) : (
-            <ul className="space-y-3">
-              {scheduledTasks.map((task) => (
-                <li key={task.jobId} className="p-4 bg-sand-50 rounded-md border border-sand-200 shadow-sm flex justify-between items-center">
-                  <div>
-                    <span className={`font-semibold ${task.taskType === 'backup' ? 'text-blue-600' : 'text-orange-600'}`}>
-                      {task.taskType.charAt(0).toUpperCase() + task.taskType.slice(1)}
+        {error && <p className="text-sm text-red-500 mb-2">Error loading scheduled tasks: {error}</p>} 
+        {scheduledTasks.length === 0 && !error ? (
+          <p className="text-night-500 italic">No tasks are currently scheduled.</p>
+        ) : (
+          <ul className="space-y-3">
+            {scheduledTasks.map((task) => (
+              <li key={task.jobId} className="p-4 bg-sand-50 rounded-md border border-sand-200 shadow-sm flex justify-between items-center">
+                <div>
+                  <span className={`font-semibold ${task.taskType === 'backup' ? 'text-blue-600' : 'text-orange-600'}`}>
+                    {task.taskType.charAt(0).toUpperCase() + task.taskType.slice(1)}
                     {task.jobName.includes('deep-desert') && ' (Deep Desert)'}
                     {task.jobName.includes('hagga-basin') && ' (Hagga Basin)'}
                     {task.jobName.includes('all-maps') && ' (All Maps)'}
-                    </span>
-                    <p className="text-sm text-night-500">
-                      Scheduled for: {
-                        task.frequency === 'weekly' && task.dayOfWeek !== undefined ?
-                        `${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][task.dayOfWeek]} at ` : 'Daily at '
-                      }
-                      {task.time ? 
-                        task.time + ' (Target Local Time)' :
+                  </span>
+                  <p className="text-sm text-night-500">
+                    Scheduled for: {
+                      task.frequency === 'weekly' && task.dayOfWeek !== undefined ?
+                      `${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][task.dayOfWeek]} at ` : 'Daily at '
+                    }
+                    {task.time ? 
+                      task.time + ' (Target Local Time)' :
                       (task.originalScheduledTimeUTC && task.originalScheduledTimeUTC !== 'INVALID_UTC_TIME' ? 
-                          new Date(task.originalScheduledTimeUTC).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) +
-                          ' (Calculated Local Time Now)' :
-                          'Time Error'
-                        )
-                      }
-                      {task.taskType === 'reset' && task.jobName.includes('_with_backup') &&
-                        <span className="italic text-xs"> (includes pre-reset backup)</span>
-                      }
-                    </p>
-                    <p className="text-xs text-night-400">ID: {task.jobName} {task.isActive ? "(Active)" : "(Inactive)"}</p>
-                  </div>
-                  <button
-                    onClick={() => handleDeleteScheduledTask(task.jobName)}
-                    className="text-red-600 hover:text-red-500 p-1 rounded-full transition duration-150 ease-in-out"
-                    title="Delete Scheduled Task"
-                  >
-                    <Trash size={18} />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
+                        new Date(task.originalScheduledTimeUTC).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) +
+                        ' (Calculated Local Time Now)' :
+                        'Time Error'
+                      )
+                    }
+                    {task.taskType === 'reset' && task.jobName.includes('_with_backup') &&
+                      <span className="italic text-xs"> (includes pre-reset backup)</span>
+                    }
+                  </p>
+                  <p className="text-xs text-night-400">ID: {task.jobName} {task.isActive ? "(Active)" : "(Inactive)"}</p>
+                </div>
+                <button
+                  onClick={() => handleDeleteScheduledTask(task.jobName)}
+                  className="text-red-600 hover:text-red-500 p-1 rounded-full transition duration-150 ease-in-out"
+                  title="Delete Scheduled Task"
+                >
+                  <Trash size={18} />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       {/* Stored Backups Section */}
@@ -1332,7 +1318,6 @@ const AdminPanel: React.FC = () => {
                       <tr className="bg-sand-100">
                         <th className="px-3 py-2 border-b border-sand-200">Filename</th>
                         <th className="px-3 py-2 border-b border-sand-200">Size</th>
-                        <th className="px-3 py-2 border-b border-sand-200">Content</th>
                         <th className="px-3 py-2 border-b border-sand-200">Created</th>
                         <th className="px-3 py-2 border-b border-sand-200 text-center">Actions</th>
                       </tr>
@@ -1342,36 +1327,6 @@ const AdminPanel: React.FC = () => {
                         <tr key={backup.id || backup.name} className="hover:bg-sand-50">
                           <td className="px-3 py-2 border-b border-sand-200 truncate" title={backup.name}>{backup.name}</td>
                           <td className="px-3 py-2 border-b border-sand-200">{formatBytes(backup.size)}</td>
-                          <td className="px-3 py-2 border-b border-sand-200">
-                            {backup.metadata ? (
-                              <div className="text-xs space-y-1">
-                                <div className="flex items-center">
-                                  <span className="font-medium text-blue-600 mr-1">DB:</span>
-                                  <span className="text-night-600">
-                                    {(backup.metadata.database?.grid_squares || 0) + 
-                                     (backup.metadata.database?.pois || 0) + 
-                                     (backup.metadata.database?.comments || 0)} records
-                                  </span>
-                                </div>
-                                {backup.metadata.formatVersion === 'v2' && (
-                                  <div className="flex items-center">
-                                    <span className="font-medium text-green-600 mr-1">Files:</span>
-                                    <span className="text-night-600">
-                                      {(backup.metadata.files?.grid_screenshots || 0) + 
-                                       (backup.metadata.files?.poi_screenshots || 0) + 
-                                       (backup.metadata.files?.comment_screenshots || 0) + 
-                                       (backup.metadata.files?.custom_icons || 0)} files
-                                    </span>
-                                  </div>
-                                )}
-                                <div className="text-xs text-night-400">
-                                  Format: {backup.metadata.formatVersion || 'v1'}
-                                </div>
-                              </div>
-                            ) : (
-                              <span className="text-night-400 italic text-xs">Loading...</span>
-                            )}
-                          </td>
                           <td className="px-3 py-2 border-b border-sand-200">{new Date(backup.created_at).toLocaleDateString()}</td>
                           <td className="px-3 py-2 border-b border-sand-200 text-center space-x-2">
                             {backup.downloadUrl ? (
@@ -1418,144 +1373,21 @@ const AdminPanel: React.FC = () => {
               {storedBackups.hagga_basin.length === 0 ? (
                 <p className="text-night-500 italic text-sm">No Hagga Basin backups found.</p>
               ) : (
-            <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm">
-                    <thead>
-                        <tr className="bg-sand-100">
-                        <th className="px-3 py-2 border-b border-sand-200">Filename</th>
-                        <th className="px-3 py-2 border-b border-sand-200">Size</th>
-                        <th className="px-3 py-2 border-b border-sand-200">Content</th>
-                        <th className="px-3 py-2 border-b border-sand-200">Created</th>
-                        <th className="px-3 py-2 border-b border-sand-200 text-center">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                      {storedBackups.hagga_basin.map(backup => (
-                            <tr key={backup.id || backup.name} className="hover:bg-sand-50">
-                          <td className="px-3 py-2 border-b border-sand-200 truncate" title={backup.name}>{backup.name}</td>
-                          <td className="px-3 py-2 border-b border-sand-200">{formatBytes(backup.size)}</td>
-                          <td className="px-3 py-2 border-b border-sand-200">
-                            {backup.metadata ? (
-                              <div className="text-xs space-y-1">
-                                <div className="flex items-center">
-                                  <span className="font-medium text-blue-600 mr-1">DB:</span>
-                                  <span className="text-night-600">
-                                    {(backup.metadata.database?.grid_squares || 0) + 
-                                     (backup.metadata.database?.pois || 0) + 
-                                     (backup.metadata.database?.comments || 0)} records
-                                  </span>
-                                </div>
-                                {backup.metadata.formatVersion === 'v2' && (
-                                  <div className="flex items-center">
-                                    <span className="font-medium text-green-600 mr-1">Files:</span>
-                                    <span className="text-night-600">
-                                      {(backup.metadata.files?.grid_screenshots || 0) + 
-                                       (backup.metadata.files?.poi_screenshots || 0) + 
-                                       (backup.metadata.files?.comment_screenshots || 0) + 
-                                       (backup.metadata.files?.custom_icons || 0)} files
-                                    </span>
-                                  </div>
-                                )}
-                                <div className="text-xs text-night-400">
-                                  Format: {backup.metadata.formatVersion || 'v1'}
-                                </div>
-                              </div>
-                            ) : (
-                              <span className="text-night-400 italic text-xs">Loading...</span>
-                            )}
-                          </td>
-                          <td className="px-3 py-2 border-b border-sand-200">{new Date(backup.created_at).toLocaleDateString()}</td>
-                          <td className="px-3 py-2 border-b border-sand-200 text-center space-x-2">
-                                    {backup.downloadUrl ? (
-                                        <a 
-                                            href={backup.downloadUrl} 
-                                            download={backup.name}
-                                className="inline-flex items-center px-2 py-1 text-xs font-medium text-white bg-green-600 rounded hover:bg-green-500"
-                                        >
-                                <Download size={12} className="mr-1" />
-                                            Download
-                                        </a>
-                                    ) : (
-                              <span className="text-xs text-night-400 italic">No URL</span>
-                                    )}
-                                    <button
-                                      onClick={() => handleDeleteBackupFile(backup.name)}
-                              disabled={isDeletingBackup === backup.name}
-                              className="inline-flex items-center px-2 py-1 text-xs font-medium text-white bg-red-600 rounded hover:bg-red-500 disabled:opacity-50"
-                                      title={`Delete ${backup.name}`}
-                                    >
-                                      {isDeletingBackup === backup.name ? (
-                                <RefreshCw size={12} className="animate-spin" />
-                                      ) : (
-                                <Trash2 size={12} />
-                                      )}
-                                    </button>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-                </div>
-              )}
-            </div>
-
-            {/* Combined Backups */}
-            <div>
-              <h4 className="text-lg font-medium text-night-600 mb-4 flex items-center">
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium bg-green-100 text-green-800 mr-2">
-                  Combined
-                </span>
-                ({storedBackups.combined.length}/10 backups)
-              </h4>
-              {storedBackups.combined.length === 0 ? (
-                <p className="text-night-500 italic text-sm">No combined backups found.</p>
-              ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-sm">
                     <thead>
                       <tr className="bg-sand-100">
                         <th className="px-3 py-2 border-b border-sand-200">Filename</th>
                         <th className="px-3 py-2 border-b border-sand-200">Size</th>
-                        <th className="px-3 py-2 border-b border-sand-200">Content</th>
                         <th className="px-3 py-2 border-b border-sand-200">Created</th>
                         <th className="px-3 py-2 border-b border-sand-200 text-center">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {storedBackups.combined.map(backup => (
+                      {storedBackups.hagga_basin.map(backup => (
                         <tr key={backup.id || backup.name} className="hover:bg-sand-50">
                           <td className="px-3 py-2 border-b border-sand-200 truncate" title={backup.name}>{backup.name}</td>
                           <td className="px-3 py-2 border-b border-sand-200">{formatBytes(backup.size)}</td>
-                          <td className="px-3 py-2 border-b border-sand-200">
-                            {backup.metadata ? (
-                              <div className="text-xs space-y-1">
-                                <div className="flex items-center">
-                                  <span className="font-medium text-blue-600 mr-1">DB:</span>
-                                  <span className="text-night-600">
-                                    {(backup.metadata.database?.grid_squares || 0) + 
-                                     (backup.metadata.database?.pois || 0) + 
-                                     (backup.metadata.database?.comments || 0)} records
-                                  </span>
-                                </div>
-                                {backup.metadata.formatVersion === 'v2' && (
-                                  <div className="flex items-center">
-                                    <span className="font-medium text-green-600 mr-1">Files:</span>
-                                    <span className="text-night-600">
-                                      {(backup.metadata.files?.grid_screenshots || 0) + 
-                                       (backup.metadata.files?.poi_screenshots || 0) + 
-                                       (backup.metadata.files?.comment_screenshots || 0) + 
-                                       (backup.metadata.files?.custom_icons || 0)} files
-                                    </span>
-                                  </div>
-                                )}
-                                <div className="text-xs text-night-400">
-                                  Format: {backup.metadata.formatVersion || 'v1'}
-                                </div>
-                              </div>
-                            ) : (
-                              <span className="text-night-400 italic text-xs">Loading...</span>
-                            )}
-                          </td>
                           <td className="px-3 py-2 border-b border-sand-200">{new Date(backup.created_at).toLocaleDateString()}</td>
                           <td className="px-3 py-2 border-b border-sand-200 text-center space-x-2">
                             {backup.downloadUrl ? (
@@ -1590,7 +1422,68 @@ const AdminPanel: React.FC = () => {
                 </div>
               )}
             </div>
+
+            {/* Combined Backups */}
+            <div>
+              <h4 className="text-lg font-medium text-night-600 mb-4 flex items-center">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium bg-green-100 text-green-800 mr-2">
+                  Combined
+                </span>
+                ({storedBackups.combined.length}/10 backups)
+              </h4>
+              {storedBackups.combined.length === 0 ? (
+                <p className="text-night-500 italic text-sm">No combined backups found.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead>
+                      <tr className="bg-sand-100">
+                        <th className="px-3 py-2 border-b border-sand-200">Filename</th>
+                        <th className="px-3 py-2 border-b border-sand-200">Size</th>
+                        <th className="px-3 py-2 border-b border-sand-200">Created</th>
+                        <th className="px-3 py-2 border-b border-sand-200 text-center">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {storedBackups.combined.map(backup => (
+                        <tr key={backup.id || backup.name} className="hover:bg-sand-50">
+                          <td className="px-3 py-2 border-b border-sand-200 truncate" title={backup.name}>{backup.name}</td>
+                          <td className="px-3 py-2 border-b border-sand-200">{formatBytes(backup.size)}</td>
+                          <td className="px-3 py-2 border-b border-sand-200">{new Date(backup.created_at).toLocaleDateString()}</td>
+                          <td className="px-3 py-2 border-b border-sand-200 text-center space-x-2">
+                            {backup.downloadUrl ? (
+                              <a 
+                                href={backup.downloadUrl} 
+                                download={backup.name}
+                                className="inline-flex items-center px-2 py-1 text-xs font-medium text-white bg-green-600 rounded hover:bg-green-500"
+                              >
+                                <Download size={12} className="mr-1" />
+                                Download
+                              </a>
+                            ) : (
+                              <span className="text-xs text-night-400 italic">No URL</span>
+                            )}
+                            <button
+                              onClick={() => handleDeleteBackupFile(backup.name)}
+                              disabled={isDeletingBackup === backup.name}
+                              className="inline-flex items-center px-2 py-1 text-xs font-medium text-white bg-red-600 rounded hover:bg-red-500 disabled:opacity-50"
+                              title={`Delete ${backup.name}`}
+                            >
+                              {isDeletingBackup === backup.name ? (
+                                <RefreshCw size={12} className="animate-spin" />
+                              ) : (
+                                <Trash2 size={12} />
+                              )}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
+          </div>
         )}
       </section>
 
@@ -1600,7 +1493,7 @@ const AdminPanel: React.FC = () => {
           <h3 className="text-xl font-bold text-red-800 mb-2 flex items-center">
             <AlertTriangle className="mr-3 text-red-600" />
             🚨 DANGER ZONE 🚨
-        </h3>
+          </h3>
           <div className="p-4 bg-red-100 border border-red-300 rounded-md">
             <p className="text-red-800 font-semibold mb-2">⚠️ CRITICAL WARNING ⚠️</p>
             <p className="text-red-700 text-sm mb-2">
@@ -1619,7 +1512,7 @@ const AdminPanel: React.FC = () => {
             <h4 className="text-lg font-bold text-red-700 mb-3 flex items-center">
               <AlertTriangle className="mr-2 text-red-600" />
               Reset Deep Desert
-          </h4>
+            </h4>
             <p className="text-red-600 text-sm mb-4 font-medium">
               Delete ALL Deep Desert data: grid squares (A1-I9), POIs, comments, and files.
             </p>
@@ -1635,13 +1528,13 @@ const AdminPanel: React.FC = () => {
                 Create backup before deletion
               </label>
             </div>
-          <button
+            <button
               onClick={() => handleReset('deep_desert', deepDesertBackupOnReset)}
-            disabled={isBackingUp || isRestoring || isResetting}
+              disabled={isBackingUp || isRestoring || isResetting}
               className="w-full bg-red-700 hover:bg-red-600 text-white font-bold py-3 px-4 rounded-md transition duration-150 ease-in-out flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed border-2 border-red-800"
-          >
+            >
               {isResetting ? 'DELETING...' : `DELETE DEEP DESERT${deepDesertBackupOnReset ? ' (with backup)' : ''}`}
-          </button>
+            </button>
           </div>
 
           {/* Hagga Basin Reset */}
@@ -1674,7 +1567,6 @@ const AdminPanel: React.FC = () => {
             </button>
           </div>
         </div>
-      </section>
     </div>
   );
 
@@ -1703,13 +1595,13 @@ const AdminPanel: React.FC = () => {
           Admin Panel
         </h1>
       </div>
-      
+
       {error && (
         <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6">
           <p>{error}</p>
         </div>
       )}
-      
+
       <div className="space-y-6">
         <div className="border-b border-sand-200">
           <nav className="-mb-px flex space-x-8">
@@ -1719,7 +1611,7 @@ const AdminPanel: React.FC = () => {
               { id: 'poi-types', label: 'POI Types', icon: Shield },
               { id: 'maps', label: 'Map Settings', icon: Map }
             ].map(({ id, label, icon: Icon }) => (
-          <button
+              <button
                 key={id}
                 onClick={() => setActiveTab(id as any)}
                 className={`py-2 px-1 border-b-2 font-medium text-sm ${
@@ -1730,17 +1622,17 @@ const AdminPanel: React.FC = () => {
               >
                 <Icon className="inline mr-2" size={16} />
                 {label}
-          </button>
+              </button>
             ))}
           </nav>
         </div>
-        
-              {isLoading ? (
+
+        {isLoading ? (
           <div className="flex justify-center items-center h-64">
             <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-spice-600"></div>
-                </div>
-              ) : (
-                  <div>
+          </div>
+        ) : (
+          <div>
             {activeTab === 'users' && (
               <div className="space-y-6">
                 <h2 className="text-2xl font-semibold text-night-800">User Management</h2>
@@ -1755,7 +1647,7 @@ const AdminPanel: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-sand-200">
-                  {profiles.map((profile) => (
+                      {profiles.map((profile) => (
                         <tr key={profile.id}>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-night-900">
                             {profile.username}
@@ -1764,28 +1656,28 @@ const AdminPanel: React.FC = () => {
                             {profile.email}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-night-500">
-                        <select
-                          value={profile.role}
-                          onChange={(e) => handleRoleChange(profile.id, e.target.value as UserRole)}
+                            <select
+                              value={profile.role}
+                              onChange={(e) => handleRoleChange(profile.id, e.target.value as UserRole)}
                               className="border border-sand-300 rounded-md px-2 py-1 text-sm"
-                          disabled={profile.id === user?.id}
-                        >
+                              disabled={profile.id === user?.id}
+                            >
                               <option value="user">User</option>
                               <option value="moderator">Moderator</option>
-                          <option value="admin">Admin</option>
-                        </select>
+                              <option value="admin">Admin</option>
+                            </select>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                          <button
-                            onClick={() => handleOpenEditModal(profile)}
+                            <button
+                              onClick={() => handleOpenEditModal(profile)}
                               className="text-blue-600 hover:text-blue-500 p-1 rounded-full transition duration-150 ease-in-out"
-                            title="Edit User"
-                          >
+                              title="Edit User"
+                            >
                               <Pencil size={16} />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteUser(profile.id, profile.username)}
-                            disabled={profile.id === user?.id || isDeletingUser === profile.id}
+                            </button>
+                            <button
+                              onClick={() => handleDeleteUser(profile.id, profile.username)}
+                              disabled={profile.id === user?.id || isDeletingUser === profile.id}
                               className="text-red-600 hover:text-red-500 p-1 rounded-full transition duration-150 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed"
                               title={profile.id === user?.id ? "Cannot delete your own account" : "Delete User"}
                             >
@@ -1794,25 +1686,25 @@ const AdminPanel: React.FC = () => {
                               ) : (
                                 <Trash2 size={16} />
                               )}
-                          </button>
+                            </button>
                           </td>
                         </tr>
-                  ))}
+                      ))}
                     </tbody>
                   </table>
                 </div>
-                </div>
-              )}
+              </div>
+            )}
 
             {activeTab === 'database' && <DatabaseTab />}
 
             {activeTab === 'poi-types' && (
               <div className="space-y-6">
                 <h2 className="text-2xl font-semibold text-night-800">POI Type Management</h2>
-            <PoiTypeManager 
-              poiTypes={poiTypes}
+                <PoiTypeManager 
+                  poiTypes={poiTypes} 
                   onPoiTypesChange={() => fetchPoiTypesForAdmin()}
-            />
+                />
               </div>
             )}
 
@@ -1825,17 +1717,17 @@ const AdminPanel: React.FC = () => {
                   <h3 className="text-xl font-semibold text-night-700 mb-6">Base Map Images</h3>
                   <BaseMapUploader />
                 </section>
-              
-              {/* Hagga Basin Settings */}
+
+                {/* Hagga Basin Settings */}
                 <section className="p-6 border border-sand-200 rounded-lg bg-white shadow-sm">
                   <h3 className="text-xl font-semibold text-night-700 mb-6 flex items-center">
                     <Map className="mr-3 text-sky-600" />
-                  Hagga Basin Settings
-                </h3>
-                
+                    Hagga Basin Settings
+                  </h3>
+                  
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     {/* Icon Size Settings */}
-                  <div className="space-y-4">
+                    <div className="space-y-4">
                       <h4 className="text-lg font-medium text-night-600">Icon Size Configuration</h4>
                       
                       <div>
@@ -1848,8 +1740,8 @@ const AdminPanel: React.FC = () => {
                           min="16"
                           max="256"
                           value={mapSettings.iconBaseSize}
-                          onChange={(e) => setMapSettings(prev => ({
-                            ...prev,
+                          onChange={(e) => setMapSettings(prev => ({ 
+                            ...prev, 
                             iconBaseSize: parseInt(e.target.value) || 64
                           }))}
                           className="w-full p-2 border border-sand-300 rounded-md focus:ring-spice-500 focus:border-spice-500"
@@ -1866,8 +1758,8 @@ const AdminPanel: React.FC = () => {
                           min="8"
                           max="128"
                           value={mapSettings.iconMinSize}
-                          onChange={(e) => setMapSettings(prev => ({
-                            ...prev,
+                          onChange={(e) => setMapSettings(prev => ({ 
+                            ...prev, 
                             iconMinSize: parseInt(e.target.value) || 32
                           }))}
                           className="w-full p-2 border border-sand-300 rounded-md focus:ring-spice-500 focus:border-spice-500"
@@ -1884,41 +1776,41 @@ const AdminPanel: React.FC = () => {
                           min="32"
                           max="512"
                           value={mapSettings.iconMaxSize}
-                          onChange={(e) => setMapSettings(prev => ({
-                            ...prev,
+                          onChange={(e) => setMapSettings(prev => ({ 
+                            ...prev, 
                             iconMaxSize: parseInt(e.target.value) || 128
                           }))}
                           className="w-full p-2 border border-sand-300 rounded-md focus:ring-spice-500 focus:border-spice-500"
                         />
+                      </div>
                     </div>
-                  </div>
-                  
+                    
                     {/* Interaction Settings */}
-                  <div className="space-y-4">
+                    <div className="space-y-4">
                       <h4 className="text-lg font-medium text-night-600">Map Interaction Settings</h4>
                       
-                    <div className="space-y-3">
+                      <div className="space-y-3">
                         <label className="flex items-center">
-                        <input
-                          type="checkbox"
-                          checked={mapSettings.showTooltips}
-                          onChange={(e) => setMapSettings(prev => ({
-                            ...prev,
-                            showTooltips: e.target.checked
-                          }))}
+                          <input
+                            type="checkbox"
+                            checked={mapSettings.showTooltips}
+                            onChange={(e) => setMapSettings(prev => ({ 
+                              ...prev, 
+                              showTooltips: e.target.checked
+                            }))}
                             className="mr-2 h-4 w-4 text-spice-600 focus:ring-spice-500 border-sand-300 rounded"
                           />
                           <span className="text-sm text-night-600">Show POI tooltips on hover</span>
                         </label>
                         
                         <label className="flex items-center">
-                        <input
-                          type="checkbox"
-                          checked={mapSettings.enablePositionChange}
-                          onChange={(e) => setMapSettings(prev => ({
-                            ...prev,
-                            enablePositionChange: e.target.checked
-                          }))}
+                          <input
+                            type="checkbox"
+                            checked={mapSettings.enablePositionChange}
+                            onChange={(e) => setMapSettings(prev => ({ 
+                              ...prev, 
+                              enablePositionChange: e.target.checked
+                            }))}
                             className="mr-2 h-4 w-4 text-spice-600 focus:ring-spice-500 border-sand-300 rounded"
                           />
                           <span className="text-sm text-night-600">Allow POI position changes</span>
@@ -1949,37 +1841,37 @@ const AdminPanel: React.FC = () => {
                           />
                           <span className="text-sm text-night-600">Show shared POI indicators</span>
                         </label>
+                      </div>
                     </div>
                   </div>
-                </div>
-                
+                  
                   {/* Save/Reset Buttons */}
                   <div className="mt-8 flex space-x-4">
-                  <button 
+                    <button
                       onClick={saveMapSettings}
                       className="px-6 py-2 bg-spice-600 text-white rounded-md hover:bg-spice-700 focus:outline-none focus:ring-2 focus:ring-spice-500 focus:ring-offset-2"
-                  >
+                    >
                       Save Settings
-                  </button>
-                  <button 
+                    </button>
+                    <button
                       onClick={resetMapSettings}
                       className="px-6 py-2 bg-sand-300 text-night-700 rounded-md hover:bg-sand-400 focus:outline-none focus:ring-2 focus:ring-sand-500 focus:ring-offset-2"
-                  >
+                    >
                       Reset to Defaults
-                  </button>
-                </div>
+                    </button>
+                  </div>
                 </section>
-              
-              {/* Deep Desert Settings */}
+
+                {/* Deep Desert Settings */}
                 <section className="p-6 border border-sand-200 rounded-lg bg-white shadow-sm">
                   <h3 className="text-xl font-semibold text-night-700 mb-6 flex items-center">
                     <Map className="mr-3 text-spice-600" />
                     Deep Desert Settings
-                </h3>
-                
+                  </h3>
+                  
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     {/* Icon Size Settings */}
-                  <div className="space-y-4">
+                    <div className="space-y-4">
                       <h4 className="text-lg font-medium text-night-600">Icon Size Configuration</h4>
                       
                       <div>
@@ -1992,8 +1884,8 @@ const AdminPanel: React.FC = () => {
                           min="16"
                           max="256"
                           value={deepDesertSettings.iconBaseSize}
-                          onChange={(e) => setDeepDesertSettings(prev => ({
-                            ...prev,
+                          onChange={(e) => setDeepDesertSettings(prev => ({ 
+                            ...prev, 
                             iconBaseSize: parseInt(e.target.value) || 32
                           }))}
                           className="w-full p-2 border border-sand-300 rounded-md focus:ring-spice-500 focus:border-spice-500"
@@ -2010,8 +1902,8 @@ const AdminPanel: React.FC = () => {
                           min="8"
                           max="128"
                           value={deepDesertSettings.iconMinSize}
-                          onChange={(e) => setDeepDesertSettings(prev => ({
-                            ...prev,
+                          onChange={(e) => setDeepDesertSettings(prev => ({ 
+                            ...prev, 
                             iconMinSize: parseInt(e.target.value) || 16
                           }))}
                           className="w-full p-2 border border-sand-300 rounded-md focus:ring-spice-500 focus:border-spice-500"
@@ -2028,56 +1920,56 @@ const AdminPanel: React.FC = () => {
                           min="32"
                           max="512"
                           value={deepDesertSettings.iconMaxSize}
-                          onChange={(e) => setDeepDesertSettings(prev => ({
-                            ...prev,
+                          onChange={(e) => setDeepDesertSettings(prev => ({ 
+                            ...prev, 
                             iconMaxSize: parseInt(e.target.value) || 64
                           }))}
                           className="w-full p-2 border border-sand-300 rounded-md focus:ring-spice-500 focus:border-spice-500"
                         />
+                      </div>
+                    </div>
+                    
+                    {/* Interaction Settings */}
+                    <div className="space-y-4">
+                      <h4 className="text-lg font-medium text-night-600">Map Interaction Settings</h4>
+                      
+                      <div className="space-y-3">
+                        <label className="flex items-center">
+                          <input
+                            type="checkbox"
+                            checked={deepDesertSettings.showTooltips}
+                            onChange={(e) => setDeepDesertSettings(prev => ({ 
+                              ...prev, 
+                              showTooltips: e.target.checked
+                            }))}
+                            className="mr-2 h-4 w-4 text-spice-600 focus:ring-spice-500 border-sand-300 rounded"
+                          />
+                          <span className="text-sm text-night-600">Show POI tooltips on hover</span>
+                        </label>
+                      </div>
                     </div>
                   </div>
                   
-                    {/* Interaction Settings */}
-                  <div className="space-y-4">
-                      <h4 className="text-lg font-medium text-night-600">Map Interaction Settings</h4>
-                      
-                    <div className="space-y-3">
-                        <label className="flex items-center">
-                        <input
-                          type="checkbox"
-                          checked={deepDesertSettings.showTooltips}
-                          onChange={(e) => setDeepDesertSettings(prev => ({
-                            ...prev,
-                            showTooltips: e.target.checked
-                          }))}
-                            className="mr-2 h-4 w-4 text-spice-600 focus:ring-spice-500 border-sand-300 rounded"
-                        />
-                          <span className="text-sm text-night-600">Show POI tooltips on hover</span>
-                        </label>
-                    </div>
-                  </div>
-                </div>
-                
                   {/* Save/Reset Buttons */}
                   <div className="mt-8 flex space-x-4">
-                  <button 
+                    <button
                       onClick={saveDeepDesertSettings}
                       className="px-6 py-2 bg-spice-600 text-white rounded-md hover:bg-spice-700 focus:outline-none focus:ring-2 focus:ring-spice-500 focus:ring-offset-2"
-                  >
+                    >
                       Save Settings
-                  </button>
-                  <button 
+                    </button>
+                    <button
                       onClick={resetDeepDesertSettings}
                       className="px-6 py-2 bg-sand-300 text-night-700 rounded-md hover:bg-sand-400 focus:outline-none focus:ring-2 focus:ring-sand-500 focus:ring-offset-2"
-                  >
+                    >
                       Reset to Defaults
-                  </button>
-                </div>
+                    </button>
+                  </div>
                 </section>
               </div>
             )}
-              </div>
-          )}
+          </div>
+        )}
       </div>
 
       {/* User Edit Modal */}
@@ -2099,9 +1991,9 @@ const AdminPanel: React.FC = () => {
                 <label htmlFor="editUsername" className="block text-sm font-medium text-night-600 mb-1">
                   Username
                 </label>
-                <input 
-                  type="text" 
-                  id="editUsername" 
+                <input
+                  type="text"
+                  id="editUsername"
                   value={editUsername}
                   onChange={(e) => setEditUsername(e.target.value)}
                   className="w-full p-2 border border-sand-300 rounded-md focus:ring-spice-500 focus:border-spice-500"
@@ -2113,9 +2005,9 @@ const AdminPanel: React.FC = () => {
                 <label htmlFor="editEmail" className="block text-sm font-medium text-night-600 mb-1">
                   Email
                 </label>
-                <input 
-                  type="email" 
-                  id="editEmail" 
+                <input
+                  type="email"
+                  id="editEmail"
                   value={editEmail}
                   onChange={(e) => setEditEmail(e.target.value)}
                   className="w-full p-2 border border-sand-300 rounded-md focus:ring-spice-500 focus:border-spice-500"
@@ -2132,8 +2024,8 @@ const AdminPanel: React.FC = () => {
               >
                 {isUpdatingUser ? 'Updating...' : 'Update User'}
               </button>
-              <button 
-                onClick={handleCloseEditModal} 
+              <button
+                onClick={handleCloseEditModal}
                 disabled={isUpdatingUser}
                 className="flex-1 bg-sand-300 text-night-700 px-4 py-2 rounded-md hover:bg-sand-400 focus:outline-none focus:ring-2 focus:ring-sand-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
@@ -2209,7 +2101,7 @@ const AdminPanel: React.FC = () => {
 
               {/* Modal Actions */}
               <div className="flex space-x-3">
-              <button 
+                <button
                   onClick={handleDangerConfirmation}
                   disabled={dangerConfirmationInput !== dangerAction.confirmationText || isResetting}
                   className="flex-1 bg-red-700 text-white px-4 py-3 rounded-md font-bold border-2 border-red-800 hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -2222,7 +2114,7 @@ const AdminPanel: React.FC = () => {
                   className="flex-1 bg-gray-300 text-gray-700 px-4 py-3 rounded-md font-medium hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Cancel
-              </button>
+                </button>
               </div>
             </div>
           </div>

@@ -33,8 +33,6 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
   const { user, isLoading } = useAuth();
   const location = useLocation();
 
-  console.log('ProtectedRoute - user:', user, 'isLoading:', isLoading, 'location:', window.location.href);
-
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -44,16 +42,13 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
   }
 
   if (!user) {
-    console.log('No user, redirecting to /auth with return path:', location.pathname);
     return <Navigate to="/auth" state={{ from: location }} replace />;
   }
 
   if (user.role === 'pending') {
-    console.log('User pending, showing pending message');
     return <PendingApprovalMessage />;
   }
 
-  console.log('User authenticated, rendering children');
   return <>{children}</>;
 };
 

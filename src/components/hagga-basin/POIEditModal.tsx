@@ -1,16 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
-import { X, MapPin, Lock, Users, Eye, Save, Upload, Trash2, Target, Edit } from 'lucide-react';
+import { X, MapPin, Lock, Users, Eye, Save, Upload, Trash2, Target, Edit, Plus, FileText, Tag, EyeOff, Share2, Globe, AlertTriangle, Settings, Image as ImageIcon } from 'lucide-react';
 import type { 
   Poi, 
   PoiType, 
   CustomIcon, 
-  PrivacyLevel 
+  PrivacyLevel, 
+  PoiScreenshot
 } from '../../types';
 import { formatCoordinates } from '../../lib/coordinates';
 import { useAuth } from '../auth/AuthProvider';
 import ImageCropModal from '../grid/ImageCropModal';
-import { PixelCrop } from 'react-image-crop';
+import { PixelCrop, Crop } from 'react-image-crop';
+import CommentsList from '../comments/CommentsList';
+import { getScreenshotLabel } from '../../lib/cropUtils';
 
 interface POIEditModalProps {
   poi: Poi;
@@ -86,8 +89,8 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
   const [coordinatesY, setCoordinatesY] = useState(poi.coordinates_y || 0);
   
   // Screenshot management - work with existing screenshots from POI
-  const [existingScreenshots, setExistingScreenshots] = useState<{ id: string; url: string }[]>(
-    poi.screenshots?.map(s => ({ id: s.id, url: s.url })) || []
+  const [existingScreenshots, setExistingScreenshots] = useState<PoiScreenshot[]>(
+    poi.screenshots || [] 
   );
   const [screenshotsToDelete, setScreenshotsToDelete] = useState<string[]>([]);
   const [additionalScreenshots, setAdditionalScreenshots] = useState<File[]>([]);
@@ -96,8 +99,19 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
   const [showCropModal, setShowCropModal] = useState(false);
   const [tempImageFile, setTempImageFile] = useState<File | null>(null);
   const [tempImageUrl, setTempImageUrl] = useState<string | null>(null);
-  const [pendingCroppedFiles, setPendingCroppedFiles] = useState<File[]>([]);
-  const [editingScreenshotId, setEditingScreenshotId] = useState<string | null>(null);
+  
+  interface PendingScreenshotFile {
+    id: string; 
+    originalFile: File; // The original uploaded file (always preserved)
+    displayFile: File; // The file to be shown (cropped or same as original)
+    cropDetails: PixelCrop | null;
+    previewUrl: string; // Preview URL for the display file
+    originalScreenshotId?: string; // For editing existing screenshots
+    originalScreenshotUrl?: string; // URL of the original file for existing screenshots
+  }
+  const [pendingCroppedFiles, setPendingCroppedFiles] = useState<PendingScreenshotFile[]>([]);
+  
+  const [editingScreenshot, setEditingScreenshot] = useState<PoiScreenshot | null>(null);
   
   // UI state
   const [showDetailedPoiSelection, setShowDetailedPoiSelection] = useState(false);
@@ -112,7 +126,7 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
 
   // Initialize screenshots from POI data
   useEffect(() => {
-    setExistingScreenshots(poi.screenshots?.map(s => ({ id: s.id, url: s.url })) || []);
+    setExistingScreenshots(poi.screenshots || []);
   }, [poi.screenshots]);
 
   // Handle position change
@@ -185,21 +199,26 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
     }
   };
 
-  // Handle crop completion
-  const handleCropComplete = async (croppedImageBlob: Blob) => {
+  // Handle crop completion for NEWLY UPLOADED files
+  const handleCropComplete = async (croppedImageBlob: Blob, cropData: PixelCrop, isFullImage: boolean) => {
     if (!tempImageFile) return;
 
     try {
-      // Convert blob to File
-      const croppedFile = new File([croppedImageBlob], tempImageFile.name, {
+      const processedFile = new File([croppedImageBlob], tempImageFile.name, {
         type: 'image/jpeg',
         lastModified: Date.now(),
       });
 
-      // Add to pending cropped files
-      setPendingCroppedFiles(prev => [...prev, croppedFile]);
+      const newPendingFile: PendingScreenshotFile = {
+        id: Date.now().toString(), // Simple unique ID for list key
+        originalFile: tempImageFile, // Preserve the original uploaded file
+        displayFile: processedFile, // Use the cropped version for display
+        cropDetails: isFullImage ? null : cropData,
+        previewUrl: URL.createObjectURL(processedFile)
+      };
 
-      // Check if there are remaining files to process
+      setPendingCroppedFiles(prev => [...prev, newPendingFile]);
+
       const remainingFiles = (tempImageFile as any).remainingFiles as File[] || [];
       
       // Clean up current temp state
@@ -220,14 +239,20 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
     }
   };
 
-  // Handle skipping crop for a file (use original)
+  // Handle skipping crop for a file (use original) - for NEWLY UPLOADED files
   const handleSkipCrop = () => {
     if (!tempImageFile) return;
 
-    // Add original file to additional screenshots instead of pending cropped files
-    setAdditionalScreenshots(prev => [...prev, tempImageFile]);
+    // Add original file as a pending file with null cropDetails
+    const newPendingFile: PendingScreenshotFile = {
+      id: Date.now().toString(),
+      originalFile: tempImageFile, // Original file
+      displayFile: tempImageFile, // Same as original since no crop
+      cropDetails: null,
+      previewUrl: URL.createObjectURL(tempImageFile)
+    };
+    setPendingCroppedFiles(prev => [...prev, newPendingFile]);
 
-    // Check if there are remaining files to process
     const remainingFiles = (tempImageFile as any).remainingFiles as File[] || [];
     
     // Clean up current temp state
@@ -252,51 +277,67 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
       URL.revokeObjectURL(tempImageUrl);
       setTempImageUrl(null);
     }
-    setEditingScreenshotId(null);
+    setEditingScreenshot(null);
   };
 
   // Handle editing existing screenshot
-  const handleEditExistingScreenshot = (screenshotId: string, screenshotUrl: string) => {
-    setEditingScreenshotId(screenshotId);
+  const handleEditExistingScreenshot = (screenshotId: string) => {
+    const screenshotToEdit = existingScreenshots.find(s => s.id === screenshotId);
+    if (!screenshotToEdit) {
+      setError('Screenshot not found for editing.');
+      return;
+    }
+
+    console.log(`[POIEditModal] handleEditExistingScreenshot called for id: ${screenshotId}, details:`, screenshotToEdit);
     
-    // Create a cache-busted URL to avoid CORS issues
-    const url = new URL(screenshotUrl);
-    url.searchParams.set('t', Date.now().toString());
-    
-    setTempImageUrl(url.toString());
+    const imageUrlForCropper = screenshotToEdit.original_url || screenshotToEdit.url;
+    if (!imageUrlForCropper) {
+      setError('No image URL available for cropping this screenshot.');
+      console.error('[POIEditModal] No original_url or url found for screenshot:', screenshotToEdit);
+      return;
+    }
+
+    setEditingScreenshot(screenshotToEdit);
+    setTempImageUrl(imageUrlForCropper);
     setShowCropModal(true);
+    // initialCrop for the modal will be set in the modal's props directly
   };
 
-  // Handle crop completion for existing screenshot
-  const handleEditCropComplete = async (croppedImageBlob: Blob) => {
-    if (!editingScreenshotId || !user) return;
-
-    try {
-      // Convert blob to File
-      const croppedFile = new File([croppedImageBlob], 'cropped-screenshot.jpg', {
-        type: 'image/jpeg',
-        lastModified: Date.now(),
-      });
-
-      // Add to pending cropped files
-      setPendingCroppedFiles(prev => [...prev, croppedFile]);
-
-      // Remove the original screenshot from existing screenshots
-      setExistingScreenshots(prev => prev.filter(s => s.id !== editingScreenshotId));
-      setScreenshotsToDelete(prev => [...prev, editingScreenshotId]);
-
-      // Close modal
-      setShowCropModal(false);
-      setTempImageFile(null);
-      if (tempImageUrl) {
-        URL.revokeObjectURL(tempImageUrl);
-        setTempImageUrl(null);
-      }
-      setEditingScreenshotId(null);
-    } catch (error) {
-      console.error('Error processing cropped image:', error);
-      setError('Failed to process cropped image. Please try again.');
+  // Handle crop completion for an EXISTING screenshot being EDITED
+  const handleEditCropComplete = async (croppedImageBlob: Blob, cropData: PixelCrop, isFullImage: boolean) => {
+    if (!editingScreenshot) {
+      setError('No screenshot selected for editing crop.');
+      return;
     }
+    console.log(`[POIEditModal] handleEditCropComplete for existing screenshot id: ${editingScreenshot.id}`);
+
+    const processedFile = new File([croppedImageBlob], `poi_screenshot_edited_${editingScreenshot.id}_${Date.now()}.jpg`, {
+      type: 'image/jpeg',
+      lastModified: Date.now(),
+    });
+
+    // For editing existing screenshots, we don't have the original file locally,
+    // so we'll use the processedFile as both original and display for the pending structure
+    // The actual original_url will be preserved from the existing screenshot
+    const newPendingVersion: PendingScreenshotFile = {
+      id: `edited_${editingScreenshot.id}_${Date.now()}`, 
+      originalFile: processedFile, // We don't have access to the true original file
+      displayFile: processedFile, // The new cropped version
+      cropDetails: isFullImage ? null : cropData,
+      previewUrl: URL.createObjectURL(processedFile),
+      originalScreenshotId: editingScreenshot.id,
+      originalScreenshotUrl: editingScreenshot.original_url || editingScreenshot.url // Keep track of the source original
+    };
+
+    setPendingCroppedFiles(prev => [...prev, newPendingVersion]);
+    setExistingScreenshots(prev => prev.filter(s => s.id !== editingScreenshot.id));
+
+    setShowCropModal(false);
+    setTempImageFile(null); 
+    if (tempImageUrl) URL.revokeObjectURL(tempImageUrl); 
+    setTempImageUrl(null);
+    setEditingScreenshot(null);
+    console.log('[POIEditModal] Added new version of edited screenshot to pendingCroppedFiles:', newPendingVersion);
   };
 
   // Remove additional screenshot
@@ -311,7 +352,7 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
 
   // Upload additional screenshots to Supabase Storage
   const uploadAdditionalScreenshots = async (poiId: string): Promise<string[]> => {
-    const allFiles = [...additionalScreenshots, ...pendingCroppedFiles];
+    const allFiles = [...additionalScreenshots, ...pendingCroppedFiles.map(file => file.displayFile)];
     if (allFiles.length === 0) return [];
 
     const uploadedUrls: string[] = [];
@@ -344,152 +385,159 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
   // Handle form submission
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    
     if (!canEdit) {
-      setError('You do not have permission to edit this POI');
+      setError('You do not have permission to edit this POI.');
       return;
     }
-
-    if (!title.trim()) {
-      setError('Title is required');
-      return;
-    }
-
-    if (!selectedPoiTypeId) {
-      setError('Please select a POI type');
-      return;
-    }
-
-    // Handle custom icon selection
-    let finalPoiTypeId = selectedPoiTypeId;
-    let customIconId = null;
-    
-    console.log('🔧 [POIEditModal] Selected POI Type ID:', selectedPoiTypeId);
-    console.log('🔧 [POIEditModal] Available custom icons:', customIcons);
-    
-    if (selectedPoiTypeId.startsWith('custom_')) {
-      customIconId = selectedPoiTypeId.replace('custom_', '');
-      const customIcon = customIcons.find(icon => icon.id === customIconId);
-      
-      console.log('🔧 [POIEditModal] Custom icon ID:', customIconId);
-      console.log('🔧 [POIEditModal] Found custom icon:', customIcon);
-      
-      if (!customIcon) {
-        setError('Selected custom icon not found.');
-        return;
-      }
-      
-      // Find a generic POI type to use as base, prefer "Custom" category or first available
-      const customCategoryType = poiTypes.find(type => type.category.toLowerCase() === 'custom');
-      const fallbackType = poiTypes.find(type => type.category.toLowerCase() === 'general') || poiTypes[0];
-      
-      finalPoiTypeId = customCategoryType?.id || fallbackType?.id;
-      
-      console.log('🔧 [POIEditModal] Final POI type ID:', finalPoiTypeId);
-      
-      if (!finalPoiTypeId) {
-        setError('No suitable POI type found for custom icon.');
-        return;
-      }
-      
-      console.log('🔧 [POIEditModal] Will save custom icon ID to database:', customIconId);
-    }
-
     setIsSubmitting(true);
     setError(null);
 
+    let updatedPoiData: Partial<Poi> = {
+      title,
+      description,
+      poi_type_id: selectedPoiTypeId,
+      privacy_level: privacyLevel,
+      coordinates_x: coordinatesX,
+      coordinates_y: coordinatesY,
+    };
+
     try {
-      // For custom icons, we'll modify the POI type data on the client side after update
+      // 1. Upload NEW screenshots (those without originalScreenshotId)
+      const newUploadedScreenshotObjects: PoiScreenshot[] = [];
+      const filesToUploadActuallyNew = pendingCroppedFiles.filter(pf => !pf.originalScreenshotId);
+      
+      for (const pendingFile of filesToUploadActuallyNew) {
+        const newScreenshotId = crypto.randomUUID();
+        const fileExt = pendingFile.displayFile.name.split('.').pop() || 'jpg';
+        
+        // Upload original file
+        const originalFileName = `poi_originals/${poi.id}/${newScreenshotId}_original.${fileExt}`;
+        const { data: originalUploadData, error: originalUploadError } = await supabase.storage
+          .from('screenshots')
+          .upload(originalFileName, pendingFile.originalFile);
+        if (originalUploadError) throw originalUploadError;
+        const { data: originalUrlData } = supabase.storage.from('screenshots').getPublicUrl(originalFileName);
 
-      // Prepare update data
-      const updateData = {
-        title: title.trim(),
-        description: description.trim() || null,
-        poi_type_id: finalPoiTypeId,
-        coordinates_x: coordinatesX,
-        coordinates_y: coordinatesY,
-        privacy_level: privacyLevel,
-        custom_icon_id: customIconId,
-        updated_by: user!.id
-      };
+        // Upload display file (cropped or same as original)
+        const displayFileName = `poi_screenshots/${poi.id}/${newScreenshotId}_display.${fileExt}`;
+        const { data: displayUploadData, error: displayUploadError } = await supabase.storage
+          .from('screenshots')
+          .upload(displayFileName, pendingFile.displayFile);
+        if (displayUploadError) throw displayUploadError;
+        const { data: displayUrlData } = supabase.storage.from('screenshots').getPublicUrl(displayFileName);
 
-      // Update the POI record
+        newUploadedScreenshotObjects.push({
+          id: newScreenshotId, 
+          url: displayUrlData.publicUrl, // Display URL (cropped or original)
+          original_url: originalUrlData.publicUrl, // Original URL
+          crop_details: pendingFile.cropDetails, // Store the crop data
+          uploaded_by: user!.id,
+          upload_date: new Date().toISOString(),
+        });
+      }
+
+      // 2. Handle EDITED screenshots (those with originalScreenshotId)
+      const editedScreenshotObjects: PoiScreenshot[] = [];
+      const urlsOfOldDisplayFilesToDelete: string[] = [];
+
+      const filesToUploadAsEdits = pendingCroppedFiles.filter(pf => pf.originalScreenshotId && pf.originalScreenshotUrl);
+      for (const pendingVersion of filesToUploadAsEdits) {
+        const fileExt = pendingVersion.displayFile.name.split('.').pop() || 'jpg';
+        const displayFileName = `poi_screenshots/${poi.id}/edited_${pendingVersion.originalScreenshotId}_${Date.now()}.${fileExt}`;
+        
+        const { data: displayUploadData, error: displayUploadError } = await supabase.storage
+          .from('screenshots')
+          .upload(displayFileName, pendingVersion.displayFile);
+        if (displayUploadError) throw displayUploadError;
+        const { data: displayUrlData } = supabase.storage.from('screenshots').getPublicUrl(displayFileName);
+        
+        editedScreenshotObjects.push({
+          id: pendingVersion.originalScreenshotId!, 
+          url: displayUrlData.publicUrl, 
+          original_url: pendingVersion.originalScreenshotUrl, // Preserve the original source URL
+          crop_details: pendingVersion.cropDetails, // The new crop details
+          uploaded_by: user!.id, // Should be updated_by for edits
+          upload_date: poi.screenshots.find(s=>s.id === pendingVersion.originalScreenshotId!)?.upload_date || new Date().toISOString(),
+          updated_by: user!.id,
+          updated_at: new Date().toISOString(),
+        });
+        // The old DISPLAY URL of the screenshot that was re-cropped
+        const oldScreenshotInstance = poi.screenshots.find(s => s.id === pendingVersion.originalScreenshotId!)
+        if(oldScreenshotInstance && oldScreenshotInstance.url) {
+             urlsOfOldDisplayFilesToDelete.push(oldScreenshotInstance.url);
+        }
+      }
+
+      // 3. Construct the final poi.screenshots array
+      let finalScreenshotsArray: PoiScreenshot[] = poi.screenshots?.map(s => ({ ...s })) || [];
+      finalScreenshotsArray = finalScreenshotsArray.filter(s => !screenshotsToDelete.includes(s.id));
+
+      finalScreenshotsArray = finalScreenshotsArray.map(s => {
+        const editedVersion = editedScreenshotObjects.find(es => es.id === s.id);
+        if (editedVersion) {
+          return editedVersion; // Replace with the full new object including new url, crop_details, original_url
+        }
+        return s;
+      });
+
+      finalScreenshotsArray.push(...newUploadedScreenshotObjects);
+      updatedPoiData.screenshots = finalScreenshotsArray;
+
+      // 4. Update the POI record in the database
       const { data: updatedPoi, error: updateError } = await supabase
         .from('pois')
-        .update(updateData)
+        .update(updatedPoiData)
         .eq('id', poi.id)
-        .select(`
-          *,
-          poi_types (*),
-          profiles (username)
-        `)
+        .select()
         .single();
 
-      if (updateError) {
-        console.error('Error updating POI:', updateError);
-        throw new Error('Failed to update POI');
-      }
+      if (updateError) throw updateError;
 
-      // Handle screenshot updates
-      let finalScreenshots = [...poi.screenshots || []];
+      // 5. Delete files from storage
+      // These are: 
+      //    - original URLs of screenshots explicitly marked for deletion (screenshotsToDelete translates to URLs)
+      //    - old CROPPED URLs of screenshots that were re-cropped (urlsOfOldCroppedFilesToDelete)
       
-      // Remove screenshots marked for deletion
-      if (screenshotsToDelete.length > 0) {
-        finalScreenshots = finalScreenshots.filter(screenshot => 
-          !screenshotsToDelete.includes(screenshot.id)
-        );
-      }
+      const urlsOfExplicitlyDeletedScreenshots = screenshotsToDelete.map(idToDelete => {
+        // Find the screenshot in the *original* poi.screenshots to get its URL for deletion
+        const originalPoiScreenshot = poi.screenshots?.find(s => s.id === idToDelete);
+        // We need to decide if we delete the original_url or the display url, or both.
+        // For now, deleting the display url. If original_url is different and also needs deletion, that's more complex.
+        return originalPoiScreenshot?.url; 
+      }).filter(url => !!url) as string[];
 
-      // Upload additional screenshots if any (both original and cropped)
-      const allNewFiles = [...additionalScreenshots, ...pendingCroppedFiles];
-      if (allNewFiles.length > 0) {
-        try {
-          const screenshotUrls = await uploadAdditionalScreenshots(poi.id);
-          
-          // Add new screenshots to the array
-          const newScreenshots = screenshotUrls.map((url, index) => ({
-            id: `${poi.id}_${Date.now()}_${index}`,
-            url,
-            uploaded_by: user!.id,
-            upload_date: new Date().toISOString()
-          }));
+      const allUrlsToDeleteFromStorage = [
+        ...urlsOfExplicitlyDeletedScreenshots,
+        ...urlsOfOldDisplayFilesToDelete
+      ];
 
-          finalScreenshots = [...finalScreenshots, ...newScreenshots];
-        } catch (screenshotUploadError) {
-          console.error('Error uploading screenshots:', screenshotUploadError);
-          setError('POI updated successfully, but some screenshots failed to upload');
+      if (allUrlsToDeleteFromStorage.length > 0) {
+        // Extract path from full URL for Supabase delete
+        const pathsToDelete = allUrlsToDeleteFromStorage.map(url => {
+          try {
+            return new URL(url).pathname.split('/storage/v1/object/public/screenshots/')[1];
+          } catch (e) {
+            console.error(`Invalid URL for deletion: ${url}`, e);
+            return null;
+          }
+        }).filter(path => !!path) as string[];
+        
+        if (pathsToDelete.length > 0) {
+          console.log('[POIEditModal] Deleting from storage paths:', pathsToDelete);
+          const { error: deleteError } = await supabase.storage.from('screenshots').remove(pathsToDelete);
+          if (deleteError) {
+            // Log delete error but don't necessarily throw, as POI update was successful
+            console.error('[POIEditModal] Error deleting files from storage:', deleteError);
+            setError(prevError => prevError ? `${prevError}. Some old screenshots might not have been deleted.` : 'POI updated, but some old screenshots might not have been deleted.')
+          }
         }
       }
 
-      // Update POI with new screenshots array
-      if (screenshotsToDelete.length > 0 || allNewFiles.length > 0) {
-        const { error: screenshotUpdateError } = await supabase
-          .from('pois')
-          .update({ screenshots: finalScreenshots })
-          .eq('id', poi.id);
-
-        if (screenshotUpdateError) {
-          console.error('Error updating screenshots:', screenshotUpdateError);
-          // Don't fail the main update for this
-        }
-      }
-
-      // Create updated POI object with updated screenshots
-      const finalUpdatedPoi = {
-        ...updatedPoi,
-        screenshots: finalScreenshots.map(s => ({
-          id: s.id,
-          url: s.url,
-          uploaded_by: s.uploaded_by,
-          upload_date: s.upload_date
-        }))
-      };
-
-      onPoiUpdated(finalUpdatedPoi);
+      onPoiUpdated(updatedPoi);
       onClose();
-    } catch (error) {
-      console.error('Error updating POI:', error);
-      setError(error instanceof Error ? error.message : 'Failed to update POI');
+    } catch (err: any) {
+      console.error('Error submitting POI edits:', err);
+      setError(err.message || 'An unexpected error occurred.');
     } finally {
       setIsSubmitting(false);
     }
@@ -498,15 +546,15 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
   if (!canEdit) {
     return (
       <div className="fixed inset-0 bg-black/60 z-[70] flex items-center justify-center p-4">
-        <div className="bg-sand-50 rounded-xl shadow-2xl max-w-md w-full">
+        <div className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl max-w-md w-full">
           <div className="p-6 text-center">
-            <h2 className="text-xl font-bold text-sand-900 mb-4">Access Denied</h2>
-            <p className="text-sand-700 mb-4">
+            <h2 className="text-xl font-bold text-amber-200 mb-4">Access Denied</h2>
+            <p className="text-slate-300 mb-4">
               You do not have permission to edit this POI.
             </p>
             <button
               onClick={onClose}
-              className="btn btn-outline w-full"
+              className="bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-600 hover:border-slate-500 px-4 py-2 rounded-lg w-full transition-colors"
             >
               Close
             </button>
@@ -518,21 +566,21 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/60 z-[70] flex items-center justify-center p-4">
-      <div className="bg-sand-50 rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
+      <div className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
         {/* Header */}
-        <div className="bg-sand-200 px-6 py-4 border-b border-sand-300 flex items-center justify-between">
+        <div className="bg-slate-800/50 px-6 py-4 border-b border-slate-700 flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <MapPin className="w-6 h-6 text-sand-700" />
+            <MapPin className="w-6 h-6 text-amber-400" />
             <div>
-              <h2 className="text-xl font-bold text-sand-900">Edit POI</h2>
-              <p className="text-sm text-sand-600">
+              <h2 className="text-xl font-bold text-amber-200" style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>Edit POI</h2>
+              <p className="text-sm text-slate-400">
                 Update POI details and position
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 text-sand-600 hover:text-sand-800 hover:bg-sand-300/50 rounded-lg transition-colors"
+            className="p-2 text-slate-400 hover:text-amber-300 hover:bg-slate-700/50 rounded-lg transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -543,14 +591,14 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
           <div className="space-y-6">
             {/* Error Display */}
             {error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                <p className="text-red-800 text-sm">{error}</p>
+              <div className="bg-red-900/20 border border-red-800 rounded-lg p-4">
+                <p className="text-red-300 text-sm">{error}</p>
               </div>
             )}
 
             {/* Title */}
             <div>
-              <label htmlFor="title" className="block text-sm font-medium text-sand-800 mb-2">
+              <label htmlFor="title" className="block text-sm font-medium text-amber-200 mb-2">
                 Title *
               </label>
               <input
@@ -558,7 +606,7 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                className="input input-bordered w-full"
+                className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-amber-100 placeholder-slate-400 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
                 placeholder="Enter POI title..."
                 required
               />
@@ -566,28 +614,28 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
 
             {/* Description */}
             <div>
-              <label htmlFor="description" className="block text-sm font-medium text-sand-800 mb-2">
+              <label htmlFor="description" className="block text-sm font-medium text-amber-200 mb-2">
                 Description
               </label>
               <textarea
                 id="description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                className="input input-bordered w-full h-24 resize-none"
+                className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-amber-100 placeholder-slate-400 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 h-24 resize-none"
                 placeholder="Describe this location..."
               />
             </div>
 
             {/* Position */}
             <div>
-              <label className="block text-sm font-medium text-sand-800 mb-2">
+              <label className="block text-sm font-medium text-amber-200 mb-2">
                 Position
               </label>
-              <div className="bg-sand-50 border border-sand-200 rounded-lg p-4">
+              <div className="bg-slate-800 border border-slate-600 rounded-lg p-4">
                 <div className="flex items-center justify-between">
-                  <div className="text-sm text-sand-700">
+                  <div className="text-sm text-amber-300">
                     <div className="font-medium">Current Position:</div>
-                    <div className="text-sand-600">
+                    <div className="text-slate-400">
                       X: {coordinatesX.toFixed(0)}, Y: {coordinatesY.toFixed(0)}
                     </div>
                   </div>
@@ -595,7 +643,7 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
                     <button
                       type="button"
                       onClick={handlePositionChange}
-                      className="btn btn-outline btn-sm"
+                      className="bg-slate-700 hover:bg-slate-600 text-amber-300 border border-slate-500 hover:border-amber-500 px-3 py-1.5 rounded-lg text-sm transition-colors flex items-center"
                     >
                       <Target className="w-4 h-4 mr-1" />
                       Change Position
@@ -607,7 +655,7 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
 
             {/* POI Type Selection */}
             <div>
-              <label htmlFor="poiTypeSelect" className="block text-sm font-medium text-sand-800 mb-2">
+              <label htmlFor="poiTypeSelect" className="block text-sm font-medium text-amber-200 mb-2">
                 POI Type *
               </label>
               
@@ -616,7 +664,7 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
                 id="poiTypeSelect"
                 value={selectedPoiTypeId}
                 onChange={(e) => setSelectedPoiTypeId(e.target.value)}
-                className="input input-bordered w-full mb-3"
+                className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-amber-100 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 mb-3"
                 required
               >
                 <option value="">Select a POI type</option>
@@ -646,20 +694,20 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
               <button
                 type="button"
                 onClick={() => setShowDetailedPoiSelection(!showDetailedPoiSelection)}
-                className="text-sm text-spice-600 hover:text-spice-800 font-medium underline"
+                className="text-sm text-amber-400 hover:text-amber-300 font-medium underline"
               >
                 {showDetailedPoiSelection ? 'Hide details' : 'Show more details'}
               </button>
 
               {/* Detailed Visual Selection */}
               {showDetailedPoiSelection && (
-                <div className="mt-4 space-y-4 border border-sand-200 rounded-lg p-4 bg-sand-25">
+                <div className="mt-4 space-y-4 border border-slate-600 rounded-lg p-4 bg-slate-800/50">
                   {categories.map(category => {
                     const categoryTypes = poiTypes.filter(type => type.category === category);
                     
                     return (
                       <div key={category}>
-                        <h4 className="text-sm font-medium text-sand-700 mb-2 capitalize">
+                        <h4 className="text-sm font-medium text-amber-300 mb-2 capitalize">
                           {category}
                         </h4>
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -671,8 +719,8 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
                                 key={poiType.id}
                                 className={`flex items-center space-x-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
                                   selectedPoiTypeId === poiType.id
-                                    ? 'border-spice-500 bg-spice-50'
-                                    : 'border-sand-200 hover:border-sand-300 bg-white'
+                                    ? 'border-amber-500 bg-amber-900/20'
+                                    : 'border-slate-600 hover:border-slate-500 bg-slate-800'
                                 }`}
                               >
                                 <input
@@ -686,7 +734,7 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
                                 
                                 {/* POI Type Icon */}
                                 <div 
-                                  className="w-8 h-8 rounded-full border border-white shadow-sm flex items-center justify-center flex-shrink-0"
+                                  className="w-8 h-8 rounded-full border border-slate-500 shadow-sm flex items-center justify-center flex-shrink-0"
                                   style={{
                                     backgroundColor: poiType.icon_has_transparent_background && imageUrl 
                                       ? 'transparent' 
@@ -715,7 +763,7 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
                                   )}
                                 </div>
                                 
-                                <span className="text-sm font-medium text-sand-800 truncate">
+                                <span className="text-sm font-medium text-amber-200 truncate">
                                   {poiType.name}
                                 </span>
                               </label>
@@ -729,7 +777,7 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
                   {/* Custom Icons Section */}
                   {customIcons.length > 0 && (
                     <div>
-                      <h4 className="text-sm font-medium text-sand-700 mb-2">
+                      <h4 className="text-sm font-medium text-amber-300 mb-2">
                         Custom Icons
                       </h4>
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -738,8 +786,8 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
                             key={`custom_${customIcon.id}`}
                             className={`flex items-center space-x-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
                               selectedPoiTypeId === `custom_${customIcon.id}`
-                                ? 'border-spice-500 bg-spice-50'
-                                : 'border-sand-200 hover:border-sand-300 bg-white'
+                                ? 'border-amber-500 bg-amber-900/20'
+                                : 'border-slate-600 hover:border-slate-500 bg-slate-800'
                             }`}
                           >
                             <input
@@ -752,7 +800,7 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
                             />
                             
                             {/* Custom Icon */}
-                            <div className="w-8 h-8 rounded-full border border-white shadow-sm flex items-center justify-center flex-shrink-0 bg-transparent">
+                            <div className="w-8 h-8 rounded-full border border-slate-500 shadow-sm flex items-center justify-center flex-shrink-0 bg-slate-700">
                               <img
                                 src={customIcon.image_url}
                                 alt={customIcon.name}
@@ -760,7 +808,7 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
                               />
                             </div>
                             
-                            <span className="text-sm font-medium text-sand-800 truncate">
+                            <span className="text-sm font-medium text-amber-200 truncate">
                               {customIcon.name}
                             </span>
                           </label>
@@ -774,7 +822,7 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
 
             {/* Privacy Level */}
             <div>
-              <label className="block text-sm font-medium text-sand-800 mb-3">
+              <label className="block text-sm font-medium text-amber-200 mb-3">
                 Privacy Level
               </label>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -785,8 +833,8 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
                       key={option.value}
                       className={`flex items-center space-x-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
                         privacyLevel === option.value
-                          ? 'border-spice-500 bg-spice-50'
-                          : 'border-sand-200 hover:border-sand-300 bg-white'
+                          ? 'border-amber-500 bg-amber-900/20'
+                          : 'border-slate-600 hover:border-slate-500 bg-slate-800'
                       }`}
                     >
                       <input
@@ -799,8 +847,8 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
                       />
                       <Icon className={`w-5 h-5 ${option.color}`} />
                       <div>
-                        <div className="font-medium text-sm text-sand-800">{option.label}</div>
-                        <div className="text-xs text-sand-600">{option.description}</div>
+                        <div className="font-medium text-sm text-amber-200">{option.label}</div>
+                        <div className="text-xs text-slate-400">{option.description}</div>
                       </div>
                     </label>
                   );
@@ -810,7 +858,7 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
 
             {/* Screenshots Management */}
             <div>
-              <label className="block text-sm font-medium text-sand-800 mb-3">
+              <label className="block text-sm font-medium text-amber-200 mb-3">
                 Screenshots ({totalScreenshotCount}/5)
               </label>
               <div className="space-y-3">
@@ -820,7 +868,7 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
                   {existingScreenshots.map(screenshot => (
                     <div 
                       key={screenshot.id}
-                      className="w-20 h-20 relative rounded overflow-hidden border border-sand-300"
+                      className="w-20 h-20 relative rounded overflow-hidden border border-slate-600"
                     >
                       <img 
                         src={screenshot.url} 
@@ -830,7 +878,7 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
                       <div className="absolute top-0 right-0 flex">
                         <button
                           type="button"
-                          onClick={() => handleEditExistingScreenshot(screenshot.id, screenshot.url)}
+                          onClick={() => handleEditExistingScreenshot(screenshot.id)}
                           className="bg-blue-600 text-white w-5 h-5 flex items-center justify-center rounded-bl-md hover:bg-blue-700 transition-colors"
                           title="Edit screenshot"
                         >
@@ -845,6 +893,15 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
                           <X className="w-3 h-3" />
                         </button>
                       </div>
+                      {/* Screenshot label */}
+                      <div className="absolute bottom-1 left-1">
+                        {(() => {
+                          const label = getScreenshotLabel(false, screenshot.crop_details);
+                          return (
+                            <span className={label.className}>{label.text}</span>
+                          );
+                        })()}
+                      </div>
                     </div>
                   ))}
 
@@ -852,7 +909,7 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
                   {additionalScreenshots.map((file, index) => (
                     <div 
                       key={`new-${index}`}
-                      className="w-20 h-20 relative rounded overflow-hidden border border-sand-300"
+                      className="w-20 h-20 relative rounded overflow-hidden border border-slate-600"
                     >
                       <img 
                         src={URL.createObjectURL(file)} 
@@ -867,8 +924,8 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
                       >
                         <X className="w-3 h-3" />
                       </button>
-                      <div className="absolute bottom-1 left-1 bg-blue-500 text-white text-xs px-1 rounded">
-                        Original
+                      <div className="absolute bottom-1 left-1">
+                        <span className="bg-green-600 text-white text-xs px-1 rounded">New (Full)</span>
                       </div>
                     </div>
                   ))}
@@ -880,7 +937,7 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
                       className="w-20 h-20 relative rounded overflow-hidden border border-green-300"
                     >
                       <img 
-                        src={URL.createObjectURL(file)} 
+                        src={file.previewUrl} 
                         alt="Cropped Screenshot" 
                         className="w-full h-full object-cover"
                       />
@@ -892,15 +949,15 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
                       >
                         <X className="w-3 h-3" />
                       </button>
-                      <div className="absolute bottom-1 left-1 bg-green-500 text-white text-xs px-1 rounded">
-                        Cropped
+                      <div className="absolute bottom-1 left-1">
+                        <span className="bg-green-600 text-white text-xs px-1 rounded">New (Cropped)</span>
                       </div>
                     </div>
                   ))}
                   
                   {/* Upload Button */}
                   {totalScreenshotCount < 5 && (
-                    <label className="w-20 h-20 border-2 border-dashed border-sand-300 rounded flex flex-col items-center justify-center text-sand-500 hover:text-sand-700 hover:border-sand-400 cursor-pointer transition-colors">
+                    <label className="w-20 h-20 border-2 border-dashed border-slate-600 rounded flex flex-col items-center justify-center text-slate-400 hover:text-amber-300 hover:border-amber-500 cursor-pointer transition-colors">
                       <Upload className="w-5 h-5" />
                       <span className="text-xs mt-1">Add</span>
                       <input
@@ -914,7 +971,7 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
                   )}
                 </div>
                 
-                <p className="text-xs text-sand-600">
+                <p className="text-xs text-slate-400">
                   Upload up to 5 screenshots total. Each image must be under 10MB. PNG, JPG formats supported.
                 </p>
               </div>
@@ -923,11 +980,11 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
         </form>
 
         {/* Footer */}
-        <div className="bg-sand-200 px-6 py-4 border-t border-sand-300 flex justify-end space-x-3">
+        <div className="bg-slate-800/50 px-6 py-4 border-t border-slate-700 flex justify-end space-x-3">
           <button
             type="button"
             onClick={onClose}
-            className="btn btn-outline"
+            className="bg-slate-700 hover:bg-slate-600 text-amber-300 border border-slate-600 hover:border-slate-500 px-4 py-2 rounded-lg transition-colors"
             disabled={isSubmitting}
           >
             Cancel
@@ -936,7 +993,7 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
             type="submit"
             onClick={handleSubmit}
             disabled={isSubmitting}
-            className="btn btn-primary"
+            className="bg-amber-600 hover:bg-amber-500 text-slate-900 border border-amber-700 hover:border-amber-600 px-4 py-2 rounded-lg transition-colors flex items-center font-medium"
           >
             <Save className="w-4 h-4 mr-2" />
             {isSubmitting ? 'Updating...' : 'Update POI'}
@@ -948,14 +1005,14 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
       {showCropModal && tempImageUrl && (
         <ImageCropModal
           imageUrl={tempImageUrl}
-          onCropComplete={editingScreenshotId ? 
-            (croppedImageBlob: Blob) => handleEditCropComplete(croppedImageBlob) :
-            (croppedImageBlob: Blob) => handleCropComplete(croppedImageBlob)
-          }
+          onCropComplete={editingScreenshot ? handleEditCropComplete : handleCropComplete}
           onClose={handleCloseCropModal}
-          onSkip={editingScreenshotId ? undefined : handleSkipCrop}
-          title={editingScreenshotId ? "Edit POI Screenshot" : "Crop POI Screenshot"}
+          title={editingScreenshot ? "Edit POI Screenshot" : "Crop New POI Screenshot"}
           defaultToSquare={false}
+          initialCrop={editingScreenshot && editingScreenshot.crop_details 
+            ? { ...editingScreenshot.crop_details, unit: 'px' } 
+            : undefined
+          }
         />
       )}
     </div>

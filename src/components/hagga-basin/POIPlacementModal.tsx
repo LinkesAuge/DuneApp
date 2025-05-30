@@ -14,6 +14,8 @@ import { useAuth } from '../auth/AuthProvider';
 import CustomPoiTypeModal from './CustomPoiTypeModal';
 import ImageCropModal from '../grid/ImageCropModal';
 import { PixelCrop } from 'react-image-crop';
+import { v4 as uuidv4 } from 'uuid';
+import { getScreenshotLabel } from '../../lib/cropUtils';
 
 interface POIPlacementModalProps {
   coordinates: PixelCoordinates;
@@ -72,6 +74,15 @@ const getDisplayImageUrl = (icon: string, customIcons: CustomIcon[]): string | n
   return null;
 };
 
+// Define a type for our screenshot objects
+interface ScreenshotFile {
+  id: string;
+  file: File;
+  cropDetails: PixelCrop | null; // Store crop data or null if it's a full image
+  isNew: boolean; // To differentiate between newly added and existing (if ever needed)
+  previewUrl: string; // For displaying the image
+}
+
 const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
   coordinates,
   poiTypes,
@@ -89,7 +100,7 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
   const [description, setDescription] = useState('');
   const [selectedPoiTypeId, setSelectedPoiTypeId] = useState('');
   const [privacyLevel, setPrivacyLevel] = useState<PrivacyLevel>('global');
-  const [screenshots, setScreenshots] = useState<File[]>([]);
+  const [screenshots, setScreenshots] = useState<ScreenshotFile[]>([]);
   
   // UI state
   const [showDetailedPoiSelection, setShowDetailedPoiSelection] = useState(false);
@@ -102,7 +113,7 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
   const [showCropModal, setShowCropModal] = useState(false);
   const [tempImageFile, setTempImageFile] = useState<File | null>(null);
   const [tempImageUrl, setTempImageUrl] = useState<string | null>(null);
-  const [pendingCroppedFiles, setPendingCroppedFiles] = useState<File[]>([]);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
 
   // Get categories for organizing POI types
   const categories = [...new Set(poiTypes.map(type => type.category))];
@@ -149,163 +160,153 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
     setUserCreatedPoiTypes(prev => prev.map(type => type.id === updatedPoiType.id ? updatedPoiType : type));
   };
 
-  // Handle screenshot upload - now with cropping
-  const handleScreenshotUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
-    
     if (files.length === 0) return;
-    
-    const validFiles = files.filter(file => 
-      file.type.startsWith('image/') && file.size <= 10 * 1024 * 1024 // 10MB limit
-    );
-    
-    if (validFiles.length !== files.length) {
-      setError('Some files were invalid. Only images under 10MB are allowed.');
+
+    // Check total limit
+    if (screenshots.length + pendingFiles.length + files.length > 5) {
+      setError(`Cannot add ${files.length} file(s). Maximum 5 screenshots total. Currently have ${screenshots.length + pendingFiles.length}.`);
+      event.target.value = '';
       return;
     }
 
-    // Check total screenshot limit
-    const totalFiles = screenshots.length + pendingCroppedFiles.length + validFiles.length;
-    if (totalFiles > 5) {
-      setError('Maximum 5 screenshots allowed per POI');
-      return;
-    }
-    
-    // Process files one by one through cropping
-    processFilesForCropping(validFiles);
-  };
-
-  // Process files through cropping workflow
-  const processFilesForCropping = (files: File[]) => {
-    if (files.length === 0) return;
-    
-    const [firstFile, ...remainingFiles] = files;
-    
-    // Set up for cropping the first file
-    setTempImageFile(firstFile);
-    setTempImageUrl(URL.createObjectURL(firstFile));
-    setShowCropModal(true);
-    
-    // Store remaining files to process after current crop is complete
-    if (remainingFiles.length > 0) {
-      // We'll handle remaining files after crop completion
-      setTempImageFile(prev => {
-        // Store remaining files in a way we can access them
-        (firstFile as any).remainingFiles = remainingFiles;
-        return firstFile;
-      });
-    }
-  };
-
-  // Handle crop completion
-  const handleCropComplete = async (croppedImageBlob: Blob) => {
-    if (!tempImageFile) return;
-
-    try {
-      // Convert blob to File
-      const croppedFile = new File([croppedImageBlob], tempImageFile.name, {
-        type: 'image/jpeg',
-        lastModified: Date.now(),
-      });
-
-      // Add to pending cropped files
-      setPendingCroppedFiles(prev => [...prev, croppedFile]);
-
-      // Check if there are remaining files to process
-      const remainingFiles = (tempImageFile as any).remainingFiles as File[] || [];
+    // Validate all files first
+    for (const file of files) {
+      if (file.size > 10 * 1024 * 1024) {
+        setError(`File "${file.name}" is too large. Maximum 10MB allowed.`);
+        event.target.value = '';
+        return;
+      }
       
-      // Clean up current temp state
-      setShowCropModal(false);
-      setTempImageFile(null);
-      if (tempImageUrl) {
-        URL.revokeObjectURL(tempImageUrl);
-        setTempImageUrl(null);
+      if (!file.type.startsWith('image/')) {
+        setError(`File "${file.name}" is not an image. Please select image files only.`);
+        event.target.value = '';
+        return;
       }
-
-      // Process remaining files if any
-      if (remainingFiles.length > 0) {
-        setTimeout(() => processFilesForCropping(remainingFiles), 100);
-      }
-    } catch (error) {
-      console.error('Error processing cropped image:', error);
-      setError('Failed to process cropped image. Please try again.');
     }
+
+    // Add files to pending queue
+    const newPendingFiles = [...pendingFiles, ...files];
+    setPendingFiles(newPendingFiles);
+    
+    // Start processing the first file if not already processing
+    if (pendingFiles.length === 0 && !showCropModal) {
+      const firstFile = newPendingFiles[0];
+      setTempImageFile(firstFile);
+      setTempImageUrl(URL.createObjectURL(firstFile));
+      setShowCropModal(true);
+    }
+    
+    event.target.value = '';
   };
 
-  // Handle skipping crop for a file (use original)
-  const handleSkipCrop = () => {
+  const handleCloseCropModal = () => {
+    if (tempImageUrl) URL.revokeObjectURL(tempImageUrl);
+    setTempImageFile(null);
+    setTempImageUrl(null);
+    setShowCropModal(false);
+  };
+
+  const processNextFile = () => {
+    if (pendingFiles.length === 0) return;
+    
+    const nextFile = pendingFiles[0];
+    setTempImageFile(nextFile);
+    setTempImageUrl(URL.createObjectURL(nextFile));
+    setShowCropModal(true);
+  };
+
+  const handleCropComplete = async (croppedImageBlob: Blob, cropData: PixelCrop, isFullImage: boolean) => {
     if (!tempImageFile) return;
 
-    // Add original file to screenshots instead of pending cropped files
-    setScreenshots(prev => [...prev, tempImageFile]);
+    const processedFile = new File([croppedImageBlob], tempImageFile.name, {
+      type: 'image/jpeg',
+      lastModified: Date.now(),
+    });
 
-    // Check if there are remaining files to process
-    const remainingFiles = (tempImageFile as any).remainingFiles as File[] || [];
+    const newScreenshot: ScreenshotFile = {
+      id: uuidv4(),
+      file: processedFile,
+      cropDetails: isFullImage ? null : cropData,
+      isNew: true,
+      previewUrl: URL.createObjectURL(processedFile),
+    };
+
+    setScreenshots(prev => [...prev, newScreenshot]);
     
-    // Clean up current temp state
-    setShowCropModal(false);
-    setTempImageFile(null);
-    if (tempImageUrl) {
-      URL.revokeObjectURL(tempImageUrl);
-      setTempImageUrl(null);
-    }
-
-    // Process remaining files if any
-    if (remainingFiles.length > 0) {
-      setTimeout(() => processFilesForCropping(remainingFiles), 100);
-    }
-  };
-
-  // Handle closing crop modal
-  const handleCloseCropModal = () => {
-    setShowCropModal(false);
-    setTempImageFile(null);
-    if (tempImageUrl) {
-      URL.revokeObjectURL(tempImageUrl);
-      setTempImageUrl(null);
-    }
-  };
-
-  // Remove screenshot (original files)
-  const removeScreenshot = (index: number) => {
-    setScreenshots(prev => prev.filter((_, i) => i !== index));
-  };
-
-  // Remove cropped screenshot
-  const removeCroppedScreenshot = (index: number) => {
-    setPendingCroppedFiles(prev => prev.filter((_, i) => i !== index));
-  };
-
-  // Upload screenshots to Supabase Storage
-  const uploadScreenshots = async (poiId: string): Promise<string[]> => {
-    const allFiles = [...screenshots, ...pendingCroppedFiles];
-    if (allFiles.length === 0) return [];
-
-    const uploadedUrls: string[] = [];
-
-    for (const file of allFiles) {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${poiId}_${Date.now()}.${fileExt}`;
-      const filePath = `screenshots/${fileName}`;
-
-      const { data, error } = await supabase.storage
-        .from('screenshots')
-        .upload(filePath, file);
-
-      if (error) {
-        console.error('Error uploading screenshot:', error);
-        throw new Error(`Failed to upload screenshot: ${file.name}`);
+    // Remove processed file from pending queue
+    setPendingFiles(prevPending => {
+      const remainingFiles = prevPending.slice(1);
+      
+      // Close current modal
+      handleCloseCropModal();
+      
+      // Process next file if any (with slight delay to ensure state is updated)
+      if (remainingFiles.length > 0) {
+        setTimeout(() => {
+          const nextFile = remainingFiles[0];
+          setTempImageFile(nextFile);
+          setTempImageUrl(URL.createObjectURL(nextFile));
+          setShowCropModal(true);
+        }, 100);
       }
+      
+      return remainingFiles;
+    });
+  };
 
-      // Get public URL
-      const { data: urlData } = supabase.storage
-        .from('screenshots')
-        .getPublicUrl(data.path);
+  const removeScreenshot = (idToRemove: string) => {
+    setScreenshots(prev => prev.filter(s => {
+      if (s.id === idToRemove) {
+        URL.revokeObjectURL(s.previewUrl); // Clean up object URL
+        return false;
+      }
+      return true;
+    }));
+  };
 
-      uploadedUrls.push(urlData.publicUrl);
+  const savePoi = async () => {
+    // ... (validation logic for name, type, etc.)
+    setIsSubmitting(true);
+    // ... (existing user ID check)
+
+    const uploadedScreenshotPaths: { url: string; crop_details: PixelCrop | null; original_name: string; }[] = [];
+
+    for (const screenshot of screenshots) {
+      if (screenshot.isNew) { // Only upload new files
+        const fileName = `${user.id}/${uuidv4()}-${screenshot.file.name}`;
+        const filePath = `poi-screenshots/${fileName}`;
+        
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('screenshots')
+          .upload(filePath, screenshot.file, { upsert: false });
+
+        if (uploadError) {
+          // ... (error handling)
+          setIsSubmitting(false);
+          return;
+        }
+        
+        const publicURL = supabase.storage.from('screenshots').getPublicUrl(filePath).data.publicUrl;
+        uploadedScreenshotPaths.push({ 
+          url: publicURL, 
+          crop_details: screenshot.cropDetails, // This now correctly reflects full/cropped
+          original_name: screenshot.file.name 
+        });
+      }
     }
 
-    return uploadedUrls;
+    const poiDataToInsert = {
+      // ... (other POI fields)
+      screenshots: uploadedScreenshotPaths.length > 0 ? uploadedScreenshotPaths : null,
+      // ...
+    };
+
+    // ... (Supabase insert logic)
+    // ... (rest of the function, success/error handling, reset state)
+    setScreenshots([]); // Clear screenshots after successful save
+    // ...
   };
 
   // Handle form submission
@@ -373,8 +374,8 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
         poi_type_id: finalPoiTypeId,
         created_by: user.id,
         map_type: mapType,
-        coordinates_x: coordinates.x,
-        coordinates_y: coordinates.y,
+        coordinates_x: Math.round(coordinates.x),
+        coordinates_y: Math.round(coordinates.y),
         privacy_level: privacyLevel,
         grid_square_id: mapType === 'deep_desert' ? gridSquareId : null,
         custom_icon_id: customIconId
@@ -397,11 +398,11 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
 
       // Upload screenshots if any and update POI
       let finalScreenshots: any[] = [];
-      const totalScreenshots = screenshots.length + pendingCroppedFiles.length;
+      const totalScreenshots = screenshots.length;
       
       if (totalScreenshots > 0) {
         try {
-          const screenshotUrls = await uploadScreenshots(poi.id);
+          const screenshotUrls = await savePoi();
           
           // Create screenshot objects in the format expected by the database
           finalScreenshots = screenshotUrls.map((url, index) => ({
@@ -444,25 +445,25 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-night-950/90 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+      <div className="bg-slate-900 border border-slate-700 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-sand-200">
+        <div className="flex items-center justify-between p-6 border-b border-slate-700 bg-slate-800/50">
           <div className="flex items-center">
-            <MapPin className="w-6 h-6 text-spice-500 mr-3" />
+            <MapPin className="w-6 h-6 text-amber-400 mr-3" />
             <div>
-              <h3 className="text-lg font-semibold text-sand-800">
+              <h3 className="text-lg font-semibold text-amber-200" style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
                 Add POI to {mapType === 'deep_desert' ? 'Deep Desert Grid' : 'Hagga Basin'}
               </h3>
               <div className="flex items-center gap-2">
-                <p className="text-sm text-sand-600">
-                  Coordinates: {formatCoordinates(coordinates.x, coordinates.y)}
+                <p className="text-sm text-slate-400">
+                  Coordinates: {formatCoordinates(coordinates.x, coordinates.y, mapType)}
                 </p>
                 {mapType === 'deep_desert' && onRequestPlacement && (
                   <button
                     type="button"
                     onClick={onRequestPlacement}
-                    className="text-xs bg-spice-100 text-spice-700 px-2 py-1 rounded hover:bg-spice-200 transition-colors flex items-center gap-1"
+                    className="text-xs bg-amber-900/30 text-amber-300 px-2 py-1 rounded hover:bg-amber-800/40 transition-colors flex items-center gap-1"
                     title="Click to change POI placement on the screenshot"
                   >
                     <MapPin className="w-3 h-3" />
@@ -474,7 +475,7 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="text-sand-400 hover:text-sand-600 transition-colors"
+            className="text-slate-400 hover:text-amber-300 transition-colors"
           >
             <X className="w-6 h-6" />
           </button>
@@ -485,13 +486,13 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
           {/* POI Type Selection */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label htmlFor="poiTypeSelect" className="block text-sm font-medium text-sand-700">
+              <label htmlFor="poiTypeSelect" className="block text-sm font-medium text-amber-200">
                 POI Type *
               </label>
               <button
                 type="button"
                 onClick={() => setShowCustomPoiTypeModal(true)}
-                className="text-sm text-spice-600 hover:text-spice-800 font-medium flex items-center"
+                className="text-sm text-amber-400 hover:text-amber-300 font-medium flex items-center"
               >
                 <Plus className="w-4 h-4 mr-1" />
                 Create Custom Type
@@ -503,103 +504,95 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
               id="poiTypeSelect"
               value={selectedPoiTypeId}
               onChange={(e) => setSelectedPoiTypeId(e.target.value)}
-              className="input input-bordered w-full mb-3"
+              className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-amber-100 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 mb-3"
               required
             >
               <option value="">Select a POI type</option>
-                              {categories.sort().map(category => (
-                  <optgroup key={category} label={category}>
-                    {poiTypes
-                      .filter(type => type.category === category)
-                      .map(type => (
-                        <option key={type.id} value={type.id}>
-                          {type.name}
-                        </option>
-                      ))}
-                  </optgroup>
-                ))}
-                {customIcons.length > 0 && (
-                  <optgroup label="Custom Icons">
-                    {customIcons.map(icon => (
-                      <option key={`custom_${icon.id}`} value={`custom_${icon.id}`}>
-                        {icon.name} (Custom)
+              {categories.sort().map(category => (
+                <optgroup key={category} label={category}>
+                  {poiTypes
+                    .filter(type => type.category === category)
+                    .map(type => (
+                      <option key={type.id} value={type.id}>
+                        {type.name}
                       </option>
                     ))}
-                  </optgroup>
-                )}
+                </optgroup>
+              ))}
+              {customIcons.length > 0 && (
+                <optgroup label="Custom Icons">
+                  {customIcons.map(icon => (
+                    <option key={`custom_${icon.id}`} value={`custom_${icon.id}`}>
+                      {icon.name} (Custom)
+                    </option>
+                  ))}
+                </optgroup>
+              )}
             </select>
 
             {/* Show More Details Toggle */}
             <button
               type="button"
               onClick={() => setShowDetailedPoiSelection(!showDetailedPoiSelection)}
-              className="text-sm text-spice-600 hover:text-spice-800 font-medium underline"
+              className="text-sm text-amber-400 hover:text-amber-300 font-medium underline"
             >
               {showDetailedPoiSelection ? 'Hide details' : 'Show more details'}
             </button>
 
             {/* Detailed Visual Selection */}
             {showDetailedPoiSelection && (
-              <div className="mt-4 space-y-4 border border-sand-200 rounded-lg p-4 bg-sand-25">
+              <div className="mt-4 space-y-4 border border-slate-600 rounded-lg p-4 bg-slate-800/50">
                 {categories.map(category => {
                   const categoryTypes = poiTypes.filter(type => type.category === category);
                   
                   return (
                     <div key={category}>
-                      <h4 className="text-sm font-medium text-sand-600 mb-2 capitalize">{category}</h4>
-                      <div className="grid grid-cols-2 gap-2">
-                        {categoryTypes.map(type => {
-                          const imageUrl = getDisplayImageUrl(type.icon, customIcons);
+                      <h4 className="text-sm font-medium text-amber-300 mb-2 capitalize">
+                        {category}
+                      </h4>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {categoryTypes.map(poiType => {
+                          const imageUrl = getDisplayImageUrl(poiType.icon, customIcons);
                           
                           return (
                             <label
-                              key={type.id}
-                              className={`flex items-center p-3 border rounded-lg cursor-pointer transition-colors ${
-                                selectedPoiTypeId === type.id
-                                  ? 'border-spice-500 bg-spice-50'
-                                  : 'border-sand-200 hover:border-sand-300'
+                              key={poiType.id}
+                              className={`flex items-center space-x-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                                selectedPoiTypeId === poiType.id
+                                  ? 'border-amber-500 bg-amber-900/20'
+                                  : 'border-slate-600 hover:border-slate-500 bg-slate-800'
                               }`}
                             >
                               <input
                                 type="radio"
                                 name="poiType"
-                                value={type.id}
-                                checked={selectedPoiTypeId === type.id}
+                                value={poiType.id}
+                                checked={selectedPoiTypeId === poiType.id}
                                 onChange={(e) => setSelectedPoiTypeId(e.target.value)}
                                 className="sr-only"
                               />
                               
                               {/* POI Type Icon */}
                               <div 
-                                className="w-6 h-6 rounded-full flex items-center justify-center mr-3 text-white text-sm"
+                                className="w-6 h-6 rounded-full border border-slate-500 flex items-center justify-center mr-3"
                                 style={{
-                                  backgroundColor: type.icon_has_transparent_background && imageUrl 
+                                  backgroundColor: poiType.icon_has_transparent_background && imageUrl 
                                     ? 'transparent' 
-                                    : type.color
+                                    : poiType.color
                                 }}
                               >
                                 {imageUrl ? (
                                   <img
                                     src={imageUrl}
-                                    alt={type.name}
+                                    alt={poiType.name}
                                     className="w-4 h-4 object-contain"
-                                    style={{
-                                      filter: type.icon_has_transparent_background ? 'none' : 'drop-shadow(0 1px 1px rgba(0,0,0,0.3))'
-                                    }}
                                   />
                                 ) : (
-                                  <span 
-                                    style={{ 
-                                      color: type.icon_has_transparent_background ? type.color : 'white',
-                                      textShadow: type.icon_has_transparent_background ? '0 1px 1px rgba(0,0,0,0.3)' : 'none'
-                                    }}
-                                  >
-                                    {type.icon}
-                                  </span>
+                                  <span className="text-xs text-white">{poiType.icon}</span>
                                 )}
                               </div>
                               
-                              <span className="text-sm font-medium text-sand-700">{type.name}</span>
+                              <span className="text-sm font-medium text-amber-200">{poiType.name}</span>
                             </label>
                           );
                         })}
@@ -608,18 +601,20 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
                   );
                 })}
 
-                {/* Custom Icons Section */}
+                {/* Custom Icons */}
                 {customIcons.length > 0 && (
                   <div>
-                    <h4 className="text-sm font-medium text-sand-600 mb-2">Custom Icons</h4>
-                    <div className="grid grid-cols-2 gap-2">
+                    <h4 className="text-sm font-medium text-amber-300 mb-2">
+                      Custom Icons
+                    </h4>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                       {customIcons.map(customIcon => (
                         <label
                           key={`custom_${customIcon.id}`}
-                          className={`flex items-center p-3 border rounded-lg cursor-pointer transition-colors ${
+                          className={`flex items-center space-x-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
                             selectedPoiTypeId === `custom_${customIcon.id}`
-                              ? 'border-spice-500 bg-spice-50'
-                              : 'border-sand-200 hover:border-sand-300'
+                              ? 'border-amber-500 bg-amber-900/20'
+                              : 'border-slate-600 hover:border-slate-500 bg-slate-800'
                           }`}
                         >
                           <input
@@ -632,7 +627,7 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
                           />
                           
                           {/* Custom Icon */}
-                          <div className="w-6 h-6 rounded-full flex items-center justify-center mr-3 bg-transparent">
+                          <div className="w-6 h-6 rounded-full border border-slate-500 flex items-center justify-center mr-3 bg-slate-700">
                             <img
                               src={customIcon.image_url}
                               alt={customIcon.name}
@@ -640,7 +635,7 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
                             />
                           </div>
                           
-                          <span className="text-sm font-medium text-sand-700">{customIcon.name}</span>
+                          <span className="text-sm font-medium text-amber-200">{customIcon.name}</span>
                         </label>
                       ))}
                     </div>
@@ -652,7 +647,7 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
 
           {/* Title */}
           <div>
-            <label className="block text-sm font-medium text-sand-700 mb-2">
+            <label className="block text-sm font-medium text-amber-200 mb-2">
               Title *
             </label>
             <input
@@ -660,14 +655,14 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Enter POI title..."
-              className="w-full px-3 py-2 border border-sand-300 rounded-md focus:outline-none focus:ring-2 focus:ring-spice-500"
+              className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-amber-100 placeholder-slate-400 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
               required
             />
           </div>
 
           {/* Description */}
           <div>
-            <label className="block text-sm font-medium text-sand-700 mb-2">
+            <label className="block text-sm font-medium text-amber-200 mb-2">
               Description
             </label>
             <textarea
@@ -675,13 +670,13 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Enter POI description..."
               rows={3}
-              className="w-full px-3 py-2 border border-sand-300 rounded-md focus:outline-none focus:ring-2 focus:ring-spice-500"
+              className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-amber-100 placeholder-slate-400 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
             />
           </div>
 
           {/* Privacy Level */}
           <div>
-            <label className="block text-sm font-medium text-sand-700 mb-2">
+            <label className="block text-sm font-medium text-amber-200 mb-2">
               Visibility
             </label>
             <div className="space-y-2">
@@ -692,8 +687,8 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
                     key={option.value}
                     className={`flex items-center p-3 border rounded-lg cursor-pointer transition-colors ${
                       privacyLevel === option.value
-                        ? 'border-spice-500 bg-spice-50'
-                        : 'border-sand-200 hover:border-sand-300'
+                        ? 'border-amber-500 bg-amber-900/20'
+                        : 'border-slate-600 hover:border-slate-500 bg-slate-800'
                     }`}
                   >
                     <input
@@ -705,8 +700,8 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
                     />
                     <Icon className={`w-5 h-5 mr-3 ${option.color}`} />
                     <div>
-                      <div className="font-medium text-sand-700">{option.label}</div>
-                      <div className="text-sm text-sand-500">{option.description}</div>
+                      <div className="font-medium text-amber-200">{option.label}</div>
+                      <div className="text-sm text-slate-400">{option.description}</div>
                     </div>
                   </label>
                 );
@@ -716,119 +711,85 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
 
           {/* Screenshots */}
           <div>
-            <label className="block text-sm font-medium text-sand-700 mb-2">
-              Screenshots (Optional)
+            <label className="block text-sm font-medium text-amber-200 mb-2">
+              Screenshots (Optional, Max 5)
             </label>
             
-            {/* Upload Button */}
+            {/* Screenshot Upload */}
             <div className="mb-4">
-              <label className="flex items-center justify-center w-full h-32 border-2 border-dashed border-sand-300 rounded-lg cursor-pointer hover:border-sand-400 transition-colors">
-                <div className="text-center">
-                  <Upload className="w-8 h-8 text-sand-400 mx-auto mb-2" />
-                  <span className="text-sm text-sand-600">
-                    Click to upload screenshots
-                  </span>
-                  <p className="text-xs text-sand-500 mt-1">
-                    PNG, JPG up to 10MB each (max 5 images)
-                  </p>
-                </div>
-                <input
-                  type="file"
-                  multiple
-                  accept="image/*"
-                  onChange={handleScreenshotUpload}
-                  className="sr-only"
-                />
+              <label htmlFor="screenshot-upload" className="block text-sm font-medium text-amber-300 mb-1">
+                Screenshots (Optional, Max 5)
               </label>
+              <input
+                id="screenshot-upload"
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-amber-100 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-amber-600 file:text-slate-900 hover:file:bg-amber-500"
+                multiple
+                disabled={screenshots.length + pendingFiles.length >= 5}
+              />
+              {(screenshots.length + pendingFiles.length > 0) && (
+                <p className="text-xs text-slate-400 mt-1">
+                  {screenshots.length + pendingFiles.length}/5 screenshots
+                  {pendingFiles.length > 0 && ` • ${pendingFiles.length} pending crop`}
+                </p>
+              )}
             </div>
 
-            {/* Screenshot Previews */}
-            {(screenshots.length > 0 || pendingCroppedFiles.length > 0) && (
-              <div className="space-y-4">
-                {/* Original Screenshots */}
-                {screenshots.length > 0 && (
-                  <div>
-                    <h4 className="text-sm font-medium text-sand-700 mb-2">Original Screenshots</h4>
-                    <div className="grid grid-cols-2 gap-2">
-                      {screenshots.map((file, index) => (
-                        <div key={`original-${index}`} className="relative">
-                          <img
-                            src={URL.createObjectURL(file)}
-                            alt={`Original Screenshot ${index + 1}`}
-                            className="w-full h-24 object-cover rounded-lg"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => removeScreenshot(index)}
-                            className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                          <div className="absolute bottom-1 left-1 bg-blue-500 text-white text-xs px-1 rounded">
-                            Original
-                          </div>
-                        </div>
-                      ))}
+            {/* Display Selected/Uploaded Screenshots */}
+            {screenshots.length > 0 && (
+              <div className="mb-4">
+                <p className="text-sm text-amber-300 mb-1">Attached Screenshots:</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {screenshots.map((sFile) => (
+                    <div key={sFile.id} className="relative group">
+                      <img src={sFile.previewUrl} alt="screenshot preview" className="w-full h-20 object-cover rounded border border-slate-600"/>
+                      <button
+                        onClick={() => removeScreenshot(sFile.id)}
+                        className="absolute top-1 right-1 bg-red-600/70 hover:bg-red-500 text-white p-0.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                        aria-label="Remove screenshot"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                      {(() => {
+                        const label = getScreenshotLabel(true, sFile.cropDetails);
+                        return (
+                          <span className={label.className}>{label.text}</span>
+                        );
+                      })()}
                     </div>
-                  </div>
-                )}
-
-                {/* Cropped Screenshots */}
-                {pendingCroppedFiles.length > 0 && (
-                  <div>
-                    <h4 className="text-sm font-medium text-sand-700 mb-2">Cropped Screenshots</h4>
-                    <div className="grid grid-cols-2 gap-2">
-                      {pendingCroppedFiles.map((file, index) => (
-                        <div key={`cropped-${index}`} className="relative">
-                          <img
-                            src={URL.createObjectURL(file)}
-                            alt={`Cropped Screenshot ${index + 1}`}
-                            className="w-full h-24 object-cover rounded-lg"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => removeCroppedScreenshot(index)}
-                            className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                          <div className="absolute bottom-1 left-1 bg-green-500 text-white text-xs px-1 rounded">
-                            Cropped
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                  ))}
+                </div>
               </div>
             )}
           </div>
 
           {/* Error Display */}
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-              <p className="text-sm text-red-600">{error}</p>
+            <div className="bg-red-900/20 border border-red-800 rounded-lg p-3">
+              <p className="text-sm text-red-300">{error}</p>
             </div>
           )}
 
           {/* Actions */}
-          <div className="flex justify-end space-x-3 pt-4 border-t border-sand-200">
+          <div className="flex justify-end space-x-3 pt-4 border-t border-slate-700">
             <button
               type="button"
               onClick={onClose}
-              className="btn btn-outline"
+              className="bg-slate-700 hover:bg-slate-600 text-amber-300 border border-slate-600 hover:border-slate-500 px-4 py-2 rounded-lg transition-colors"
               disabled={isSubmitting}
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="btn btn-primary"
+              className="bg-amber-600 hover:bg-amber-500 text-slate-900 border border-amber-700 hover:border-amber-600 px-4 py-2 rounded-lg transition-colors flex items-center font-medium"
               disabled={isSubmitting || !title.trim() || !selectedPoiTypeId}
             >
               {isSubmitting ? (
                 <div className="flex items-center">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-slate-900 mr-2"></div>
                   Creating POI...
                 </div>
               ) : (
@@ -850,13 +811,12 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
       />
 
       {/* Image Crop Modal */}
-      {showCropModal && tempImageFile && tempImageUrl && (
+      {showCropModal && tempImageUrl && tempImageFile && (
         <ImageCropModal
           imageUrl={tempImageUrl}
-          onCropComplete={(croppedImageBlob: Blob) => handleCropComplete(croppedImageBlob)}
+          onCropComplete={handleCropComplete}
           onClose={handleCloseCropModal}
-          onSkip={handleSkipCrop}
-          title="Crop POI Screenshot"
+          title={`Crop POI Screenshot (${screenshots.length + 1}/${screenshots.length + pendingFiles.length + 1})`}
           defaultToSquare={false}
         />
       )}

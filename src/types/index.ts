@@ -1,3 +1,5 @@
+import { PixelCrop } from 'react-image-crop';
+
 // User related types
 export type UserRole = 'admin' | 'editor' | 'member' | 'pending';
 
@@ -56,6 +58,8 @@ export interface PoiType {
 export interface PoiScreenshot {
   id: string;
   url: string;
+  original_url?: string | null; // URL of original image before cropping
+  crop_details?: PixelCrop | null; // Crop information from react-image-crop
   uploaded_by: string;
   upload_date: string;
   updated_by?: string | null; // Who last edited this screenshot

@@ -23,6 +23,32 @@ This document tracks known issues, their states, context, and resolutions encoun
 
 ---
 
+-   **Date**: 2025-01-28
+-   **Error Description**: POI image cropping system issues - free mode tool preselected, cropping from already-cropped images instead of originals, and missing database schema for original/cropped image handling.
+-   **Context/Symptoms**: 
+    1. When opening POI edit modal for image cropping, "Free Form" tool was automatically preselected when user wanted no tool active by default
+    2. When editing existing POI images that were previously cropped, subsequent crops were applied to the already-cropped image instead of the original image
+    3. Original images were being lost during the upload/crop workflow because only cropped versions were saved
+    4. Database schema was missing `original_url` and `crop_details` fields in PoiScreenshot interface, causing TypeScript errors and runtime issues
+-   **Investigation/Diagnosis**:
+    -   **Tool Preselection**: ImageCropModal was using `aspect=undefined` for "no tool active" state, but this was being interpreted as "Free Form" active. Needed a distinct state for "no tool selected".
+    -   **Original Image Loss**: The `PendingScreenshotFile` interface only stored the final processed file, losing the original when cropping was applied. When editing existing screenshots, the system tried to access `original_url` but this field wasn't properly stored.
+    -   **Database Schema Gap**: The PoiScreenshot interface was missing `original_url` and `crop_details` fields that the code was trying to use, creating a mismatch between implementation and types.
+    -   **Upload Workflow Flaw**: The current workflow immediately replaced the original file with the cropped version, making it impossible to re-crop from the original or store both versions properly.
+-   **Solution/Fix**:
+    1.  **Fixed Tool Selection State Management**: Modified ImageCropModal to use `aspect=null` for "no tool active", `aspect=undefined` for "Free Form", and `aspect=1` for "Square Mode". Updated button styling logic accordingly.
+    2.  **Enhanced Database Schema**: Added `original_url?: string | null` and `crop_details?: PixelCrop | null` fields to PoiScreenshot interface with proper import from 'react-image-crop'.
+    3.  **Redesigned Upload Workflow**: Completely overhauled the PendingScreenshotFile interface to store both `originalFile` and `displayFile`, preserving the original throughout the entire workflow.
+    4.  **Fixed Upload Logic**: Modified the upload process to save both original and display versions to separate storage paths (`poi_originals/` and `poi_screenshots/`) with proper URL references.
+    5.  **Improved Image Preview**: Changed ImageCropModal image constraint from `max-h-[60vh]` to `max-h-full` to better utilize available space for tall images.
+-   **Files Affected**:
+    -   `src/components/grid/ImageCropModal.tsx` (Tool selection state and image sizing)
+    -   `src/types/index.ts` (Enhanced PoiScreenshot interface)
+    -   `src/components/hagga-basin/POIEditModal.tsx` (Complete workflow overhaul)
+-   **Lesson Learned**: When implementing image cropping systems: (1) Always preserve original files separately from processed versions, (2) Use distinct state values for different UI modes rather than relying on undefined/truthy checks, (3) Ensure database schema matches the data structures used in code, (4) Design upload workflows to handle both original and processed versions from the start rather than retrofitting later, (5) Test image cropping workflows with both new uploads and editing existing images to catch different code paths.
+
+---
+
 -   **Date**: YYYY-MM-DD <!-- User should replace with current date -->
 -   **Error Description**: Supabase Storage `listBuckets()` returns empty array `[]` and `getBucket('bucket-name')` fails with "Bucket not found" (400 error) for a newly created, public bucket, despite the bucket existing in the Supabase dashboard and client being authenticated.
 -   **Context/Symptoms**: Occurred in `PoiTypeManager.tsx` when attempting to interact with a new 'poi-icons' bucket for icon uploads. Another existing bucket ('screenshots') was working for other functionalities. SQL grants for `SELECT` on `storage.buckets` to `authenticated` and `anon` roles did not resolve the issue. No restrictive RLS policies were found on `storage.buckets` table itself.
@@ -165,5 +191,28 @@ This document tracks known issues, their states, context, and resolutions encoun
     -   `src/components/auth/SignInForm.tsx` (Removed console logs)
     -   `src/lib/supabase.ts` (Removed console logs)
 -   **Lesson Learned**: Complex filtering logic with multiple conditions can create edge cases where the logic works for some scenarios but fails for others. When debugging filter systems: (1) Test all possible states including empty selections, (2) Watch for useEffect hooks that might interfere with user actions, (3) Simplify filtering conditions to avoid edge case failures, (4) Use state flags to control when automatic effects should run vs. when user actions should take precedence. Always verify that "hide all" and "show all" scenarios work correctly in filtering systems.
+
+---
+
+-   **Date**: 2025-01-28
+-   **Error Description**: POI image cropping modal issues - square mode preselected when editing images and tall images getting cut off in preview.
+-   **Context/Symptoms**: 
+    -   When editing already cropped POI images (especially those with height > width), the square cropping tool was automatically preselected
+    -   Tall images appeared very small or "cut off" in the cropping modal preview, making it difficult to see and select the desired crop area
+    -   Users expected no cropping tool to be preselected by default when editing POI images
+    -   The preview area wasn't utilizing available space efficiently for tall images
+-   **Investigation/Diagnosis**:
+    -   **Root Cause 1 - Square Mode Preselection**: In `POIEditModal.tsx`, the `ImageCropModal` was called with `defaultToSquare={true}`, automatically activating square mode regardless of user preference
+    -   **Root Cause 2 - Image Preview Height Constraint**: In `ImageCropModal.tsx`, the image had CSS class `max-h-[60vh]` which limited height to 60% of viewport height. For tall images, this constraint was too restrictive given the available space in the modal's image area
+    -   The modal itself was `max-h-[90vh]` and the image area used `flex-grow`, but the fixed 60vh limit on the image prevented it from using the full available space
+-   **Solution/Fix**:
+    1.  **Fixed Square Mode Preselection**: Changed `defaultToSquare={true}` to `defaultToSquare={false}` in `POIEditModal.tsx` line 1000
+    2.  **Improved Image Preview Sizing**: Changed image CSS from `max-h-[60vh]` to `max-h-full` in `ImageCropModal.tsx` line 391, allowing images to use the full height of their flex container
+    -   This allows tall images to display much larger while still fitting within the modal's responsive layout
+    -   The flex container with `flex-grow` and `overflow-hidden` properly constrains the image to available space
+-   **Files Affected**:
+    -   `src/components/hagga-basin/POIEditModal.tsx` (Changed defaultToSquare prop)
+    -   `src/components/grid/ImageCropModal.tsx` (Improved image sizing CSS)
+-   **Lesson Learned**: When implementing cropping modals: (1) Don't preselect cropping tools unless there's a specific business requirement - let users choose their preferred method, (2) Use flexible CSS constraints (like `max-h-full`) that work with flex layouts rather than fixed viewport units that may not utilize available space efficiently, (3) Consider the aspect ratio and available space when constraining image previews - tall images need more height allowance than fixed vh units typically provide.
 
 ---

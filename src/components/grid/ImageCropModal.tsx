@@ -1,7 +1,61 @@
-import React, { useState, useRef, useCallback } from 'react';
-import ReactCrop, { Crop, PixelCrop } from 'react-image-crop';
-import { X, Square, Maximize2, RotateCcw, Check, Download } from 'lucide-react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
+import ReactCrop, {
+  centerCrop,
+  makeAspectCrop,
+  Crop,
+  PixelCrop,
+} from 'react-image-crop';
+import { X, Square, Maximize2, RotateCcw, Check, Download, Minimize2, Trash2 } from 'lucide-react';
 import 'react-image-crop/dist/ReactCrop.css';
+
+// Utility function to get the cropped image Blob
+// It's important that the crop parameter accurately reflects the desired output dimensions
+// and the source rectangle from the original image.
+const getCroppedImg = (
+  image: HTMLImageElement,
+  crop: PixelCrop,
+  fileName: string
+): Promise<Blob> => {
+  return new Promise((resolve, reject) => {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+
+    if (!ctx) {
+      reject(new Error('Failed to get 2d context'));
+      return;
+    }
+
+    // Set canvas dimensions to the exact dimensions of the crop area
+    canvas.width = crop.width;
+    canvas.height = crop.height;
+
+    // Draw the cropped portion of the image onto the canvas.
+    // The crop.x, crop.y, crop.width, crop.height define the source rectangle
+    // from the original image. We draw this into a canvas of size crop.width, crop.height
+    // at destination (0,0) on the canvas.
+    ctx.drawImage(
+      image,
+      crop.x, // Source X from original image
+      crop.y, // Source Y from original image
+      crop.width, // Source Width from original image
+      crop.height, // Source Height from original image
+      0, // Destination X on canvas
+      0, // Destination Y on canvas
+      crop.width, // Destination Width on canvas
+      crop.height // Destination Height on canvas
+    );
+
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        reject(new Error('Canvas is empty'));
+        return;
+      }
+      // Optionally, you could add blob.name = fileName here if needed by consumers
+      // but typically file name is handled when constructing the File object later.
+      resolve(blob);
+    }, 'image/jpeg');
+  });
+};
 
 // Helper for consistent theming of text based on background (can be imported from a shared util if used in many places)
 const getThemedTextColor = (variant: 'primary' | 'secondary' | 'muted') => {
@@ -12,9 +66,8 @@ const getThemedTextColor = (variant: 'primary' | 'secondary' | 'muted') => {
 
 interface ImageCropModalProps {
   imageUrl: string;
-  onCropComplete: (croppedImageBlob: Blob, cropData: PixelCrop) => Promise<void>;
+  onCropComplete: (croppedImageBlob: Blob, cropData: PixelCrop, isFullImage: boolean) => Promise<void>;
   onClose: () => void;
-  onSkip?: () => void;
   onDelete?: () => Promise<void>;
   title?: string;
   defaultToSquare?: boolean;
@@ -24,368 +77,345 @@ interface ImageCropModalProps {
 const ImageCropModal: React.FC<ImageCropModalProps> = ({
   imageUrl,
   onCropComplete,
-  onClose,
-  onSkip,
+  onClose: parentOnClose,
   onDelete,
-  title = "Crop Your Screenshot",
+  title = "Image Editing",
   initialCrop,
   defaultToSquare = false
 }) => {
-  const [crop, setCrop] = useState<Crop>({
-    unit: '%',
-    x: 25,
-    y: 25,
-    width: 50,
-    height: 50,
-  });
-  const [completedCrop, setCompletedCrop] = useState<PixelCrop>();
-  const [squareMode, setSquareMode] = useState(defaultToSquare);
+  const [crop, setCrop] = useState<Crop | undefined>(undefined);
+  const [completedCrop, setCompletedCrop] = useState<PixelCrop | undefined>(undefined);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const imgRef = useRef<HTMLImageElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [aspect, setAspect] = useState<number | undefined | null>(
+    defaultToSquare ? 1 / 1 : null  // null = no tool active, undefined = free form, 1/1 = square
+  );
+  const [isFullImageRequestedByUser, setIsFullImageRequestedByUser] = useState(false);
+  const [isImageLoaded, setIsImageLoaded] = useState(false);
+  const cropperRef = useRef<ReactCrop | null>(null);
 
-  // Set up initial crop when image loads
+  const handleInternalOnClose = () => {
+    setIsFullImageRequestedByUser(false);
+    parentOnClose();
+  };
+
   const onImageLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>) => {
-    const { naturalWidth, naturalHeight } = e.currentTarget;
-    const { width: displayWidth, height: displayHeight } = e.currentTarget.getBoundingClientRect();
-    
-    if (initialCrop && displayWidth > 0 && displayHeight > 0) {
-      // Convert stored crop coordinates from natural dimensions to display dimensions
-      const scaleX = displayWidth / naturalWidth;
-      const scaleY = displayHeight / naturalHeight;
+    setIsImageLoaded(true);
+    const img = e.currentTarget;
+    const { width: mediaWidth, height: mediaHeight } = img;
+
+    if (initialCrop) {
+      setCrop(initialCrop);
+      setCompletedCrop(initialCrop);
       
-      const displayX = initialCrop.x * scaleX;
-      const displayY = initialCrop.y * scaleY;
-      const displayWidth_crop = initialCrop.width * scaleX;
-      const displayHeight_crop = initialCrop.height * scaleY;
-      
-      // Ensure the crop is within the display bounds
-      const clampedX = Math.max(0, Math.min(displayX, displayWidth - 50));
-      const clampedY = Math.max(0, Math.min(displayY, displayHeight - 50));
-      const clampedWidth = Math.max(50, Math.min(displayWidth_crop, displayWidth - clampedX));
-      const clampedHeight = Math.max(50, Math.min(displayHeight_crop, displayHeight - clampedY));
-      
-      setCrop({
-        unit: 'px',
-        x: clampedX,
-        y: clampedY,
-        width: clampedWidth,
-        height: clampedHeight,
-      });
-      
-      setCompletedCrop({
-        x: clampedX,
-        y: clampedY,
-        width: clampedWidth,
-        height: clampedHeight,
-      });
-    } else {
-      // Create a centered crop using percentage to ensure it's always visible
-      const cropSize = 60; // 60% of the image
-      const centerX = (100 - cropSize) / 2; // 20%
-      const centerY = (100 - cropSize) / 2; // 20%
-      
-      const newCrop: Crop = {
-        unit: '%',
-        x: centerX,
-        y: centerY,
-        width: cropSize,
-        height: defaultToSquare ? cropSize : cropSize * 0.8, // Square or slightly rectangular
-      };
-      
+      if (defaultToSquare) {
+        setAspect(1 / 1);
+      } else {
+        const isInitialCropSquare = initialCrop.width && initialCrop.height && initialCrop.width === initialCrop.height;
+        setAspect(isInitialCropSquare ? 1 / 1 : undefined);
+      }
+    } else if (defaultToSquare) {
+      const newCrop = centerCrop(
+        makeAspectCrop(
+          {
+            unit: '%',
+            width: 90,
+          },
+          1 / 1,
+          mediaWidth,
+          mediaHeight
+        ),
+        mediaWidth,
+        mediaHeight
+      );
       setCrop(newCrop);
-      
-      // Also set completedCrop in pixel coordinates for consistency
-      const pixelX = (centerX / 100) * displayWidth;
-      const pixelY = (centerY / 100) * displayHeight;
-      const pixelWidth = (cropSize / 100) * displayWidth;
-      const pixelHeight = ((defaultToSquare ? cropSize : cropSize * 0.8) / 100) * displayHeight;
-      
-      setCompletedCrop({
-        x: pixelX,
-        y: pixelY,
-        width: pixelWidth,
-        height: pixelHeight,
-      });
+      setAspect(1 / 1);
+    } else {
+      // No tool should be preselected - keep aspect as null
+      setCrop(undefined);
+      setAspect(null);
     }
   }, [initialCrop, defaultToSquare]);
 
-  // Generate cropped image canvas
-  const generateCroppedImage = useCallback(async (): Promise<Blob | null> => {
-    if (!completedCrop || !imgRef.current || !canvasRef.current) {
-      return null;
+  useEffect(() => {
+    setIsImageLoaded(false);
+    setCrop(undefined);
+    setCompletedCrop(undefined);
+  }, [imageUrl]);
+
+  const activateSquareMode = () => {
+    setIsFullImageRequestedByUser(false);
+    setAspect(1 / 1);
+    if (imgRef.current) {
+      const { width, height } = imgRef.current;
+      const newCrop = centerCrop(
+        makeAspectCrop(
+          {
+            unit: '%',
+            width: crop?.width && crop.unit === '%' ? crop.width : 90,
+          },
+          1 / 1,
+          width,
+          height
+        ),
+        width,
+        height
+      );
+      setCrop(newCrop);
+      if (newCrop.width > 0 && newCrop.height > 0) {
+        setCompletedCrop({
+          x: Math.round((width * newCrop.x) / 100),
+          y: Math.round((height * newCrop.y) / 100),
+          width: Math.round((width * newCrop.width) / 100),
+          height: Math.round((height * newCrop.height) / 100),
+          unit: 'px',
+        });
+      } else {
+        setCompletedCrop(undefined);
+      }
     }
+  };
 
-    const image = imgRef.current;
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
+  const activateFreeFormMode = () => {
+    setIsFullImageRequestedByUser(false);
+    setAspect(undefined);
+  };
 
-    if (!ctx) {
-      return null;
-    }
+  const handleConfirmCrop = async () => {
+    console.log('[ImageCropModal] handleConfirmCrop started.');
+    console.log('[ImageCropModal] Initial completedCrop:', JSON.parse(JSON.stringify(completedCrop || {})));
+    console.log('[ImageCropModal] Initial isFullImageRequestedByUser:', isFullImageRequestedByUser);
 
-    const { x, y, width, height } = completedCrop;
-    
-    // Get the natural (actual) dimensions of the image
-    const { naturalWidth, naturalHeight } = image;
-    
-    // Get the displayed dimensions
-    const { width: displayWidth, height: displayHeight } = image.getBoundingClientRect();
-    
-    // Calculate scale factors to convert from display coordinates to natural coordinates
-    const scaleX = naturalWidth / displayWidth;
-    const scaleY = naturalHeight / displayHeight;
-    
-    // Convert crop coordinates to natural image coordinates
-    const naturalX = x * scaleX;
-    const naturalY = y * scaleY;
-    const naturalCropWidth = width * scaleX;
-    const naturalCropHeight = height * scaleY;
-    
-    // Ensure coordinates are within image bounds
-    const clampedX = Math.max(0, Math.min(naturalX, naturalWidth - 1));
-    const clampedY = Math.max(0, Math.min(naturalY, naturalHeight - 1));
-    const clampedWidth = Math.max(1, Math.min(naturalCropWidth, naturalWidth - clampedX));
-    const clampedHeight = Math.max(1, Math.min(naturalCropHeight, naturalHeight - clampedY));
+    let finalPixelCrop: PixelCrop | undefined;
+    let isFullImageUpload = false;
 
-    // Set canvas size to crop size (using natural dimensions)
-    canvas.width = clampedWidth;
-    canvas.height = clampedHeight;
-
-    // Draw the cropped portion using natural coordinates
-    ctx.drawImage(
-      image,
-      clampedX, clampedY, clampedWidth, clampedHeight,  // Source rectangle (natural coords)
-      0, 0, clampedWidth, clampedHeight   // Destination rectangle (canvas coords)
-    );
-
-    return new Promise((resolve) => {
-      canvas.toBlob(resolve, 'image/jpeg', 0.9);
-    });
-  }, [completedCrop]);
-
-  const handleCropConfirm = async () => {
-    if (!completedCrop) {
-      alert('Please select an area to crop');
+    if (!imgRef.current) {
+      setError("Image reference is not available. Cannot process crop.");
+      console.error("[ImageCropModal] imgRef.current is null.");
       return;
+    }
+    const { naturalWidth, naturalHeight } = imgRef.current;
+    console.log(`[ImageCropModal] imgRef.current dimensions: naturalW=${naturalWidth}, naturalH=${naturalHeight}, displayW=${imgRef.current.width}, displayH=${imgRef.current.height}`);
+
+    if (isFullImageRequestedByUser) {
+      console.log('[ImageCropModal] Prioritizing full image due to isFullImageRequestedByUser=true.');
+      finalPixelCrop = { unit: 'px', x: 0, y: 0, width: naturalWidth, height: naturalHeight };
+      isFullImageUpload = true;
+    } else if (!completedCrop || completedCrop.width === 0 || completedCrop.height === 0) {
+      console.log('[ImageCropModal] No valid user-defined completedCrop, defaulting to full natural image.');
+      finalPixelCrop = { unit: 'px', x: 0, y: 0, width: naturalWidth, height: naturalHeight };
+      setCrop({ unit: '%', x: 0, y: 0, width: 100, height: 100 });
+      isFullImageUpload = true;
+    } else {
+      console.log('[ImageCropModal] Using user-defined completedCrop.');
+      finalPixelCrop = completedCrop;
+      if (
+        finalPixelCrop.x === 0 &&
+        finalPixelCrop.y === 0 &&
+        finalPixelCrop.width === naturalWidth &&
+        finalPixelCrop.height === naturalHeight
+      ) {
+        console.log('[ImageCropModal] User-defined completedCrop IS the full natural image.');
+        isFullImageUpload = true;
+      } else {
+        console.log('[ImageCropModal] User-defined completedCrop is a partial crop.');
+        isFullImageUpload = false;
+      }
+    }
+
+    console.log('[ImageCropModal] Determined finalPixelCrop (before potential scaling):', JSON.parse(JSON.stringify(finalPixelCrop || {})));
+    console.log('[ImageCropModal] Determined isFullImageUpload:', isFullImageUpload);
+
+    if (!finalPixelCrop || finalPixelCrop.width === 0 || finalPixelCrop.height === 0) {
+       setError("Cannot confirm with an empty or invalid crop area. This shouldn't happen after defaulting logic.");
+       console.error('[ImageCropModal] finalPixelCrop is STILL invalid before processing. Logic error somewhere!');
+       return;
+    }
+
+    let cropForProcessing: PixelCrop = { ...finalPixelCrop };
+
+    if (!isFullImageUpload && imgRef.current) {
+      const { naturalWidth, naturalHeight, width: displayWidth, height: displayHeight } = imgRef.current;
+      
+      if (displayWidth > 0 && displayHeight > 0) {
+        console.log('[ImageCropModal] Scaling partial crop coordinates from display to natural.');
+        console.log('[ImageCropModal] Before scaling: x=${cropForProcessing.x}, y=${cropForProcessing.y}, w=${cropForProcessing.width}, h=${cropForProcessing.height}');
+        
+        cropForProcessing.x = (cropForProcessing.x / displayWidth) * naturalWidth;
+        cropForProcessing.y = (cropForProcessing.y / displayHeight) * naturalHeight;
+        cropForProcessing.width = (cropForProcessing.width / displayWidth) * naturalWidth;
+        cropForProcessing.height = (cropForProcessing.height / displayHeight) * naturalHeight;
+
+        cropForProcessing.x = Math.round(cropForProcessing.x);
+        cropForProcessing.y = Math.round(cropForProcessing.y);
+        cropForProcessing.width = Math.round(cropForProcessing.width);
+        cropForProcessing.height = Math.round(cropForProcessing.height);
+
+        console.log('[ImageCropModal] After scaling: x=${cropForProcessing.x}, y=${cropForProcessing.y}, w=${cropForProcessing.width}, h=${cropForProcessing.height}');
+      } else {
+        console.warn('[ImageCropModal] Display dimensions are zero, cannot scale crop. Using unscaled crop data.');
+      }
     }
 
     setIsProcessing(true);
-
+    setError(null);
     try {
-      console.log('Starting crop process with data:', completedCrop);
-      console.log('Image dimensions:', {
-        natural: imgRef.current ? { width: imgRef.current.naturalWidth, height: imgRef.current.naturalHeight } : 'N/A',
-        display: imgRef.current ? imgRef.current.getBoundingClientRect() : 'N/A'
-      });
+      const croppedBlob = await getCroppedImg(imgRef.current!, cropForProcessing, 'cropped-image.jpeg');
       
-      const croppedBlob = await generateCroppedImage();
-      if (croppedBlob) {
-        console.log('Crop successful, blob size:', croppedBlob.size);
-        await onCropComplete(croppedBlob, completedCrop);
-      } else {
-        throw new Error('Failed to generate cropped image blob');
+      await onCropComplete(croppedBlob, finalPixelCrop, isFullImageUpload);
+      handleInternalOnClose(); 
+    } catch (e: any) {
+      console.error("Cropping failed in ImageCropModal. Details:", e);
+      if (e && typeof e === 'object' && 'message' in e) {
+        console.error("Error message:", e.message);
+        console.error("Error name:", e.name);
+        console.error("Error stack:", e.stack);
       }
-    } catch (error) {
-      console.error('Error generating cropped image:', error);
-      console.error('Crop data at time of error:', completedCrop);
-      console.error('Image element:', imgRef.current);
-      alert('Failed to process the cropped image. Please try again.');
+      setError("Failed to crop image. Please try again.");
     } finally {
       setIsProcessing(false);
+      setIsFullImageRequestedByUser(false);
     }
   };
 
-  const handleSquareModeToggle = () => {
-    setSquareMode(!squareMode);
-    
-    if (!squareMode && imgRef.current && completedCrop) {
-      // Switching to square mode - make current crop square and ensure it's visible
-      const { width: displayWidth, height: displayHeight } = imgRef.current.getBoundingClientRect();
-      
-      if (displayWidth > 0 && displayHeight > 0) {
-        const { x, y, width, height } = completedCrop;
-        
-        // Use the smaller dimension to create a square
-        const size = Math.min(width, height);
-        
-        // Center the square within the current crop area
-        let newX = x + (width - size) / 2;
-        let newY = y + (height - size) / 2;
-        
-        // Ensure the square crop is within display bounds
-        newX = Math.max(0, Math.min(newX, displayWidth - size));
-        newY = Math.max(0, Math.min(newY, displayHeight - size));
-        
-        // If the crop would be too small or off-screen, reset to center
-        if (size < 50 || newX < 0 || newY < 0 || newX + size > displayWidth || newY + size > displayHeight) {
-          const cropSize = Math.min(displayWidth, displayHeight) * 0.6;
-          newX = (displayWidth - cropSize) / 2;
-          newY = (displayHeight - cropSize) / 2;
-          
-          const newCrop: Crop = {
-            unit: 'px',
-            x: newX,
-            y: newY,
-            width: cropSize,
-            height: cropSize,
-          };
-          
-          setCrop(newCrop);
-          setCompletedCrop({
-            x: newX,
-            y: newY,
-            width: cropSize,
-            height: cropSize,
-          });
-        } else {
-          const newCrop: Crop = {
-            unit: 'px',
-            x: newX,
-            y: newY,
-            width: size,
-            height: size,
-          };
-          
-          setCrop(newCrop);
-          setCompletedCrop({
-            x: newX,
-            y: newY,
-            width: size,
-            height: size,
-          });
-        }
-      }
-    }
-  };
-
-  const resetCrop = () => {
+  const handleResetCrop = () => {
     if (imgRef.current) {
-      const { width: displayWidth, height: displayHeight } = imgRef.current.getBoundingClientRect();
-      
-      if (squareMode) {
-        // Square mode - use percentage for consistent visibility
-        const cropSize = 60; // 60% of the image
-        const centerX = (100 - cropSize) / 2; // 20%
-        const centerY = (100 - cropSize) / 2; // 20%
-        
-        const newCrop: Crop = {
-          unit: '%',
-          x: centerX,
-          y: centerY,
-          width: cropSize,
-          height: cropSize,
-        };
-        
+      const { width, height } = imgRef.current;
+      if (aspect === 1/1) {
+         const newCrop = centerCrop(
+          makeAspectCrop(
+            {
+              unit: '%',
+              width: 90,
+            },
+            1/1,
+            width,
+            height
+          ),
+          width,
+          height
+        );
         setCrop(newCrop);
-        
-        // Update completedCrop in pixel coordinates
-        if (displayWidth > 0 && displayHeight > 0) {
-          const pixelX = (centerX / 100) * displayWidth;
-          const pixelY = (centerY / 100) * displayHeight;
-          const pixelWidth = (cropSize / 100) * displayWidth;
-          const pixelHeight = (cropSize / 100) * displayHeight;
-          
-          setCompletedCrop({
-            x: pixelX,
-            y: pixelY,
-            width: pixelWidth,
-            height: pixelHeight,
-          });
-        }
+        setCompletedCrop({
+            x: (width * newCrop.x) / 100,
+            y: (height * newCrop.y) / 100,
+            width: (width * newCrop.width) / 100,
+            height: (height * newCrop.height) / 100,
+            unit: 'px',
+        });
       } else {
-        // Free form mode - use percentage for consistent visibility
-        const newCrop: Crop = {
-          unit: '%',
-          x: 15,
-          y: 15,
-          width: 70,
-          height: 60,
-        };
-        
-        setCrop(newCrop);
-        
-        // Update completedCrop in pixel coordinates
-        if (displayWidth > 0 && displayHeight > 0) {
-          const pixelX = (15 / 100) * displayWidth;
-          const pixelY = (15 / 100) * displayHeight;
-          const pixelWidth = (70 / 100) * displayWidth;
-          const pixelHeight = (60 / 100) * displayHeight;
-          
-          setCompletedCrop({
-            x: pixelX,
-            y: pixelY,
-            width: pixelWidth,
-            height: pixelHeight,
-          });
-        }
+        setCrop(undefined);
+        setCompletedCrop(undefined);
       }
     }
   };
 
+  const handleUseFullImage = () => {
+    if (imgRef.current) {
+      setIsFullImageRequestedByUser(true);
+      const { naturalWidth, naturalHeight } = imgRef.current;
+      const fullCrop: Crop = {
+        unit: '%',
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 100,
+      };
+      setCrop(fullCrop);
+      setCompletedCrop({
+        unit: 'px',
+        x: 0,
+        y: 0,
+        width: naturalWidth,
+        height: naturalHeight,
+      });
+    }
+  };
+  
   return (
     <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-gradient-to-b from-slate-900 to-slate-800 rounded-lg shadow-2xl max-w-5xl max-h-[90vh] w-full mx-4 flex flex-col border border-slate-700">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-slate-700">
-          <h2 className={`text-xl font-semibold ${getThemedTextColor('primary')}`} style={{ fontFamily: "'Trebuchet MS', sans-serif" }}>{title}</h2>
+          <h2 className={`text-xl font-semibold ${getThemedTextColor('primary')}`}>{title}</h2>
           <button
-            onClick={onClose}
+            onClick={handleInternalOnClose}
             className={`${getThemedTextColor('muted')} hover:${getThemedTextColor('primary')} p-1 rounded-full hover:bg-slate-700 transition-colors`}
           >
             <X className="w-6 h-6" />
           </button>
         </div>
 
+        {/* Error Display */}
+        {error && (
+          <div className="p-4 bg-red-900/30 border-b border-red-700">
+            <p className="text-red-300 text-sm">{error}</p>
+          </div>
+        )}
+
         {/* Controls */}
         <div className="flex items-center justify-between p-4 border-b border-slate-700 bg-slate-800">
           <div className="flex items-center gap-3">
             <button
-              onClick={handleSquareModeToggle}
-              className={`btn text-xs ${squareMode ? 'btn-primary' : 'btn-outline'}`}
+              onClick={handleUseFullImage}
+              className="btn text-xs btn-outline"
             >
-              <Square className="w-4 h-4" />
+              <Maximize2 className="w-4 h-4 mr-1" />
+              Use Full Image
+            </button>
+            <button
+              onClick={activateSquareMode} 
+              className={`btn text-xs ${aspect === 1/1 ? 'btn-primary' : 'btn-outline'}`}
+            >
+              <Square className="w-4 h-4 mr-1" />
               Square Mode
             </button>
-            
             <button
-              onClick={() => setSquareMode(false)}
-              className={`btn text-xs ${!squareMode ? 'btn-primary' : 'btn-outline'}`}
+              onClick={activateFreeFormMode} 
+              className={`btn text-xs ${aspect === undefined ? 'btn-primary' : 'btn-outline'}`}
             >
-              <Maximize2 className="w-4 h-4" />
+              <Minimize2 className="w-4 h-4 mr-1" />
               Free Form
             </button>
-
-            <button 
-              onClick={resetCrop}
-              className="btn btn-outline text-xs"
+            <button
+              onClick={handleResetCrop}
+              className="btn text-xs btn-outline"
             >
-              <RotateCcw className="w-4 h-4" />
+              <RotateCcw className="w-4 h-4 mr-1" />
               Reset Crop
             </button>
           </div>
         </div>
 
-        {/* Image Area - ReactCrop component is here, background is inherited */}
+        {/* Image Area */}
         <div className="flex-grow p-4 overflow-hidden flex items-center justify-center bg-slate-850">
           {imageUrl ? (
             <ReactCrop
+              ref={cropperRef}
               crop={crop}
-              onChange={(_, percentCrop) => setCrop(percentCrop)}
-              onComplete={(c) => setCompletedCrop(c)}
-              aspect={squareMode ? 1 : undefined}
+              onChange={(_, percentCrop) => {
+                setIsFullImageRequestedByUser(false);
+                setCrop(percentCrop);
+              }}
+              onComplete={(c) => {
+                setCompletedCrop(c);
+              }}
+              aspect={aspect === null ? undefined : aspect}
               minWidth={50}
               minHeight={50}
               circularCrop={false}
               ruleOfThirds
               className="max-w-full max-h-full"
+              disabled={isProcessing}
             >
               <img
                 ref={imgRef}
                 alt="Crop me"
                 src={imageUrl}
                 onLoad={onImageLoad}
-                className="max-w-full max-h-[60vh] object-contain select-none"
+                crossOrigin="anonymous"
+                className="max-w-full max-h-full object-contain select-none"
                 style={{ imageRendering: 'pixelated' }}
               />
             </ReactCrop>
@@ -396,24 +426,17 @@ const ImageCropModal: React.FC<ImageCropModalProps> = ({
 
         {/* Footer with Actions */}
         <div className="flex items-center justify-between p-4 border-t border-slate-700 bg-slate-800">
-          <div className="flex gap-3">
-            {onSkip && (
-              <button
-                onClick={onSkip}
-                className={`font-light transition-colors ${getThemedTextColor('secondary')} hover:${getThemedTextColor('primary')} text-sm py-2 px-3 rounded-md hover:bg-slate-700`}
-                style={{fontFamily: "'Trebuchet MS', sans-serif"}}
-              >
-                Skip Cropping
-              </button>
-            )}
+          <div className="flex gap-3 items-center">
             {onDelete && (
               <button
                 onClick={async () => {
+                  if (!confirm("Are you sure you want to delete this image? This action cannot be undone.")) return;
                   setIsProcessing(true);
                   try {
                     await onDelete();
-                  } catch (error) {
-                    console.error('Error deleting screenshot:', error);
+                  } catch (deleteError: any) {
+                    console.error('Error deleting image:', deleteError);
+                    setError(deleteError.message || "Failed to delete image.");
                   } finally {
                     setIsProcessing(false);
                   }
@@ -421,30 +444,37 @@ const ImageCropModal: React.FC<ImageCropModalProps> = ({
                 disabled={isProcessing}
                 className="btn btn-danger text-sm"
               >
-                {isProcessing && onDelete ? 'Deleting...' : 'Delete'}
+                {isProcessing ? 'Deleting...' : <><Trash2 size={16} className="mr-1" /> Delete Image</>}
               </button>
             )}
           </div>
           
           <div className="flex gap-3">
             <button
-              onClick={onClose}
+              onClick={handleInternalOnClose}
               className="btn btn-outline text-sm"
             >
               Cancel
             </button>
             <button
-              onClick={handleCropConfirm}
-              disabled={isProcessing || !completedCrop}
+              onClick={handleConfirmCrop}
+              disabled={isProcessing || !imgRef.current || !isImageLoaded}
               className="btn btn-primary text-sm"
             >
-              {isProcessing && !onDelete ? 'Processing...' : 'Confirm Crop'}
-              {!isProcessing && <Check size={16} className="ml-1" />}
+              {isProcessing ? (
+                <>
+                  <span className="loading loading-spinner loading-xs mr-2"></span>
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <Check size={16} className="mr-1" /> Confirm
+                </>
+              )}
             </button>
           </div>
         </div>
       </div>
-      <canvas ref={canvasRef} className="hidden" />
     </div>
   );
 };

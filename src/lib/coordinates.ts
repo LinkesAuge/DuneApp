@@ -85,10 +85,12 @@ export const clampCoordinates = (coordinates: PixelCoordinates): PixelCoordinate
 });
 
 /**
- * Format coordinates for display (e.g., "2000, 1500")
+ * Format coordinates for display using pixel coordinates
  */
-export const formatCoordinates = (x: number, y: number): string => {
-  return `${Math.round(x)}, ${Math.round(y)}`;
+export const formatCoordinates = (x: number, y: number, mapType?: string): string => {
+  // Both map types now use pixel coordinates
+  // Deep Desert: 0-2000 pixels, Hagga Basin: 0-4000 pixels
+  return `${Math.round(x)}, ${Math.round(y)} px`;
 };
 
 /**
