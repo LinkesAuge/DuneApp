@@ -74,6 +74,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const discordUsername = discordData.name || discordData.full_name || discordData.user_name || 'Unknown User';
     const discordAvatar = discordData.avatar_url || discordData.picture || null;
 
+    // Check if Discord data has actually changed to avoid unnecessary updates
+    const hasChanges = 
+      existingProfile.discord_id !== discordId ||
+      existingProfile.discord_username !== discordUsername ||
+      existingProfile.discord_avatar_url !== discordAvatar ||
+      existingProfile.email !== (authUser.email || existingProfile.email);
+
+    if (!hasChanges) {
+      console.log('Discord profile data unchanged, skipping update');
+      return existingProfile;
+    }
+
+    console.log('Updating Discord profile data for user:', userId);
     const { data, error: profileError } = await supabase
       .from('profiles')
       .update({
@@ -161,7 +174,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     });
 
-    // Listen for role updates from admin panel
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, []); // Remove user dependency to prevent infinite loop
+
+  // Separate useEffect for role update listener to avoid auth subscription recreation
+  useEffect(() => {
     const handleRoleUpdate = (event: CustomEvent) => {
       const { userId } = event.detail;
       // If this user's role was updated, refresh their profile
@@ -175,11 +195,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     window.addEventListener('user-role-updated', handleRoleUpdate as EventListener);
 
     return () => {
-      mounted = false;
-      subscription.unsubscribe();
       window.removeEventListener('user-role-updated', handleRoleUpdate as EventListener);
     };
-  }, [user]); // Include user in dependencies so we can check if it's the current user
+  }, [user]); // This dependency is fine since it only affects the role update listener
 
   const signOut = async () => {
     setIsLoading(true);
