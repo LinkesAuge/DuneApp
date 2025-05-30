@@ -3,14 +3,16 @@ import { useAuth } from '../components/auth/AuthProvider';
 import { supabase } from '../lib/supabase';
 import { EnhancedProfile, Rank, ProfileUpdateData } from '../types/profile';
 import DiamondIcon from '../components/common/DiamondIcon';
-import { User, Save, Upload, Award, Mail, Calendar, Shield, Check, X } from 'lucide-react';
+import AvatarUpload from '../components/profile/AvatarUpload';
+import { User, Save, Upload, Award, Mail, Calendar, Shield, Check, X, MessageCircle } from 'lucide-react';
 
 const ProfilePage: React.FC = () => {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const [profile, setProfile] = useState<EnhancedProfile | null>(null);
   const [rank, setRank] = useState<Rank | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [formData, setFormData] = useState({
@@ -46,7 +48,7 @@ const ProfilePage: React.FC = () => {
         setFormData({
           display_name: profileData.display_name || '',
           bio: profileData.bio || '',
-          use_discord_avatar: profileData.use_discord_avatar ?? true
+          use_discord_avatar: profileData.discord_avatar_url ? (profileData.use_discord_avatar ?? true) : false
         });
       } catch (err: any) {
         console.error('Error fetching profile:', err);
@@ -97,6 +99,9 @@ const ProfilePage: React.FC = () => {
       
       // Clear success message after 3 seconds
       setTimeout(() => setSuccess(null), 3000);
+
+      // Refresh user state
+      refreshUser();
     } catch (err: any) {
       console.error('Error updating profile:', err);
       setError('Failed to update profile: ' + err.message);
@@ -117,6 +122,48 @@ const ProfilePage: React.FC = () => {
 
   const getDisplayName = () => {
     return profile?.display_name || profile?.username || 'Unknown User';
+  };
+
+  // Refresh profile after avatar change
+  const handleAvatarChange = async (newAvatarUrl: string | null) => {
+    // Refresh profile data to get latest avatar info
+    if (!user?.id) return;
+    
+    try {
+      const { data: updatedProfile, error: fetchError } = await supabase
+        .from('profiles')
+        .select(`
+          *,
+          rank:ranks(*)
+        `)
+        .eq('id', user.id)
+        .single();
+
+      if (fetchError) throw fetchError;
+      setProfile(updatedProfile);
+      setSuccess('Avatar updated successfully!');
+      setTimeout(() => setSuccess(null), 3000);
+
+      // Refresh user state
+      refreshUser();
+    } catch (err: any) {
+      console.error('Error refreshing profile after avatar change:', err);
+      setError('Avatar updated but failed to refresh profile data');
+    }
+  };
+
+  const handleUploadStart = () => {
+    setIsUploading(true);
+    setError(null);
+  };
+
+  const handleUploadComplete = () => {
+    setIsUploading(false);
+  };
+
+  const handleUploadError = (errorMessage: string) => {
+    setIsUploading(false);
+    setError(errorMessage);
   };
 
   if (isLoading) {
@@ -209,7 +256,14 @@ const ProfilePage: React.FC = () => {
                         style={{ fontFamily: "'Trebuchet MS', sans-serif" }}>
                       {getDisplayName()}
                     </h4>
-                    <p className="text-amber-300/70 text-sm">@{profile?.username}</p>
+                    {profile?.discord_username ? (
+                      <div className="flex items-center justify-center gap-2 text-amber-300/70 text-sm">
+                        <MessageCircle size={14} className="text-blue-400" />
+                        <span>{profile.discord_username}</span>
+                      </div>
+                    ) : (
+                      <p className="text-amber-300/70 text-sm">@{profile?.username}</p>
+                    )}
                   </div>
 
                   {/* Profile Info */}
@@ -327,42 +381,79 @@ const ProfilePage: React.FC = () => {
 
                     {/* Avatar Settings */}
                     <div>
-                      <label className="block text-amber-200 text-sm font-light mb-2"
+                      <label className="block text-amber-200 text-sm font-light mb-4"
                              style={{ fontFamily: "'Trebuchet MS', sans-serif" }}>
                         Avatar Settings
                       </label>
-                      <div className="space-y-3">
-                        <label className="flex items-center gap-3">
-                          <input
-                            type="radio"
-                            name="avatar_source"
-                            checked={formData.use_discord_avatar}
-                            onChange={() => setFormData(prev => ({ ...prev, use_discord_avatar: true }))}
-                            className="text-gold-300 focus:ring-gold-300/50"
-                          />
-                          <span className="text-amber-300 text-sm">Use Discord Avatar</span>
-                          {profile?.discord_avatar_url && (
+                      
+                      <div className="space-y-4 mb-6">
+                        {/* Discord Avatar Option - Only show if user has Discord avatar */}
+                        {profile?.discord_avatar_url ? (
+                          <label className="flex items-center gap-3">
+                            <input
+                              type="radio"
+                              name="avatar_source"
+                              checked={formData.use_discord_avatar}
+                              onChange={() => setFormData(prev => ({ ...prev, use_discord_avatar: true }))}
+                              className="text-gold-300 focus:ring-gold-300/50"
+                            />
+                            <span className="text-amber-300 text-sm">Use Discord Avatar</span>
                             <img
                               src={profile.discord_avatar_url}
                               alt="Discord Avatar"
                               className="w-6 h-6 rounded-full border border-gold-300/30"
                             />
-                          )}
-                        </label>
+                          </label>
+                        ) : (
+                          <div className="p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
+                            <p className="text-blue-300 text-sm">
+                              <strong>Discord Avatar Not Available</strong> - You signed up with email/password. 
+                              To use a Discord avatar, you would need to link your Discord account.
+                            </p>
+                          </div>
+                        )}
+                        
+                        {/* Custom Avatar Option */}
                         <label className="flex items-center gap-3">
                           <input
                             type="radio"
                             name="avatar_source"
-                            checked={!formData.use_discord_avatar}
+                            checked={!formData.use_discord_avatar || !profile?.discord_avatar_url}
                             onChange={() => setFormData(prev => ({ ...prev, use_discord_avatar: false }))}
                             className="text-gold-300 focus:ring-gold-300/50"
                           />
-                          <span className="text-amber-300 text-sm">Use Custom Avatar</span>
-                          <span className="text-amber-300/60 text-xs">(Coming Soon)</span>
+                          <span className="text-amber-300 text-sm">
+                            {profile?.custom_avatar_url ? 'Use Custom Avatar' : 'Upload Custom Avatar'}
+                          </span>
+                          {profile?.custom_avatar_url && (
+                            <img
+                              src={profile.custom_avatar_url}
+                              alt="Custom Avatar"
+                              className="w-6 h-6 rounded-full border border-gold-300/30"
+                            />
+                          )}
                         </label>
                       </div>
-                      <p className="text-amber-300/60 text-xs mt-1">
-                        Choose your preferred avatar source
+
+                      {/* Custom Avatar Upload - Show when custom avatar is selected OR when no Discord avatar available */}
+                      {(!formData.use_discord_avatar || !profile?.discord_avatar_url) && (
+                        <div className="mt-4 p-4 bg-void-950/30 rounded-lg border border-gold-300/20">
+                          <AvatarUpload
+                            currentAvatarUrl={profile?.custom_avatar_url}
+                            onAvatarChange={handleAvatarChange}
+                            isUploading={isUploading}
+                            onUploadStart={handleUploadStart}
+                            onUploadComplete={handleUploadComplete}
+                            onError={handleUploadError}
+                          />
+                        </div>
+                      )}
+                      
+                      <p className="text-amber-300/60 text-xs mt-2">
+                        {profile?.discord_avatar_url 
+                          ? "Choose between your Discord avatar or upload a custom one."
+                          : "Upload a custom avatar to personalize your profile."
+                        }
                       </p>
                     </div>
 

@@ -5,6 +5,7 @@ import { useAuth } from '../auth/AuthProvider';
 import { supabase } from '../../lib/supabase';
 import { formatCompactDateTime, wasUpdated, formatDateWithPreposition } from '../../lib/dateUtils';
 import { getDisplayNameFromProfile } from '../../lib/utils';
+import UserAvatar from './UserAvatar';
 import CommentsList from '../comments/CommentsList';
 
 interface POICardProps {
@@ -84,8 +85,8 @@ const POICard: React.FC<POICardProps> = ({
   const canModify = user && (user.id === poi.created_by || user.role === 'admin' || user.role === 'editor');
   
   // State for user information
-  const [creatorInfo, setCreatorInfo] = useState<{ username: string; display_name?: string | null } | null>(null);
-  const [editorInfo, setEditorInfo] = useState<{ username: string; display_name?: string | null } | null>(null);
+  const [creatorInfo, setCreatorInfo] = useState<{ username: string; display_name?: string | null; custom_avatar_url?: string | null; discord_avatar_url?: string | null; use_discord_avatar?: boolean } | null>(null);
+  const [editorInfo, setEditorInfo] = useState<{ username: string; display_name?: string | null; custom_avatar_url?: string | null; discord_avatar_url?: string | null; use_discord_avatar?: boolean } | null>(null);
   const [loadingUserInfo, setLoadingUserInfo] = useState(true);
   const [commentCount, setCommentCount] = useState(0);
   
@@ -109,7 +110,7 @@ const POICard: React.FC<POICardProps> = ({
         if (userIds.length > 0) {
           const { data: userData, error: userError } = await supabase
             .from('profiles')
-            .select('id, username, display_name')
+            .select('id, username, display_name, custom_avatar_url, discord_avatar_url')
             .in('id', userIds);
           
           if (userError) throw userError;
@@ -117,8 +118,8 @@ const POICard: React.FC<POICardProps> = ({
           const creatorData = userData?.find(u => u.id === poi.created_by);
           const editorData = userData?.find(u => u.id === poi.updated_by);
           
-          setCreatorInfo(creatorData ? { username: creatorData.username, display_name: creatorData.display_name } : null);
-          setEditorInfo(editorData ? { username: editorData.username, display_name: editorData.display_name } : null);
+          setCreatorInfo(creatorData ? { username: creatorData.username, display_name: creatorData.display_name, custom_avatar_url: creatorData.custom_avatar_url, discord_avatar_url: creatorData.discord_avatar_url } : null);
+          setEditorInfo(editorData ? { username: editorData.username, display_name: editorData.display_name, custom_avatar_url: editorData.custom_avatar_url, discord_avatar_url: editorData.discord_avatar_url } : null);
         } else {
           // No valid user IDs, set to null
           setCreatorInfo(null);
@@ -377,9 +378,55 @@ const POICard: React.FC<POICardProps> = ({
             </div>
           </div>
 
-          {/* Metadata - Compact */}
-          <div className="p-3 border-b border-slate-700 text-xs text-slate-400 text-center">
-            {metaText}
+          {/* Metadata - Enhanced with Avatars */}
+          <div className="p-3 border-b border-slate-700">
+            <div className="space-y-2">
+              {/* Creator Information */}
+              <div className="flex items-center gap-2 text-xs">
+                <UserAvatar 
+                  user={{ 
+                    custom_avatar_url: creatorInfo?.custom_avatar_url, 
+                    discord_avatar_url: creatorInfo?.discord_avatar_url,
+                    use_discord_avatar: creatorInfo?.use_discord_avatar
+                  }} 
+                  size="xs" 
+                />
+                <span className="text-slate-400">Created by</span>
+                <span className="text-amber-300 font-medium">
+                  {getDisplayNameFromProfile(creatorInfo) || (poi.created_by ? 'Loading...' : 'Deleted User')}
+                </span>
+                <span className="text-slate-400">
+                  {(() => {
+                    const { date, useOn } = formatDateWithPreposition(poi.created_at);
+                    return useOn ? `on ${date}` : date;
+                  })()}
+                </span>
+              </div>
+              
+              {/* Editor Information */}
+              {isEdited && (
+                <div className="flex items-center gap-2 text-xs">
+                  <UserAvatar 
+                    user={{ 
+                      custom_avatar_url: editorInfo?.custom_avatar_url, 
+                      discord_avatar_url: editorInfo?.discord_avatar_url,
+                      use_discord_avatar: editorInfo?.use_discord_avatar
+                    }} 
+                    size="xs" 
+                  />
+                  <span className="text-slate-400">Edited by</span>
+                  <span className="text-amber-300 font-medium">
+                    {editorInfo ? getDisplayNameFromProfile(editorInfo) : 'Deleted User'}
+                  </span>
+                  <span className="text-slate-400">
+                    {(() => {
+                      const { date: editDate, useOn: editUseOn } = formatDateWithPreposition(poi.updated_at);
+                      return editUseOn ? `on ${editDate}` : editDate;
+                    })()}
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Comments Section - Direct CommentsList */}

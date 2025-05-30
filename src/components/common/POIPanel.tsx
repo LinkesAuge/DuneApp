@@ -13,7 +13,7 @@ interface POIPanelProps {
   pois: Poi[];
   poiTypes: PoiType[];
   customIcons: CustomIcon[];
-  userInfo: { [key: string]: { username: string } };
+  userInfo: { [key: string]: { username: string; display_name?: string | null; custom_avatar_url?: string | null; discord_avatar_url?: string | null; use_discord_avatar?: boolean } };
   
   // Event handlers
   onPoiClick: (poi: Poi) => void;

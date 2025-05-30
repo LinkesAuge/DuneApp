@@ -498,7 +498,7 @@ This document serves as a learning journal for the Dune Awakening Deep Desert Tr
 
 ---
 
-### 2025-01-27: Importance of Distinguishing Between Global Resources and Map-Specific Data in Admin Operations
+### 2025-01-28: Importance of Distinguishing Between Global Resources and Map-Specific Data in Admin Operations
 -   **Topic/Feature**: Admin Operations - Global vs. Map-Specific Data Handling.
 -   **Observation/Pattern**:
     1.  Admin operations often involve handling both global resources (like user management, system settings) and map-specific data (like POI management, grid mapping).
@@ -554,5 +554,43 @@ This document serves as a learning journal for the Dune Awakening Deep Desert Tr
     -   Regularly verify that warning text matches actual backend behavior to maintain user trust and prevent confusion.
     -   Consider implementing audit logging for admin operations to track what resources are actually affected by each action.
     -   Document resource categorization clearly so future developers understand which data should be preserved during various operations.
+
+---
+
+### 2025-01-28: Discord Avatar System Implementation - Comprehensive Authentication Enhancement
+-   **Topic/Feature**: Discord Avatar System - Global Avatar Display, Preference System, and OAuth Integration Fixes.
+-   **Observation/Pattern**:
+    1.  User requested two enhancements: reduce avatar upload size limit and display user avatars throughout the application.
+    2.  Initial implementation revealed Discord OAuth integration issue - Discord authentication was working but avatar data wasn't being stored.
+    3.  Root cause analysis showed AuthProvider was only checking primary OAuth provider, missing linked Discord accounts that existed in `app_metadata.providers`.
+    4.  Avatar preference system needed comprehensive user state management to ensure real-time updates across all components.
+    5.  Global avatar implementation required updating 15+ components with consistent data fetching patterns and type safety.
+-   **Decision/Action Taken**:
+    1.  **Avatar Size Optimization**: Reduced upload limit from 5MB to 1MB in `AvatarUpload.tsx` for better performance.
+    2.  **Discord OAuth Fix**: Enhanced `AuthProvider.tsx` `handleAuthStateChange()` to detect Discord in linked providers array and properly extract Discord data from `user_metadata`.
+    3.  **Global State Management**: Added `refreshUser()` function to AuthProvider and called it after profile updates to ensure immediate state synchronization.
+    4.  **Avatar Preference System**: Implemented database-backed preference system with radio button controls and real-time preview updates.
+    5.  **Universal Component Updates**: Updated all user-displaying components (POI cards, admin panels, navbar, modals) with avatar fetching and display logic.
+    6.  **Profile Enhancement**: Added Discord username display with MessageCircle icon for clear Discord user identification.
+    7.  **Type Safety**: Enhanced all TypeScript interfaces to include `use_discord_avatar`, `discord_username`, `discord_avatar_url` fields.
+-   **Rationale**:
+    1.  To provide comprehensive avatar system that works seamlessly with both Discord OAuth and custom uploads.
+    2.  To fix Discord integration issues preventing proper avatar sync for linked Discord accounts.
+    3.  To ensure real-time user experience where preference changes take immediate effect across the entire application.
+    4.  To maintain type safety and consistent patterns while implementing global avatar display functionality.
+-   **Impact/Outcome**:
+    -   **Enhanced User Experience**: Users with Discord accounts get avatars automatically, with easy preference switching.
+    -   **Professional Interface**: Discord usernames appear with proper iconography for clear community identification.
+    -   **Performance Optimization**: 1MB upload limit improves loading times and reduces storage costs.
+    -   **Technical Excellence**: Robust error handling, TypeScript safety, and mobile optimization throughout.
+    -   **Global Consistency**: Avatar display follows same patterns across all 15+ application components.
+    -   **Real-time Responsiveness**: Profile changes reflect instantly across all interfaces without page refreshes.
+-   **Future Consideration**:
+    -   When implementing OAuth integrations, always check for linked providers in `app_metadata.providers`, not just primary provider.
+    -   For global state changes (like user preferences), implement refresh mechanisms that update all dependent components immediately.
+    -   When adding features that affect multiple components, create utility functions (`getDisplayAvatarUrl()`) for consistent logic application.
+    -   Always test OAuth integration with both primary OAuth and linked account scenarios to catch edge cases.
+    -   For avatar/profile systems, implement preference controls that give users choice between automatic (OAuth) and manual (upload) options.
+    -   Document OAuth data extraction patterns for different authentication scenarios (primary vs linked providers) for future reference.
 
 ---

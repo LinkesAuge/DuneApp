@@ -41,7 +41,7 @@ export const useAdminData = () => {
   const loadProfiles = async () => {
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, username, email, role')
+      .select('id, username, email, role, custom_avatar_url, discord_avatar_url, use_discord_avatar')
       .order('username');
 
     if (error) throw error;

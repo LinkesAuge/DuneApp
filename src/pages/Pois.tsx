@@ -30,7 +30,7 @@ const PoisPage: React.FC = () => {
   const [showGallery, setShowGallery] = useState(false);
   const [galleryIndex, setGalleryIndex] = useState(0);
   const [editingPoiId, setEditingPoiId] = useState<string | null>(null);
-  const [userInfo, setUserInfo] = useState<{ [key: string]: { username: string; display_name?: string | null } }>({});
+  const [userInfo, setUserInfo] = useState<{ [key: string]: { username: string; display_name?: string | null; custom_avatar_url?: string | null; discord_avatar_url?: string | null; use_discord_avatar?: boolean } }>({});
 
   // New state for tag-based filtering
   const [selectedTagCategories, setSelectedTagCategories] = useState<Set<string>>(new Set());
@@ -123,15 +123,15 @@ const PoisPage: React.FC = () => {
           if (userIds.length > 0) {
             const { data: userData, error: userError } = await supabase
               .from('profiles')
-              .select('id, username, display_name')
+              .select('id, username, display_name, custom_avatar_url, discord_avatar_url')
               .in('id', userIds);
 
             if (userError) throw userError;
 
             const userInfoMap = userData.reduce((acc, user) => {
-              acc[user.id] = { username: user.username, display_name: user.display_name };
+              acc[user.id] = { username: user.username, display_name: user.display_name, custom_avatar_url: user.custom_avatar_url, discord_avatar_url: user.discord_avatar_url };
               return acc;
-            }, {} as { [key: string]: { username: string; display_name?: string | null } });
+            }, {} as { [key: string]: { username: string; display_name?: string | null; custom_avatar_url?: string | null; discord_avatar_url?: string | null } });
 
             setUserInfo(userInfoMap);
           } else {

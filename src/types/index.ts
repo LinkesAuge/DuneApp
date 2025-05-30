@@ -9,10 +9,12 @@ export interface User {
   username: string;
   display_name?: string | null; // User's preferred display name
   role: UserRole;
-  // NEW: Discord authentication fields
-  discordId?: string | null;
-  discordUsername?: string | null;
-  discordAvatarUrl?: string | null;
+  // Discord authentication fields
+  discord_id?: string | null;
+  discord_username?: string | null;
+  discord_avatar_url?: string | null;
+  custom_avatar_url?: string | null; // User's custom avatar override
+  use_discord_avatar?: boolean; // User's preference for which avatar to display
 }
 
 // Map system types - NEW for Hagga Basin
@@ -310,4 +312,35 @@ export interface ActivityItem {
     mapType?: MapType;
     collectionName?: string;
   };
+}
+
+// Discord authentication types
+export interface DiscordProfile {
+  id: string;
+  username: string;
+  discriminator?: string; // For legacy Discord usernames
+  global_name?: string | null; // New display name system
+  avatar?: string | null; // Avatar hash
+  email?: string;
+}
+
+export interface AuthUser {
+  id: string;
+  email: string;
+  app_metadata: Record<string, any>;
+  user_metadata: Record<string, any>;
+  raw_user_meta_data?: {
+    provider_id?: string;
+    username?: string;
+    avatar_url?: string;
+    full_name?: string;
+  };
+}
+
+// Helper types for avatar and display name resolution
+export interface ProfileDisplay {
+  display_name: string;
+  avatar_url: string;
+  is_discord_user: boolean;
+  is_custom_avatar: boolean;
 }

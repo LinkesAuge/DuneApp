@@ -5,13 +5,14 @@ import { useAuth } from '../auth/AuthProvider';
 import { supabase } from '../../lib/supabase';
 import { formatDateWithPreposition, wasUpdated } from '../../lib/dateUtils';
 import { getDisplayNameFromProfile } from '../../lib/utils';
+import UserAvatar from './UserAvatar';
 import CommentsList from '../comments/CommentsList';
 
 interface POIPreviewCardProps {
   poi: Poi;
   poiType: PoiType;
   customIcons: CustomIcon[];
-  userInfo?: { [key: string]: { username: string; display_name?: string | null } };
+  userInfo?: { [key: string]: { username: string; display_name?: string | null; custom_avatar_url?: string | null; discord_avatar_url?: string | null; use_discord_avatar?: boolean } };
   layout?: 'grid' | 'list';
   onClick: () => void;
   className?: string;
@@ -355,10 +356,24 @@ const POIPreviewCard: React.FC<POIPreviewCardProps> = ({
               </div>
             </div>
 
-            {/* Metadata - Compact */}
-            <div className="p-3 border-b border-slate-700 text-xs text-slate-400 text-center">
-              <div className="flex items-center justify-between text-xs text-sand-600">
-                <span>Created by {getDisplayNameFromProfile(creator) || 'Loading...'} {formattedDate}</span>
+            {/* Metadata - Enhanced with Avatars */}
+            <div className="p-3 border-b border-slate-700">
+              <div className="flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2">
+                  <UserAvatar 
+                    user={{ 
+                      custom_avatar_url: creator?.custom_avatar_url, 
+                      discord_avatar_url: creator?.discord_avatar_url,
+                      use_discord_avatar: creator?.use_discord_avatar
+                    }} 
+                    size="xs" 
+                  />
+                  <span className="text-slate-400">Created by</span>
+                  <span className="text-amber-300 font-medium">
+                    {getDisplayNameFromProfile(creator) || 'Unknown'}
+                  </span>
+                  <span className="text-slate-400">{formattedDate}</span>
+                </div>
                 <div className="flex items-center space-x-2">
                   <PrivacyIcon size={12} className={privacyColor} />
                   <span className={privacyColor}>{privacyLabel}</span>

@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { Users, Pencil, Trash2, RefreshCw, Shield, AlertCircle, Award } from 'lucide-react';
 import { Profile, UserRole } from '../../types/admin';
 import { Rank } from '../../types/profile';
+import UserAvatar from '../common/UserAvatar';
 
 interface UserManagementProps {
   profiles: Profile[];
@@ -409,13 +410,23 @@ const UserManagement: React.FC<UserManagementProps> = ({
               {enhancedProfiles.map((profile) => (
                 <tr key={profile.id} className="hover:bg-gold-300/5 transition-colors duration-300">
                   <td className="px-6 py-5 whitespace-nowrap">
-                    <div>
-                      <div className="text-sm font-light text-amber-200"
-                           style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-                        {profile.username}
-                      </div>
-                      <div className="text-sm text-amber-200/60 font-light">
-                        {profile.email}
+                    <div className="flex items-center gap-3">
+                      <UserAvatar 
+                        user={{ 
+                          custom_avatar_url: profile.custom_avatar_url, 
+                          discord_avatar_url: profile.discord_avatar_url,
+                          use_discord_avatar: profile.use_discord_avatar
+                        }} 
+                        size="sm" 
+                      />
+                      <div>
+                        <div className="text-sm font-light text-amber-200"
+                             style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                          {profile.username}
+                        </div>
+                        <div className="text-sm text-amber-200/60 font-light">
+                          {profile.email}
+                        </div>
                       </div>
                     </div>
                   </td>

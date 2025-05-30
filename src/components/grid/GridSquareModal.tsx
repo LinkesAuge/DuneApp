@@ -48,7 +48,7 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
   const [pois, setPois] = useState<Poi[]>([]);
   const [poiTypes, setPoiTypes] = useState<PoiType[]>([]);
   const [customIcons, setCustomIcons] = useState<CustomIcon[]>([]);
-  const [userInfo, setUserInfo] = useState<Record<string, { username: string; display_name?: string | null }>>({});
+  const [userInfo, setUserInfo] = useState<Record<string, { username: string; display_name?: string | null; custom_avatar_url?: string | null; discord_avatar_url?: string | null; use_discord_avatar?: boolean }>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [showAddPoiForm, setShowAddPoiForm] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -200,14 +200,20 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
           if (userIds.length > 0) {
             const { data: userProfiles, error: userError } = await supabase
               .from('profiles')
-              .select('id, username, display_name')
+              .select('id, username, display_name, custom_avatar_url, discord_avatar_url, use_discord_avatar')
               .in('id', userIds);
             
             if (!userError && userProfiles) {
               const userInfoMap = userProfiles.reduce((acc, profile) => {
-                acc[profile.id] = { username: profile.username, display_name: profile.display_name };
+                acc[profile.id] = { 
+                  username: profile.username, 
+                  display_name: profile.display_name, 
+                  custom_avatar_url: profile.custom_avatar_url, 
+                  discord_avatar_url: profile.discord_avatar_url,
+                  use_discord_avatar: profile.use_discord_avatar
+                };
                 return acc;
-              }, {} as Record<string, { username: string; display_name?: string | null }>);
+              }, {} as Record<string, { username: string; display_name?: string | null; custom_avatar_url?: string | null; discord_avatar_url?: string | null; use_discord_avatar?: boolean }>);
               setUserInfo(userInfoMap);
             }
           } else {

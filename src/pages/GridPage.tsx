@@ -55,7 +55,7 @@ const GridPage: React.FC = () => {
   const [poiTypes, setPoiTypes] = useState<PoiType[]>([]);
   const [customIcons, setCustomIcons] = useState<CustomIcon[]>([]);
   const [collections, setCollections] = useState<PoiCollection[]>([]);
-  const [userInfo, setUserInfo] = useState<{ [key: string]: { username: string } }>({});
+  const [userInfo, setUserInfo] = useState<{ [key: string]: { username: string; display_name?: string | null; custom_avatar_url?: string | null; discord_avatar_url?: string | null; use_discord_avatar?: boolean } }>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -349,7 +349,7 @@ const GridPage: React.FC = () => {
 
     const { data: userData, error: userError } = await supabase
       .from('profiles')
-      .select('id, username')
+      .select('id, username, display_name, custom_avatar_url, discord_avatar_url, use_discord_avatar')
       .in('id', userIds);
 
     if (userError) {
@@ -358,9 +358,15 @@ const GridPage: React.FC = () => {
     }
 
     const userInfoMap = userData.reduce((acc, user) => {
-      acc[user.id] = { username: user.username };
+      acc[user.id] = { 
+        username: user.username, 
+        display_name: user.display_name, 
+        custom_avatar_url: user.custom_avatar_url, 
+        discord_avatar_url: user.discord_avatar_url,
+        use_discord_avatar: user.use_discord_avatar
+      };
       return acc;
-    }, {} as { [key: string]: { username: string } });
+    }, {} as { [key: string]: { username: string; display_name?: string | null; custom_avatar_url?: string | null; discord_avatar_url?: string | null; use_discord_avatar?: boolean } });
 
     setUserInfo(userInfoMap);
   };

@@ -10,6 +10,8 @@ export interface Profile {
   discord_username?: string | null;
   discord_avatar_url?: string | null;
   discord_discriminator?: string | null;
+  custom_avatar_url?: string | null;
+  use_discord_avatar?: boolean;
   rank_id?: string | null;
   rank?: {
     id: string;

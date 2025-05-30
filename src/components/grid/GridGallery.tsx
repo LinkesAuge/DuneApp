@@ -17,7 +17,7 @@ interface GridGalleryProps {
 }
 
 interface UserInfo {
-  [key: string]: { username: string };
+  [key: string]: { username: string; display_name?: string | null; custom_avatar_url?: string | null; discord_avatar_url?: string | null; use_discord_avatar?: boolean };
 }
 
 const GridGallery: React.FC<GridGalleryProps> = ({ squares, initialIndex, onClose, poiInfo }) => {
@@ -38,13 +38,19 @@ const GridGallery: React.FC<GridGalleryProps> = ({ squares, initialIndex, onClos
       try {
         const { data, error } = await supabase
           .from('profiles')
-          .select('id, username')
+          .select('id, username, display_name, custom_avatar_url, discord_avatar_url, use_discord_avatar')
           .in('id', userIds);
 
         if (error) throw error;
 
         const infoMap = data.reduce((acc, user) => {
-          acc[user.id] = { username: user.username };
+          acc[user.id] = { 
+            username: user.username, 
+            display_name: user.display_name, 
+            custom_avatar_url: user.custom_avatar_url, 
+            discord_avatar_url: user.discord_avatar_url,
+            use_discord_avatar: user.use_discord_avatar
+          };
           return acc;
         }, {} as UserInfo);
 

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
 import { getDisplayName } from '../../lib/utils';
+import UserAvatar from './UserAvatar';
 import { Menu, X, User, LogOut, Shield, LayoutDashboard, Mountain, MapPin, Pyramid } from 'lucide-react';
 
 const Navbar: React.FC = () => {
@@ -333,7 +334,7 @@ const Navbar: React.FC = () => {
                   <div className="relative">
                     <button
                       onClick={toggleProfile}
-                      className="group relative flex items-center h-16 px-4 min-w-[120px] justify-center transition-all duration-300"
+                      className="group relative flex items-center mx-4 px-4 py-3 min-w-[120px] justify-center transition-all duration-300"
                     >
                       {/* Profile button background image */}
                       <div 
@@ -344,21 +345,15 @@ const Navbar: React.FC = () => {
                         }}
                       />
                       
-                      {/* Enhanced purple hover overlay with advanced fading */}
-                      <div 
-                        className="absolute inset-0 bg-gradient-to-b from-violet-700/0 via-violet-600/0 to-transparent group-hover:from-violet-700/30 group-hover:via-violet-600/15 transition-all duration-300"
-                        style={{
-                          background: 'radial-gradient(ellipse at center top, rgba(139, 92, 246, 0) 0%, rgba(124, 58, 237, 0) 40%, transparent 70%)',
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.background = 'radial-gradient(ellipse at center top, rgba(139, 92, 246, 0.15) 0%, rgba(124, 58, 237, 0.08) 40%, transparent 70%)';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.background = 'radial-gradient(ellipse at center top, rgba(139, 92, 246, 0) 0%, rgba(124, 58, 237, 0) 40%, transparent 70%)';
-                        }}
-                      />
+                      {/* Purple hover overlay */}
+                      <div className="absolute inset-0 bg-gradient-to-b from-violet-600/0 via-violet-700/0 to-transparent group-hover:from-violet-600/30 group-hover:via-violet-700/15 transition-all duration-300" />
                       
-                      <span className="relative z-10 mr-3 text-amber-200 group-hover:text-amber-50 transition-all duration-300 font-light tracking-wide text-xs group-hover:drop-shadow-lg"
+                      {/* Avatar */}
+                      <div className="relative z-10 mr-3">
+                        <UserAvatar user={user} size="sm" />
+                      </div>
+                      
+                      <span className="relative z-10 mr-2 text-amber-200 group-hover:text-amber-50 transition-all duration-300 font-light tracking-wide text-xs group-hover:drop-shadow-lg"
                       style={{
                         textShadow: 'none'
                       }}
@@ -371,7 +366,6 @@ const Navbar: React.FC = () => {
                       >
                         {getDisplayName(user)}
                       </span>
-                      <User size={14} strokeWidth={1.5} className="relative z-10 text-amber-300 group-hover:text-amber-100 transition-all duration-300 group-hover:drop-shadow-lg" />
                       
                       {/* Sleek expanding underline */}
                       <div className="absolute bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-transparent via-violet-400 to-transparent group-hover:w-full transition-all duration-700 ease-out shadow-md shadow-violet-400/50" />
@@ -387,12 +381,22 @@ const Navbar: React.FC = () => {
                           
                           {/* Header with gradient */}
                           <div className="px-4 py-3 border-b border-slate-600/20 bg-gradient-to-r from-amber-600/10 via-amber-500/5 to-amber-600/10">
-                            <p className="font-light text-amber-100 tracking-wide text-sm">{getDisplayName(user)}</p>
-                            <div className="flex items-center mt-1">
-                              <span className="text-xs text-amber-200 mr-2 font-light">Role:</span>
-                              <span className="px-2 py-1 text-xs font-light text-slate-900 bg-gradient-to-r from-amber-200 to-amber-300 tracking-wide">
-                                {user.role}
-                              </span>
+                            <div className="flex items-center gap-3">
+                              {/* Avatar */}
+                              <div className="flex-shrink-0">
+                                <UserAvatar user={user} size="sm" />
+                              </div>
+                              
+                              {/* User Info */}
+                              <div className="flex-grow">
+                                <p className="font-light text-amber-100 tracking-wide text-sm">{getDisplayName(user)}</p>
+                                <div className="flex items-center mt-1">
+                                  <span className="text-xs text-amber-200 mr-2 font-light">Role:</span>
+                                  <span className="px-2 py-1 text-xs font-light text-slate-900 bg-gradient-to-r from-amber-200 to-amber-300 tracking-wide">
+                                    {user.role}
+                                  </span>
+                                </div>
+                              </div>
                             </div>
                           </div>
                           
@@ -575,12 +579,22 @@ const Navbar: React.FC = () => {
                 {/* Mobile Profile */}
                 <div className="mt-6 pt-4 border-t border-slate-600/20">
                   <div className="mx-4 p-3 bg-gradient-to-r from-amber-600/8 via-amber-500/4 to-amber-600/8 border border-slate-600/30">
-                    <p className="font-light text-amber-100 tracking-wide text-sm">{getDisplayName(user)}</p>
-                    <div className="flex items-center mt-1">
-                      <span className="text-xs text-amber-200 mr-2 font-light">Role:</span>
-                      <span className="px-2 py-1 text-xs font-light text-slate-900 bg-gradient-to-r from-amber-200 to-amber-300 tracking-wide">
-                        {user.role}
-                      </span>
+                    <div className="flex items-center gap-3">
+                      {/* Avatar */}
+                      <div className="flex-shrink-0">
+                        <UserAvatar user={user} size="sm" />
+                      </div>
+                      
+                      {/* User Info */}
+                      <div className="flex-grow">
+                        <p className="font-light text-amber-100 tracking-wide text-sm">{getDisplayName(user)}</p>
+                        <div className="flex items-center mt-1">
+                          <span className="text-xs text-amber-200 mr-2 font-light">Role:</span>
+                          <span className="px-2 py-1 text-xs font-light text-slate-900 bg-gradient-to-r from-amber-200 to-amber-300 tracking-wide">
+                            {user.role}
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                   <button
