@@ -728,16 +728,33 @@ const PoisPage: React.FC = () => {
             if (!poiType) return null;
 
             return (
-              <POIPreviewCard
-                key={poi.id}
-                poi={poi}
-                poiTypes={poiTypes}
-                customIcons={customIcons}
-                userInfo={userInfo}
-                layout={displayMode}
-                onClick={() => setSelectedPoiId(poi.id)}
-                onImageClick={() => handleGalleryOpen(poi)}
-              />
+                                    <POIPreviewCard
+                        key={poi.id}
+                        poi={poi}
+                        poiTypes={poiTypes}
+                        customIcons={customIcons}
+                        userInfo={userInfo}
+                        layout={displayMode}
+                        onClick={() => setSelectedPoiId(poi.id)}
+                        onImageClick={() => handleGalleryOpen(poi)}
+                        onEdit={() => setEditingPoiId(poi.id)}
+                        onDelete={() => handleDelete(poi.id)}
+                        onShare={() => {
+                          // Copy POI link to clipboard
+                          const poiUrl = poi.map_type === 'hagga_basin' 
+                            ? `${window.location.origin}/hagga-basin?highlight=${poi.id}`
+                            : poi.grid_square?.coordinate 
+                              ? `${window.location.origin}/deep-desert/grid/${poi.grid_square.coordinate}?highlight=${poi.id}`
+                              : `${window.location.origin}/deep-desert`;
+                          
+                          navigator.clipboard.writeText(poiUrl).then(() => {
+                            // You could add a toast notification here
+                            console.log('POI link copied to clipboard:', poiUrl);
+                          }).catch(err => {
+                            console.error('Failed to copy POI link:', err);
+                          });
+                        }}
+                      />
             );
           })}
         </div>

@@ -7,6 +7,7 @@ import { formatDateWithPreposition, wasUpdated } from '../../lib/dateUtils';
 import { getDisplayNameFromProfile } from '../../lib/utils';
 import UserAvatar from './UserAvatar';
 import CommentsList from '../comments/CommentsList';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 interface POIPreviewCardProps {
   poi: Poi;
@@ -91,6 +92,8 @@ const POIPreviewCard: React.FC<POIPreviewCardProps> = ({
   onHighlight
 }) => {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
   
   // Handle case where poiTypes is undefined or empty
   if (!poiTypes || !Array.isArray(poiTypes)) {
@@ -224,7 +227,27 @@ const POIPreviewCard: React.FC<POIPreviewCardProps> = ({
     setExpanded(!expanded);
   };
 
-
+  // Handle Go To button navigation
+  const handleGoTo = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    const currentPath = location.pathname;
+    const targetPath = poi.map_type === 'hagga_basin' 
+      ? `/hagga-basin`
+      : poi.grid_square?.coordinate 
+        ? `/deep-desert/grid/${poi.grid_square.coordinate}`
+        : '/deep-desert';
+    
+    // If we're already on the target page, just add/update the highlight parameter
+    if (currentPath === targetPath) {
+      const searchParams = new URLSearchParams(location.search);
+      searchParams.set('highlight', poi.id);
+      navigate(`${targetPath}?${searchParams.toString()}`, { replace: true });
+    } else {
+      // Navigate to the target page with highlight
+      navigate(`${targetPath}?highlight=${poi.id}`);
+    }
+  };
 
   if (layout === 'list') {
     return (
@@ -280,15 +303,7 @@ const POIPreviewCard: React.FC<POIPreviewCardProps> = ({
           {/* Action Buttons - Identical to Modal */}
           <div className="flex items-center space-x-1 flex-shrink-0">
             <button
-              onClick={() => {
-                // Navigate to the appropriate map page based on POI's map type
-                const path = poi.map_type === 'hagga_basin' 
-                  ? `/hagga-basin?highlight=${poi.id}`
-                  : poi.grid_square?.coordinate 
-                    ? `/deep-desert/grid/${poi.grid_square.coordinate}?highlight=${poi.id}`
-                    : '/deep-desert';
-                window.location.href = path;
-              }}
+              onClick={handleGoTo}
               className="p-1.5 text-purple-300 hover:text-purple-100 hover:bg-slate-700/50 rounded transition-colors"
               title="Go to POI on Map"
             >
@@ -570,15 +585,7 @@ const POIPreviewCard: React.FC<POIPreviewCardProps> = ({
         {/* Action Buttons - Compact */}
         <div className="flex items-center space-x-0.5 flex-shrink-0">
           <button
-            onClick={() => {
-              // Navigate to the appropriate map page based on POI's map type
-              const path = poi.map_type === 'hagga_basin' 
-                ? `/hagga-basin?highlight=${poi.id}`
-                : poi.grid_square?.coordinate 
-                  ? `/deep-desert/grid/${poi.grid_square.coordinate}?highlight=${poi.id}`
-                  : '/deep-desert';
-              window.location.href = path;
-            }}
+            onClick={handleGoTo}
             className="p-1 text-purple-300 hover:text-purple-100 hover:bg-slate-700/50 rounded transition-colors"
             title="Go to POI on Map"
           >
