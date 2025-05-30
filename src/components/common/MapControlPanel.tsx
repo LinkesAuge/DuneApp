@@ -90,8 +90,8 @@ const MapControlPanel: React.FC<MapControlPanelProps> = ({
     const categoryTypes = poiTypes.filter(type => type.category === category);
     const categoryTypeIds = categoryTypes.map(type => type.id);
     
-    // A category is "visible" if ALL its types are selected
-    const categoryVisible = categoryTypeIds.length > 0 && categoryTypeIds.every(id => selectedPoiTypes.includes(id));
+    // A category is "visible" if ANY of its types are selected (fixed bug)
+    const categoryVisible = categoryTypeIds.length > 0 && categoryTypeIds.some(id => selectedPoiTypes.includes(id));
     
     return (
       <div key={category} className="mb-3">
@@ -115,8 +115,8 @@ const MapControlPanel: React.FC<MapControlPanelProps> = ({
           </div>
         </div>
         
-        {/* Individual POI Types in Category */}
-        <div className="space-y-0.5">
+        {/* Individual POI Types in Category - Reduced spacing */}
+        <div className="space-y-0">
           {categoryTypes.map(type => {
             const typePoiCount = filteredPois.filter(poi => poi.poi_type_id === type.id).length;
             const isTypeSelected = selectedPoiTypes.includes(type.id);
@@ -124,12 +124,10 @@ const MapControlPanel: React.FC<MapControlPanelProps> = ({
             return (
               <label 
                 key={type.id} 
-                className={`flex items-center justify-between cursor-pointer group px-2 py-1 rounded transition-all ${
-                  !categoryVisible 
-                    ? 'opacity-40 cursor-not-allowed' 
-                    : isTypeSelected 
-                      ? 'hover:bg-amber-500/10' 
-                      : 'opacity-60 hover:opacity-80 hover:bg-slate-800/30'
+                className={`flex items-center justify-between cursor-pointer group px-2 py-0.5 rounded transition-all ${
+                  isTypeSelected 
+                    ? 'hover:bg-amber-500/10' 
+                    : 'opacity-60 hover:opacity-80 hover:bg-slate-800/30'
                 }`}
               >
                 <div className="flex items-center">
@@ -137,13 +135,12 @@ const MapControlPanel: React.FC<MapControlPanelProps> = ({
                     type="checkbox"
                     checked={isTypeSelected}
                     onChange={() => onTypeToggle(type.id)}
-                    disabled={!categoryVisible}
                     className="rounded border-slate-600 bg-slate-800 text-amber-500 focus:ring-amber-500/30 w-3 h-3"
                   />
                   
                   {/* POI Type Icon */}
                   <div 
-                    className="w-4 h-4 rounded flex items-center justify-center ml-2 mr-2 flex-shrink-0"
+                    className="w-10 h-10 rounded flex items-center justify-center ml-2 mr-0.5 flex-shrink-0"
                     style={{
                       backgroundColor: type.icon_has_transparent_background && isIconUrl(type.icon) 
                         ? 'transparent' 
@@ -154,14 +151,14 @@ const MapControlPanel: React.FC<MapControlPanelProps> = ({
                       <img
                         src={getDisplayImageUrl(type.icon)}
                         alt={type.name}
-                        className="w-2.5 h-2.5 object-contain"
+                        className="w-6 h-6 object-contain"
                         style={{
                           filter: type.icon_has_transparent_background ? 'none' : 'drop-shadow(0 1px 1px rgba(0,0,0,0.2))'
                         }}
                       />
                     ) : (
                       <span 
-                        className="text-xs leading-none"
+                        className="text-base leading-none font-medium"
                         style={{ 
                           color: type.icon_has_transparent_background ? type.color : 'white',
                           textShadow: type.icon_has_transparent_background ? '0 1px 1px rgba(0,0,0,0.2)' : 'none'
@@ -173,21 +170,17 @@ const MapControlPanel: React.FC<MapControlPanelProps> = ({
                   </div>
                   
                   <span className={`text-xs transition-colors ${
-                    !categoryVisible 
-                      ? 'text-slate-600' 
-                      : isTypeSelected 
-                        ? 'text-amber-200 group-hover:text-amber-100' 
-                        : 'text-amber-200/70 group-hover:text-amber-200'
+                    isTypeSelected 
+                      ? 'text-amber-200 group-hover:text-amber-100' 
+                      : 'text-amber-200/70 group-hover:text-amber-200'
                   }`}>
                     {type.name}
                   </span>
                 </div>
                 <span className={`text-xs ${
-                  !categoryVisible 
-                    ? 'text-slate-600' 
-                    : isTypeSelected 
-                      ? 'text-amber-300/70' 
-                      : 'text-amber-300/50'
+                  isTypeSelected 
+                    ? 'text-amber-300/70' 
+                    : 'text-amber-300/50'
                 }`}>
                   {typePoiCount}
                 </span>
@@ -433,11 +426,27 @@ const MapControlPanel: React.FC<MapControlPanelProps> = ({
                     <h4 className="text-sm font-medium text-amber-200">Custom POI Types</h4>
                     <button 
                       onClick={onShowCustomPoiTypeModal}
-                      className="px-3 py-1.5 text-xs rounded bg-amber-600 text-slate-900 hover:bg-amber-500 border border-amber-700 hover:border-amber-600 transition-all font-medium flex items-center gap-1"
+                      disabled={userCreatedPoiTypes.length >= 5}
+                      className={`px-3 py-1.5 text-xs rounded font-medium flex items-center gap-1 transition-all ${
+                        userCreatedPoiTypes.length >= 5
+                          ? 'bg-slate-700 text-amber-200/50 border border-slate-600 cursor-not-allowed'
+                          : 'bg-amber-600 text-slate-900 hover:bg-amber-500 border border-amber-700 hover:border-amber-600'
+                      }`}
+                      title={userCreatedPoiTypes.length >= 5 ? 'Maximum 5 custom POI types allowed' : 'Create custom POI type'}
                     >
                       <Plus className="w-3 h-3" />
                       Create
                     </button>
+                  </div>
+                  
+                  {/* Limit indicator */}
+                  <div className="mb-3">
+                    <div className="text-xs text-amber-300/70">
+                      {userCreatedPoiTypes.length}/5 custom types created
+                      {userCreatedPoiTypes.length >= 5 && (
+                        <span className="ml-2 text-amber-400/90 font-medium">Limit reached</span>
+                      )}
+                    </div>
                   </div>
                   
                   {userCreatedPoiTypes.length === 0 ? (
@@ -455,7 +464,7 @@ const MapControlPanel: React.FC<MapControlPanelProps> = ({
                         >
                           <div className="flex items-center">
                             <div 
-                              className="w-8 h-8 rounded flex items-center justify-center mr-3 flex-shrink-0"
+                              className="w-10 h-10 rounded flex items-center justify-center mr-1 flex-shrink-0"
                               style={{
                                 backgroundColor: poiType.icon_has_transparent_background && isIconUrl(poiType.icon) 
                                   ? 'transparent' 
@@ -466,10 +475,10 @@ const MapControlPanel: React.FC<MapControlPanelProps> = ({
                                 <img
                                   src={getDisplayImageUrl(poiType.icon)}
                                   alt={poiType.name}
-                                  className="w-5 h-5 object-contain"
+                                  className="w-6 h-6 object-contain"
                                 />
                               ) : (
-                                <span className="text-sm" style={{ 
+                                <span className="text-base font-medium" style={{ 
                                   color: poiType.icon_has_transparent_background ? poiType.color : 'white'
                                 }}>
                                   {poiType.icon}

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import StatCard from './StatCard';
+import DiamondIcon from '../common/DiamondIcon';
 import { Users, MessageSquare, Camera, TrendingUp, Activity, BarChart3, MapPin } from 'lucide-react';
 
 interface GeneralStatsData {
@@ -116,12 +117,18 @@ const GeneralStatsPanel: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="bg-white border border-sand-200 rounded-lg p-4">
-        <div className="animate-pulse space-y-3">
-          <div className="h-5 bg-sand-200 rounded w-3/4"></div>
-          <div className="space-y-2">
-            <div className="h-4 bg-sand-200 rounded"></div>
-            <div className="h-4 bg-sand-200 rounded w-5/6"></div>
+      <div className="group relative">
+        {/* Multi-layer background system */}
+        <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 rounded-lg" />
+        <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-800/40 to-slate-900/60 rounded-lg" />
+        
+        <div className="relative p-4 rounded-lg border border-amber-400/20">
+          <div className="animate-pulse space-y-3">
+            <div className="h-5 bg-slate-700/40 rounded w-3/4"></div>
+            <div className="space-y-2">
+              <div className="h-4 bg-slate-700/40 rounded"></div>
+              <div className="h-4 bg-slate-700/40 rounded w-5/6"></div>
+            </div>
           </div>
         </div>
       </div>
@@ -133,105 +140,132 @@ const GeneralStatsPanel: React.FC = () => {
   const haggaBasinPercentage = totalPois > 0 ? (stats.regionComparison.haggaBasin / totalPois) * 100 : 50;
 
   return (
-    <div className="bg-white border border-sand-200 rounded-lg p-4">
-      {/* Header */}
-      <div className="flex items-center gap-2 mb-4">
-        <div className="p-1.5 bg-gradient-to-r from-spice-500 to-spice-600 rounded-lg">
-          <BarChart3 size={16} className="text-white" />
-        </div>
-        <h3 className="text-base font-semibold text-spice-600">
-          Community Overview
-        </h3>
-      </div>
-
-      {/* Main Community Stats - 5 Column Layout */}
-      <div className="grid grid-cols-5 gap-2 mb-4">
-        <StatCard
-          title="Total Users"
-          value={stats.totalUsers}
-          subtitle={`+${stats.weeklyGrowth.newUsers} this week`}
-          icon={Users}
-          color="green"
-          trend={stats.weeklyGrowth.newUsers > 0 ? { direction: 'up', value: `+${stats.weeklyGrowth.newUsers}` } : undefined}
-        />
-        
-        <StatCard
-          title="Comments"
-          value={stats.totalComments}
-          subtitle={`+${stats.weeklyGrowth.newComments} this week`}
-          icon={MessageSquare}
-          color="blue"
-        />
-        
-        <StatCard
-          title="Screenshots"
-          value={stats.totalScreenshots}
-          subtitle="Images shared"
-          icon={Camera}
-          color="purple"
-        />
-
-        <StatCard
-          title="Total POIs"
-          value={totalPois}
-          subtitle={`+${stats.weeklyGrowth.newPois} this week`}
-          icon={MapPin}
-          color="orange"
-          trend={stats.weeklyGrowth.newPois > 0 ? { direction: 'up', value: `+${stats.weeklyGrowth.newPois}` } : undefined}
-        />
-
-        <StatCard
-          title="Collections"
-          value={stats.totalCollections}
-          subtitle="POI collections"
-          icon={BarChart3}
-          color="indigo"
-        />
-      </div>
-
-      {/* Bottom section - Compact Regional Breakdown */}
-      <div className="grid grid-cols-2 gap-2">
-        {/* Deep Desert Distribution */}
-        <div className="bg-orange-50 rounded-lg p-2 border border-orange-200">
-          <div className="flex items-center justify-between mb-1">
-            <h4 className="text-xs font-semibold text-orange-700 flex items-center gap-1">
-              <span className="w-2 h-2 bg-orange-500 rounded-full"></span>
-              Deep Desert
-            </h4>
-            <span className="text-sm font-bold text-orange-600">
-              {stats.regionComparison.deepDesert}
-            </span>
-          </div>
-          <div className="w-full h-1.5 bg-orange-100 rounded-full overflow-hidden">
-            <div 
-              className="h-full bg-orange-500 transition-all duration-500"
-              style={{ width: `${deepDesertPercentage}%` }}
-            />
-          </div>
-          <div className="text-xs text-orange-600 mt-1">
-            {deepDesertPercentage.toFixed(0)}% of all POIs
-          </div>
+    <div className="group relative">
+      {/* Multi-layer background system */}
+      <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 rounded-lg" />
+      <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-800/40 to-slate-900/60 rounded-lg" />
+      
+      {/* Interactive purple overlay */}
+      <div className="absolute inset-0 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 ease-in-out bg-gradient-to-b from-violet-600/10 via-violet-700/5 to-transparent" />
+      
+      <div className="relative p-4 rounded-lg border border-amber-400/20 hover:border-amber-300/30 transition-all duration-300">
+        {/* Header */}
+        <div className="flex items-center gap-3 mb-4">
+          <DiamondIcon
+            icon={<BarChart3 size={16} strokeWidth={1.5} />}
+            size="sm"
+            bgColor="bg-void-950"
+            actualBorderColor="bg-gold-300"
+            borderThickness={1}
+            iconColor="text-gold-300"
+          />
+          <h3 className="text-base font-light tracking-widest text-amber-200 uppercase"
+              style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+            Community Overview
+          </h3>
         </div>
 
-        {/* Hagga Basin Distribution */}
-        <div className="bg-blue-50 rounded-lg p-2 border border-blue-200">
-          <div className="flex items-center justify-between mb-1">
-            <h4 className="text-xs font-semibold text-blue-700 flex items-center gap-1">
-              <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
-              Hagga Basin
-            </h4>
-            <span className="text-sm font-bold text-blue-600">
-              {stats.regionComparison.haggaBasin}
-            </span>
+        {/* Main Community Stats - 5 Column Layout */}
+        <div className="grid grid-cols-5 gap-2 mb-4">
+          <StatCard
+            title="Total Users"
+            value={stats.totalUsers}
+            subtitle={`+${stats.weeklyGrowth.newUsers} this week`}
+            icon={Users}
+            color="green"
+            trend={stats.weeklyGrowth.newUsers > 0 ? { direction: 'up', value: `+${stats.weeklyGrowth.newUsers}` } : undefined}
+          />
+          
+          <StatCard
+            title="Comments"
+            value={stats.totalComments}
+            subtitle={`+${stats.weeklyGrowth.newComments} this week`}
+            icon={MessageSquare}
+            color="blue"
+          />
+          
+          <StatCard
+            title="Screenshots"
+            value={stats.totalScreenshots}
+            subtitle="Images shared"
+            icon={Camera}
+            color="purple"
+          />
+
+          <StatCard
+            title="Total POIs"
+            value={totalPois}
+            subtitle={`+${stats.weeklyGrowth.newPois} this week`}
+            icon={MapPin}
+            color="orange"
+            trend={stats.weeklyGrowth.newPois > 0 ? { direction: 'up', value: `+${stats.weeklyGrowth.newPois}` } : undefined}
+          />
+
+          <StatCard
+            title="Collections"
+            value={stats.totalCollections}
+            subtitle="POI collections"
+            icon={BarChart3}
+            color="indigo"
+          />
+        </div>
+
+        {/* Bottom section - Compact Regional Breakdown */}
+        <div className="grid grid-cols-2 gap-3">
+          {/* Deep Desert Distribution */}
+          <div className="group relative">
+            <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-slate-850 to-slate-900 rounded-lg" />
+            <div className="absolute inset-0 bg-gradient-to-b from-amber-600/10 via-amber-500/5 to-transparent rounded-lg" />
+            
+            <div className="relative p-3 rounded-lg border border-amber-400/30">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-xs font-light tracking-wide text-amber-200 flex items-center gap-2"
+                    style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                  <span className="w-2 h-2 bg-amber-400 rounded-full"></span>
+                  Deep Desert
+                </h4>
+                <span className="text-sm font-light text-amber-300 tracking-wide">
+                  {stats.regionComparison.deepDesert}
+                </span>
+              </div>
+              <div className="w-full h-1.5 bg-slate-800/60 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-amber-500 to-amber-400 transition-all duration-500"
+                  style={{ width: `${deepDesertPercentage}%` }}
+                />
+              </div>
+              <div className="text-xs text-amber-300/80 mt-1">
+                {deepDesertPercentage.toFixed(0)}% of all POIs
+              </div>
+            </div>
           </div>
-          <div className="w-full h-1.5 bg-blue-100 rounded-full overflow-hidden">
-            <div 
-              className="h-full bg-blue-500 transition-all duration-500"
-              style={{ width: `${haggaBasinPercentage}%` }}
-            />
-          </div>
-          <div className="text-xs text-blue-600 mt-1">
-            {haggaBasinPercentage.toFixed(0)}% of all POIs
+
+          {/* Hagga Basin Distribution */}
+          <div className="group relative">
+            <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-slate-850 to-slate-900 rounded-lg" />
+            <div className="absolute inset-0 bg-gradient-to-b from-blue-600/10 via-blue-500/5 to-transparent rounded-lg" />
+            
+            <div className="relative p-3 rounded-lg border border-blue-400/30">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-xs font-light tracking-wide text-blue-200 flex items-center gap-2"
+                    style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                  <span className="w-2 h-2 bg-blue-400 rounded-full"></span>
+                  Hagga Basin
+                </h4>
+                <span className="text-sm font-light text-blue-300 tracking-wide">
+                  {stats.regionComparison.haggaBasin}
+                </span>
+              </div>
+              <div className="w-full h-1.5 bg-slate-800/60 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-blue-500 to-blue-400 transition-all duration-500"
+                  style={{ width: `${haggaBasinPercentage}%` }}
+                />
+              </div>
+              <div className="text-xs text-blue-300/80 mt-1">
+                {haggaBasinPercentage.toFixed(0)}% of all POIs
+              </div>
+            </div>
           </div>
         </div>
       </div>

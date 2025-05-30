@@ -17,6 +17,7 @@ interface PoiControlPanelProps {
   showCreatePoiButton?: boolean;
   onCreatePoiClick?: () => void;
   compactMode?: boolean;
+  userCreatedPoiTypes?: PoiType[];
 }
 
 const PoiControlPanel: React.FC<PoiControlPanelProps> = ({
@@ -32,7 +33,8 @@ const PoiControlPanel: React.FC<PoiControlPanelProps> = ({
   onCustomPoiTypeUpdated,
   showCreatePoiButton = false,
   onCreatePoiClick,
-  compactMode = false
+  compactMode = false,
+  userCreatedPoiTypes = []
 }) => {
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [showCustomPoiTypeModal, setShowCustomPoiTypeModal] = useState(false);
@@ -117,9 +119,9 @@ const PoiControlPanel: React.FC<PoiControlPanelProps> = ({
           </div>
         </div>
         
-        {/* Individual POI Types in Category */}
+        {/* Individual POI Types in Category - Reduced spacing */}
         {!isCollapsed && (
-          <div className={`bg-white ${compactMode ? 'p-2 space-y-0.5' : 'p-3 space-y-1'}`}>
+          <div className={`bg-white ${compactMode ? 'p-2 space-y-0' : 'p-3 space-y-0'}`}>
             {categoryTypes.map(type => {
               const typePoiCount = pois.filter(poi => poi.poi_type_id === type.id).length;
               const isTypeSelected = selectedPoiTypes.includes(type.id);
@@ -127,12 +129,10 @@ const PoiControlPanel: React.FC<PoiControlPanelProps> = ({
               return (
                 <label 
                   key={type.id} 
-                  className={`flex items-center justify-between cursor-pointer group px-2 py-1 rounded transition-all ${
-                    !categoryVisible 
-                      ? 'opacity-40 cursor-not-allowed' 
-                      : isTypeSelected 
-                        ? 'hover:bg-spice-50' 
-                        : 'opacity-60 hover:opacity-80 hover:bg-sand-50'
+                  className={`flex items-center justify-between cursor-pointer group px-2 py-0.5 rounded transition-all ${
+                    isTypeSelected 
+                      ? 'hover:bg-spice-50' 
+                      : 'opacity-60 hover:opacity-80 hover:bg-sand-50'
                   }`}
                 >
                   <div className="flex items-center">
@@ -140,13 +140,12 @@ const PoiControlPanel: React.FC<PoiControlPanelProps> = ({
                       type="checkbox"
                       checked={isTypeSelected}
                       onChange={() => onTypeToggle(type.id)}
-                      disabled={!categoryVisible}
                       className="rounded border-sand-300 text-spice-600 focus:ring-spice-500 w-3 h-3"
                     />
                     
                     {/* POI Type Icon */}
                     <div 
-                      className="w-4 h-4 rounded flex items-center justify-center ml-2 mr-2 flex-shrink-0"
+                      className="w-10 h-10 rounded flex items-center justify-center ml-2 mr-0.5 flex-shrink-0"
                       style={{
                         backgroundColor: type.icon_has_transparent_background && isIconUrl(type.icon) 
                           ? 'transparent' 
@@ -157,14 +156,14 @@ const PoiControlPanel: React.FC<PoiControlPanelProps> = ({
                         <img
                           src={getDisplayImageUrl(type.icon)}
                           alt={type.name}
-                          className="w-2.5 h-2.5 object-contain"
+                          className="w-6 h-6 object-contain"
                           style={{
                             filter: type.icon_has_transparent_background ? 'none' : 'drop-shadow(0 1px 1px rgba(0,0,0,0.2))'
                           }}
                         />
                       ) : (
                         <span 
-                          className="text-xs leading-none"
+                          className="text-base leading-none font-medium"
                           style={{ 
                             color: type.icon_has_transparent_background ? type.color : 'white',
                             textShadow: type.icon_has_transparent_background ? '0 1px 1px rgba(0,0,0,0.2)' : 'none'
@@ -176,21 +175,17 @@ const PoiControlPanel: React.FC<PoiControlPanelProps> = ({
                     </div>
                     
                     <span className={`text-xs transition-colors ${
-                      !categoryVisible 
-                        ? 'text-sand-400' 
-                        : isTypeSelected 
-                          ? 'text-sand-800 group-hover:text-spice-800' 
-                          : 'text-sand-500 group-hover:text-sand-700'
+                      isTypeSelected 
+                        ? 'text-sand-800 group-hover:text-spice-800' 
+                        : 'text-sand-500 group-hover:text-sand-700'
                     }`}>
                       {type.name}
                     </span>
                   </div>
                   <span className={`text-xs ${
-                    !categoryVisible 
-                      ? 'text-sand-300' 
-                      : isTypeSelected 
-                        ? 'text-sand-600' 
-                        : 'text-sand-400'
+                    isTypeSelected 
+                      ? 'text-sand-600' 
+                      : 'text-sand-400'
                   }`}>
                     {typePoiCount}
                   </span>
@@ -219,13 +214,24 @@ const PoiControlPanel: React.FC<PoiControlPanelProps> = ({
             </button>
           )}
           {onCustomPoiTypeCreated && (
-            <button
-              onClick={() => setShowCustomPoiTypeModal(true)}
-              className="btn btn-sm btn-outline"
-              title="Create Custom POI Type"
-            >
-              <Settings size={16} />
-            </button>
+            <div className="relative group">
+              <button
+                onClick={() => setShowCustomPoiTypeModal(true)}
+                disabled={userCreatedPoiTypes.length >= 5}
+                className={`btn btn-sm ${
+                  userCreatedPoiTypes.length >= 5 
+                    ? 'btn-outline opacity-50 cursor-not-allowed' 
+                    : 'btn-outline'
+                }`}
+                title={
+                  userCreatedPoiTypes.length >= 5 
+                    ? `Maximum 5 custom POI types allowed (${userCreatedPoiTypes.length}/5)` 
+                    : `Create Custom POI Type (${userCreatedPoiTypes.length}/5)`
+                }
+              >
+                <Settings size={16} />
+              </button>
+            </div>
           )}
         </div>
       </div>

@@ -36,13 +36,8 @@ const GridSquare: React.FC<GridSquareProps> = ({ square, poisToDisplay = [], poi
   }, [poisToDisplay]);
 
   const handleClick = (e: React.MouseEvent) => {
-    const target = e.target as HTMLElement;
-    if (target.tagName.toLowerCase() === 'img') {
-      e.stopPropagation();
-      onImageClick();
-    } else if (!target.closest('.poi-icons')) {
-      onClick();
-    }
+    // Always navigate to the grid page when clicking anywhere on the square
+    onClick();
   };
 
   // Get unique POI types for this grid square based on poisToDisplay
@@ -63,21 +58,25 @@ const GridSquare: React.FC<GridSquareProps> = ({ square, poisToDisplay = [], poi
 
   return (
     <div 
-      className={`w-full h-full border relative group cursor-pointer transition-all duration-200 hover:shadow-md overflow-hidden ${
-        square.is_explored ? 'bg-white' : 'bg-sand-200'
+      className={`w-full h-full border relative group cursor-pointer transition-all duration-300 hover:shadow-xl overflow-hidden ${
+        square.is_explored 
+          ? 'bg-slate-800' 
+          : 'bg-slate-700/60'
       } ${
-        isHighlighted ? 'border-2 border-spice-700 shadow-spice-700/20 shadow-inner animate-pulse-highlight' : 'border-dotted border-orange-700'
+        isHighlighted 
+          ? 'border-2 border-amber-400/60 shadow-amber-400/30 shadow-lg animate-pulse-highlight' 
+          : 'border border-amber-400/30'
       }`}
       onClick={handleClick}
     >
-      {/* Highlight Overlay - subtle version, border does most of the work */}
+      {/* Enhanced Highlight Overlay */}
       {isHighlighted && (
-        <div className="absolute inset-0 bg-spice-700/20 pointer-events-none z-[5]"></div>
+        <div className="absolute inset-0 bg-amber-500/20 pointer-events-none z-[5] animate-pulse"></div>
       )}
 
-      {/* POI Count Badge - based on poisToDisplay */}
+      {/* Enhanced POI Count Badge */}
       {poisToDisplay.length > 0 && (
-        <div className="absolute top-2 left-2 bg-spice-600/90 text-white px-2 py-0.5 rounded-full text-xs font-medium z-10 backdrop-blur-sm">
+        <div className="absolute top-2 left-2 bg-gradient-to-r from-amber-500 to-amber-400 text-slate-900 px-2 py-0.5 rounded-full text-xs font-medium z-10 backdrop-blur-sm shadow-lg">
           {poisToDisplay.length}
         </div>
       )}
@@ -87,43 +86,45 @@ const GridSquare: React.FC<GridSquareProps> = ({ square, poisToDisplay = [], poi
           <img 
             src={square.screenshot_url} 
             alt={`Grid ${square.coordinate}`}
-            className="w-full h-full object-cover cursor-zoom-in"
+            className="w-full h-full object-cover cursor-pointer"
           />
-          {/* Thumbnail Overlay for highlight pulse */}
+          {/* Enhanced Thumbnail Overlay for highlight pulse */}
           {isHighlighted && (
-            <div className="absolute inset-0 w-full h-full animate-pulse-thumbnail-overlay pointer-events-none z-[6]"></div>
+            <div className="absolute inset-0 w-full h-full animate-pulse-thumbnail-overlay pointer-events-none z-[6] bg-amber-500/10"></div>
           )}
-          <div className="absolute inset-0 bg-gradient-to-t from-night-950/50 via-transparent to-transparent pointer-events-none"></div>
-          <div className="absolute inset-0 bg-night-950/20 opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-transparent to-transparent pointer-events-none"></div>
+          <div className="absolute inset-0 bg-slate-950/30 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
           
-          {/* Coordinate overlay for squares with screenshots */}
+          {/* Enhanced Coordinate overlay for squares with screenshots */}
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <span className="text-white text-lg font-medium bg-night-950/40 px-2 py-1 rounded backdrop-blur-sm">
+            <span className="text-amber-200 text-lg font-light tracking-wider bg-slate-950/60 px-3 py-1.5 rounded-lg backdrop-blur-sm border border-amber-400/20"
+                  style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
               {square.coordinate}
             </span>
           </div>
         </>
       ) : (
-        <div className="w-full h-full flex flex-col items-center justify-center">
-          <ImageOff className="text-sand-500 mb-2" size={24} />
-          <span className="text-sm text-sand-700 font-medium">{square.coordinate}</span>
+        <div className="w-full h-full flex flex-col items-center justify-center bg-slate-700/40 border border-amber-400/20 group-hover:border-amber-400/40 transition-all duration-300">
+          <ImageOff className="text-amber-300/70 mb-2 group-hover:text-amber-300 transition-colors duration-300" size={24} />
+          <span className="text-sm text-amber-200 font-light tracking-wide"
+                style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+            {square.coordinate}
+          </span>
         </div>
       )}
-      
 
-
-      {/* POI Type Icons */}
+      {/* Enhanced POI Type Icons - Click-through disabled */}
       {poiTypeDetails.length > 0 && (
-        <div className="poi-icons absolute bottom-2 left-2 flex flex-wrap gap-1 max-w-[80%] z-20">
+        <div className="poi-icons absolute bottom-2 left-2 flex flex-wrap gap-1 max-w-[80%] z-20 pointer-events-none">
           {poiTypeDetails.map((type) => (
             <div
               key={type.id}
-              className="text-white w-6 h-6 rounded flex items-center justify-center backdrop-blur-sm hover:bg-night-900/70 transition-colors relative group/icon shadow-md"
+              className="text-white w-6 h-6 rounded-lg flex items-center justify-center backdrop-blur-sm transition-all duration-300 relative shadow-lg border border-amber-400/20"
               style={{
                 backgroundColor: 
                   (isIconUrl(type.icon) && type.icon_has_transparent_background) 
-                  ? 'transparent' 
-                  : (type.color || 'rgba(0,0,0,0.7)') // Fallback color if type.color is not set
+                  ? 'rgba(30, 41, 59, 0.8)' 
+                  : (type.color || 'rgba(30, 41, 59, 0.8)') // Enhanced fallback with slate tone
               }}
               onMouseEnter={() => setHoveredPoiType(type)}
               onMouseLeave={() => setHoveredPoiType(null)}
@@ -138,22 +139,23 @@ const GridSquare: React.FC<GridSquareProps> = ({ square, poisToDisplay = [], poi
                 <span className="text-base">{type.icon}</span>
               )}
 
-              {/* Tooltip */}
+              {/* Enhanced Tooltip */}
               {hoveredPoiType?.id === type.id && poisForType.length > 0 && (
                 <div 
-                  className="fixed z-[100] w-48 bg-night-950/95 text-white rounded-lg shadow-lg p-2 text-sm backdrop-blur-sm"
+                  className="fixed z-[100] w-48 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-amber-200 rounded-lg shadow-xl border border-amber-400/30 p-3 text-sm backdrop-blur-sm"
                   style={{
                     bottom: '2.5rem',
                     left: '50%',
                     transform: 'translateX(-50%)',
-                    pointerEvents: 'none'
+                    pointerEvents: 'none',
+                    fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif"
                   }}
                 >
-                  <div className="font-semibold mb-1">{type.name}</div>
-                  <div className="text-xs text-sand-300">{type.category}</div>
+                  <div className="font-light text-amber-200 mb-1 tracking-wide">{type.name}</div>
+                  <div className="text-xs text-amber-300/70 font-light tracking-wide">{type.category}</div>
                   <div className="mt-2 space-y-1">
                     {poisForType.map(poi => (
-                      <div key={poi.id} className="text-xs truncate">
+                      <div key={poi.id} className="text-xs truncate text-amber-300/80 font-light">
                         • {poi.title}
                       </div>
                     ))}

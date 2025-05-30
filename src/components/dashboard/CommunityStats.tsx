@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import DiamondIcon from '../common/DiamondIcon';
 import { Users, TrendingUp, Calendar } from 'lucide-react';
 
 interface CommunityData {
@@ -85,16 +86,16 @@ const CommunityStats: React.FC = () => {
     return (
       <div className="space-y-3 animate-pulse">
         <div className="flex justify-between items-center">
-          <div className="h-4 bg-sand-200 rounded w-20"></div>
-          <div className="h-4 bg-sand-200 rounded w-12"></div>
+          <div className="h-4 bg-slate-700/40 rounded w-20"></div>
+          <div className="h-4 bg-slate-700/40 rounded w-12"></div>
         </div>
         <div className="flex justify-between items-center">
-          <div className="h-4 bg-sand-200 rounded w-24"></div>
-          <div className="h-4 bg-sand-200 rounded w-8"></div>
+          <div className="h-4 bg-slate-700/40 rounded w-24"></div>
+          <div className="h-4 bg-slate-700/40 rounded w-8"></div>
         </div>
         <div className="flex justify-between items-center">
-          <div className="h-4 bg-sand-200 rounded w-16"></div>
-          <div className="h-4 bg-sand-200 rounded w-10"></div>
+          <div className="h-4 bg-slate-700/40 rounded w-16"></div>
+          <div className="h-4 bg-slate-700/40 rounded w-10"></div>
         </div>
       </div>
     );
@@ -106,31 +107,43 @@ const CommunityStats: React.FC = () => {
     <div className="space-y-3">
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-2">
-          <Users size={14} className="text-blue-600" />
-          <span className="text-sm text-sand-600">Active Users</span>
+          <DiamondIcon
+            icon={<Users size={14} strokeWidth={1.5} />}
+            size="sm"
+            bgColor="bg-void-950"
+            actualBorderColor="bg-gold-300"
+            borderThickness={1}
+            iconColor="text-gold-300"
+          />
+          <span className="text-sm text-amber-300/80 font-light tracking-wide">Active Users</span>
         </div>
-        <span className="text-sm font-medium text-night-900">{data.activeUsers}</span>
+        <span className="text-sm font-light text-amber-200 tracking-wide">{data.activeUsers}</span>
       </div>
       
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-2">
-          <TrendingUp size={14} className="text-green-600" />
-          <span className="text-sm text-sand-600">Today's Activity</span>
+          <TrendingUp size={14} className="text-green-400" />
+          <span className="text-sm text-amber-300/80 font-light tracking-wide">Today's Activity</span>
         </div>
-        <span className="text-sm font-medium text-night-900">{data.todaysActivity}</span>
+        <span className="text-sm font-light text-amber-200 tracking-wide">{data.todaysActivity}</span>
       </div>
       
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-2">
-          <Calendar size={14} className="text-purple-600" />
-          <span className="text-sm text-sand-600">This Week</span>
+          <Calendar size={14} className="text-purple-400" />
+          <span className="text-sm text-amber-300/80 font-light tracking-wide">This Week</span>
         </div>
-        <span className="text-sm font-medium text-night-900">{data.weeklyActivity}</span>
+        <span className="text-sm font-light text-amber-200 tracking-wide">{data.weeklyActivity}</span>
       </div>
 
       {data.todaysActivity > 0 && (
-        <div className="text-xs text-sand-500 bg-green-50 p-2 rounded border border-green-200">
-          🎉 Active community today!
+        <div className="group relative">
+          <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-slate-850 to-slate-900 rounded-lg" />
+          <div className="absolute inset-0 bg-gradient-to-b from-green-600/10 via-green-500/5 to-transparent rounded-lg" />
+          
+          <div className="relative text-xs text-green-300 p-2 rounded-lg border border-green-400/30">
+            <span className="font-light tracking-wide">🎉 Active community today!</span>
+          </div>
         </div>
       )}
     </div>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import DiamondIcon from '../common/DiamondIcon';
 import { Eye, Target, Grid3X3 } from 'lucide-react';
 import { useExplorationChangeListener } from '../../lib/explorationEvents';
 
@@ -69,14 +70,14 @@ const ExplorationProgress: React.FC = () => {
       <div className="space-y-4 animate-pulse">
         <div>
           <div className="flex justify-between text-sm mb-2">
-            <div className="h-4 bg-sand-200 rounded w-24"></div>
-            <div className="h-4 bg-sand-200 rounded w-16"></div>
+            <div className="h-4 bg-slate-700/40 rounded w-24"></div>
+            <div className="h-4 bg-slate-700/40 rounded w-16"></div>
           </div>
-          <div className="w-full bg-sand-200 rounded-full h-2">
-            <div className="bg-sand-300 h-2 rounded-full w-1/3"></div>
+          <div className="w-full bg-slate-700/40 rounded-full h-2">
+            <div className="bg-slate-600/40 h-2 rounded-full w-1/3"></div>
           </div>
         </div>
-        <div className="h-3 bg-sand-200 rounded w-3/4"></div>
+        <div className="h-3 bg-slate-700/40 rounded w-3/4"></div>
       </div>
     );
   }
@@ -84,68 +85,88 @@ const ExplorationProgress: React.FC = () => {
   if (!data) return null;
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       {/* Header */}
-      <div className="flex items-center gap-1.5 mb-2">
-        <Grid3X3 size={12} className="text-orange-600" />
-        <h4 className="text-xs font-semibold text-orange-600">Grid Exploration</h4>
+      <div className="flex items-center gap-2 mb-3">
+        <DiamondIcon
+          icon={<Grid3X3 size={12} strokeWidth={1.5} />}
+          size="sm"
+          bgColor="bg-void-950"
+          actualBorderColor="bg-gold-300"
+          borderThickness={1}
+          iconColor="text-gold-300"
+        />
+        <h4 className="text-xs font-light tracking-widest text-amber-200 uppercase"
+            style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+          Grid Exploration
+        </h4>
       </div>
 
       {/* Progress Bar */}
       <div>
-        <div className="flex justify-between text-xs mb-1">
-          <span className="text-sand-600">Coverage</span>
-          <span className="font-medium text-night-900">
+        <div className="flex justify-between text-xs mb-2">
+          <span className="text-amber-300/80 font-light tracking-wide">Coverage</span>
+          <span className="font-light text-amber-200 tracking-wide">
             {data.percentage.toFixed(1)}%
           </span>
         </div>
-        <div className="w-full bg-orange-100 rounded-full h-1.5">
+        <div className="w-full bg-slate-800/60 rounded-full h-1.5">
           <div 
-            className="bg-gradient-to-r from-orange-500 to-orange-600 h-1.5 rounded-full transition-all duration-300"
+            className="bg-gradient-to-r from-amber-500 to-amber-400 h-1.5 rounded-full transition-all duration-300"
             style={{ width: `${Math.min(data.percentage, 100)}%` }}
           ></div>
         </div>
       </div>
       
       {/* Stats */}
-      <div className="grid grid-cols-2 gap-2 text-xs">
-        <div className="flex items-center gap-1">
-          <Target size={10} className="text-orange-600" />
-          <span className="text-sand-600">Total:</span>
-          <span className="font-medium text-night-900">{data.totalGridSquares}</span>
+      <div className="grid grid-cols-2 gap-3 text-xs">
+        <div className="flex items-center gap-2">
+          <Target size={10} className="text-amber-400" />
+          <span className="text-amber-300/80 font-light">Total:</span>
+          <span className="font-light text-amber-200">{data.totalGridSquares}</span>
         </div>
-        <div className="flex items-center gap-1">
-          <Eye size={10} className="text-green-600" />
-          <span className="text-sand-600">Found:</span>
-          <span className="font-medium text-night-900">{data.exploredGridSquares}</span>
+        <div className="flex items-center gap-2">
+          <Eye size={10} className="text-green-400" />
+          <span className="text-amber-300/80 font-light">Found:</span>
+          <span className="font-light text-amber-200">{data.exploredGridSquares}</span>
         </div>
       </div>
 
       {/* Recent Activity */}
       {data.recentExplorations > 0 && (
-        <div className="text-xs text-orange-700 bg-orange-50 p-1.5 rounded border border-orange-200">
-          🔥 {data.recentExplorations} new this week
+        <div className="group relative">
+          <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-slate-850 to-slate-900 rounded-lg" />
+          <div className="absolute inset-0 bg-gradient-to-b from-amber-600/10 via-amber-500/5 to-transparent rounded-lg" />
+          
+          <div className="relative text-xs text-amber-300 p-2 rounded-lg border border-amber-400/30">
+            <span className="font-light tracking-wide">🔥 {data.recentExplorations} new this week</span>
+          </div>
         </div>
       )}
 
       {/* Explored Grids List */}
       {data.exploredGrids.length > 0 && (
-        <div className="bg-sand-50 rounded-lg p-2 border border-sand-200">
-          <h5 className="text-xs font-medium text-sand-700 mb-1">Explored Squares:</h5>
-          <div className="flex flex-wrap gap-0.5">
-            {data.exploredGrids.slice(0, 8).map((grid) => (
-              <span
-                key={grid}
-                className="inline-block px-1.5 py-0.5 bg-orange-100 text-orange-700 text-xs rounded border border-orange-200"
-              >
-                {grid}
-              </span>
-            ))}
-            {data.exploredGrids.length > 8 && (
-              <span className="inline-block px-1.5 py-0.5 bg-sand-100 text-sand-600 text-xs rounded border border-sand-200">
-                +{data.exploredGrids.length - 8}
-              </span>
-            )}
+        <div className="group relative">
+          <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-slate-850 to-slate-900 rounded-lg" />
+          <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-800/40 to-slate-900/60 rounded-lg" />
+          
+          <div className="relative p-3 rounded-lg border border-amber-400/20">
+            <h5 className="text-xs font-light text-amber-200 mb-2 tracking-wide">Explored Squares:</h5>
+            <div className="flex flex-wrap gap-1">
+              {data.exploredGrids.slice(0, 8).map((grid) => (
+                <span
+                  key={grid}
+                  className="inline-block px-2 py-1 bg-amber-400/20 text-amber-300 text-xs rounded border border-amber-400/30 font-light tracking-wide"
+                >
+                  {grid}
+                </span>
+              ))}
+              {data.exploredGrids.length > 8 && (
+                <span className="inline-block px-2 py-1 bg-slate-700/60 text-amber-300/80 text-xs rounded border border-slate-600/40 font-light">
+                  +{data.exploredGrids.length - 8}
+                </span>
+              )}
+            </div>
           </div>
         </div>
       )}

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import StatCard from './StatCard';
 import CategoryBreakdown from './CategoryBreakdown';
+import DiamondIcon from '../common/DiamondIcon';
 import { MapPin, TrendingUp, Activity, Users } from 'lucide-react';
 import { useExplorationChangeListener } from '../../lib/explorationEvents';
 
@@ -42,16 +43,18 @@ const RegionalStatsPanel: React.FC<RegionalStatsPanelProps> = ({
 
   const themeConfig = {
     desert: {
-      primary: 'from-orange-500 to-orange-600',
-      secondary: 'text-orange-600',
-      background: 'bg-orange-50',
-      border: 'border-orange-200'
+      primary: 'from-amber-500 to-amber-600',
+      accent: 'text-amber-300',
+      border: 'border-amber-400/30',
+      bg: 'bg-gradient-to-b from-amber-600/10 via-amber-500/5 to-transparent',
+      progressBar: 'from-amber-500 to-amber-400'
     },
     basin: {
       primary: 'from-blue-500 to-blue-600',
-      secondary: 'text-blue-600', 
-      background: 'bg-blue-50',
-      border: 'border-blue-200'
+      accent: 'text-blue-300', 
+      border: 'border-blue-400/30',
+      bg: 'bg-gradient-to-b from-blue-600/10 via-blue-500/5 to-transparent',
+      progressBar: 'from-blue-500 to-blue-400'
     }
   };
 
@@ -110,7 +113,7 @@ const RegionalStatsPanel: React.FC<RegionalStatsPanelProps> = ({
         name,
         count,
         icon: categoryIcons[name as keyof typeof categoryIcons] || '📍',
-        color: config.secondary
+        color: config.accent
       }));
 
       // Get recent activity (POIs added in last 7 days)
@@ -162,12 +165,18 @@ const RegionalStatsPanel: React.FC<RegionalStatsPanelProps> = ({
 
   if (loading) {
     return (
-      <div className={`${config.background} ${config.border} border rounded-lg p-6`}>
-        <div className="animate-pulse space-y-4">
-          <div className="h-6 bg-sand-200 rounded w-3/4"></div>
-          <div className="space-y-2">
-            <div className="h-4 bg-sand-200 rounded"></div>
-            <div className="h-4 bg-sand-200 rounded w-5/6"></div>
+      <div className="group relative">
+        {/* Multi-layer background system */}
+        <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 rounded-lg" />
+        <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-800/40 to-slate-900/60 rounded-lg" />
+        
+        <div className="relative p-4 rounded-lg border border-amber-400/20">
+          <div className="animate-pulse space-y-4">
+            <div className="h-6 bg-slate-700/40 rounded w-3/4"></div>
+            <div className="space-y-2">
+              <div className="h-4 bg-slate-700/40 rounded"></div>
+              <div className="h-4 bg-slate-700/40 rounded w-5/6"></div>
+            </div>
           </div>
         </div>
       </div>
@@ -175,78 +184,104 @@ const RegionalStatsPanel: React.FC<RegionalStatsPanelProps> = ({
   }
 
   return (
-    <div className={`${config.background} ${config.border} border rounded-lg p-4`}>
-      {/* Header */}
-      <div className="flex items-center gap-2 mb-4">
-        <div className={`p-1.5 bg-gradient-to-r ${config.primary} rounded-lg`}>
-          <MapPin size={16} className="text-white" />
+    <div className="group relative">
+      {/* Multi-layer background system */}
+      <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 rounded-lg" />
+      <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-800/40 to-slate-900/60 rounded-lg" />
+      <div className={`absolute inset-0 ${config.bg} rounded-lg`} />
+      
+      {/* Interactive purple overlay */}
+      <div className="absolute inset-0 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 ease-in-out bg-gradient-to-b from-violet-600/10 via-violet-700/5 to-transparent" />
+      
+      <div className={`relative p-4 rounded-lg border ${config.border} hover:border-amber-300/30 transition-all duration-300`}>
+        {/* Header */}
+        <div className="flex items-center gap-3 mb-4">
+          <DiamondIcon
+            icon={<MapPin size={16} strokeWidth={1.5} />}
+            size="sm"
+            bgColor="bg-void-950"
+            actualBorderColor="bg-gold-300"
+            borderThickness={1}
+            iconColor="text-gold-300"
+          />
+          <h3 className={`text-base font-light tracking-widest ${config.accent} uppercase`}
+              style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+            {title}
+          </h3>
         </div>
-        <h3 className={`text-base font-semibold ${config.secondary}`}>
-          {title}
-        </h3>
-      </div>
 
-      {/* Main Stats - 3 Column Layout for both regions */}
-      <div className="grid grid-cols-3 gap-2 mb-4">
-        {/* Total POIs */}
-        <StatCard
-          title="Total POIs"
-          value={stats.totalPois}
-          subtitle={`${stats.recentActivity} added this week`}
-          trend={stats.recentActivity > 0 ? { direction: 'up', value: `+${stats.recentActivity}` } : undefined}
-          color={theme === 'desert' ? 'orange' : 'blue'}
-          icon={MapPin}
-        />
-        
-        {/* Middle column - Exploration for Desert, Recent Activity for Basin */}
-        {region === 'deep_desert' ? (
-          <div className="text-center p-2 bg-white rounded-lg border border-sand-100 flex flex-col justify-center">
-            <div className={`text-lg font-bold ${config.secondary}`}>
-              {Math.round(stats.explorationProgress)}%
+        {/* Main Stats - 3 Column Layout for both regions */}
+        <div className="grid grid-cols-3 gap-2 mb-4">
+          {/* Total POIs */}
+          <StatCard
+            title="Total POIs"
+            value={stats.totalPois}
+            subtitle={`${stats.recentActivity} added this week`}
+            trend={stats.recentActivity > 0 ? { direction: 'up', value: `+${stats.recentActivity}` } : undefined}
+            color={theme === 'desert' ? 'orange' : 'blue'}
+            icon={MapPin}
+          />
+          
+          {/* Middle column - Exploration for Desert, Recent Activity for Basin */}
+          {region === 'deep_desert' ? (
+            <div className="group relative">
+              <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 rounded-lg" />
+              <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-800/40 to-slate-900/60 rounded-lg" />
+              
+              <div className="relative p-2 rounded-lg border border-amber-400/20 flex flex-col justify-center text-center">
+                <div className="text-lg font-light text-amber-200 tracking-wide">
+                  {Math.round(stats.explorationProgress)}%
+                </div>
+                <div className="text-xs text-amber-300/80 mb-1 font-light tracking-wide">Exploration</div>
+                <div className="h-1 bg-slate-800/60 rounded-full overflow-hidden">
+                  <div 
+                    className={`h-full bg-gradient-to-r ${config.progressBar} transition-all duration-500`}
+                    style={{ width: `${stats.explorationProgress}%` }}
+                  />
+                </div>
+              </div>
             </div>
-            <div className="text-xs text-sand-600 mb-1">Exploration</div>
-            <div className="h-1 bg-sand-100 rounded-full overflow-hidden">
-              <div 
-                className={`h-full ${theme === 'desert' ? 'bg-orange-500' : 'bg-blue-500'} transition-all duration-500`}
-                style={{ width: `${stats.explorationProgress}%` }}
-              />
+          ) : (
+            <StatCard
+              title="Recent POIs"
+              value={stats.recentActivity}
+              subtitle="Added this week"
+              color={theme === 'desert' ? 'orange' : 'blue'}
+              icon={Activity}
+            />
+          )}
+          
+          {/* Contributors */}
+          <StatCard
+            title="Contributors"
+            value={stats.userContributions}
+            subtitle="Active users"
+            color={theme === 'desert' ? 'orange' : 'blue'}
+            icon={Users}
+          />
+        </div>
+
+        {/* Category Breakdown */}
+        <CategoryBreakdown
+          categories={stats.categoryBreakdown}
+          total={stats.totalPois}
+          title="POI Categories"
+          theme={theme}
+        />
+
+        {/* Recent Activity Indicator */}
+        {stats.recentActivity > 0 && (
+          <div className="mt-4 group relative">
+            <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-slate-850 to-slate-900 rounded-lg" />
+            <div className="absolute inset-0 bg-gradient-to-b from-green-600/10 via-green-500/5 to-transparent rounded-lg" />
+            
+            <div className="relative flex items-center gap-2 text-xs text-green-300 p-2 rounded-lg border border-green-400/30">
+              <Activity size={12} className="text-green-400" />
+              <span className="font-light tracking-wide">{stats.recentActivity} new POIs added this week</span>
             </div>
           </div>
-        ) : (
-          <StatCard
-            title="Recent POIs"
-            value={stats.recentActivity}
-            subtitle="Added this week"
-            color={theme === 'desert' ? 'orange' : 'blue'}
-            icon={Activity}
-          />
         )}
-        
-        {/* Contributors */}
-        <StatCard
-          title="Contributors"
-          value={stats.userContributions}
-          subtitle="Active users"
-          color={theme === 'desert' ? 'orange' : 'blue'}
-          icon={Users}
-        />
       </div>
-
-      {/* Category Breakdown */}
-      <CategoryBreakdown
-        categories={stats.categoryBreakdown}
-        total={stats.totalPois}
-        title="POI Categories"
-        theme={theme}
-      />
-
-      {/* Recent Activity Indicator */}
-      {stats.recentActivity > 0 && (
-        <div className="mt-4 flex items-center gap-2 text-xs text-sand-600 bg-white rounded-lg p-2">
-          <Activity size={12} className="text-green-500" />
-          <span>{stats.recentActivity} new POIs added this week</span>
-        </div>
-      )}
     </div>
   );
 };
