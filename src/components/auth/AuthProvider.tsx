@@ -161,11 +161,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     });
 
+    // Listen for role updates from admin panel
+    const handleRoleUpdate = (event: CustomEvent) => {
+      const { userId } = event.detail;
+      // If this user's role was updated, refresh their profile
+      if (user && user.id === userId) {
+        console.log('User role was updated, refreshing profile...');
+        refreshUser();
+      }
+    };
+
+    // Add event listener for role updates
+    window.addEventListener('user-role-updated', handleRoleUpdate as EventListener);
+
     return () => {
       mounted = false;
       subscription.unsubscribe();
+      window.removeEventListener('user-role-updated', handleRoleUpdate as EventListener);
     };
-  }, []);
+  }, [user]); // Include user in dependencies so we can check if it's the current user
 
   const signOut = async () => {
     setIsLoading(true);

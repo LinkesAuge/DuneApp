@@ -103,7 +103,14 @@ const UserManagement: React.FC<UserManagementProps> = ({
 
       if (data?.success) {
         onRefreshProfiles();
-        onSuccess(`User role updated to ${newRole}`);
+        
+        // Notify all connected clients that user permissions have changed
+        // This will cause affected users to refresh their auth state
+        window.dispatchEvent(new CustomEvent('user-role-updated', { 
+          detail: { userId: profileId, newRole } 
+        }));
+        
+        onSuccess(`User role updated to ${newRole}. New permissions will take effect immediately for active users.`);
       } else {
         throw new Error(data?.error || 'Role update failed');
       }
@@ -225,6 +232,8 @@ const UserManagement: React.FC<UserManagementProps> = ({
         return 'bg-red-900/50 text-red-200 border border-red-600/40';
       case 'editor':
         return 'bg-amber-900/50 text-amber-200 border border-amber-600/40';
+      case 'pending':
+        return 'bg-orange-900/50 text-orange-200 border border-orange-600/40';
       default:
         return 'bg-green-900/50 text-green-200 border border-green-600/40';
     }
@@ -377,8 +386,10 @@ const UserManagement: React.FC<UserManagementProps> = ({
                           <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium tracking-wide border ${
                             profile.role === 'admin' 
                               ? 'border-red-400/30 bg-red-400/10 text-red-300' 
-                              : profile.role === 'moderator'
+                              : profile.role === 'editor'
                               ? 'border-yellow-400/30 bg-yellow-400/10 text-yellow-300'
+                              : profile.role === 'pending'
+                              ? 'border-orange-400/30 bg-orange-400/10 text-orange-300'
                               : 'border-blue-400/30 bg-blue-400/10 text-blue-300'
                           }`}
                                 style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
@@ -412,8 +423,9 @@ const UserManagement: React.FC<UserManagementProps> = ({
                                    transition-all duration-300 text-sm min-w-[100px]"
                           style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
                         >
+                          <option value="pending" className="bg-void-950 text-orange-200">Pending</option>
                           <option value="member" className="bg-void-950 text-amber-200">Member</option>
-                          <option value="moderator" className="bg-void-950 text-amber-200">Moderator</option>
+                          <option value="editor" className="bg-void-950 text-amber-200">Editor</option>
                           <option value="admin" className="bg-void-950 text-amber-200">Admin</option>
                         </select>
                       </div>

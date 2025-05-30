@@ -297,7 +297,7 @@ All items completed and verified:
 - ✅ Can schedule automated maintenance tasks
 
 #### Story 5: Content Moderation ✅
-**As a moderator**, I want to manage community content so that I can ensure quality and appropriate usage.
+**As an editor**, I want to manage community content so that I can ensure quality and appropriate usage.
 
 **Acceptance Criteria**: ✅ **COMPLETE**
 - ✅ Can view and moderate all user content

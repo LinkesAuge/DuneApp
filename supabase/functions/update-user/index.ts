@@ -93,13 +93,16 @@ serve(async (req: Request) => {
       })
     }
 
-    // Check if this is a rank-only update (for quick rank assignments from table)
+    // Check if this is a targeted update (rank-only, role-only, or partial update)
     const isRankOnlyUpdate = rankId !== undefined && !username && !email && !role;
+    const isRoleOnlyUpdate = role && !username && !email && rankId === undefined;
+    const isPartialUpdate = isRankOnlyUpdate || isRoleOnlyUpdate;
     
-    if (!isRankOnlyUpdate && (!username || !email)) {
+    // Only require username and email for full profile updates
+    if (!isPartialUpdate && (!username || !email)) {
       return new Response(JSON.stringify({ 
-        error: 'Missing required fields: username, email (unless updating rank only)',
-        received: { userId: !!userId, username: !!username, email: !!email, rankId: rankId !== undefined }
+        error: 'Missing required fields: username, email (unless updating rank or role only)',
+        received: { userId: !!userId, username: !!username, email: !!email, role: !!role, rankId: rankId !== undefined }
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400,
@@ -111,7 +114,9 @@ serve(async (req: Request) => {
       email: email || '(unchanged)', 
       role: role || '(unchanged)',
       rankId: rankId !== undefined ? rankId : '(unchanged)',
-      isRankOnlyUpdate
+      isRankOnlyUpdate,
+      isRoleOnlyUpdate,
+      isPartialUpdate
     });
 
     // For Discord OAuth users, we should be careful about updating email in auth.users
@@ -132,7 +137,7 @@ serve(async (req: Request) => {
     console.log(`User ${userId} is Discord OAuth user: ${isDiscordUser}`);
 
     // Only update email in auth.users for non-Discord users
-    if (!isRankOnlyUpdate && !isDiscordUser && currentAuthUser.email !== email) {
+    if (!isPartialUpdate && !isDiscordUser && email && currentAuthUser.email !== email) {
       console.log(`Email for user ${userId} is changing from ${currentAuthUser.email} to ${email}. Updating in auth.users.`);
       const { error: updateAuthEmailError } = await supabaseAdmin.auth.admin.updateUserById(
         userId,
@@ -146,7 +151,7 @@ serve(async (req: Request) => {
         throw new Error(`Failed to update email in authentication: ${updateAuthEmailError.message}`)
       }
       console.log(`Email updated in auth.users for ${userId}.`);
-    } else if (!isRankOnlyUpdate && isDiscordUser && currentAuthUser.email !== email) {
+    } else if (!isPartialUpdate && isDiscordUser && email && currentAuthUser.email !== email) {
       console.log(`User ${userId} is Discord OAuth user - skipping auth.users email update, updating only in profiles`);
     }
 
@@ -188,10 +193,11 @@ serve(async (req: Request) => {
 
     return new Response(JSON.stringify({ 
       success: true,
-      message: isRankOnlyUpdate ? 'User rank updated successfully' : 'User updated successfully',
+      message: isRankOnlyUpdate ? 'User rank updated successfully' : isRoleOnlyUpdate ? 'User role updated successfully' : 'User updated successfully',
       updated: updateData,
       isDiscordUser: isDiscordUser,
-      isRankOnlyUpdate: isRankOnlyUpdate
+      isRankOnlyUpdate: isRankOnlyUpdate,
+      isRoleOnlyUpdate: isRoleOnlyUpdate
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
