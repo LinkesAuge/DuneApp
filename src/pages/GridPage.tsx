@@ -1867,23 +1867,26 @@ const GridPage: React.FC = () => {
         </div>
 
         {/* Right Panel - POI List */}
-              <POIPanel
+        <POIPanel
           showPanel={showRightPanel}
           onTogglePanel={() => setShowRightPanel(!showRightPanel)}
           title={`POIs in ${gridId}`}
           pois={filteredPois}
-                poiTypes={poiTypes}
-                customIcons={customIcons}
-                userInfo={userInfo}
-          onPoiClick={(poi) => setSelectedPoiId(poi.id)}
+          poiTypes={poiTypes}
+          customIcons={customIcons}
+          userInfo={userInfo}
+          onPoiClick={(poi) => {
+            // Highlight the POI on the map instead of opening a modal
+            setHighlightedPoiId(poi.id);
+            // Clear highlight after 3 seconds
+            setTimeout(() => setHighlightedPoiId(null), 3000);
+          }}
           onPoiEdit={handlePoiEdit}
           onPoiDelete={handlePoiDelete}
           onPoiShare={handlePoiShare}
-          onPoiGalleryOpen={handlePoiGalleryOpen}
-          onPoiHighlight={setHighlightedPoiId}
+          onPoiImageClick={handlePoiGalleryOpen}
           emptyStateMessage="No POIs found"
           emptyStateSubtitle="Add POIs to this grid square to see them here"
-          mode="grid"
         />
       </div>
 
