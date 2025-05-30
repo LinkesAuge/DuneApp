@@ -40,6 +40,9 @@ const GridPage: React.FC = () => {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   
+  // Get highlight parameter for POI highlighting
+  const highlightPoiId = searchParams.get('highlight');
+  
   // Debug logging
   console.log('GridPage rendered with gridId:', gridId);
   console.log('Grid pattern test:', gridId ? VALID_GRID_PATTERN.test(gridId) : 'gridId is null/undefined');
@@ -107,6 +110,19 @@ const GridPage: React.FC = () => {
 
   // Highlighted POI state for navigation focus
   const [highlightedPoiId, setHighlightedPoiId] = useState<string | null>(null);
+  
+  // Set highlighted POI from URL parameter
+  useEffect(() => {
+    if (highlightPoiId) {
+      setHighlightedPoiId(highlightPoiId);
+      // Clear the highlight parameter from URL after a delay
+      setTimeout(() => {
+        const newParams = new URLSearchParams(searchParams);
+        newParams.delete('highlight');
+        setSearchParams(newParams, { replace: true });
+      }, 3000);
+    }
+  }, [highlightPoiId, searchParams, setSearchParams]);
 
   // Zoom/Pan state for interactive screenshots
   const [currentZoom, setCurrentZoom] = useState(0.8); // Changed from 0.4 to 0.8 for smaller Deep Desert screenshots

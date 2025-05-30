@@ -73,6 +73,22 @@ const HaggaBasinPage: React.FC = () => {
   // Highlighted POI state for navigation focus
   const [highlightedPoiId, setHighlightedPoiId] = useState<string | null>(null);
   const [selectedPoiId, setSelectedPoiId] = useState<string | null>(null);
+  
+  // Get highlight parameter for POI highlighting
+  const highlightPoiId = searchParams.get('highlight');
+  
+  // Set highlighted POI from URL parameter
+  useEffect(() => {
+    if (highlightPoiId) {
+      setHighlightedPoiId(highlightPoiId);
+      // Clear the highlight parameter from URL after a delay
+      setTimeout(() => {
+        const newParams = new URLSearchParams(searchParams);
+        newParams.delete('highlight');
+        setSearchParams(newParams, { replace: true });
+      }, 3000);
+    }
+  }, [highlightPoiId, searchParams, setSearchParams]);
 
   // State to track if initial filter setup has been done
   const [initialFilterSetup, setInitialFilterSetup] = useState(false);

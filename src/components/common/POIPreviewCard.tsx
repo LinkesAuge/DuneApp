@@ -280,6 +280,22 @@ const POIPreviewCard: React.FC<POIPreviewCardProps> = ({
           {/* Action Buttons - Identical to Modal */}
           <div className="flex items-center space-x-1 flex-shrink-0">
             <button
+              onClick={() => {
+                // Navigate to the appropriate map page based on POI's map type
+                const path = poi.map_type === 'hagga_basin' 
+                  ? `/hagga-basin?highlight=${poi.id}`
+                  : poi.grid_square?.coordinate 
+                    ? `/deep-desert/grid/${poi.grid_square.coordinate}?highlight=${poi.id}`
+                    : '/deep-desert';
+                window.location.href = path;
+              }}
+              className="p-1.5 text-purple-300 hover:text-purple-100 hover:bg-slate-700/50 rounded transition-colors"
+              title="Go to POI on Map"
+            >
+              <MapPin className="w-4 h-4" />
+            </button>
+
+            <button
               onClick={handleToggleExpanded}
               className="p-1.5 text-amber-300 hover:text-amber-100 hover:bg-slate-700/50 rounded transition-colors"
               title={expanded ? "Collapse" : "Expand"}
@@ -553,6 +569,22 @@ const POIPreviewCard: React.FC<POIPreviewCardProps> = ({
 
         {/* Action Buttons - Compact */}
         <div className="flex items-center space-x-0.5 flex-shrink-0">
+          <button
+            onClick={() => {
+              // Navigate to the appropriate map page based on POI's map type
+              const path = poi.map_type === 'hagga_basin' 
+                ? `/hagga-basin?highlight=${poi.id}`
+                : poi.grid_square?.coordinate 
+                  ? `/deep-desert/grid/${poi.grid_square.coordinate}?highlight=${poi.id}`
+                  : '/deep-desert';
+              window.location.href = path;
+            }}
+            className="p-1 text-purple-300 hover:text-purple-100 hover:bg-slate-700/50 rounded transition-colors"
+            title="Go to POI on Map"
+          >
+            <MapPin className="w-3.5 h-3.5" />
+          </button>
+
           {poi.screenshots && poi.screenshots.length > 0 && onImageClick && (
             <button
               onClick={handleImageClick}
