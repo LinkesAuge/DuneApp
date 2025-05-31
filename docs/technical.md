@@ -125,31 +125,82 @@
 -   npm: Version 9+ (as specified in `docs/DOCUMENTATION.md`)
 -   A Supabase project.
 
-### 2.2. Getting Started
+### 2.2. Two-Environment Development Workflow
+
+The project uses a **streamlined two-environment approach**: Local Development and Production.
+
+#### **Environment Architecture**
+- **Local Development**: `http://localhost:5173` with shared production database
+- **Production**: Netlify deployment with production database
+- **No Preview Deployments**: Direct local → production workflow
+
+#### **Local Development Setup**
 
 1.  **Clone the repository** (assuming it's hosted on a Git platform).
 2.  **Install dependencies**:
     ```bash
     npm install
     ```
-3.  **Set up environment variables**:
-    Create a `.env` file in the project root with the following variables (obtain values from your Supabase project):
+3.  **Set up local environment variables**:
+    Create a `.env.local` file in the project root:
     ```env
-    VITE_SUPABASE_URL=your_supabase_url
-    VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+    # Production Supabase credentials (shared database)
+    VITE_SUPABASE_URL=your_production_supabase_url
+    VITE_SUPABASE_ANON_KEY=your_production_anon_key
+
+    # Development environment settings
+    VITE_ENVIRONMENT=development
+    VITE_LOCAL_DEV=true
+    VITE_ENABLE_DEBUG_TOOLS=true
+
+    # Discord OAuth
+    VITE_DISCORD_CLIENT_ID=your_discord_client_id
+
+    # Optional: Discord-only migration testing
+    # VITE_TEST_DISCORD_ONLY=true
     ```
-4.  **Run the development server**:
+
+4.  **Configure Discord OAuth**:
+    Add these redirect URIs in Discord Developer Portal:
+    ```
+    http://localhost:5173/auth/callback
+    https://your-netlify-site.netlify.app/auth/callback
+    ```
+
+5.  **Configure Supabase Authentication**:
+    In Supabase Dashboard > Authentication > URL Configuration:
+    ```
+    http://localhost:5173/auth/callback
+    http://localhost:5173/
+    ```
+
+6.  **Run the development server**:
     ```bash
     npm run dev
     ```
-    The application should now be accessible, typically at `http://localhost:5173` (Vite default).
+    The application will be accessible at `http://localhost:5173` with a red "🛠️ LOCAL DEV" indicator.
+
+#### **Development Safety Features**
+- **Visual Indicator**: Red development badge in top-right corner
+- **Database Protection**: Confirmation dialogs for destructive operations
+- **Environment Detection**: Automatic local vs production environment recognition
+- **Debug Tools**: Enhanced logging and development utilities when enabled
 
 ### 2.3. Build Commands
 
--   **Development**: `npm run dev`
--   **Production Build**: `npm run build` (compiles TypeScript and bundles assets into `dist/`)
--   **Preview Production Build**: `npm run preview` (serves the `dist/` directory locally)
--   **Linting**: `npm run lint` (uses ESLint with TypeScript plugins)
+-   **Development**: `npm run dev` - Start local development with safety features
+-   **Production Build**: `npm run build` - Compile TypeScript and bundle for production  
+-   **Preview Production Build**: `npm run preview` - Test production build locally
+-   **Linting**: `npm run lint` - Run ESLint with TypeScript plugins
+-   **Discord Migration Testing**: Add `VITE_TEST_DISCORD_ONLY=true` to `.env.local` then `npm run dev`
+
+### 2.4. Development Workflow
+1. **Feature Development**: Work locally with visual safety indicators
+2. **Production Testing**: Build and preview locally before deployment
+3. **Deployment**: Push to `main` branch for automatic Netlify deployment
+4. **Discord Migration**: Test locally with environment flags before production rollout
+
+**Comprehensive Documentation**: See `docs/development-workflow.md` for detailed workflow patterns, troubleshooting, and best practices.
 
 ## 3. Key Technical Decisions & Patterns
 
