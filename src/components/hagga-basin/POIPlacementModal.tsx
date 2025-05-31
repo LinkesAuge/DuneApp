@@ -332,15 +332,13 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
     let finalPoiTypeId = selectedPoiTypeId;
     let customIconId = null;
     
-    console.log('🔧 [POIPlacementModal] Selected POI Type ID:', selectedPoiTypeId);
-    console.log('🔧 [POIPlacementModal] Available custom icons:', customIcons);
+          // POIPlacementModal: Selected POI Type ID and available custom icons
     
     if (selectedPoiTypeId.startsWith('custom_')) {
       customIconId = selectedPoiTypeId.replace('custom_', '');
       const customIcon = customIcons.find(icon => icon.id === customIconId);
       
-      console.log('🔧 [POIPlacementModal] Custom icon ID:', customIconId);
-      console.log('🔧 [POIPlacementModal] Found custom icon:', customIcon);
+              // POIPlacementModal: Found custom icon
       
       if (!customIcon) {
         setError('Selected custom icon not found.');
@@ -353,14 +351,14 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
       
       finalPoiTypeId = customCategoryType?.id || fallbackType?.id;
       
-      console.log('🔧 [POIPlacementModal] Final POI type ID:', finalPoiTypeId);
+      // POIPlacementModal: Final POI type ID determined
       
       if (!finalPoiTypeId) {
         setError('No suitable POI type found for custom icon.');
         return;
       }
       
-      console.log('🔧 [POIPlacementModal] Will save custom icon ID to database:', customIconId);
+              // POIPlacementModal: Will save custom icon ID to database
     }
 
     setIsSubmitting(true);

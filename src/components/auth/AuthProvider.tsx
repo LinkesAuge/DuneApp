@@ -82,11 +82,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       existingProfile.email !== (authUser.email || existingProfile.email);
 
     if (!hasChanges) {
-      console.log('Discord profile data unchanged, skipping update');
+      // Discord profile data unchanged, skipping update
       return existingProfile;
     }
 
-    console.log('Updating Discord profile data for user:', userId);
+    // Updating Discord profile data for user
     const { data, error: profileError } = await supabase
       .from('profiles')
       .update({
@@ -114,7 +114,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (!profile) {
         // Create new profile for Discord user
-        console.log('Creating new Discord profile for user:', session.user.id);
+        // Creating new Discord profile for user
         profile = await createDiscordProfile(session.user);
       } else {
         // Check if Discord is linked (either as primary provider or linked provider)
@@ -123,7 +123,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         if (hasDiscordProvider && (discordData.provider_id || discordData.avatar_url)) {
           // Update existing profile with latest Discord data
-          console.log('Updating profile with Discord data for user:', session.user.id);
+          // Updating profile with Discord data for user
           profile = await updateDiscordProfile(session.user.id, session.user, profile);
         }
       }
@@ -186,7 +186,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { userId } = event.detail;
       // If this user's role was updated, refresh their profile
       if (user && user.id === userId) {
-        console.log('User role was updated, refreshing profile...');
+        // User role was updated, refreshing profile
         refreshUser();
       }
     };

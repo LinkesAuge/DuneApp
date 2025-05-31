@@ -7,10 +7,11 @@ import ScheduledTasks from './ScheduledTasks';
 import PoiDefinitionManager from './PoiTypeManager';
 import MapSettings from './MapSettings';
 import RankManagement from './RankManagement';
+import SystemBuilder from './SystemBuilder';
 import DiamondIcon from '../common/DiamondIcon';
 
 const AdminPanel: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'database' | 'users' | 'poi-types' | 'settings' | 'tasks' | 'ranks'>('users');
+  const [activeTab, setActiveTab] = useState<'database' | 'users' | 'poi-types' | 'settings' | 'tasks' | 'ranks' | 'system-builder'>('users');
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -32,12 +33,14 @@ const AdminPanel: React.FC = () => {
   } = useAdminData();
 
   const handleSuccess = (message: string) => {
+    console.log('🎉 AdminPanel: handleSuccess called with message:', message);
     setSuccessMessage(message);
     setErrorMessage(null);
     setTimeout(() => setSuccessMessage(null), 5000);
   };
 
   const handleError = (error: string) => {
+    console.log('❌ AdminPanel: handleError called with error:', error);
     setErrorMessage(error);
     setSuccessMessage(null);
     setTimeout(() => setErrorMessage(null), 8000);
@@ -47,6 +50,7 @@ const AdminPanel: React.FC = () => {
     { id: 'users' as const, label: 'Users', icon: '👥' },
     { id: 'ranks' as const, label: 'Ranks', icon: '🏆' },
     { id: 'poi-types' as const, label: 'POI Definitions', icon: '📍' },
+    { id: 'system-builder' as const, label: 'System Builder', icon: '🔧' },
     { id: 'settings' as const, label: 'Map Settings', icon: '⚙️' },
     { id: 'tasks' as const, label: 'Scheduled Tasks', icon: '⏰' },
     { id: 'database' as const, label: 'Database', icon: '💾' }
@@ -248,6 +252,13 @@ const AdminPanel: React.FC = () => {
                 onError={handleError}
                 onSuccess={handleSuccess}
                 onDataChange={refreshData}
+              />
+            )}
+
+            {activeTab === 'system-builder' && (
+              <SystemBuilder
+                onError={handleError}
+                onSuccess={handleSuccess}
               />
             )}
 

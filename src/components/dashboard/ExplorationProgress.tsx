@@ -53,7 +53,7 @@ const ExplorationProgress: React.FC = () => {
           recent = recentResult.count || 0;
         }
       } catch (error) {
-        console.log('Could not fetch recent explorations, using 0');
+        // Could not fetch recent explorations, using 0
         recent = 0;
       }
 
@@ -78,7 +78,7 @@ const ExplorationProgress: React.FC = () => {
 
   // Listen for exploration status changes
   useExplorationChangeListener((details) => {
-    console.log('ExplorationProgress: Received exploration change:', details);
+    // ExplorationProgress: Received exploration change
     fetchExplorationData();
   });
 

@@ -74,7 +74,7 @@ const RegionalStatsPanel: React.FC<RegionalStatsPanelProps> = ({
 
   // Listen for exploration status changes
   useExplorationChangeListener((details) => {
-    console.log('RegionalStatsPanel: Received exploration change:', details);
+    // RegionalStatsPanel: Received exploration change
     fetchRegionalStats(); // Refresh regional statistics when exploration status changes
   });
 

@@ -52,7 +52,7 @@ export const useAdminData = () => {
       created_at: new Date().toISOString() // Placeholder date
     }));
     
-    console.log('Profiles loaded successfully:', profilesWithDate);
+    // Profiles loaded successfully
     setProfiles(profilesWithDate);
   };
 
@@ -70,10 +70,10 @@ export const useAdminData = () => {
   // Load scheduled tasks
   const loadScheduledTasks = async () => {
     try {
-      console.log('Attempting to load scheduled tasks...');
+      // Attempting to load scheduled tasks
       const { data, error } = await supabase.functions.invoke('get-scheduled-admin-tasks');
 
-      console.log('Scheduled tasks response:', { data, error });
+              // Scheduled tasks response received
 
       if (error) {
         console.warn('Edge Functions not available for scheduled tasks:', error);
@@ -82,7 +82,7 @@ export const useAdminData = () => {
       }
 
       if (data?.tasks) {
-        console.log('Successfully loaded scheduled tasks:', data.tasks);
+        // Successfully loaded scheduled tasks
         setScheduledTasks(data.tasks || []);
       } else {
         console.warn('Failed to load scheduled tasks, data structure:', data);

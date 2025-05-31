@@ -13,6 +13,7 @@ import GridPage from './pages/GridPage';
 import UITestPage from './pages/UITestPage';
 import ProfilePage from './pages/ProfilePage';
 import ItemsSchematicsPage from './pages/ItemsSchematicsPage';
+import { SharedImagesTest } from './pages/SharedImagesTest';
 import { useAuth } from './components/auth/AuthProvider';
 import { AlertTriangle } from 'lucide-react';
 
@@ -149,6 +150,14 @@ const AppRoutes: React.FC = () => {
       <Route 
         path="/ui-test" 
         element={<UITestPage />}
+      />
+      <Route 
+        path="/shared-images-test" 
+        element={
+          <ProtectedRoute>
+            <SharedImagesTest />
+          </ProtectedRoute>
+        }
       />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

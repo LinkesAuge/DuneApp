@@ -119,13 +119,13 @@ const GridContainer: React.FC = () => {
       // Add a small delay to ensure database transaction is committed
       await new Promise(resolve => setTimeout(resolve, 100));
       
-      console.log('[GridContainer] Refetching POIs after add...');
+              // GridContainer: Refetching POIs after add
       const { data: poisData, error: poisError } = await supabase
         .from('pois')
         .select('*');
       if (poisError) throw poisError;
       
-      console.log('[GridContainer] Fetched POIs:', poisData?.length || 0);
+              // GridContainer: Fetched POIs
       setPois(poisData || []);
       
       // Force a re-render by updating a refresh key

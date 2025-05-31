@@ -46,7 +46,7 @@ export const initializeStorage = async () => {
     // Minimal check to ensure storage is generally accessible if needed in future, 
     // or this function can be removed if no other initialization is required.
     await supabase.storage.listBuckets(); 
-    console.log("Supabase storage client initialized and accessible.");
+    // Supabase storage client initialized and accessible
   } catch (error) {
     console.error('Error accessing Supabase storage buckets:', error);
   }

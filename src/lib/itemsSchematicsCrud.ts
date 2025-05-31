@@ -150,10 +150,13 @@ export async function updateTier(
       };
     }
 
-    // Update tier
+    // Update tier with updated_by tracking
     const { data, error } = await supabase
       .from('tiers')
-      .update(updates)
+      .update({
+        ...updates,
+        updated_by: user?.id || null
+      })
       .eq('id', tierId)
       .select()
       .single();
@@ -293,18 +296,17 @@ export async function createCategory(
       };
     }
 
-    // Validate name uniqueness
+    // Validate name uniqueness (within user's visible scope)
     const { data: existing, error: checkError } = await supabase
       .from('categories')
       .select('id')
-      .eq('name', categoryData.name)
-      .single();
+      .eq('name', categoryData.name);
 
-    if (checkError && checkError.code !== 'PGRST116') {
+    if (checkError) {
       throw checkError;
     }
 
-    if (existing) {
+    if (existing && existing.length > 0) {
       return {
         success: false,
         error: 'A category with this name already exists'
@@ -317,7 +319,8 @@ export async function createCategory(
       .insert([{
         ...categoryData,
         created_by: user!.id,
-        is_global: false
+        updated_by: user!.id, // Set initial updated_by to creator
+        is_global: true
       }])
       .select()
       .single();
@@ -333,6 +336,432 @@ export async function createCategory(
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to create category'
+    };
+  }
+}
+
+export async function updateCategory(
+  user: User | null,
+  categoryId: string,
+  updates: Partial<Category>
+): Promise<CrudResult<Category>> {
+  try {
+    // Fetch current category for permission check
+    const { data: currentCategory, error: fetchError } = await supabase
+      .from('categories')
+      .select('*')
+      .eq('id', categoryId)
+      .single();
+
+    if (fetchError) throw fetchError;
+
+    // Permission check
+    const permissionResult = checkPermission({
+      user,
+      entity: {
+        type: 'category',
+        id: categoryId,
+        created_by: currentCategory.created_by,
+        is_global: currentCategory.is_global
+      },
+      action: 'update'
+    });
+
+    if (!permissionResult.allowed) {
+      return {
+        success: false,
+        error: permissionResult.reason || 'Permission denied',
+        permissionError: true
+      };
+    }
+
+    // Check name uniqueness if name is being updated
+    if (updates.name && updates.name !== currentCategory.name) {
+      const { data: existing, error: checkError } = await supabase
+        .from('categories')
+        .select('id')
+        .eq('name', updates.name)
+        .neq('id', categoryId);
+
+      if (checkError) {
+        throw checkError;
+      }
+
+      if (existing && existing.length > 0) {
+        return {
+          success: false,
+          error: `Category name '${updates.name}' already exists`
+        };
+      }
+    }
+
+    // Update category with updated_by field
+    const { data, error } = await supabase
+      .from('categories')
+      .update({
+        ...updates,
+        updated_by: user?.id || null
+      })
+      .eq('id', categoryId)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    return {
+      success: true,
+      data
+    };
+  } catch (error) {
+    console.error('Error updating category:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to update category'
+    };
+  }
+}
+
+// Interface for category dependency information
+export interface CategoryDependencies {
+  types: number;
+  items: number;
+  schematics: number;
+  total: number;
+  hasAny: boolean;
+}
+
+// Get detailed dependency information for a category
+export async function getCategoryDependencies(
+  user: User | null,
+  categoryId: string
+): Promise<CrudResult<CategoryDependencies>> {
+  try {
+    if (!isMemberOrHigher(user)) {
+      return {
+        success: false,
+        error: 'Member role required to check category dependencies',
+        permissionError: true
+      };
+    }
+
+    // Count types
+    const { count: typeCount, error: typeError } = await supabase
+      .from('types')
+      .select('*', { count: 'exact', head: true })
+      .eq('category_id', categoryId);
+
+    if (typeError) throw typeError;
+
+    // Count items
+    const { count: itemCount, error: itemError } = await supabase
+      .from('items')
+      .select('*', { count: 'exact', head: true })
+      .eq('category_id', categoryId);
+
+    if (itemError) throw itemError;
+
+    // Count schematics
+    const { count: schematicCount, error: schematicError } = await supabase
+      .from('schematics')
+      .select('*', { count: 'exact', head: true })
+      .eq('category_id', categoryId);
+
+    if (schematicError) throw schematicError;
+
+    const dependencies: CategoryDependencies = {
+      types: typeCount || 0,
+      items: itemCount || 0,
+      schematics: schematicCount || 0,
+      total: (typeCount || 0) + (itemCount || 0) + (schematicCount || 0),
+      hasAny: (typeCount || 0) > 0 || (itemCount || 0) > 0 || (schematicCount || 0) > 0
+    };
+
+    return {
+      success: true,
+      data: dependencies
+    };
+  } catch (error) {
+    console.error('Error checking category dependencies:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to check category dependencies'
+    };
+  }
+}
+
+// Migrate all content from one category to another
+export async function migrateCategoryContent(
+  user: User | null,
+  fromCategoryId: string,
+  toCategoryId: string
+): Promise<CrudResult<{ migrated: number; errors: string[] }>> {
+  try {
+    // Permission checks for both categories
+    const { data: fromCategory, error: fromError } = await supabase
+      .from('categories')
+      .select('*')
+      .eq('id', fromCategoryId)
+      .single();
+
+    if (fromError) throw fromError;
+
+    const { data: toCategory, error: toError } = await supabase
+      .from('categories')
+      .select('*')
+      .eq('id', toCategoryId)
+      .single();
+
+    if (toError) throw toError;
+
+    // Check permissions for source category
+    const fromPermission = checkPermission({
+      user,
+      entity: {
+        type: 'category',
+        id: fromCategoryId,
+        created_by: fromCategory.created_by,
+        is_global: fromCategory.is_global
+      },
+      action: 'delete'
+    });
+
+    if (!fromPermission.allowed) {
+      return {
+        success: false,
+        error: 'Permission denied to migrate from source category',
+        permissionError: true
+      };
+    }
+
+    // Check permissions for target category  
+    const toPermission = checkPermission({
+      user,
+      entity: {
+        type: 'category',
+        id: toCategoryId,
+        created_by: toCategory.created_by,
+        is_global: toCategory.is_global
+      },
+      action: 'update'
+    });
+
+    if (!toPermission.allowed) {
+      return {
+        success: false,
+        error: 'Permission denied to migrate to target category',
+        permissionError: true
+      };
+    }
+
+    let migratedCount = 0;
+    const errors: string[] = [];
+
+    // Migrate types
+    try {
+      console.log(`🔄 Migrating types from category ${fromCategoryId} to ${toCategoryId}`);
+      
+      const { count: typeCount, error: typeError } = await supabase
+        .from('types')
+        .update({ 
+          category_id: toCategoryId,
+          updated_by: user?.id || null
+        })
+        .eq('category_id', fromCategoryId)
+        .select('*', { count: 'exact' });
+
+      if (typeError) {
+        console.error('🚨 Type migration error details:', {
+          message: typeError.message,
+          code: typeError.code,
+          details: typeError.details,
+          hint: typeError.hint
+        });
+        throw typeError;
+      }
+      console.log(`✅ Successfully migrated ${typeCount || 0} types`);
+      migratedCount += typeCount || 0;
+    } catch (error) {
+      const errorMessage = `Failed to migrate types: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      console.error('🚨 Type migration failed:', errorMessage);
+      errors.push(errorMessage);
+    }
+
+    // Migrate items  
+    try {
+      console.log(`🔄 Migrating items from category ${fromCategoryId} to ${toCategoryId}`);
+      const { count: itemCount, error: itemError } = await supabase
+        .from('items')
+        .update({ 
+          category_id: toCategoryId,
+          updated_by: user?.id || null
+        })
+        .eq('category_id', fromCategoryId)
+        .select('*', { count: 'exact' });
+
+      if (itemError) {
+        console.error('🚨 Item migration error details:', {
+          message: itemError.message,
+          code: itemError.code,
+          details: itemError.details,
+          hint: itemError.hint
+        });
+        throw itemError;
+      }
+      console.log(`✅ Successfully migrated ${itemCount || 0} items`);
+      migratedCount += itemCount || 0;
+    } catch (error) {
+      const errorMessage = `Failed to migrate items: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      console.error('🚨 Item migration failed:', errorMessage);
+      errors.push(errorMessage);
+    }
+
+    // Migrate schematics
+    try {
+      console.log(`🔄 Migrating schematics from category ${fromCategoryId} to ${toCategoryId}`);
+      const { count: schematicCount, error: schematicError } = await supabase
+        .from('schematics')
+        .update({ 
+          category_id: toCategoryId,
+          updated_by: user?.id || null
+        })
+        .eq('category_id', fromCategoryId)
+        .select('*', { count: 'exact' });
+
+      if (schematicError) {
+        console.error('🚨 Schematic migration error details:', {
+          message: schematicError.message,
+          code: schematicError.code,
+          details: schematicError.details,
+          hint: schematicError.hint
+        });
+        throw schematicError;
+      }
+      console.log(`✅ Successfully migrated ${schematicCount || 0} schematics`);
+      migratedCount += schematicCount || 0;
+    } catch (error) {
+      const errorMessage = `Failed to migrate schematics: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      console.error('🚨 Schematic migration failed:', errorMessage);
+      errors.push(errorMessage);
+    }
+
+    // Only return success if there were no errors
+    if (errors.length > 0) {
+      return {
+        success: false,
+        error: `Migration failed: ${errors.join('; ')}`,
+        data: { migrated: migratedCount, errors }
+      };
+    }
+
+    return {
+      success: true,
+      data: { migrated: migratedCount, errors }
+    };
+  } catch (error) {
+    console.error('Error migrating category content:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to migrate category content'
+    };
+  }
+}
+
+export async function deleteCategory(
+  user: User | null,
+  categoryId: string,
+  migrateToCategoryId?: string
+): Promise<CrudResult<boolean>> {
+  try {
+    // Fetch current category for permission check
+    const { data: currentCategory, error: fetchError } = await supabase
+      .from('categories')
+      .select('*')
+      .eq('id', categoryId)
+      .single();
+
+    if (fetchError) throw fetchError;
+
+    // Permission check
+    const permissionResult = checkPermission({
+      user,
+      entity: {
+        type: 'category',
+        id: categoryId,
+        created_by: currentCategory.created_by,
+        is_global: currentCategory.is_global
+      },
+      action: 'delete'
+    });
+
+    if (!permissionResult.allowed) {
+      return {
+        success: false,
+        error: permissionResult.reason || 'Permission denied',
+        permissionError: true
+      };
+    }
+
+    // If migration target is provided, migrate content first
+    if (migrateToCategoryId) {
+      console.log(`🔄 Migration target provided: ${migrateToCategoryId}`);
+      const migrationResult = await migrateCategoryContent(user, categoryId, migrateToCategoryId);
+      console.log(`🔄 Migration result:`, migrationResult);
+      
+      if (!migrationResult.success) {
+        console.error(`🚨 Migration failed, aborting deletion:`, migrationResult.error);
+        return {
+          success: false,
+          error: `Migration failed: ${migrationResult.error}`
+        };
+      }
+      
+      console.log(`✅ Migration completed successfully, proceeding with deletion`);
+      
+      // Verify no remaining dependencies after migration
+      const remainingDeps = await getCategoryDependencies(user, categoryId);
+      console.log(`🔍 Remaining dependencies after migration:`, remainingDeps);
+      
+      if (remainingDeps.success && remainingDeps.data?.hasAny) {
+        const errorMessage = `Migration incomplete: ${remainingDeps.data.types} types, ${remainingDeps.data.items} items, ${remainingDeps.data.schematics} schematics still remain`;
+        console.error(`🚨 ${errorMessage}`);
+        return { success: false, error: errorMessage };
+      }
+    } else {
+      // Check for dependencies if no migration target provided
+      const dependencyResult = await getCategoryDependencies(user, categoryId);
+      if (!dependencyResult.success) {
+        return {
+          success: false,
+          error: `Failed to check dependencies: ${dependencyResult.error}`
+        };
+      }
+
+      if (dependencyResult.data!.hasAny) {
+        return {
+          success: false,
+          error: `Cannot delete category: it contains ${dependencyResult.data!.types} types, ${dependencyResult.data!.items} items, and ${dependencyResult.data!.schematics} schematics. Please migrate content to another category first.`,
+          data: dependencyResult.data
+        };
+      }
+    }
+
+    // Delete category
+    const { error } = await supabase
+      .from('categories')
+      .delete()
+      .eq('id', categoryId);
+
+    if (error) throw error;
+
+    return {
+      success: true,
+      data: true
+    };
+  } catch (error) {
+    console.error('Error deleting category:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to delete category'
     };
   }
 }
@@ -418,7 +847,8 @@ export async function createType(
       .insert([{
         ...typeData,
         created_by: user!.id,
-        is_global: false
+        updated_by: user!.id, // Set initial updated_by to creator
+        is_global: true
       }])
       .select()
       .single();
@@ -434,6 +864,38 @@ export async function createType(
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to create type'
+    };
+  }
+}
+
+export async function fetchTypes(
+  user: User | null
+): Promise<CrudListResult<Type>> {
+  try {
+    if (!isMemberOrHigher(user)) {
+      return {
+        success: false,
+        error: 'Member role required to view types',
+        permissionError: true
+      };
+    }
+
+    const { data, error } = await supabase
+      .from('types')
+      .select('*')
+      .order('name', { ascending: true });
+
+    if (error) throw error;
+
+    return {
+      success: true,
+      data: data || []
+    };
+  } catch (error) {
+    console.error('Error fetching types:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to fetch types'
     };
   }
 }
@@ -468,6 +930,180 @@ export async function fetchTypesByCategory(
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to fetch types'
+    };
+  }
+}
+
+export async function deleteType(
+  user: User | null,
+  typeId: string
+): Promise<CrudResult<boolean>> {
+  try {
+    if (!isEditorOrHigher(user)) {
+      return {
+        success: false,
+        error: 'Editor role required to delete types',
+        permissionError: true
+      };
+    }
+
+    // Check dependencies
+    const depsResult = await getTypeDependencies(user, typeId);
+    if (!depsResult.success || (depsResult.data && depsResult.data.total_count > 0)) {
+      return {
+        success: false,
+        error: 'Cannot delete type: type has dependencies. Migrate content first.'
+      };
+    }
+
+    const { error } = await supabase
+      .from('types')
+      .delete()
+      .eq('id', typeId);
+
+    if (error) throw error;
+
+    return {
+      success: true,
+      data: true
+    };
+  } catch (error) {
+    console.error('Error deleting type:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to delete type'
+    };
+  }
+}
+
+export async function getTypeDependencies(
+  user: User | null,
+  typeId: string
+): Promise<CrudResult<TypeDependencies>> {
+  try {
+    if (!isMemberOrHigher(user)) {
+      return {
+        success: false,
+        error: 'Member role required to check type dependencies',
+        permissionError: true
+      };
+    }
+
+    // Count subtypes
+    const { count: subtypesCount } = await supabase
+      .from('subtypes')
+      .select('*', { count: 'exact', head: true })
+      .eq('type_id', typeId);
+
+    // Count items
+    const { count: itemsCount } = await supabase
+      .from('items')
+      .select('*', { count: 'exact', head: true })
+      .eq('type_id', typeId);
+
+    // Count schematics
+    const { count: schematicsCount } = await supabase
+      .from('schematics')
+      .select('*', { count: 'exact', head: true })
+      .eq('type_id', typeId);
+
+    const dependencies: TypeDependencies = {
+      subtypes_count: subtypesCount || 0,
+      items_count: itemsCount || 0,
+      schematics_count: schematicsCount || 0,
+      total_count: (subtypesCount || 0) + (itemsCount || 0) + (schematicsCount || 0)
+    };
+
+    return {
+      success: true,
+      data: dependencies
+    };
+  } catch (error) {
+    console.error('Error getting type dependencies:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to get type dependencies'
+    };
+  }
+}
+
+export async function migrateTypeContent(
+  user: User | null,
+  fromTypeId: string,
+  toTypeId: string
+): Promise<CrudResult<{ migrated: number; errors: string[] }>> {
+  try {
+    if (!isEditorOrHigher(user)) {
+      return {
+        success: false,
+        error: 'Editor role required to migrate type content',
+        permissionError: true
+      };
+    }
+
+    let migrated = 0;
+    const errors: string[] = [];
+
+    // Migrate subtypes
+    try {
+      const { count: subtypesMigrated } = await supabase
+        .from('subtypes')
+        .update({ 
+          type_id: toTypeId,
+          updated_by: user!.id,
+          updated_at: new Date().toISOString()
+        })
+        .eq('type_id', fromTypeId)
+        .select('*', { count: 'exact' });
+      
+      migrated += subtypesMigrated || 0;
+    } catch (error) {
+      errors.push(`Failed to migrate subtypes: ${error}`);
+    }
+
+    // Migrate items
+    try {
+      const { count: itemsMigrated } = await supabase
+        .from('items')
+        .update({ 
+          type_id: toTypeId,
+          updated_by: user!.id,
+          updated_at: new Date().toISOString()
+        })
+        .eq('type_id', fromTypeId)
+        .select('*', { count: 'exact' });
+      
+      migrated += itemsMigrated || 0;
+    } catch (error) {
+      errors.push(`Failed to migrate items: ${error}`);
+    }
+
+    // Migrate schematics
+    try {
+      const { count: schematicsMigrated } = await supabase
+        .from('schematics')
+        .update({ 
+          type_id: toTypeId,
+          updated_by: user!.id,
+          updated_at: new Date().toISOString()
+        })
+        .eq('type_id', fromTypeId)
+        .select('*', { count: 'exact' });
+      
+      migrated += schematicsMigrated || 0;
+    } catch (error) {
+      errors.push(`Failed to migrate schematics: ${error}`);
+    }
+
+    return {
+      success: true,
+      data: { migrated, errors }
+    };
+  } catch (error) {
+    console.error('Error migrating type content:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to migrate type content'
     };
   }
 }
@@ -919,6 +1555,313 @@ export async function fetchDropdownOptions(
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to fetch dropdown options'
+    };
+  }
+}
+
+// =================================
+// Update Functions (Complete CRUD)
+// =================================
+
+export async function updateType(
+  user: User | null,
+  typeId: string,
+  updates: Partial<Type>
+): Promise<CrudResult<Type>> {
+  try {
+    // Fetch current type for permission check
+    const { data: currentType, error: fetchError } = await supabase
+      .from('types')
+      .select('*')
+      .eq('id', typeId)
+      .single();
+
+    if (fetchError) throw fetchError;
+
+    // Permission check
+    const permissionResult = checkPermission({
+      user,
+      entity: {
+        type: 'type',
+        id: typeId,
+        created_by: currentType.created_by,
+        is_global: currentType.is_global
+      },
+      action: 'update'
+    });
+
+    if (!permissionResult.allowed) {
+      return {
+        success: false,
+        error: permissionResult.reason || 'Permission denied',
+        permissionError: true
+      };
+    }
+
+    // Update type with updated_by tracking
+    const { data, error } = await supabase
+      .from('types')
+      .update({
+        ...updates,
+        updated_by: user?.id || null
+      })
+      .eq('id', typeId)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    return {
+      success: true,
+      data
+    };
+  } catch (error) {
+    console.error('Error updating type:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to update type'
+    };
+  }
+}
+
+export async function updateFieldDefinition(
+  user: User | null,
+  fieldId: string,
+  updates: Partial<FieldDefinition>
+): Promise<CrudResult<FieldDefinition>> {
+  try {
+    // Fetch current field definition for permission check
+    const { data: currentField, error: fetchError } = await supabase
+      .from('field_definitions')
+      .select('*')
+      .eq('id', fieldId)
+      .single();
+
+    if (fetchError) throw fetchError;
+
+    // Permission check
+    const permissionResult = checkPermission({
+      user,
+      entity: {
+        type: 'field_definition',
+        id: fieldId,
+        created_by: currentField.created_by
+      },
+      action: 'update'
+    });
+
+    if (!permissionResult.allowed) {
+      return {
+        success: false,
+        error: permissionResult.reason || 'Permission denied',
+        permissionError: true
+      };
+    }
+
+    // Update field definition with updated_by tracking
+    const { data, error } = await supabase
+      .from('field_definitions')
+      .update({
+        ...updates,
+        updated_by: user?.id || null
+      })
+      .eq('id', fieldId)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    return {
+      success: true,
+      data
+    };
+  } catch (error) {
+    console.error('Error updating field definition:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to update field definition'
+    };
+  }
+}
+
+export async function updateDropdownGroup(
+  user: User | null,
+  groupId: string,
+  updates: Partial<DropdownGroup>
+): Promise<CrudResult<DropdownGroup>> {
+  try {
+    // Fetch current dropdown group for permission check
+    const { data: currentGroup, error: fetchError } = await supabase
+      .from('dropdown_groups')
+      .select('*')
+      .eq('id', groupId)
+      .single();
+
+    if (fetchError) throw fetchError;
+
+    // Permission check
+    const permissionResult = checkPermission({
+      user,
+      entity: {
+        type: 'dropdown_group',
+        id: groupId,
+        created_by: currentGroup.created_by
+      },
+      action: 'update'
+    });
+
+    if (!permissionResult.allowed) {
+      return {
+        success: false,
+        error: permissionResult.reason || 'Permission denied',
+        permissionError: true
+      };
+    }
+
+    // Update dropdown group with updated_by tracking
+    const { data, error } = await supabase
+      .from('dropdown_groups')
+      .update({
+        ...updates,
+        updated_by: user?.id || null
+      })
+      .eq('id', groupId)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    return {
+      success: true,
+      data
+    };
+  } catch (error) {
+    console.error('Error updating dropdown group:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to update dropdown group'
+    };
+  }
+}
+
+export async function updateItem(
+  user: User | null,
+  itemId: string,
+  updates: Partial<Item>
+): Promise<CrudResult<Item>> {
+  try {
+    // Fetch current item for permission check
+    const { data: currentItem, error: fetchError } = await supabase
+      .from('items')
+      .select('*')
+      .eq('id', itemId)
+      .single();
+
+    if (fetchError) throw fetchError;
+
+    // Permission check
+    const permissionResult = checkPermission({
+      user,
+      entity: {
+        type: 'item',
+        id: itemId,
+        created_by: currentItem.created_by,
+        is_global: currentItem.is_global
+      },
+      action: 'update'
+    });
+
+    if (!permissionResult.allowed) {
+      return {
+        success: false,
+        error: permissionResult.reason || 'Permission denied',
+        permissionError: true
+      };
+    }
+
+    // Update item with updated_by tracking
+    const { data, error } = await supabase
+      .from('items')
+      .update({
+        ...updates,
+        updated_by: user?.id || null
+      })
+      .eq('id', itemId)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    return {
+      success: true,
+      data
+    };
+  } catch (error) {
+    console.error('Error updating item:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to update item'
+    };
+  }
+}
+
+export async function updateSchematic(
+  user: User | null,
+  schematicId: string,
+  updates: Partial<Schematic>
+): Promise<CrudResult<Schematic>> {
+  try {
+    // Fetch current schematic for permission check
+    const { data: currentSchematic, error: fetchError } = await supabase
+      .from('schematics')
+      .select('*')
+      .eq('id', schematicId)
+      .single();
+
+    if (fetchError) throw fetchError;
+
+    // Permission check
+    const permissionResult = checkPermission({
+      user,
+      entity: {
+        type: 'schematic',
+        id: schematicId,
+        created_by: currentSchematic.created_by,
+        is_global: currentSchematic.is_global
+      },
+      action: 'update'
+    });
+
+    if (!permissionResult.allowed) {
+      return {
+        success: false,
+        error: permissionResult.reason || 'Permission denied',
+        permissionError: true
+      };
+    }
+
+    // Update schematic with updated_by tracking
+    const { data, error } = await supabase
+      .from('schematics')
+      .update({
+        ...updates,
+        updated_by: user?.id || null
+      })
+      .eq('id', schematicId)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    return {
+      success: true,
+      data
+    };
+  } catch (error) {
+    console.error('Error updating schematic:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to update schematic'
     };
   }
 }

@@ -20,7 +20,7 @@ export const broadcastExplorationChange = (details: ExplorationChangeDetails) =>
     detail: details
   });
   window.dispatchEvent(event);
-  console.log('Broadcasted exploration change:', details);
+  // Broadcasted exploration change
 };
 
 /**

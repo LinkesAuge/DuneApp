@@ -94,7 +94,7 @@ const StatisticsCards: React.FC = () => {
 
   // Listen for exploration status changes
   useExplorationChangeListener((details) => {
-    console.log('StatisticsCards: Received exploration change:', details);
+    // StatisticsCards: Received exploration change
     fetchStatistics(); // Refresh statistics when exploration status changes
   });
 

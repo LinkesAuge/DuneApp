@@ -380,6 +380,7 @@ export interface Tier {
   color: string;
   description: string | null;
   created_by: string | null;
+  updated_by: string | null; // Who last updated this tier
   created_at: string;
   updated_at: string;
 }
@@ -388,10 +389,13 @@ export interface Tier {
 export interface Category {
   id: string;
   name: string;
-  icon: string | null;
+  icon: string | null; // Legacy field for backward compatibility
+  icon_image_id: string | null; // NEW: Reference to shared image
+  icon_fallback: string | null; // NEW: Fallback text icon
   applies_to: AppliesTo[];
   description: string | null;
   created_by: string | null;
+  updated_by: string | null; // Who last updated this category
   is_global: boolean;
   created_at: string;
   updated_at: string;
@@ -402,8 +406,12 @@ export interface Type {
   id: string;
   name: string;
   category_id: string;
+  parent_type_id: string | null; // NEW: Support for type hierarchy
+  icon_image_id: string | null; // NEW: Reference to shared image
+  icon_fallback: string | null; // NEW: Fallback text icon
   description: string | null;
   created_by: string | null;
+  updated_by: string | null; // Who last updated this type
   is_global: boolean;
   created_at: string;
   updated_at: string;
@@ -416,9 +424,35 @@ export interface SubType {
   type_id: string;
   description: string | null;
   created_by: string | null;
+  updated_by: string | null; // Who last updated this subtype
   is_global: boolean;
   created_at: string;
   updated_at: string;
+}
+
+// NEW: Type management interfaces
+export interface TypeDependencies {
+  subtypes_count: number;
+  items_count: number;
+  schematics_count: number;
+  total_count: number;
+}
+
+export interface CreateTypeRequest {
+  name: string;
+  category_id: string;
+  parent_type_id?: string | null;
+  icon_image_id?: string | null;
+  icon_fallback?: string | null;
+  description?: string | null;
+}
+
+export interface UpdateTypeRequest {
+  name?: string;
+  parent_type_id?: string | null;
+  icon_image_id?: string | null;
+  icon_fallback?: string | null;
+  description?: string | null;
 }
 
 // Dropdown system interfaces
@@ -427,6 +461,7 @@ export interface DropdownGroup {
   name: string;
   description: string | null;
   created_by: string | null;
+  updated_by: string | null; // Who last updated this dropdown group
   created_at: string;
   updated_at: string;
 }
@@ -439,6 +474,8 @@ export interface DropdownOption {
   sort_order: number;
   is_active: boolean;
   created_at: string;
+  updated_at: string; // When this dropdown option was last updated
+  updated_by: string | null; // Who last updated this dropdown option
 }
 
 // Dynamic field system interface
@@ -455,6 +492,7 @@ export interface FieldDefinition {
   dropdown_group_id: string | null;
   validation_rules: Record<string, any>;
   created_by: string | null;
+  updated_by: string | null; // Who last updated this field definition
   created_at: string;
   updated_at: string;
 }
@@ -471,6 +509,7 @@ export interface Item {
   icon_url: string | null;
   field_values: FieldValues;
   created_by: string | null;
+  updated_by: string | null; // Who last updated this item
   is_global: boolean;
   created_at: string;
   updated_at: string;
@@ -488,6 +527,7 @@ export interface Schematic {
   icon_url: string | null;
   field_values: FieldValues;
   created_by: string | null;
+  updated_by: string | null; // Who last updated this schematic
   is_global: boolean;
   created_at: string;
   updated_at: string;

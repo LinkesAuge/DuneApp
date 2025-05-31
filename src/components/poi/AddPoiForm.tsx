@@ -214,7 +214,7 @@ const AddPoiForm: React.FC<AddPoiFormProps> = ({ gridSquareId, poiTypes, onCance
       if (error) throw error;
       
       if (data) {
-        console.log('[AddPoiForm] POI added successfully:', data);
+        // AddPoiForm: POI added successfully
         onPoiAdded(data as Poi);
       } else {
         console.warn('[AddPoiForm] POI added but no data returned');
