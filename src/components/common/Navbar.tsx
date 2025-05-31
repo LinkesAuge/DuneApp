@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
 import { getDisplayName } from '../../lib/utils';
 import UserAvatar from './UserAvatar';
-import { Menu, X, User, LogOut, Shield, LayoutDashboard, Mountain, MapPin, Pyramid } from 'lucide-react';
+import { Menu, X, User, LogOut, Shield, LayoutDashboard, Mountain, MapPin, Pyramid, Database } from 'lucide-react';
 
 const Navbar: React.FC = () => {
   const { user, signOut } = useAuth();
@@ -313,6 +313,13 @@ const Navbar: React.FC = () => {
                     >
                       Points of Interest
                     </NavButton>
+                    <NavButton
+                      to="/database"
+                      icon={<Database size={14} strokeWidth={1.5} />}
+                      isActive={location.pathname === '/database'}
+                    >
+                      Database
+                    </NavButton>
                     {user.role === 'admin' && (
                       <NavButton
                         to="/admin"
@@ -556,6 +563,14 @@ const Navbar: React.FC = () => {
                   onClick={() => setIsMenuOpen(false)}
                 >
                   Points of Interest
+                </MobileNavButton>
+                <MobileNavButton
+                  to="/database"
+                  icon={<Database size={15} strokeWidth={1.5} />}
+                  isActive={location.pathname === '/database'}
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  Database
                 </MobileNavButton>
                 <MobileNavButton
                   to="/profile"

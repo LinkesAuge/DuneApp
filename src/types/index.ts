@@ -265,6 +265,16 @@ export interface AppState {
   haggaBasinOverlays: HaggaBasinOverlay[];
   poiCollections: PoiCollection[];
   customIcons: CustomIcon[];
+  // NEW: Items & Schematics state
+  tiers: Tier[];
+  categories: Category[];
+  types: Type[];
+  subtypes: SubType[];
+  items: Item[];
+  schematics: Schematic[];
+  fieldDefinitions: FieldDefinition[];
+  dropdownGroups: DropdownGroup[];
+  dropdownOptions: DropdownOption[];
 }
 
 // Admin Panel Specific Types
@@ -346,4 +356,311 @@ export interface ProfileDisplay {
   avatar_url: string;
   is_discord_user: boolean;
   is_custom_avatar: boolean;
+}
+
+// Items & Schematics System Types
+// =================================
+
+// Core entity type definitions
+export type FieldType = 'text' | 'number' | 'dropdown';
+export type ScopeType = 'global' | 'category' | 'type';
+export type AppliesTo = 'items' | 'schematics';
+
+// Dynamic field value types
+export type FieldValue = string | number | boolean | null;
+export interface FieldValues {
+  [key: string]: FieldValue;
+}
+
+// Tier system interface
+export interface Tier {
+  id: string;
+  name: string;
+  level: number;
+  color: string;
+  description: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// Category system interface
+export interface Category {
+  id: string;
+  name: string;
+  icon: string | null;
+  applies_to: AppliesTo[];
+  description: string | null;
+  created_by: string | null;
+  is_global: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// Type system interface
+export interface Type {
+  id: string;
+  name: string;
+  category_id: string;
+  description: string | null;
+  created_by: string | null;
+  is_global: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// SubType system interface
+export interface SubType {
+  id: string;
+  name: string;
+  type_id: string;
+  description: string | null;
+  created_by: string | null;
+  is_global: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// Dropdown system interfaces
+export interface DropdownGroup {
+  id: string;
+  name: string;
+  description: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DropdownOption {
+  id: string;
+  group_id: string;
+  value: string;
+  display_text: string;
+  sort_order: number;
+  is_active: boolean;
+  created_at: string;
+}
+
+// Dynamic field system interface
+export interface FieldDefinition {
+  id: string;
+  name: string;
+  display_name: string;
+  field_type: FieldType;
+  scope_type: ScopeType;
+  scope_id: string | null;
+  is_required: boolean;
+  default_visible: boolean;
+  display_order: number;
+  dropdown_group_id: string | null;
+  validation_rules: Record<string, any>;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// Core item interface
+export interface Item {
+  id: string;
+  name: string;
+  description: string | null;
+  category_id: string;
+  type_id: string | null;
+  subtype_id: string | null;
+  tier_id: string | null;
+  icon_url: string | null;
+  field_values: FieldValues;
+  created_by: string | null;
+  is_global: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// Core schematic interface
+export interface Schematic {
+  id: string;
+  name: string;
+  description: string | null;
+  category_id: string;
+  type_id: string | null;
+  subtype_id: string | null;
+  tier_id: string | null;
+  icon_url: string | null;
+  field_values: FieldValues;
+  created_by: string | null;
+  is_global: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// Screenshot interfaces
+export interface ItemScreenshot {
+  id: string;
+  item_id: string;
+  url: string;
+  original_url: string | null;
+  crop_details: PixelCrop | null;
+  uploaded_by: string | null;
+  upload_date: string;
+  sort_order: number;
+  file_size: number | null;
+  file_name: string | null;
+}
+
+export interface SchematicScreenshot {
+  id: string;
+  schematic_id: string;
+  url: string;
+  original_url: string | null;
+  crop_details: PixelCrop | null;
+  uploaded_by: string | null;
+  upload_date: string;
+  sort_order: number;
+  file_size: number | null;
+  file_name: string | null;
+}
+
+// Resolved field interface for inheritance system
+export interface ResolvedField {
+  id: string;
+  name: string;
+  display_name: string;
+  field_type: FieldType;
+  scope_type: ScopeType;
+  scope_id: string | null;
+  is_required: boolean;
+  default_visible: boolean;
+  display_order: number;
+  dropdown_group_id: string | null;
+  validation_rules: Record<string, any>;
+  inheritance_level: number; // 1=global, 2=category, 3=type
+}
+
+// Extended interfaces with relationships
+export interface ItemWithRelations extends Item {
+  category?: Category;
+  type?: Type;
+  subtype?: SubType;
+  tier?: Tier;
+  screenshots?: ItemScreenshot[];
+}
+
+export interface SchematicWithRelations extends Schematic {
+  category?: Category;
+  type?: Type;
+  subtype?: SubType;
+  tier?: Tier;
+  screenshots?: SchematicScreenshot[];
+}
+
+export interface CategoryWithTypes extends Category {
+  types?: Type[];
+}
+
+export interface TypeWithSubTypes extends Type {
+  subtypes?: SubType[];
+  category?: Category;
+}
+
+export interface FieldDefinitionWithGroup extends FieldDefinition {
+  dropdown_group?: DropdownGroup;
+  dropdown_options?: DropdownOption[];
+}
+
+// Field resolution parameters
+export interface FieldResolutionParams {
+  category_id?: string;
+  type_id?: string;
+}
+
+// Field resolution result
+export interface FieldResolutionResult {
+  fields: ResolvedField[];
+  field_count: number;
+  has_required_fields: boolean;
+}
+
+// Hierarchy validation interfaces
+export interface HierarchyValidation {
+  is_valid: boolean;
+  errors: string[];
+  warnings: string[];
+}
+
+export interface ItemValidation extends HierarchyValidation {
+  item: Partial<Item>;
+}
+
+export interface SchematicValidation extends HierarchyValidation {
+  schematic: Partial<Schematic>;
+}
+
+// Items & Schematics Permission System Types
+// ==========================================
+
+// Permission action types
+export type PermissionAction = 'create' | 'read' | 'update' | 'delete' | 'manage';
+
+// Content scope types
+export type ContentScope = 'global' | 'own' | 'all';
+
+// Entity permission types
+export type EntityType = 'tier' | 'category' | 'type' | 'subtype' | 'field_definition' | 'dropdown_group' | 'item' | 'schematic';
+
+// Permission check result
+export interface PermissionCheckResult {
+  allowed: boolean;
+  reason?: string;
+  requiresElevation?: boolean;
+}
+
+// User capabilities interface
+export interface ItemsSchematicsCapabilities {
+  // System management capabilities
+  canManageTiers: boolean;
+  canManageCategories: boolean;
+  canManageTypes: boolean;
+  canManageSubTypes: boolean;
+  canManageFieldDefinitions: boolean;
+  canManageDropdownGroups: boolean;
+  
+  // Item capabilities
+  canCreateItems: boolean;
+  canEditOwnItems: boolean;
+  canEditAllItems: boolean;
+  canDeleteOwnItems: boolean;
+  canDeleteAllItems: boolean;
+  
+  // Schematic capabilities
+  canCreateSchematics: boolean;
+  canEditOwnSchematics: boolean;
+  canEditAllSchematics: boolean;
+  canDeleteOwnSchematics: boolean;
+  canDeleteAllSchematics: boolean;
+  
+  // Global content capabilities
+  canCreateGlobalContent: boolean;
+  canManageGlobalContent: boolean;
+  
+  // Advanced capabilities
+  isSystemBuilder: boolean;
+  isAdministrator: boolean;
+}
+
+// Permission context for checking specific operations
+export interface PermissionContext {
+  user: User | null;
+  entity?: {
+    type: EntityType;
+    id?: string;
+    created_by?: string | null;
+    is_global?: boolean;
+  };
+  action: PermissionAction;
+  scope?: ContentScope;
+}
+
+// Bulk permission check result
+export interface BulkPermissionResult {
+  [entityId: string]: PermissionCheckResult;
 }
