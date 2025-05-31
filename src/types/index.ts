@@ -456,10 +456,18 @@ export interface UpdateTypeRequest {
 }
 
 // Dropdown system interfaces
+export type DropdownSourceType = 'custom' | 'categories' | 'types' | 'items' | 'schematics' | 'tiers';
+
 export interface DropdownGroup {
   id: string;
   name: string;
   description: string | null;
+  source_type: DropdownSourceType; // How options are populated
+  // Filter fields for dynamic sources
+  source_category_id: string | null; // Filter items/schematics by category
+  source_type_id: string | null; // Filter items/schematics by type
+  source_tier_id: string | null; // Filter items/schematics by tier
+  applies_to: AppliesTo | null; // Filter categories/types by what they apply to
   created_by: string | null;
   updated_by: string | null; // Who last updated this dropdown group
   created_at: string;

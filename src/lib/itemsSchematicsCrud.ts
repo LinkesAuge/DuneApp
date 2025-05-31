@@ -827,14 +827,13 @@ export async function createType(
       .from('types')
       .select('id')
       .eq('name', typeData.name)
-      .eq('category_id', typeData.category_id)
-      .single();
+      .eq('category_id', typeData.category_id);
 
-    if (checkError && checkError.code !== 'PGRST116') {
+    if (checkError) {
       throw checkError;
     }
 
-    if (existing) {
+    if (existing && existing.length > 0) {
       return {
         success: false,
         error: 'A type with this name already exists in this category'
@@ -1680,6 +1679,329 @@ export async function updateFieldDefinition(
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to update field definition'
+    };
+  }
+}
+
+export async function deleteFieldDefinition(
+  user: User | null,
+  fieldId: string
+): Promise<CrudResult<boolean>> {
+  try {
+    // Fetch current field definition for permission check
+    const { data: currentField, error: fetchError } = await supabase
+      .from('field_definitions')
+      .select('*')
+      .eq('id', fieldId)
+      .single();
+
+    if (fetchError) {
+      if (fetchError.code === 'PGRST116') {
+        return {
+          success: false,
+          error: 'Field definition not found'
+        };
+      }
+      throw fetchError;
+    }
+
+    // Permission check
+    const permissionResult = checkPermission({
+      user,
+      entity: {
+        type: 'field_definition',
+        id: fieldId,
+        created_by: currentField.created_by
+      },
+      action: 'delete'
+    });
+
+    if (!permissionResult.allowed) {
+      return {
+        success: false,
+        error: permissionResult.reason || 'Permission denied',
+        permissionError: true
+      };
+    }
+
+    // TODO: Check for dependencies (field values in items/schematics) before deletion
+    // For now, we'll proceed with deletion and rely on database constraints
+
+    // Delete field definition
+    const { error } = await supabase
+      .from('field_definitions')
+      .delete()
+      .eq('id', fieldId);
+
+    if (error) throw error;
+
+    return {
+      success: true,
+      data: true
+    };
+  } catch (error) {
+    console.error('Error deleting field definition:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to delete field definition'
+    };
+  }
+}
+
+export async function deleteDropdownGroup(
+  user: User | null,
+  groupId: string
+): Promise<CrudResult<boolean>> {
+  try {
+    // Fetch current dropdown group for permission check
+    const { data: currentGroup, error: fetchError } = await supabase
+      .from('dropdown_groups')
+      .select('*')
+      .eq('id', groupId)
+      .single();
+
+    if (fetchError) {
+      if (fetchError.code === 'PGRST116') {
+        return {
+          success: false,
+          error: 'Dropdown group not found'
+        };
+      }
+      throw fetchError;
+    }
+
+    // Permission check
+    const permissionResult = checkPermission({
+      user,
+      entity: {
+        type: 'dropdown_group',
+        id: groupId,
+        created_by: currentGroup.created_by
+      },
+      action: 'delete'
+    });
+
+    if (!permissionResult.allowed) {
+      return {
+        success: false,
+        error: permissionResult.reason || 'Permission denied',
+        permissionError: true
+      };
+    }
+
+    // TODO: Check for dependencies (fields using this group) before deletion
+    // For now, we'll proceed with deletion and rely on database constraints
+
+    // Delete dropdown group
+    const { error } = await supabase
+      .from('dropdown_groups')
+      .delete()
+      .eq('id', groupId);
+
+    if (error) throw error;
+
+    return {
+      success: true,
+      data: true
+    };
+  } catch (error) {
+    console.error('Error deleting dropdown group:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to delete dropdown group'
+    };
+  }
+}
+
+export async function createDropdownOption(
+  user: User | null,
+  optionData: Omit<DropdownOption, 'id' | 'created_at' | 'updated_at'>
+): Promise<CrudResult<DropdownOption>> {
+  try {
+    if (!isEditorOrHigher(user)) {
+      return {
+        success: false,
+        error: 'Editor role required to create dropdown options',
+        permissionError: true
+      };
+    }
+
+    // Check if value is unique within the group
+    const { data: existing, error: checkError } = await supabase
+      .from('dropdown_options')
+      .select('id')
+      .eq('group_id', optionData.group_id)
+      .eq('value', optionData.value);
+
+    if (checkError) throw checkError;
+
+    if (existing && existing.length > 0) {
+      return {
+        success: false,
+        error: 'An option with this value already exists in this group'
+      };
+    }
+
+    // Create dropdown option
+    const { data, error } = await supabase
+      .from('dropdown_options')
+      .insert([{
+        ...optionData,
+        updated_by: user!.id
+      }])
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    return {
+      success: true,
+      data
+    };
+  } catch (error) {
+    console.error('Error creating dropdown option:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to create dropdown option'
+    };
+  }
+}
+
+export async function updateDropdownOption(
+  user: User | null,
+  optionId: string,
+  updates: Partial<DropdownOption>
+): Promise<CrudResult<DropdownOption>> {
+  try {
+    // Fetch current dropdown option for permission check
+    const { data: currentOption, error: fetchError } = await supabase
+      .from('dropdown_options')
+      .select('*')
+      .eq('id', optionId)
+      .single();
+
+    if (fetchError) throw fetchError;
+
+    // Permission check (note: dropdown options don't have created_by, using group permission)
+    const permissionResult = checkPermission({
+      user,
+      entity: {
+        type: 'dropdown_group',
+        id: currentOption.group_id
+      },
+      action: 'update'
+    });
+
+    if (!permissionResult.allowed) {
+      return {
+        success: false,
+        error: permissionResult.reason || 'Permission denied',
+        permissionError: true
+      };
+    }
+
+    // If updating value, check for duplicates within the same group
+    if (updates.value && updates.value !== currentOption.value) {
+      const { data: existing, error: dupError } = await supabase
+        .from('dropdown_options')
+        .select('id')
+        .eq('group_id', currentOption.group_id)
+        .eq('value', updates.value)
+        .neq('id', optionId);
+
+      if (dupError) throw dupError;
+
+      if (existing && existing.length > 0) {
+        return {
+          success: false,
+          error: 'An option with this value already exists in this group'
+        };
+      }
+    }
+
+    // Update dropdown option
+    const { data, error } = await supabase
+      .from('dropdown_options')
+      .update({
+        ...updates,
+        updated_by: user?.id || null
+      })
+      .eq('id', optionId)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    return {
+      success: true,
+      data
+    };
+  } catch (error) {
+    console.error('Error updating dropdown option:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to update dropdown option'
+    };
+  }
+}
+
+export async function deleteDropdownOption(
+  user: User | null,
+  optionId: string
+): Promise<CrudResult<boolean>> {
+  try {
+    // Fetch current dropdown option for permission check
+    const { data: currentOption, error: fetchError } = await supabase
+      .from('dropdown_options')
+      .select('*')
+      .eq('id', optionId)
+      .single();
+
+    if (fetchError) {
+      if (fetchError.code === 'PGRST116') {
+        return {
+          success: false,
+          error: 'Dropdown option not found'
+        };
+      }
+      throw fetchError;
+    }
+
+    // Permission check (note: dropdown options don't have created_by, using group permission)
+    const permissionResult = checkPermission({
+      user,
+      entity: {
+        type: 'dropdown_group',
+        id: currentOption.group_id
+      },
+      action: 'delete'
+    });
+
+    if (!permissionResult.allowed) {
+      return {
+        success: false,
+        error: permissionResult.reason || 'Permission denied',
+        permissionError: true
+      };
+    }
+
+    // Delete dropdown option
+    const { error } = await supabase
+      .from('dropdown_options')
+      .delete()
+      .eq('id', optionId);
+
+    if (error) throw error;
+
+    return {
+      success: true,
+      data: true
+    };
+  } catch (error) {
+    console.error('Error deleting dropdown option:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to delete dropdown option'
     };
   }
 }

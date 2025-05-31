@@ -15,6 +15,7 @@ import {
 import DiamondIcon from '../common/DiamondIcon';
 import { ImageSelector } from '../shared/ImageSelector';
 import { ImagePreview } from '../shared/ImagePreview';
+import { ConfirmationModal } from '../shared/ConfirmationModal';
 import { useAuth } from '../auth/AuthProvider';
 import { 
   fetchTypes, 
@@ -71,6 +72,14 @@ export const TypeManager: React.FC<TypeManagerProps> = ({ className = '' }) => {
   // Error States
   const [createError, setCreateError] = useState<string | null>(null);
   const [editErrors, setEditErrors] = useState<Record<string, string>>({});
+  
+  // Confirmation Modal State
+  const [confirmationModal, setConfirmationModal] = useState({
+    isOpen: false,
+    type: 'success' as 'success' | 'error',
+    title: '',
+    message: ''
+  });
 
   // Load data
   const loadData = useCallback(async () => {
@@ -78,10 +87,23 @@ export const TypeManager: React.FC<TypeManagerProps> = ({ className = '' }) => {
     setError(null);
     
     try {
-      const [typesData, categoriesData] = await Promise.all([
-        fetchTypes(),
-        fetchCategories()
+      const [typesResult, categoriesResult] = await Promise.all([
+        fetchTypes(user),
+        fetchCategories(user)
       ]);
+      
+      // Handle types result
+      if (!typesResult.success) {
+        throw new Error(typesResult.error || 'Failed to load types');
+      }
+      
+      // Handle categories result
+      if (!categoriesResult.success) {
+        throw new Error(categoriesResult.error || 'Failed to load categories');
+      }
+      
+      const typesData = typesResult.data || [];
+      const categoriesData = categoriesResult.data || [];
       
       setTypes(typesData);
       setCategories(categoriesData);
@@ -92,15 +114,38 @@ export const TypeManager: React.FC<TypeManagerProps> = ({ className = '' }) => {
       }
     } catch (err) {
       console.error('Error loading data:', err);
-      setError('Failed to load types and categories');
+      setError(err instanceof Error ? err.message : 'Failed to load types and categories');
     } finally {
       setLoading(false);
     }
-  }, [selectedCategory]);
+  }, [selectedCategory, user]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Modal helper functions
+  const showSuccess = (title: string, message: string) => {
+    setConfirmationModal({
+      isOpen: true,
+      type: 'success',
+      title,
+      message
+    });
+  };
+
+  const showError = (title: string, message: string) => {
+    setConfirmationModal({
+      isOpen: true,
+      type: 'error',
+      title,
+      message
+    });
+  };
+
+  const closeConfirmationModal = () => {
+    setConfirmationModal(prev => ({ ...prev, isOpen: false }));
+  };
 
   // Build hierarchical tree structure
   const buildTypeTree = useCallback((categoryId: string): TypeTreeNode[] => {
@@ -164,7 +209,13 @@ export const TypeManager: React.FC<TypeManagerProps> = ({ className = '' }) => {
         parent_type_id: createForm.parent_type_id
       };
 
-      await createTypeAPI(user, request);
+      const result = await createTypeAPI(user, request);
+      
+      if (!result.success) {
+        // Show error modal instead of just setting form error
+        showError('Type Creation Failed', result.error || 'Failed to create type');
+        return;
+      }
       
       // Reset form and reload data
       setCreateForm({
@@ -176,11 +227,15 @@ export const TypeManager: React.FC<TypeManagerProps> = ({ className = '' }) => {
         parent_type_id: null
       });
       setShowCreateModal(false);
+      setCreateError(null); // Clear any previous errors
       await loadData();
+      
+      // Show success modal
+      showSuccess('Type Created', `Type "${request.name}" has been created successfully.`);
       
     } catch (err: any) {
       console.error('Error creating type:', err);
-      setCreateError(err.message || 'Failed to create type');
+      showError('Type Creation Failed', err.message || 'Failed to create type');
     }
   };
 
@@ -191,7 +246,12 @@ export const TypeManager: React.FC<TypeManagerProps> = ({ className = '' }) => {
     setEditErrors(prev => ({ ...prev, [type.id]: '' }));
     
     try {
-      await updateTypeAPI(user, type.id, updates);
+      const result = await updateTypeAPI(user, type.id, updates);
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to update type');
+      }
+      
       await loadData();
       
     } catch (err: any) {
@@ -209,7 +269,13 @@ export const TypeManager: React.FC<TypeManagerProps> = ({ className = '' }) => {
     
     try {
       // Check dependencies
-      const dependencies = await getTypeDependencies(type.id);
+      const depsResult = await getTypeDependencies(user, type.id);
+      
+      if (!depsResult.success) {
+        throw new Error(depsResult.error || 'Failed to check dependencies');
+      }
+      
+      const dependencies = depsResult.data!;
       
       if (dependencies.total_count > 0) {
         // Show migration dialog
@@ -217,7 +283,12 @@ export const TypeManager: React.FC<TypeManagerProps> = ({ className = '' }) => {
       } else {
         // Safe to delete
         if (confirm(`Delete type "${type.name}"? This action cannot be undone.`)) {
-          await deleteTypeAPI(user, type.id);
+          const deleteResult = await deleteTypeAPI(user, type.id);
+          
+          if (!deleteResult.success) {
+            throw new Error(deleteResult.error || 'Failed to delete type');
+          }
+          
           await loadData();
         }
       }
@@ -248,8 +319,18 @@ export const TypeManager: React.FC<TypeManagerProps> = ({ className = '' }) => {
     }
     
     try {
-      await migrateTypeContent(user, type.id, targetTypeId);
-      await deleteTypeAPI(user, type.id);
+      const migrateResult = await migrateTypeContent(user, type.id, targetTypeId);
+      
+      if (!migrateResult.success) {
+        throw new Error(migrateResult.error || 'Failed to migrate content');
+      }
+      
+      const deleteResult = await deleteTypeAPI(user, type.id);
+      
+      if (!deleteResult.success) {
+        throw new Error(deleteResult.error || 'Failed to delete type');
+      }
+      
       await loadData();
       
     } catch (err: any) {
@@ -268,8 +349,8 @@ export const TypeManager: React.FC<TypeManagerProps> = ({ className = '' }) => {
       <div key={node.id} className="space-y-1">
         {/* Type Item */}
         <div 
-          className={`flex items-center gap-2 p-2 rounded-lg hover:bg-void-800/30 transition-colors group ${
-            node.level > 0 ? 'ml-4 border-l border-sand-700/30' : ''
+          className={`flex items-center gap-2 p-2 rounded-lg hover:bg-slate-800/30 transition-colors group ${
+            node.level > 0 ? 'ml-4 border-l border-slate-600/30' : ''
           }`}
         >
           {/* Expand/Collapse Button */}
@@ -277,7 +358,7 @@ export const TypeManager: React.FC<TypeManagerProps> = ({ className = '' }) => {
             onClick={() => toggleNode(node.id)}
             className={`w-6 h-6 flex items-center justify-center transition-colors ${
               hasChildren 
-                ? 'text-sand-400 hover:text-gold-300' 
+                ? 'text-slate-400 hover:text-amber-300' 
                 : 'invisible'
             }`}
           >
@@ -310,11 +391,11 @@ export const TypeManager: React.FC<TypeManagerProps> = ({ className = '' }) => {
           ) : (
             <>
               <div className="flex-1">
-                <h4 className="text-sand-200 font-light" style={{ fontFamily: 'Trebuchet MS, sans-serif' }}>
+                <h4 className="text-slate-100 font-light" style={{ fontFamily: 'Trebuchet MS, sans-serif' }}>
                   {node.name}
                 </h4>
                 {node.description && (
-                  <p className="text-xs text-sand-400 font-light" style={{ fontFamily: 'Trebuchet MS, sans-serif' }}>
+                  <p className="text-xs text-slate-400 font-light" style={{ fontFamily: 'Trebuchet MS, sans-serif' }}>
                     {node.description}
                   </p>
                 )}
@@ -324,14 +405,14 @@ export const TypeManager: React.FC<TypeManagerProps> = ({ className = '' }) => {
               <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                 <button
                   onClick={() => setEditingType(node)}
-                  className="p-1 text-sand-400 hover:text-gold-300 hover:bg-gold-600/10 rounded"
+                  className="p-1 text-slate-400 hover:text-amber-300 hover:bg-amber-600/10 rounded"
                   title="Edit type"
                 >
                   <Edit2 size={14} />
                 </button>
                 <button
                   onClick={() => handleDeleteType(node)}
-                  className="p-1 text-sand-400 hover:text-red-300 hover:bg-red-600/10 rounded"
+                  className="p-1 text-slate-400 hover:text-red-300 hover:bg-red-600/10 rounded"
                   title="Delete type"
                 >
                   <Trash2 size={14} />
@@ -366,8 +447,8 @@ export const TypeManager: React.FC<TypeManagerProps> = ({ className = '' }) => {
     return (
       <div className={`space-y-6 ${className}`}>
         <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-void-800/30 rounded"></div>
-          <div className="h-64 bg-void-800/30 rounded"></div>
+          <div className="h-8 bg-slate-800/30 rounded"></div>
+          <div className="h-64 bg-slate-800/30 rounded"></div>
         </div>
       </div>
     );
@@ -388,7 +469,7 @@ export const TypeManager: React.FC<TypeManagerProps> = ({ className = '' }) => {
           </p>
           <button
             onClick={loadData}
-            className="px-4 py-2 bg-gold-600 text-void-900 rounded-lg hover:bg-gold-500 transition-colors font-light"
+            className="px-4 py-2 bg-amber-600/20 border border-amber-300/30 rounded text-amber-300 hover:bg-amber-600/30 hover:border-amber-300/50 transition-all duration-200 font-light"
             style={{ fontFamily: 'Trebuchet MS, sans-serif' }}
           >
             Retry
@@ -410,11 +491,11 @@ export const TypeManager: React.FC<TypeManagerProps> = ({ className = '' }) => {
             icon={<FolderTree size={20} />}
             size="md"
             bgColor="bg-void-950"
-            actualBorderColor="bg-gold-300"
+            actualBorderColor="bg-amber-300"
             borderThickness={2}
-            iconColor="text-gold-300"
+            iconColor="text-amber-300"
           />
-          <h2 className="text-xl font-light text-gold-300" style={{ fontFamily: 'Trebuchet MS, sans-serif' }}>
+          <h2 className="text-xl font-light text-amber-300" style={{ fontFamily: 'Trebuchet MS, sans-serif' }}>
             Type Management
           </h2>
         </div>
@@ -425,7 +506,7 @@ export const TypeManager: React.FC<TypeManagerProps> = ({ className = '' }) => {
               setCreateForm(prev => ({ ...prev, category_id: selectedCategory }));
               setShowCreateModal(true);
             }}
-            className="flex items-center gap-2 px-4 py-2 bg-gold-600 text-void-900 rounded-lg hover:bg-gold-500 transition-colors font-light"
+            className="flex items-center gap-2 px-4 py-2 bg-amber-600/20 border border-amber-300/30 rounded text-amber-300 hover:bg-amber-600/30 hover:border-amber-300/50 transition-all duration-200 font-light"
             style={{ fontFamily: 'Trebuchet MS, sans-serif' }}
           >
             <Plus size={16} />
@@ -437,7 +518,7 @@ export const TypeManager: React.FC<TypeManagerProps> = ({ className = '' }) => {
       <div className="grid grid-cols-4 gap-6">
         {/* Category Sidebar */}
         <div className="space-y-4">
-          <h3 className="text-lg font-light text-sand-200" style={{ fontFamily: 'Trebuchet MS, sans-serif' }}>
+          <h3 className="text-lg font-light text-slate-100" style={{ fontFamily: 'Trebuchet MS, sans-serif' }}>
             Categories
           </h3>
           
@@ -448,8 +529,8 @@ export const TypeManager: React.FC<TypeManagerProps> = ({ className = '' }) => {
                 onClick={() => setSelectedCategory(category.id)}
                 className={`w-full flex items-center gap-3 p-3 rounded-lg text-left transition-colors ${
                   selectedCategory === category.id
-                    ? 'bg-gold-300/20 border border-gold-300/30 text-gold-300'
-                    : 'hover:bg-void-800/30 text-sand-200'
+                    ? 'bg-amber-600/20 border border-amber-300/30 text-amber-300'
+                    : 'hover:bg-slate-800/30 text-slate-100'
                 }`}
               >
                 <ImagePreview
@@ -468,7 +549,7 @@ export const TypeManager: React.FC<TypeManagerProps> = ({ className = '' }) => {
         {/* Types Tree */}
         <div className="col-span-3">
           {selectedCategoryData ? (
-            <div className="bg-void-900/20 border border-sand-700/30 rounded-lg p-6">
+            <div className="bg-slate-800/50 border border-slate-600/50 rounded-lg p-6">
               <div className="flex items-center gap-3 mb-4">
                 <ImagePreview
                   iconImageId={selectedCategoryData.icon_image_id}
@@ -476,10 +557,10 @@ export const TypeManager: React.FC<TypeManagerProps> = ({ className = '' }) => {
                   size="md"
                 />
                 <div>
-                  <h3 className="text-lg font-light text-sand-200" style={{ fontFamily: 'Trebuchet MS, sans-serif' }}>
+                  <h3 className="text-lg font-light text-slate-100" style={{ fontFamily: 'Trebuchet MS, sans-serif' }}>
                     {selectedCategoryData.name} Types
                   </h3>
-                  <p className="text-sm text-sand-400 font-light" style={{ fontFamily: 'Trebuchet MS, sans-serif' }}>
+                  <p className="text-sm text-slate-400 font-light" style={{ fontFamily: 'Trebuchet MS, sans-serif' }}>
                     {typeTree.length} root types
                   </p>
                 </div>
@@ -490,7 +571,7 @@ export const TypeManager: React.FC<TypeManagerProps> = ({ className = '' }) => {
                   {typeTree.map(node => renderTypeNode(node))}
                 </div>
               ) : (
-                <div className="text-center py-8 text-sand-400">
+                <div className="text-center py-8 text-slate-400">
                   <Package size={48} className="mx-auto mb-3 opacity-50" />
                   <p className="font-light" style={{ fontFamily: 'Trebuchet MS, sans-serif' }}>
                     No types in this category yet
@@ -502,8 +583,8 @@ export const TypeManager: React.FC<TypeManagerProps> = ({ className = '' }) => {
               )}
             </div>
           ) : (
-            <div className="bg-void-900/20 border border-sand-700/30 rounded-lg p-6 text-center">
-              <p className="text-sand-400 font-light" style={{ fontFamily: 'Trebuchet MS, sans-serif' }}>
+            <div className="bg-slate-800/50 border border-slate-600/50 rounded-lg p-6 text-center">
+              <p className="text-slate-400 font-light" style={{ fontFamily: 'Trebuchet MS, sans-serif' }}>
                 Select a category to view and manage its types
               </p>
             </div>
@@ -526,6 +607,18 @@ export const TypeManager: React.FC<TypeManagerProps> = ({ className = '' }) => {
           error={createError}
         />
       )}
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={confirmationModal.isOpen}
+        onClose={closeConfirmationModal}
+        onConfirm={closeConfirmationModal}
+        title={confirmationModal.title}
+        message={confirmationModal.message}
+        type={confirmationModal.type}
+        confirmText="OK"
+        cancelText=""
+      />
     </div>
   );
 };
@@ -563,7 +656,7 @@ const EditTypeForm: React.FC<EditTypeFormProps> = ({ type, onSave, onCancel, err
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="Type name"
-          className="px-3 py-2 bg-void-900/20 border border-sand-700/30 rounded text-sand-200 placeholder-sand-400 text-sm font-light"
+          className="px-3 py-2 bg-slate-800/50 border border-slate-600/50 rounded text-slate-100 placeholder-slate-400 text-sm font-light"
           style={{ fontFamily: 'Trebuchet MS, sans-serif' }}
         />
         
@@ -572,7 +665,7 @@ const EditTypeForm: React.FC<EditTypeFormProps> = ({ type, onSave, onCancel, err
           value={iconFallback}
           onChange={(e) => setIconFallback(e.target.value)}
           placeholder="Text icon (fallback)"
-          className="px-3 py-2 bg-void-900/20 border border-sand-700/30 rounded text-sand-200 placeholder-sand-400 text-sm font-light"
+          className="px-3 py-2 bg-slate-800/50 border border-slate-600/50 rounded text-slate-100 placeholder-slate-400 text-sm font-light"
           style={{ fontFamily: 'Trebuchet MS, sans-serif' }}
         />
       </div>
@@ -589,14 +682,14 @@ const EditTypeForm: React.FC<EditTypeFormProps> = ({ type, onSave, onCancel, err
         onChange={(e) => setDescription(e.target.value)}
         placeholder="Description (optional)"
         rows={2}
-        className="w-full px-3 py-2 bg-void-900/20 border border-sand-700/30 rounded text-sand-200 placeholder-sand-400 text-sm resize-none font-light"
+        className="w-full px-3 py-2 bg-slate-800/50 border border-slate-600/50 rounded text-slate-100 placeholder-slate-400 text-sm resize-none font-light"
         style={{ fontFamily: 'Trebuchet MS, sans-serif' }}
       />
 
       <div className="flex items-center gap-2">
         <button
           onClick={handleSave}
-          className="flex items-center gap-1 px-3 py-1 bg-gold-600 text-void-900 rounded text-sm hover:bg-gold-500 transition-colors font-light"
+          className="flex items-center gap-1 px-3 py-1 bg-amber-600/20 border border-amber-300/30 rounded text-amber-300 hover:bg-amber-600/30 hover:border-amber-300/50 transition-all duration-200 text-sm font-light"
           style={{ fontFamily: 'Trebuchet MS, sans-serif' }}
         >
           <Save size={14} />
@@ -604,7 +697,7 @@ const EditTypeForm: React.FC<EditTypeFormProps> = ({ type, onSave, onCancel, err
         </button>
         <button
           onClick={onCancel}
-          className="flex items-center gap-1 px-3 py-1 text-sand-400 hover:text-gold-300 hover:bg-gold-600/10 rounded text-sm transition-colors font-light"
+          className="flex items-center gap-1 px-3 py-1 text-slate-400 hover:text-amber-300 hover:bg-amber-600/10 rounded text-sm transition-colors font-light"
           style={{ fontFamily: 'Trebuchet MS, sans-serif' }}
         >
           <X size={14} />
@@ -655,15 +748,15 @@ const CreateTypeModal: React.FC<CreateTypeModalProps> = ({
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50">
       <div className="bg-slate-800 border border-amber-300/30 rounded-lg shadow-2xl w-full max-w-2xl">
         {/* Modal Header */}
-        <div className="flex items-center justify-between p-6 border-b border-sand-700/30">
+        <div className="flex items-center justify-between p-6 border-b border-slate-600/50">
           <div className="flex items-center gap-3">
             <DiamondIcon
               icon={<Plus size={18} />}
               size="md"
               bgColor="bg-void-950"
-              actualBorderColor="bg-gold-300"
+              actualBorderColor="bg-amber-300"
               borderThickness={2}
-              iconColor="text-gold-300"
+              iconColor="text-amber-300"
             />
             <h3 className="text-lg font-light text-amber-300" style={{ fontFamily: 'Trebuchet MS, sans-serif' }}>
               Create New Type
@@ -794,10 +887,10 @@ const CreateTypeModal: React.FC<CreateTypeModalProps> = ({
         </div>
 
         {/* Modal Footer */}
-        <div className="flex justify-end gap-3 p-6 border-t border-sand-700/30">
+        <div className="flex justify-end gap-3 p-6 border-t border-slate-600/50">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-slate-300 hover:text-amber-300 hover:bg-amber-600/10 rounded-lg transition-colors font-light"
+            className="px-4 py-2 text-slate-300 hover:text-amber-300 hover:bg-amber-600/10 rounded transition-colors font-light"
             style={{ fontFamily: 'Trebuchet MS, sans-serif' }}
           >
             Cancel
@@ -805,7 +898,7 @@ const CreateTypeModal: React.FC<CreateTypeModalProps> = ({
           <button
             onClick={onSubmit}
             disabled={!form.name.trim() || !form.category_id}
-            className="px-4 py-2 bg-amber-600 text-slate-900 rounded-lg hover:bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-light"
+            className="px-4 py-2 bg-amber-600/20 border border-amber-300/30 rounded text-amber-300 hover:bg-amber-600/30 hover:border-amber-300/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-light"
             style={{ fontFamily: 'Trebuchet MS, sans-serif' }}
           >
             Create Type
