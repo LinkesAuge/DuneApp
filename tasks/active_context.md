@@ -1,5 +1,70 @@
 # Active Development Context
 
+## **🎯 NEW MAJOR PROJECT: ITEMS & SCHEMATICS SYSTEM ARCHITECTURE 🎯**
+
+**Date**: January 29, 2025
+**Status**: **COMPREHENSIVE PLANNING PHASE COMPLETED** ✅
+**Priority**: **HIGHEST** - Major System Extension Design
+
+**PROJECT OVERVIEW**:
+The Items & Schematics system represents a transformative extension that will evolve the Dune Awakening Deep Desert Tracker from a POI tracking tool into a comprehensive game database management platform. This system enables users to create, manage, and organize detailed item and schematic databases with sophisticated categorization, dynamic field definitions, and seamless POI integration.
+
+**✅ COMPREHENSIVE TECHNICAL SPECIFICATION COMPLETED:**
+
+### **System Architecture Defined** ✅
+- **Complete Database Schema**: 15+ interconnected tables with proper constraints and relationships
+- **Advanced Permission System**: Granular user permissions with "System Builder" role and individual permission overrides
+- **Dynamic Field System**: Flexible inheritance-based field definitions (Global → Category → Type scope)
+- **Hierarchical Organization**: Items/Schematics → Categories → Types → SubTypes + Tier tagging system
+- **POI Integration**: Many-to-many relationships with default assignment rules and retroactive application
+
+### **Key Architectural Decisions Finalized** ✅
+- **Permission Model**: Role-based defaults with individual user permission overrides (admin/editor/member base + granular overrides)
+- **Field Inheritance**: Global fields inherited by categories, category fields inherited by types
+- **Default Assignment Tracking**: Retroactive template system where POI type changes update all existing POIs
+- **Validation Strategy**: Case-insensitive duplicate prevention with hierarchy enforcement
+- **Icon System Integration**: Shared icon pool between POI system and Items/Schematics with custom uploads
+
+### **Complex Requirements Resolved** ✅
+- **Dynamic Stats System**: Text/Number/Dropdown field types with admin-defined dropdown groups
+- **Screenshot Integration**: Optional screenshots leveraging existing upload/crop functionality  
+- **Map Visualization**: Schematic indicators and item counts with toggleable visibility
+- **Search & Filtering**: Hierarchical filtering, text search, and tier-based filtering
+- **UI/UX Design**: Tree view navigation, grid/list toggle, and comprehensive admin interface
+
+### **Implementation Strategy Established** ✅
+- **5-Phase Development Plan**: Core Infrastructure → System Builder → Main Interface → POI Integration → Polish
+- **Estimated Timeline**: 4-6 months (1,200-1,500 development hours)
+- **Performance Considerations**: Materialized views, virtual scrolling, component memoization
+- **Integration Approach**: Seamless extension of existing architecture without disruption
+
+**✅ TECHNICAL DOCUMENTATION CREATED:**
+- **Comprehensive Specification**: `docs/items_schematics_system_specification.md` (complete 60-page technical document)
+- **Database Schema**: Complete SQL definitions with constraints, indexes, and triggers
+- **TypeScript Interfaces**: All entity definitions, API types, and UI component props
+- **UI/UX Specifications**: Layout mockups, component designs, and interaction patterns
+- **Performance Strategy**: Database optimization, React optimization, and deployment considerations
+
+**KEY FEATURES PLANNED:**
+- **Dynamic Field Builder**: Admin interface for creating text/number/dropdown fields with inheritance
+- **Tier Management**: "Makeshift", "Copper", "Iron" tech level system with admin customization
+- **Default Assignment Rules**: Automatic item/schematic assignment to POI types with retroactive updates
+- **Hierarchical Navigation**: Tree view with category/type/subtype organization
+- **Map Integration**: Visual indicators for POIs containing items/schematics with toggle controls
+- **Advanced Permissions**: "System Builder" role plus granular own/all item permissions
+
+**BUSINESS VALUE ASSESSMENT:**
+- **Platform Evolution**: Transforms simple tracker into comprehensive community database tool
+- **User Engagement**: Sophisticated system that could retain users for hours of database building
+- **Community Building**: Shared knowledge base for game items and crafting information  
+- **Differentiation**: Unique feature set that distinguishes platform from simple mapping tools
+
+**PROJECT SCOPE COMPLEXITY**: **MAJOR** - This is essentially building a complete CMS/database management system with game-specific features, dynamic form generation, and complex permission management.
+
+**NEXT PHASE**: Begin detailed implementation planning and Phase 1 database infrastructure development.
+
+---
+
 ## **✅ LATEST MAJOR ACCOMPLISHMENTS - JANUARY 28, 2025 ✅**
 
 ### **🎉 COMPREHENSIVE DASHBOARD & UI ENHANCEMENT SUITE - COMPLETED! 🎉**
