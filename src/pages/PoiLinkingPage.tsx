@@ -1,18 +1,44 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { ArrowLeft, Search, Check, Package, FileText, MapPin, List, Map } from 'lucide-react';
+import { ArrowLeft, Search, Check, Package, FileText, MapPin, List, Map, Mountain, Grid3X3, X } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { createBulkPoiItemLinks } from '../lib/api/poiItemLinks';
 import { useAuth } from '../components/auth/AuthProvider';
 import { supabase } from '../lib/supabase';
 import InteractiveMap from '../components/hagga-basin/InteractiveMap';
-import type { Poi, PoiType, Item, Schematic, HaggaBasinBaseMap, CustomIcon } from '../types';
+import DeepDesertSelectionMode from '../components/poi-linking/DeepDesertSelectionMode';
+import type { Poi, PoiType, Item, Schematic, HaggaBasinBaseMap, CustomIcon, GridSquare } from '../types';
 
 interface PoiFilters {
   searchTerm: string;
   selectedPoiTypes: Set<string>;
   selectedRegions: Set<string>;
 }
+
+interface EnhancedPoiLinkingState {
+  // Map mode and navigation
+  mapMode: 'hagga-basin' | 'deep-desert';
+  currentGridId: string; // A1-I9 for Deep Desert navigation
+  
+  // Unified selection (works across both maps)
+  selectedPoiIds: Set<string>;
+  existingLinks: Set<string>;
+  
+  // Enhanced filtering (mode-aware)
+  filters: PoiFilters;
+}
+
+const GRID_COORDINATES = [
+  'A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8', 'A9',
+  'B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B8', 'B9',
+  'C1', 'C2', 'C3', 'C4', 'C5', 'C6', 'C7', 'C8', 'C9',
+  'D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7', 'D8', 'D9',
+  'E1', 'E2', 'E3', 'E4', 'E5', 'E6', 'E7', 'E8', 'E9',
+  'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9',
+  'G1', 'G2', 'G3', 'G4', 'G5', 'G6', 'G7', 'G8', 'G9',
+  'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'H7', 'H8', 'H9',
+  'I1', 'I2', 'I3', 'I4', 'I5', 'I6', 'I7', 'I8', 'I9'
+];
 
 const PoiLinkingPage: React.FC = () => {
   const { entityId } = useParams<{ entityId: string }>();
@@ -25,26 +51,32 @@ const PoiLinkingPage: React.FC = () => {
                      location.pathname.includes('/schematics/') ? 'schematics' : 
                      undefined;
   
-  // Note: EntityType extracted from URL path for proper routing
-  
   // Entity data
   const [targetEntity, setTargetEntity] = useState<Item | Schematic | null>(null);
   const [loading, setLoading] = useState(true);
   
-  // POI data
+  // Enhanced state management for dual map support
+  const [mapMode, setMapMode] = useState<'hagga-basin' | 'deep-desert'>('hagga-basin');
+  const [currentGridId, setCurrentGridId] = useState<string>('A1'); // Default starting grid
+  const [selectedPoiIds, setSelectedPoiIds] = useState<Set<string>>(new Set());
+  const [existingLinks, setExistingLinks] = useState<Set<string>>(new Set());
+  
+  // POI data - unified across both maps
   const [pois, setPois] = useState<Poi[]>([]);
   const [poiTypes, setPoiTypes] = useState<PoiType[]>([]);
-  const [selectedPoiIds, setSelectedPoiIds] = useState<Set<string>>(new Set());
-  const [existingLinks, setExistingLinks] = useState<Set<string>>(new Set()); // POIs already linked
   
-  // Map data
+  // Map-specific data
   const [baseMap, setBaseMap] = useState<HaggaBasinBaseMap | null>(null);
   const [customIcons, setCustomIcons] = useState<CustomIcon[]>([]);
+  const [allGridSquares, setAllGridSquares] = useState<GridSquare[]>([]);
   
   // UI state
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
   const [relationshipType, setRelationshipType] = useState<'found_here' | 'material_source'>('found_here');
   const [submitting, setSubmitting] = useState(false);
+  
+  // Panel visibility state
+  const [showRightPanel, setShowRightPanel] = useState(true);
   
   const [filters, setFilters] = useState<PoiFilters>({
     searchTerm: '',
@@ -64,6 +96,47 @@ const PoiLinkingPage: React.FC = () => {
       return <img src={icon} alt="POI Icon" className={`${className} object-contain`} />;
     } else {
       return <span className="text-lg">{icon}</span>;
+    }
+  };
+
+  // Map mode selection handlers
+  const handleMapModeChange = (mode: 'hagga-basin' | 'deep-desert') => {
+    setMapMode(mode);
+    if (mode === 'deep-desert') {
+      // Start at A1 when switching to Deep Desert
+      setCurrentGridId('A1');
+    }
+  };
+
+  // Deep Desert grid navigation
+  const handleGridNavigate = (gridId: string) => {
+    if (GRID_COORDINATES.includes(gridId)) {
+      setCurrentGridId(gridId);
+    }
+  };
+
+  // Selection handlers (unified across both maps)
+  const handlePoiSelect = (poiId: string) => {
+    setSelectedPoiIds(prev => {
+      const newSet = new Set(prev);
+      newSet.add(poiId);
+      return newSet;
+    });
+  };
+
+  const handlePoiDeselect = (poiId: string) => {
+    setSelectedPoiIds(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(poiId);
+      return newSet;
+    });
+  };
+
+  const handlePoiToggle = (poiId: string) => {
+    if (selectedPoiIds.has(poiId)) {
+      handlePoiDeselect(poiId);
+    } else {
+      handlePoiSelect(poiId);
     }
   };
 
@@ -94,7 +167,7 @@ const PoiLinkingPage: React.FC = () => {
         if (entityError) throw entityError;
         setTargetEntity(entityData);
 
-        // Fetch POIs
+        // Fetch POIs from both maps
         const { data: poisData, error: poisError } = await supabase
           .from('pois')
           .select(`
@@ -163,10 +236,21 @@ const PoiLinkingPage: React.FC = () => {
           console.warn('Error fetching custom icons:', iconsError);
         }
 
+        // Fetch all grid squares for Deep Desert minimap
+        const { data: gridSquaresData, error: gridSquaresError } = await supabase
+          .from('grid_squares')
+          .select('*')
+          .order('grid_id');
+
+        if (gridSquaresError) {
+          console.warn('Error fetching grid squares:', gridSquaresError);
+        }
+
         setPois(poisWithTransformedScreenshots);
         setPoiTypes(typesData || []);
         setBaseMap(baseMapData || null);
         setCustomIcons(iconsData || []);
+        setAllGridSquares(gridSquaresData || []);
 
         // Fetch existing links for this entity
         const linkField = entityType === 'items' ? 'item_id' : 'schematic_id';
@@ -194,110 +278,110 @@ const PoiLinkingPage: React.FC = () => {
     fetchData();
   }, [entityId, entityType, navigate]);
 
-  // Filter POIs
+  // Filter POIs based on current map mode and filters
   const filteredPois = useMemo(() => {
     let filtered = pois;
 
-    if (filters.searchTerm.trim()) {
-      const searchLower = filters.searchTerm.toLowerCase();
-      filtered = filtered.filter(poi => 
-        poi.title.toLowerCase().includes(searchLower)
+    // Filter by map mode
+    if (mapMode === 'hagga-basin') {
+      filtered = filtered.filter(poi => poi.map_type === 'hagga_basin');
+    } else if (mapMode === 'deep-desert') {
+      // For Deep Desert mode, filter to current grid if we have grid data
+      filtered = filtered.filter(poi => poi.map_type === 'deep_desert');
+      // Additional grid filtering would be added here when GridPage integration is complete
+    }
+
+    // Apply search filter
+    if (filters.searchTerm) {
+      filtered = filtered.filter(poi =>
+        poi.title.toLowerCase().includes(filters.searchTerm.toLowerCase()) ||
+        poi.description?.toLowerCase().includes(filters.searchTerm.toLowerCase())
       );
     }
 
+    // Apply POI type filter
     if (filters.selectedPoiTypes.size > 0) {
-      filtered = filtered.filter(poi => 
-        filters.selectedPoiTypes.has(poi.poi_type_id)
-      );
-    }
-
-    if (filters.selectedRegions.size > 0 && filters.selectedRegions.size < 2) {
-      filtered = filtered.filter(poi => {
-        if (filters.selectedRegions.has('hagga_basin')) {
-          return poi.map_type === 'hagga_basin';
-        }
-        if (filters.selectedRegions.has('deep_desert')) {
-          return poi.map_type === 'deep_desert';
-        }
-        return true;
-      });
+      filtered = filtered.filter(poi => filters.selectedPoiTypes.has(poi.poi_type_id));
     }
 
     return filtered;
-  }, [pois, filters]);
+  }, [pois, mapMode, filters, currentGridId]);
 
-  // Handlers
-  const handlePoiToggle = (poiId: string) => {
-    const newSelection = new Set(selectedPoiIds);
-    if (newSelection.has(poiId)) {
-      newSelection.delete(poiId);
-    } else {
-      newSelection.add(poiId);
-    }
-    setSelectedPoiIds(newSelection);
-  };
-
+  // Filter handlers
   const handleFilterChange = (key: keyof PoiFilters, value: any) => {
     setFilters(prev => ({ ...prev, [key]: value }));
   };
 
   const togglePoiType = (typeId: string) => {
-    const newSelection = new Set(filters.selectedPoiTypes);
-    if (newSelection.has(typeId)) {
-      newSelection.delete(typeId);
-    } else {
-      newSelection.add(typeId);
-    }
-    handleFilterChange('selectedPoiTypes', newSelection);
+    setFilters(prev => {
+      const newTypes = new Set(prev.selectedPoiTypes);
+      if (newTypes.has(typeId)) {
+        newTypes.delete(typeId);
+      } else {
+        newTypes.add(typeId);
+      }
+      return { ...prev, selectedPoiTypes: newTypes };
+    });
   };
 
   const toggleRegion = (region: string) => {
-    const newSelection = new Set(filters.selectedRegions);
-    if (newSelection.has(region)) {
-      newSelection.delete(region);
-    } else {
-      newSelection.add(region);
-    }
-    handleFilterChange('selectedRegions', newSelection);
+    setFilters(prev => {
+      const newRegions = new Set(prev.selectedRegions);
+      if (newRegions.has(region)) {
+        newRegions.delete(region);
+      } else {
+        newRegions.add(region);
+      }
+      return { ...prev, selectedRegions: newRegions };
+    });
   };
 
+  // Create links handler
   const handleCreateLinks = async () => {
-    if (selectedPoiIds.size === 0 || !targetEntity) return;
+    if (!targetEntity || !user) return;
+
+    const newlySelectedPois = Array.from(selectedPoiIds).filter(poiId => !existingLinks.has(poiId));
+    
+    if (newlySelectedPois.length === 0) {
+      toast.error('No new POIs selected to link');
+      return;
+    }
 
     try {
       setSubmitting(true);
-
-      // Only create links for newly selected POIs (not already existing ones)
-      const newlySelectedPois = Array.from(selectedPoiIds).filter(poiId => !existingLinks.has(poiId));
       
-      if (newlySelectedPois.length === 0) {
-        toast.success('No new links to create');
-        navigate('/database');
-        return;
-      }
-
       const operations = newlySelectedPois.map(poiId => ({
         poi_id: poiId,
         [entityType === 'items' ? 'item_id' : 'schematic_id']: targetEntity.id,
         link_type: relationshipType,
-        created_by: user?.id
+        created_by: user.id
       }));
 
       await createBulkPoiItemLinks(operations);
-
-      toast.success(`Created ${newlySelectedPois.length} new POI link${newlySelectedPois.length !== 1 ? 's' : ''} successfully`);
+      
+      toast.success(`Successfully linked ${newlySelectedPois.length} POI${newlySelectedPois.length !== 1 ? 's' : ''}`);
       navigate('/database');
     } catch (error) {
       console.error('Error creating links:', error);
-      toast.error('Failed to create POI links');
+      toast.error('Failed to create links');
     } finally {
       setSubmitting(false);
     }
   };
 
-  // Handle map POI click
+  // Handle map POI clicks
   const handleMapPoiClick = (poi: Poi) => {
     handlePoiToggle(poi.id);
+  };
+
+  // Get selection counts by map type for summary
+  const getSelectionSummary = () => {
+    const selectedPois = Array.from(selectedPoiIds).map(id => pois.find(poi => poi.id === id)).filter(Boolean) as Poi[];
+    const haggaBasinCount = selectedPois.filter(poi => poi.map_type === 'hagga_basin').length;
+    const deepDesertCount = selectedPois.filter(poi => poi.map_type === 'deep_desert').length;
+    const newSelectionCount = Array.from(selectedPoiIds).filter(id => !existingLinks.has(id)).length;
+    
+    return { haggaBasinCount, deepDesertCount, newSelectionCount, total: selectedPoiIds.size };
   };
 
   if (loading || !targetEntity) {
@@ -314,13 +398,15 @@ const PoiLinkingPage: React.FC = () => {
     );
   }
 
+  const selectionSummary = getSelectionSummary();
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-      {/* Header */}
+      {/* Header with Map Mode Toggle */}
       <div className="sticky top-0 z-40 bg-slate-800/95 backdrop-blur border-b border-slate-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            {/* Back Button & Title */}
+            {/* Left: Back Button & Title */}
             <div className="flex items-center space-x-4">
               <button
                 onClick={() => navigate('/database')}
@@ -346,7 +432,35 @@ const PoiLinkingPage: React.FC = () => {
               </div>
             </div>
 
-            {/* View Mode Toggle */}
+            {/* Center: Map Mode Toggle */}
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => handleMapModeChange('hagga-basin')}
+                className={`px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors ${
+                  mapMode === 'hagga-basin' 
+                    ? 'bg-amber-600 text-slate-900 shadow-lg' 
+                    : 'bg-slate-700 text-amber-200 hover:bg-slate-600'
+                }`}
+                style={{ fontFamily: "'Trebuchet MS', sans-serif" }}
+              >
+                <Mountain className="w-4 h-4" />
+                <span className="font-medium">Hagga Basin</span>
+              </button>
+              <button
+                onClick={() => handleMapModeChange('deep-desert')}
+                className={`px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors ${
+                  mapMode === 'deep-desert' 
+                    ? 'bg-amber-600 text-slate-900 shadow-lg' 
+                    : 'bg-slate-700 text-amber-200 hover:bg-slate-600'
+                }`}
+                style={{ fontFamily: "'Trebuchet MS', sans-serif" }}
+              >
+                <Grid3X3 className="w-4 h-4" />
+                <span className="font-medium">Deep Desert</span>
+              </button>
+            </div>
+
+            {/* Right: View Mode Toggle */}
             <div className="flex items-center space-x-2">
               <button
                 onClick={() => setViewMode('list')}
@@ -373,14 +487,16 @@ const PoiLinkingPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Filters Sidebar */}
-          <div className="lg:col-span-1">
-            <div className="bg-slate-800 rounded-lg border border-slate-700 p-6 sticky top-24">
+      {/* Three-Panel Layout */}
+      <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="flex gap-6 h-[calc(100vh-8rem)]">
+          
+          {/* Left Panel: Controls */}
+          <div className="w-80 flex-shrink-0">
+            <div className="bg-slate-800 rounded-lg border border-slate-700 p-6 h-full overflow-y-auto">
               <h3 className="text-amber-200 font-semibold mb-6"
                   style={{ fontFamily: "'Trebuchet MS', sans-serif" }}>
-                Filters & Settings
+                Controls & Filters
               </h3>
 
               {/* Search */}
@@ -395,27 +511,6 @@ const PoiLinkingPage: React.FC = () => {
                     placeholder="Search by name..."
                     className="w-full pl-10 pr-4 py-2 bg-slate-700 border border-slate-600 rounded text-amber-200 placeholder-slate-400 focus:outline-none focus:border-amber-400"
                   />
-                </div>
-              </div>
-
-              {/* Regions */}
-              <div className="mb-6">
-                <label className="block text-amber-200/80 text-sm mb-2">Regions</label>
-                <div className="space-y-2">
-                  {[
-                    { id: 'hagga_basin', label: 'Hagga Basin' },
-                    { id: 'deep_desert', label: 'Deep Desert' }
-                  ].map(region => (
-                    <label key={region.id} className="flex items-center space-x-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={filters.selectedRegions.has(region.id)}
-                        onChange={() => toggleRegion(region.id)}
-                        className="rounded border-slate-600 bg-slate-700 text-amber-400 focus:ring-amber-400"
-                      />
-                      <span className="text-amber-200/90 text-sm">{region.label}</span>
-                    </label>
-                  ))}
                 </div>
               </div>
 
@@ -469,58 +564,107 @@ const PoiLinkingPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Selection Summary */}
+              {/* Current Map Info */}
               <div className="border-t border-slate-600 pt-4">
-                <div className="text-amber-200/80 text-sm mb-2">
-                  {selectedPoiIds.size} POI{selectedPoiIds.size !== 1 ? 's' : ''} selected
+                <div className="text-amber-200/80 text-sm mb-3">
+                  Current Map: <span className="font-medium text-amber-200">
+                    {mapMode === 'hagga-basin' ? 'Hagga Basin' : `Deep Desert (${currentGridId})`}
+                  </span>
                 </div>
-                {selectedPoiIds.size > 0 && (
-                  <div className="text-amber-200/60 text-xs space-y-1">
-                    {(() => {
-                      const newSelections = Array.from(selectedPoiIds).filter(id => !existingLinks.has(id)).length;
-                      const existingSelections = Array.from(selectedPoiIds).filter(id => existingLinks.has(id)).length;
-                      
-                      return (
-                        <>
-                          {existingSelections > 0 && (
-                            <div className="text-blue-300">
-                              {existingSelections} already linked
-                            </div>
-                          )}
-                          {newSelections > 0 && (
-                            <div>
-                              {newSelections} new as "{relationshipType === 'found_here' ? 'Found Here' : 'Material Source'}"
-                            </div>
-                          )}
-                        </>
+                
+                {/* Real-time stats */}
+                <div className="grid grid-cols-2 gap-2 mb-3">
+                  <div className="bg-slate-700/30 rounded p-2 text-center">
+                    <div className="text-amber-300 text-lg font-bold">
+                      {filteredPois.length}
+                    </div>
+                    <div className="text-amber-200/60 text-xs">Available</div>
+                  </div>
+                  <div className="bg-slate-700/30 rounded p-2 text-center">
+                    <div className="text-amber-300 text-lg font-bold">
+                      {(() => {
+                        const currentMapPois = filteredPois.filter(poi => 
+                          mapMode === 'hagga-basin' 
+                            ? poi.map_type === 'hagga_basin'
+                            : poi.map_type === 'deep_desert'
+                        );
+                        return Array.from(selectedPoiIds).filter(id => 
+                          currentMapPois.some(poi => poi.id === id)
+                        ).length;
+                      })()}
+                    </div>
+                    <div className="text-amber-200/60 text-xs">Selected</div>
+                  </div>
+                </div>
+                
+                {/* Quick selection actions */}
+                <div className="space-y-2">
+                  <button
+                    onClick={() => {
+                      const currentMapPois = filteredPois.filter(poi => 
+                        mapMode === 'hagga-basin' 
+                          ? poi.map_type === 'hagga_basin'
+                          : poi.map_type === 'deep_desert'
+                      );
+                      const newSelection = new Set(selectedPoiIds);
+                      currentMapPois.forEach(poi => newSelection.add(poi.id));
+                      setSelectedPoiIds(newSelection);
+                    }}
+                    disabled={filteredPois.length === 0}
+                    className="w-full px-2 py-1 text-xs text-amber-200 border border-slate-600 rounded hover:bg-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Select All on Current Map
+                  </button>
+                  <button
+                    onClick={() => {
+                      const currentMapPois = filteredPois.filter(poi => 
+                        mapMode === 'hagga-basin' 
+                          ? poi.map_type === 'hagga_basin'
+                          : poi.map_type === 'deep_desert'
+                      );
+                      const newSelection = new Set(selectedPoiIds);
+                      currentMapPois.forEach(poi => newSelection.delete(poi.id));
+                      setSelectedPoiIds(newSelection);
+                    }}
+                    disabled={(() => {
+                      const currentMapPois = filteredPois.filter(poi => 
+                        mapMode === 'hagga-basin' 
+                          ? poi.map_type === 'hagga_basin'
+                          : poi.map_type === 'deep_desert'
+                      );
+                      return !Array.from(selectedPoiIds).some(id => 
+                        currentMapPois.some(poi => poi.id === id)
                       );
                     })()}
-                  </div>
-                )}
+                    className="w-full px-2 py-1 text-xs text-amber-200 border border-slate-600 rounded hover:bg-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Clear Current Map
+                  </button>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Main Content */}
-          <div className="lg:col-span-3">
-            <div className="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden">
-              {/* Content Header */}
-              <div className="p-4 border-b border-slate-700 bg-slate-750">
-                <div className="flex items-center justify-between">
-                  <span className="text-amber-200/80 text-sm">
-                    {filteredPois.length} POI{filteredPois.length !== 1 ? 's' : ''} available
-                  </span>
-                  <div className="flex items-center space-x-4">
-                    <span className="text-amber-200 text-sm">
-                      {selectedPoiIds.size} selected
-                    </span>
-                  </div>
-                </div>
+          {/* Center Panel: Map/Grid Content */}
+          <div className="flex-1 bg-slate-800 rounded-lg border border-slate-700 overflow-hidden">
+            {/* Content Header */}
+            <div className="p-4 border-b border-slate-700 bg-slate-750">
+              <div className="flex items-center justify-between">
+                <span className="text-amber-200/80 text-sm">
+                  {mapMode === 'hagga-basin' ? 'Hagga Basin' : `Deep Desert - Grid ${currentGridId}`} • 
+                  {filteredPois.length} POI{filteredPois.length !== 1 ? 's' : ''}
+                </span>
+                <span className="text-amber-200 text-sm">
+                  {selectionSummary.total} selected
+                </span>
               </div>
+            </div>
 
-              {/* Content Area */}
-              <div className="h-[600px]">
-                {viewMode === 'list' ? (
+            {/* Content Area */}
+            <div className="h-[calc(100%-4rem)]">
+              {mapMode === 'hagga-basin' ? (
+                /* Hagga Basin Mode */
+                viewMode === 'list' ? (
                   /* List View */
                   <div className="h-full overflow-y-auto p-4">
                     {filteredPois.length === 0 ? (
@@ -536,7 +680,6 @@ const PoiLinkingPage: React.FC = () => {
                         {filteredPois.map(poi => {
                           const isSelected = selectedPoiIds.has(poi.id);
                           const isExistingLink = existingLinks.has(poi.id);
-                          const isNewlySelected = isSelected && !isExistingLink;
                           
                           return (
                             <div
@@ -575,26 +718,26 @@ const PoiLinkingPage: React.FC = () => {
                                   )}
                                 </div>
 
-                              {/* POI Icon */}
-                              <div className="w-8 h-8 flex items-center justify-center flex-shrink-0">
-                                {renderPoiIcon(poi.poi_types?.icon, '📍', 'w-6 h-6')}
-                              </div>
+                                {/* POI Icon */}
+                                <div className="w-8 h-8 flex items-center justify-center flex-shrink-0">
+                                  {renderPoiIcon(poi.poi_types?.icon, '📍', 'w-6 h-6')}
+                                </div>
 
-                              {/* POI Info */}
-                              <div className="flex-1 min-w-0">
-                                <div className="font-medium text-amber-200 truncate"
-                                     style={{ fontFamily: "'Trebuchet MS', sans-serif" }}>
-                                  {poi.title}
+                                {/* POI Info */}
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-medium text-amber-200 truncate"
+                                       style={{ fontFamily: "'Trebuchet MS', sans-serif" }}>
+                                    {poi.title}
+                                  </div>
+                                  <div className="text-sm text-amber-200/60 truncate">
+                                    {poi.poi_types?.name} • {poi.map_type === 'hagga_basin' ? 'Hagga Basin' : 'Deep Desert'}
+                                  </div>
                                 </div>
-                                <div className="text-sm text-amber-200/60 truncate">
-                                  {poi.poi_types?.name} • {poi.map_type === 'hagga_basin' ? 'Hagga Basin' : 'Deep Desert'}
-                                </div>
-                              </div>
                               </div>
                             </div>
                           );
                         })}
-                        </div>
+                      </div>
                     )}
                   </div>
                 ) : (
@@ -631,61 +774,231 @@ const PoiLinkingPage: React.FC = () => {
                           <MapPin className="w-5 h-5 mx-auto mb-1" />
                           <div className="text-sm font-medium">Selection Mode</div>
                           <div className="text-xs opacity-90">Click POIs to select/deselect</div>
-                          <div className="text-xs font-medium mt-1">{selectedPoiIds.size} POI{selectedPoiIds.size !== 1 ? 's' : ''} selected</div>
+                          <div className="text-xs font-medium mt-1">{selectionSummary.total} POI{selectionSummary.total !== 1 ? 's' : ''} selected</div>
                         </div>
                       </div>
                     </div>
                   </div>
-                )}
-              </div>
-            </div>
-
-            {/* Action Bar */}
-            <div className="mt-6 bg-slate-800 rounded-lg border border-slate-700 p-4">
-              <div className="flex items-center justify-between">
-                <div className="text-amber-200/80 text-sm">
-                  {selectedPoiIds.size > 0 ? (
-                    (() => {
-                      const newSelections = Array.from(selectedPoiIds).filter(id => !existingLinks.has(id)).length;
-                      const existingSelections = Array.from(selectedPoiIds).filter(id => existingLinks.has(id)).length;
-                      
-                      if (newSelections === 0 && existingSelections > 0) {
-                        return `${existingSelections} POI${existingSelections !== 1 ? 's' : ''} already linked`;
-                      } else if (newSelections > 0 && existingSelections === 0) {
-                        return `Ready to create ${newSelections} new link${newSelections !== 1 ? 's' : ''} as "${relationshipType === 'found_here' ? 'Found Here' : 'Material Source'}"`;
-                      } else if (newSelections > 0 && existingSelections > 0) {
-                        return `${existingSelections} existing + ${newSelections} new link${newSelections !== 1 ? 's' : ''} to create`;
-                      }
-                      return 'Select POIs to create relationships';
-                    })()
-                  ) : (
-                    'Select POIs to create relationships'
-                  )}
-                </div>
-                <div className="flex space-x-3">
-                  <button
-                    onClick={() => navigate('/database')}
-                    disabled={submitting}
-                    className="px-4 py-2 text-amber-200 border border-slate-600 rounded hover:bg-slate-700 transition-colors disabled:opacity-50"
-                    style={{ fontFamily: "'Trebuchet MS', sans-serif" }}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleCreateLinks}
-                    disabled={selectedPoiIds.size === 0 || submitting}
-                    className="px-6 py-2 bg-amber-600 text-slate-900 rounded hover:bg-amber-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-                    style={{ fontFamily: "'Trebuchet MS', sans-serif" }}
-                  >
-                    {submitting ? 'Creating Links...' : (() => {
-                      const newSelections = Array.from(selectedPoiIds).filter(id => !existingLinks.has(id)).length;
-                      return `Create ${newSelections} Link${newSelections !== 1 ? 's' : ''}`;
-                    })()}
-                  </button>
-                </div>
-              </div>
+                )
+              ) : (
+                /* Deep Desert Mode */
+                <DeepDesertSelectionMode
+                  currentGridId={currentGridId}
+                  allGridSquares={allGridSquares}
+                  pois={pois}
+                  poiTypes={poiTypes}
+                  customIcons={customIcons}
+                  selectedPoiIds={selectedPoiIds}
+                  onPoiSelect={handlePoiSelect}
+                  onPoiDeselect={handlePoiDeselect}
+                  onGridNavigate={handleGridNavigate}
+                  filteredPois={filteredPois}
+                />
+              )}
             </div>
           </div>
+
+          {/* Right Panel: Selection Summary */}
+          {showRightPanel && (
+            <div className="w-80 flex-shrink-0">
+              <div className="bg-slate-800 rounded-lg border border-slate-700 p-6 h-full overflow-y-auto">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-amber-200 font-semibold"
+                      style={{ fontFamily: "'Trebuchet MS', sans-serif" }}>
+                    Selected POIs
+                  </h3>
+                  <button
+                    onClick={() => setShowRightPanel(false)}
+                    className="p-1 text-slate-400 hover:text-amber-200 hover:bg-slate-700 rounded transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Selection Summary */}
+                <div className="mb-6">
+                  <div className="text-amber-200 text-lg font-medium mb-4">
+                    {selectionSummary.total} POI{selectionSummary.total !== 1 ? 's' : ''} selected
+                  </div>
+                  
+                  {selectionSummary.total > 0 ? (
+                    <div className="space-y-3">
+                      {/* Map type breakdown */}
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="bg-slate-700/50 rounded-lg p-3 text-center">
+                          <div className="flex items-center justify-center mb-1">
+                            <Mountain className="w-4 h-4 text-amber-300 mr-1" />
+                            <span className="text-xs text-amber-200/80 font-medium">Hagga Basin</span>
+                          </div>
+                          <div className="text-lg font-bold text-amber-200">
+                            {selectionSummary.haggaBasinCount}
+                          </div>
+                        </div>
+                        <div className="bg-slate-700/50 rounded-lg p-3 text-center">
+                          <div className="flex items-center justify-center mb-1">
+                            <Grid3X3 className="w-4 h-4 text-amber-300 mr-1" />
+                            <span className="text-xs text-amber-200/80 font-medium">Deep Desert</span>
+                          </div>
+                          <div className="text-lg font-bold text-amber-200">
+                            {selectionSummary.deepDesertCount}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Link status breakdown */}
+                      <div className="border-t border-slate-600 pt-3">
+                        {(() => {
+                          const existingCount = Array.from(selectedPoiIds).filter(id => existingLinks.has(id)).length;
+                          return (
+                            <div className="space-y-2">
+                              {existingCount > 0 && (
+                                <div className="flex items-center justify-between p-2 bg-blue-500/10 border border-blue-500/20 rounded">
+                                  <span className="text-blue-300 text-sm">Already linked</span>
+                                  <span className="text-blue-200 font-medium">{existingCount}</span>
+                                </div>
+                              )}
+                              {selectionSummary.newSelectionCount > 0 && (
+                                <div className="flex items-center justify-between p-2 bg-amber-500/10 border border-amber-500/20 rounded">
+                                  <span className="text-amber-300 text-sm">
+                                    New ({relationshipType === 'found_here' ? 'Found Here' : 'Material Source'})
+                                  </span>
+                                  <span className="text-amber-200 font-medium">{selectionSummary.newSelectionCount}</span>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-amber-200/40">
+                      <MapPin className="w-8 h-8 mx-auto mb-2" />
+                      <p className="text-sm">No POIs selected</p>
+                      <p className="text-xs mt-1">Select POIs from either map to create links</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Selected POI List */}
+                {selectionSummary.total > 0 && (
+                  <div className="mb-6">
+                    <h4 className="text-amber-200/80 text-sm font-medium mb-3">Selected POIs</h4>
+                    <div className="space-y-2 max-h-64 overflow-y-auto">
+                      {Array.from(selectedPoiIds).map(poiId => {
+                        const poi = pois.find(p => p.id === poiId);
+                        if (!poi) return null;
+                        
+                        const poiType = poiTypes.find(type => type.id === poi.poi_type_id);
+                        const isExistingLink = existingLinks.has(poiId);
+                        
+                        return (
+                          <div
+                            key={poiId}
+                            className={`
+                              flex items-center space-x-3 p-2 rounded-lg border transition-all
+                              ${isExistingLink 
+                                ? 'bg-blue-500/10 border-blue-500/20' 
+                                : 'bg-amber-500/10 border-amber-500/20'
+                              }
+                            `}
+                          >
+                            {/* POI Icon */}
+                            <div className="w-6 h-6 flex items-center justify-center flex-shrink-0">
+                              {renderPoiIcon(poiType?.icon, '📍', 'w-4 h-4')}
+                            </div>
+                            
+                            {/* POI Info */}
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-amber-200 text-sm truncate">
+                                {poi.title}
+                              </div>
+                              <div className="text-xs text-amber-200/60 truncate">
+                                {poiType?.name} • {poi.map_type === 'hagga_basin' ? 'Hagga Basin' : 'Deep Desert'}
+                              </div>
+                            </div>
+                            
+                            {/* Status indicator */}
+                            <div className="flex-shrink-0">
+                              {isExistingLink ? (
+                                <div className="w-2 h-2 bg-blue-400 rounded-full" title="Already linked" />
+                              ) : (
+                                <div className="w-2 h-2 bg-amber-400 rounded-full" title="New link" />
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                <div className="space-y-3 pt-4 border-t border-slate-600">
+                  {selectionSummary.total > 0 && (
+                    <button
+                      onClick={() => setSelectedPoiIds(new Set())}
+                      className="w-full px-4 py-2 text-amber-200 border border-slate-600 rounded hover:bg-slate-700 transition-colors flex items-center justify-center space-x-2"
+                      style={{ fontFamily: "'Trebuchet MS', sans-serif" }}
+                    >
+                      <X className="w-4 h-4" />
+                      <span>Clear All ({selectionSummary.total})</span>
+                    </button>
+                  )}
+                  
+                  <button
+                    onClick={handleCreateLinks}
+                    disabled={selectionSummary.newSelectionCount === 0 || submitting}
+                    className={`
+                      w-full px-4 py-3 rounded font-medium transition-all flex items-center justify-center space-x-2
+                      ${selectionSummary.newSelectionCount > 0 && !submitting
+                        ? 'bg-amber-600 text-slate-900 hover:bg-amber-500 shadow-lg'
+                        : 'bg-slate-700 text-slate-400 cursor-not-allowed'
+                      }
+                    `}
+                    style={{ fontFamily: "'Trebuchet MS', sans-serif" }}
+                  >
+                    {submitting ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-slate-700 border-t-slate-900 rounded-full animate-spin" />
+                        <span>Creating Links...</span>
+                      </>
+                    ) : selectionSummary.newSelectionCount > 0 ? (
+                      <>
+                        <Check className="w-4 h-4" />
+                        <span>Create {selectionSummary.newSelectionCount} New Link{selectionSummary.newSelectionCount !== 1 ? 's' : ''}</span>
+                      </>
+                    ) : (
+                      <>
+                        <MapPin className="w-4 h-4" />
+                        <span>Select POIs to Create Links</span>
+                      </>
+                    )}
+                  </button>
+                  
+                  {/* Quick tips */}
+                  <div className="text-xs text-amber-200/40 text-center space-y-1">
+                    <div>💡 Tip: Switch between maps to select POIs from both areas</div>
+                    {mapMode === 'deep-desert' && (
+                      <div>🗺️ Use the minimap to navigate between grid squares</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Right Panel Toggle (when collapsed) */}
+          {!showRightPanel && (
+            <div className="w-6 flex-shrink-0 flex items-start pt-6">
+              <button
+                onClick={() => setShowRightPanel(true)}
+                className="p-2 text-slate-400 hover:text-amber-200 hover:bg-slate-700 rounded transition-colors bg-slate-800 border border-slate-700"
+                title="Show selection panel"
+              >
+                <ArrowLeft className="w-4 h-4 rotate-180" />
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>
