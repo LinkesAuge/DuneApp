@@ -34,74 +34,111 @@ const CategoryHierarchyNav: React.FC<CategoryHierarchyNavProps> = ({
   searchTerm = '',
   onSearchChange
 }) => {
-  const { categories, types, tiers, loading } = useItemsSchematics();
+  const { categories, types, tiers, loading, refetchAllTypes } = useItemsSchematics();
   
-  // View state - 'all' shows both items and schematics
+  // Local state
   const [localActiveView, setLocalActiveView] = useState<ActiveView>(activeView);
-  
-  // Search state
   const [localSearchTerm, setLocalSearchTerm] = useState(searchTerm);
   const [showAdvancedSearch, setShowAdvancedSearch] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+  
+  // Simple filter state - just track what's selected
+  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
+  const [selectedTypes, setSelectedTypes] = useState<Set<string>>(new Set());
+  const [selectedTiers, setSelectedTiers] = useState<Set<string>>(new Set());
+  const [filtersInitialized, setFiltersInitialized] = useState(false);
+
+  // Advanced search state
   const [advancedFilters, setAdvancedFilters] = useState({
     createdBy: '',
     dateFrom: '',
     dateTo: '',
     hasDescription: false
   });
-  
-  // Filter state - hierarchical selection (initialize as empty, will be populated on data load)
-  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
-  const [selectedTypes, setSelectedTypes] = useState<Set<string>>(new Set());
-  const [selectedTiers, setSelectedTiers] = useState<Set<string>>(new Set());
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
-  const [initialized, setInitialized] = useState(false);
-  
-  // Modal state
-  const [showCreateModal, setShowCreateModal] = useState(false);
 
-  // Initialize filters with all items selected when data is available
+  // Sync local view with prop
   useEffect(() => {
-    if (!initialized && categories.length > 0 && tiers.length > 0) {
-      const allCategoryIds = categories.map(cat => cat.id);
-      const allTypeIds = types.map(type => type.id);
-      const allTierIds = tiers.map(tier => tier.id);
+    setLocalActiveView(activeView);
+  }, [activeView]);
+
+  // Initialize filters when data loads
+  useEffect(() => {
+    if (!filtersInitialized && categories.length > 0 && tiers.length > 0) {
+      console.log('Initializing filters...');
+      console.log('Categories:', categories);
+      console.log('Types:', types); 
+      console.log('Tiers:', tiers);
       
-      setSelectedCategories(new Set(allCategoryIds));
-      setSelectedTypes(new Set(allTypeIds));
-      setSelectedTiers(new Set(allTierIds));
-      setInitialized(true);
+      // Get categories that apply to current view
+      const applicableCategories = getApplicableCategoriesForView(localActiveView);
+      console.log('Applicable categories for view', localActiveView, ':', applicableCategories);
       
-      // Update filters to show everything by default
-      const initialFilters = {
-        categories: allCategoryIds,
-        types: allTypeIds,
-        tiers: allTierIds,
-        searchTerm: '',
-        dateRange: undefined,
-        creators: undefined,
-        dynamicFields: undefined
-      };
+      // Select all applicable categories
+      const categoryIds = applicableCategories.map(cat => cat.id);
+      setSelectedCategories(new Set(categoryIds));
       
-      onFiltersChange(initialFilters);
+      // Select all types (we'll filter them by applicable categories later)
+      const typeIds = types.map(type => type.id);
+      setSelectedTypes(new Set(typeIds));
+      
+      // Select all tiers independently
+      const tierIds = tiers.map(tier => tier.id);
+      setSelectedTiers(new Set(tierIds));
+      
+      setFiltersInitialized(true);
+      
+      // Update parent with initial filters
+      updateParentFilters(localActiveView, new Set(categoryIds), new Set(typeIds), new Set(tierIds));
     }
-  }, [categories, types, tiers, initialized, onFiltersChange]);
+  }, [categories, types, tiers, localActiveView, filtersInitialized]);
+
+  // Get categories that apply to a specific view
+  const getApplicableCategoriesForView = (view: ActiveView) => {
+    if (view === 'all') {
+      return categories; // All categories are applicable for 'all' view
+    }
+    
+    return categories.filter(category => {
+      if (Array.isArray(category.applies_to)) {
+        return category.applies_to.includes(view) || category.applies_to.includes('both');
+      }
+      return category.applies_to === 'both' || category.applies_to === view;
+    });
+  };
+
+  // Update parent component with current filter state
+  const updateParentFilters = (view: ActiveView, categories: Set<string>, types: Set<string>, tiers: Set<string>) => {
+    const filters = {
+      view: view,
+      categories: Array.from(categories),
+      types: Array.from(types),
+      tiers: Array.from(tiers),
+      searchTerm: localSearchTerm,
+      ...advancedFilters
+    };
+    
+    console.log('Updating parent filters:', filters);
+    onFiltersChange(filters);
+  };
 
   // Handle view change
   const handleViewChange = (view: ActiveView) => {
+    console.log('View changed to:', view);
     setLocalActiveView(view);
-    if (view === 'all') {
-      // For "all" view, we need to tell the parent to show both items and schematics
-      // This will be handled in the parent component's filtering logic
-      onViewChange?.(view as any);
-    } else {
-      onViewChange?.(view);
-    }
+    
+    // Reset filters when view changes to ensure we show applicable categories
+    setFiltersInitialized(false);
+    
+    // Notify parent
+    onViewChange?.(view);
   };
 
   // Handle search
   const handleSearchChange = (value: string) => {
     setLocalSearchTerm(value);
     onSearchChange?.(value);
+    updateParentFilters(localActiveView, selectedCategories, selectedTypes, selectedTiers);
   };
 
   // Toggle category expansion
@@ -117,115 +154,95 @@ const CategoryHierarchyNav: React.FC<CategoryHierarchyNavProps> = ({
     });
   };
 
-  // Handle category filtering (like Hagga Basin)
+  // Handle category toggle
   const handleCategoryToggle = (categoryId: string) => {
-    const isSelected = selectedCategories.has(categoryId);
-    const categoryTypeIds = types
-      .filter(type => type.category_id === categoryId)
-      .map(type => type.id);
-
-    if (isSelected) {
-      // Deselect category and all its types
-      setSelectedCategories(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(categoryId);
-        return newSet;
-      });
-      setSelectedTypes(prev => {
-        const newSet = new Set(prev);
-        categoryTypeIds.forEach(typeId => newSet.delete(typeId));
-        return newSet;
-      });
+    const newSelectedCategories = new Set(selectedCategories);
+    const newSelectedTypes = new Set(selectedTypes);
+    
+    if (selectedCategories.has(categoryId)) {
+      // Deselect category and its types
+      newSelectedCategories.delete(categoryId);
+      // Remove all types that belong to this category
+      const categoryTypes = types.filter(type => type.category_id === categoryId);
+      categoryTypes.forEach(type => newSelectedTypes.delete(type.id));
     } else {
-      // Select category and all its types
-      setSelectedCategories(prev => new Set([...prev, categoryId]));
-      setSelectedTypes(prev => new Set([...prev, ...categoryTypeIds]));
+      // Select category and its types
+      newSelectedCategories.add(categoryId);
+      // Add all types that belong to this category
+      const categoryTypes = types.filter(type => type.category_id === categoryId);
+      categoryTypes.forEach(type => newSelectedTypes.add(type.id));
     }
     
-    // Update filters
-    updateFilters();
+    setSelectedCategories(newSelectedCategories);
+    setSelectedTypes(newSelectedTypes);
+    updateParentFilters(localActiveView, newSelectedCategories, newSelectedTypes, selectedTiers);
   };
 
-  // Handle type filtering
+  // Handle type toggle
   const handleTypeToggle = (typeId: string) => {
-    const isSelected = selectedTypes.has(typeId);
+    const newSelectedTypes = new Set(selectedTypes);
     
-    if (isSelected) {
-      setSelectedTypes(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(typeId);
-        return newSet;
-      });
+    if (selectedTypes.has(typeId)) {
+      newSelectedTypes.delete(typeId);
     } else {
-      setSelectedTypes(prev => new Set([...prev, typeId]));
+      newSelectedTypes.add(typeId);
     }
     
-    updateFilters();
+    setSelectedTypes(newSelectedTypes);
+    updateParentFilters(localActiveView, selectedCategories, newSelectedTypes, selectedTiers);
   };
 
-  // Handle tier filtering
+  // Handle tier toggle
   const handleTierToggle = (tierId: string) => {
-    const isSelected = selectedTiers.has(tierId);
+    const newSelectedTiers = new Set(selectedTiers);
     
-    if (isSelected) {
-      setSelectedTiers(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(tierId);
-        return newSet;
-      });
+    if (selectedTiers.has(tierId)) {
+      newSelectedTiers.delete(tierId);
     } else {
-      setSelectedTiers(prev => new Set([...prev, tierId]));
+      newSelectedTiers.add(tierId);
     }
     
-    updateFilters();
+    setSelectedTiers(newSelectedTiers);
+    updateParentFilters(localActiveView, selectedCategories, selectedTypes, newSelectedTiers);
   };
 
-  // Handle "All" toggle - show/hide everything
+  // Handle "Show All" / "Hide All" toggle for categories and types only
   const handleToggleAll = () => {
-    const allCategoryIds = categories.map(cat => cat.id);
-    const allTypeIds = types.map(type => type.id);
-    const allTierIds = tiers.map(tier => tier.id);
-    
+    const applicableCategories = getApplicableCategoriesForView(localActiveView);
+    const allCategoryIds = applicableCategories.map(cat => cat.id);
     const allSelected = allCategoryIds.every(id => selectedCategories.has(id));
     
     if (allSelected) {
-      // Hide all
+      // Hide all categories and types
       setSelectedCategories(new Set());
       setSelectedTypes(new Set());
-      setSelectedTiers(new Set());
+      updateParentFilters(localActiveView, new Set(), new Set(), selectedTiers);
     } else {
-      // Show all
-      setSelectedCategories(new Set(allCategoryIds));
-      setSelectedTypes(new Set(allTypeIds));
-      setSelectedTiers(new Set(allTierIds));
+      // Show all categories and types
+      const categoryIds = new Set(allCategoryIds);
+      const typeIds = new Set(types.map(type => type.id));
+      
+      setSelectedCategories(categoryIds);
+      setSelectedTypes(typeIds);
+      updateParentFilters(localActiveView, categoryIds, typeIds, selectedTiers);
     }
+  };
+
+  // Handle "Show All" / "Hide All" toggle for tiers only
+  const handleToggleAllTiers = () => {
+    const allTierIds = tiers.map(tier => tier.id);
+    const allSelected = allTierIds.every(id => selectedTiers.has(id));
     
-    updateFilters();
-  };
-
-  // Update filters callback
-  const updateFilters = () => {
-    const newFilters = {
-      categories: Array.from(selectedCategories),
-      types: Array.from(selectedTypes),
-      tiers: Array.from(selectedTiers),
-      searchTerm: localSearchTerm,
-      ...advancedFilters
-    };
-    onFiltersChange(newFilters);
-  };
-
-  // Get filtered categories based on current view
-  const getFilteredCategories = () => {
-    if (localActiveView === 'all') {
-      return categories;
+    if (allSelected) {
+      // Hide all tiers
+      setSelectedTiers(new Set());
+      updateParentFilters(localActiveView, selectedCategories, selectedTypes, new Set());
+    } else {
+      // Show all tiers
+      const tierIds = new Set(allTierIds);
+      setSelectedTiers(tierIds);
+      updateParentFilters(localActiveView, selectedCategories, selectedTypes, tierIds);
     }
-    return categories.filter(category => {
-      if (Array.isArray(category.applies_to)) {
-        return category.applies_to.includes(localActiveView) || category.applies_to.includes('both');
-      }
-      return category.applies_to === 'both' || category.applies_to === localActiveView;
-    });
   };
 
   // Get types for a specific category
@@ -234,12 +251,7 @@ const CategoryHierarchyNav: React.FC<CategoryHierarchyNavProps> = ({
   };
 
   const handleCreateNew = () => {
-    if (localActiveView === 'all') {
-      // Default to items when creating from 'all' view
-      setShowCreateModal(true);
-    } else {
-      setShowCreateModal(true);
-    }
+    setShowCreateModal(true);
   };
 
   const handleEntityCreated = (entity: any) => {
@@ -249,7 +261,8 @@ const CategoryHierarchyNav: React.FC<CategoryHierarchyNavProps> = ({
     }
   };
 
-  const filteredCategories = getFilteredCategories();
+  // Get categories to display based on current view
+  const applicableCategories = getApplicableCategoriesForView(localActiveView);
 
   return (
     <>
@@ -370,6 +383,21 @@ const CategoryHierarchyNav: React.FC<CategoryHierarchyNavProps> = ({
           </div>
         </div>
 
+        {/* Create New Button */}
+        <div className="p-4 border-b border-amber-400/20">
+          <button
+            onClick={handleCreateNew}
+            className="w-full flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-amber-500/20 to-amber-600/20 
+                     hover:from-amber-500/30 hover:to-amber-600/30 border border-amber-400/30 rounded-lg 
+                     text-amber-200 font-light tracking-wide transition-all duration-200"
+            style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
+          >
+            <Plus className="w-4 h-4" />
+            <Package className="w-4 h-4" />
+            Add Item / Schematic
+          </button>
+        </div>
+
         {/* Search Section */}
         <div className="p-4 border-b border-amber-400/20">
           <div className="space-y-3">
@@ -470,44 +498,23 @@ const CategoryHierarchyNav: React.FC<CategoryHierarchyNavProps> = ({
           </div>
         </div>
 
-        {/* Create New Button */}
-        <div className="p-4 border-b border-amber-400/20">
-          <button
-            onClick={handleCreateNew}
-            className="w-full flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-amber-500/20 to-amber-600/20 
-                     hover:from-amber-500/30 hover:to-amber-600/30 border border-amber-400/30 rounded-lg 
-                     text-amber-200 font-light tracking-wide transition-all duration-200"
-            style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
-          >
-            <Plus className="w-4 h-4" />
-            <Package className="w-4 h-4" />
-            Add Item / Schematic
-          </button>
-        </div>
-
         {/* Filters Section */}
         <div className="flex-1 overflow-y-auto p-4">
           <div className="space-y-4">
-            {/* Filter Header with All toggle */}
+            {/* Category / Type Filter Header with All toggle */}
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-light text-amber-200/80 tracking-wide"
                   style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-                Filters
+                Category / Type Filter
               </h3>
               <button
                 onClick={handleToggleAll}
                 className="text-xs text-amber-300/70 hover:text-amber-300 transition-colors font-light"
                 style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
               >
-                {filteredCategories.every(cat => selectedCategories.has(cat.id)) ? 'Hide All' : 'Show All'}
+                {applicableCategories.every(cat => selectedCategories.has(cat.id)) ? 'Hide All' : 'Show All'}
               </button>
             </div>
-
-            {filteredCount > 0 && (
-              <div className="text-xs bg-amber-500/20 text-amber-300 px-2 py-1 rounded-full font-light text-center">
-                {filteredCount} {localActiveView === 'all' ? 'items' : localActiveView} found
-              </div>
-            )}
 
             {loading.categories ? (
               <div className="flex items-center justify-center py-8">
@@ -517,7 +524,7 @@ const CategoryHierarchyNav: React.FC<CategoryHierarchyNavProps> = ({
             ) : (
               <div className="space-y-3">
                 {/* Categories */}
-                {filteredCategories.map((category) => {
+                {applicableCategories.map((category) => {
                   const categoryTypes = getTypesForCategory(category.id);
                   const isExpanded = expandedCategories.has(category.id);
                   const isSelected = selectedCategories.has(category.id);
@@ -592,10 +599,19 @@ const CategoryHierarchyNav: React.FC<CategoryHierarchyNavProps> = ({
                 {/* Tiers Section */}
                 {tiers && tiers.length > 0 && (
                   <div className="pt-4 border-t border-amber-400/20">
-                    <h4 className="text-sm font-light text-amber-200/80 tracking-wide mb-3"
-                        style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-                      Tiers
-                    </h4>
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="text-sm font-light text-amber-200/80 tracking-wide"
+                          style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                        Tiers
+                      </h4>
+                      <button
+                        onClick={handleToggleAllTiers}
+                        className="text-xs text-amber-300/70 hover:text-amber-300 transition-colors font-light"
+                        style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
+                      >
+                        {tiers.every(tier => selectedTiers.has(tier.id)) ? 'Hide All' : 'Show All'}
+                      </button>
+                    </div>
                     <div className="space-y-1">
                       {tiers.map((tier) => {
                         const isSelected = selectedTiers.has(tier.id);

@@ -556,10 +556,13 @@ const CreateEditItemSchematicModal: React.FC<CreateEditItemSchematicModalProps> 
 
       setFieldsLoading(true);
       try {
+        console.log('🔍 Resolving fields for category:', formData.category_id, 'type:', formData.type_id);
         const fields = await resolveFields({
           category_id: formData.category_id,
           type_id: formData.type_id || undefined
         });
+        console.log('🔍 Resolved fields:', fields);
+        console.log('🔍 Current form field_values:', formData.field_values);
         setResolvedFields(fields);
       } catch (error) {
         console.error('Error resolving fields:', error);
@@ -575,6 +578,8 @@ const CreateEditItemSchematicModal: React.FC<CreateEditItemSchematicModalProps> 
   // Initialize form data when entity changes (for edit mode)
   useEffect(() => {
     if (mode === 'edit' && entity) {
+      console.log('🔄 Initializing edit form with entity:', entity);
+      console.log('🔄 Entity field_values:', entity.field_values);
       setFormData({
         name: entity.name || '',
         description: entity.description || '',
@@ -636,12 +641,12 @@ const CreateEditItemSchematicModal: React.FC<CreateEditItemSchematicModalProps> 
     console.log('Checking dynamic fields...');
     resolvedFields.forEach(field => {
       if (field.is_required) {
-        const value = formData.field_values[field.field_name];
+        const value = formData.field_values[field.name];
         if (value === null || value === undefined || value === '') {
-          errors[`field_${field.field_name}`] = `${field.display_name} is required`;
-          console.log(`❌ Required field '${field.field_name}' validation failed:`, value);
+          errors[`field_${field.name}`] = `${field.display_name} is required`;
+          console.log(`❌ Required field '${field.name}' validation failed:`, value);
         } else {
-          console.log(`✅ Required field '${field.field_name}' validation passed:`, value);
+          console.log(`✅ Required field '${field.name}' validation passed:`, value);
         }
       }
     });

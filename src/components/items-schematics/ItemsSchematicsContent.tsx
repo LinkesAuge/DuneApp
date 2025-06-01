@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Package, FileText, Eye, Edit, Trash, PanelLeftOpen, PanelLeftClose, PanelRightOpen, PanelRightClose, CheckSquare, Square, Edit2, Link2, Cube, DocumentText, Search, Grid3X3, List, TreePine, SortAsc, SortDesc, Filter } from 'lucide-react';
+import { Package, FileText, Eye, Edit, Trash, PanelLeftOpen, PanelLeftClose, PanelRightOpen, PanelRightClose, CheckSquare, Square, Edit2, Link2, Cube, DocumentText, Search, Grid3X3, List, TreePine, SortAsc, SortDesc, Filter, ArrowUp, ArrowDown } from 'lucide-react';
 import { useActiveViewData } from '../../hooks/useItemsSchematicsData';
 import { useItemsSchematics } from '../../hooks/useItemsSchematics';
 import CreateEditItemSchematicModal from './CreateEditItemSchematicModal';
@@ -532,651 +532,459 @@ const ItemsSchematicsContent: React.FC<ItemsSchematicsContentProps> = ({
   onSelectionChange,
   onBulkOperationTriggered
 }) => {
+  const { 
+    items, 
+    schematics, 
+    categories, 
+    types, 
+    tiers, 
+    loading, 
+    createItem, 
+    createSchematic, 
+    updateItem, 
+    updateSchematic, 
+    deleteItem, 
+    deleteSchematic,
+    getItemById,
+    getSchematicById,
+    refetchItems,
+    refetchSchematics
+  } = useItemsSchematics();
+
   // Content controls state
   const [localViewMode, setLocalViewMode] = useState<ViewMode>(viewMode);
-  const [sortField, setSortField] = useState<SortField>('name');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [sortBy, setSortBy] = useState<'name' | 'created_at' | 'updated_at' | 'category' | 'tier'>('name');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
-  // Modal state
-  const [editModalOpen, setEditModalOpen] = useState(false);
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [selectedEntity, setSelectedEntity] = useState<Entity | null>(null);
-  
-  // Bulk operations state
-  const [bulkModalOpen, setBulkModalOpen] = useState(false);
-  const [bulkOperation, setBulkOperation] = useState<'edit' | 'delete'>('edit');
-  
-  // Selection mode (for bulk operations)
-  const selectionMode = selectedEntities.length > 0;
+  // Modal states
+  const [editingEntity, setEditingEntity] = useState<Entity | null>(null);
+  const [deletingEntity, setDeletingEntity] = useState<Entity | null>(null);
+  const [poiLinkEntity, setPoiLinkEntity] = useState<Entity | null>(null);
 
-  // POI Integration state
-  const [poiLinkModal, setPoiLinkModal] = useState<{
-    isOpen: boolean;
-    item?: ItemWithLocations;
-    schematic?: SchematicWithLocations;
-  }>({
-    isOpen: false
-  });
-
-  // Data for POI integration
-  const [availablePois, setAvailablePois] = useState<Poi[]>([]);
-  const [poiTypes, setPoiTypes] = useState<PoiType[]>([]);
-  const { items: allItems, schematics: allSchematics, deleteItem, deleteSchematic, categories, types, tiers } = useItemsSchematics();
-
-  // Helper functions to resolve names from IDs
-  const getCategoryName = (categoryId: string) => {
+  // Helper functions to get display names
+  const getCategoryName = (categoryId: string): string => {
     const category = categories.find(c => c.id === categoryId);
-    return category?.name || categoryId;
+    return category ? category.name : 'Unknown Category';
   };
 
-  const getTypeName = (typeId: string) => {
+  const getTypeName = (typeId: string): string => {
     const type = types.find(t => t.id === typeId);
-    return type?.name || typeId;
+    return type ? type.name : 'Unknown Type';
   };
 
-  const getTierName = (tierId: string) => {
+  const getTierName = (tierId: string): string => {
     const tier = tiers.find(t => t.id === tierId);
-    return tier?.name || tierId;
+    return tier ? tier.name : 'Unknown Tier';
   };
 
-  // Fetch POIs and POI types for the modal
-  useEffect(() => {
-    const fetchPoiData = async () => {
-      try {
-        // Fetch POIs
-        const { data: pois, error: poisError } = await supabase
-          .from('pois')
-          .select('*')
-          .order('title');
-        
-        if (!poisError && pois) {
-          setAvailablePois(pois);
-        }
-
-        // Fetch POI types
-        const { data: types, error: typesError } = await supabase
-          .from('poi_types')
-          .select('*')
-          .order('name');
-        
-        if (!typesError && types) {
-          setPoiTypes(types);
-        }
-      } catch (error) {
-        console.error('Failed to fetch POI data:', error);
-      }
-    };
-
-    fetchPoiData();
-  }, []);
-
-  // Handlers for CRUD operations
+  // Action handlers
   const handleEdit = (entity: Entity) => {
-    setSelectedEntity(entity);
-    setEditModalOpen(true);
+    console.log('🔧 Edit button clicked, entity:', entity);
+    console.log('🔧 Entity field_values:', entity.field_values);
+    
+    // Get the latest version from local state to ensure we have fresh data
+    const latestEntity = entity.entityType === 'items' 
+      ? getItemById(entity.id)
+      : getSchematicById(entity.id);
+    
+    if (latestEntity) {
+      console.log('🔧 Using latest entity from state:', latestEntity);
+      console.log('🔧 Latest field_values:', latestEntity.field_values);
+      setEditingEntity({ ...latestEntity, entityType: entity.entityType });
+    } else {
+      console.log('🔧 Latest entity not found in state, using passed entity');
+      setEditingEntity(entity);
+    }
   };
 
   const handleDelete = (entity: Entity) => {
-    setSelectedEntity(entity);
-    setDeleteConfirmOpen(true);
+    setDeletingEntity(entity);
   };
 
-  const handleEditSuccess = (updatedEntity: Entity) => {
-    setEditModalOpen(false);
-    setSelectedEntity(null);
-    // TODO: Refresh data when API is available
+  const handleConfirmDelete = async () => {
+    if (!deletingEntity) return;
+
+    try {
+      const isItem = deletingEntity.entityType === 'items';
+      if (isItem) {
+        await deleteItem(deletingEntity.id);
+      } else {
+        await deleteSchematic(deletingEntity.id);
+      }
+      
+      // Call parent callback if provided
+      if (onEntityDeleted) {
+        onEntityDeleted(deletingEntity.id);
+      }
+      
+      setDeletingEntity(null);
+    } catch (error) {
+      console.error('Error deleting entity:', error);
+      // TODO: Show error toast
+    }
+  };
+
+  const handlePoiLink = (entity: Entity) => {
+    setPoiLinkEntity(entity);
+  };
+
+  const handleEntitySaved = (savedEntity: Entity) => {
+    console.log('✅ Entity saved successfully:', savedEntity);
+    
+    // Ensure entityType is preserved from the original editing entity
+    const updatedEntity = {
+      ...savedEntity,
+      entityType: editingEntity?.entityType
+    };
+    
+    setEditingEntity(null);
+    
+    // Force refresh of data to ensure UI shows latest state
+    if (updatedEntity.entityType === 'items') {
+      refetchItems();
+    } else {
+      refetchSchematics();
+    }
+    
+    // Call parent callback if provided
     if (onEntityUpdated) {
       onEntityUpdated(updatedEntity);
     }
   };
 
-  const handleDeleteConfirm = async () => {
-    if (!selectedEntity) return;
+  // Simple, clean filtering logic
+  const getFilteredEntities = () => {
+    console.log('Filtering entities...');
+    console.log('Active view:', activeView);
+    console.log('Filters:', filters);
+    console.log('Items count:', items.length);
+    console.log('Schematics count:', schematics.length);
+
+    let entities: Entity[] = [];
+
+    // Step 1: Determine which entity types to include based on view
+    const viewFromFilters = filters?.view || activeView;
     
-    try {
-      console.log('Deleting entity:', selectedEntity.id);
-      
-      // Call the appropriate delete function based on entityType (for 'all' view) or activeView
-      let deleteSuccess = false;
-      const entityTypeToDelete = selectedEntity.entityType || activeView;
-      
-      if (entityTypeToDelete === 'items') {
-        deleteSuccess = await deleteItem(selectedEntity.id);
-      } else if (entityTypeToDelete === 'schematics') {
-        deleteSuccess = await deleteSchematic(selectedEntity.id);
-      }
-      
-      if (deleteSuccess) {
-        console.log('Entity deleted successfully');
-        setDeleteConfirmOpen(false);
-        setSelectedEntity(null);
-        
-        // Notify parent component and trigger refresh
-        if (onEntityDeleted) {
-          onEntityDeleted(selectedEntity.id);
-        }
-      } else {
-        throw new Error('Delete operation failed');
-      }
-    } catch (error) {
-      console.error('Failed to delete entity:', error);
-      // TODO: Show error toast notification
-      const entityTypeToDelete = selectedEntity.entityType || activeView;
-      alert(`Failed to delete ${entityTypeToDelete === 'items' ? 'item' : 'schematic'}. Please try again.`);
+    if (viewFromFilters === 'all') {
+      // Include both items and schematics, marked with entityType
+      entities = [
+        ...items.map(item => ({ ...item, entityType: 'items' as const })),
+        ...schematics.map(schematic => ({ ...schematic, entityType: 'schematics' as const }))
+      ];
+    } else if (viewFromFilters === 'items') {
+      entities = items.map(item => ({ ...item, entityType: 'items' as const }));
+    } else if (viewFromFilters === 'schematics') {
+      entities = schematics.map(schematic => ({ ...schematic, entityType: 'schematics' as const }));
     }
-  };
 
-  // Bulk operation handlers
-  const handleSelectionToggle = (entityId: string) => {
-    if (!onSelectionChange) return;
-    
-    const newSelection = selectedEntities.includes(entityId)
-      ? selectedEntities.filter(id => id !== entityId)
-      : [...selectedEntities, entityId];
-    
-    onSelectionChange(newSelection);
-  };
+    console.log('After view filtering:', entities.length, 'entities');
 
-  const handleBulkEdit = () => {
-    if (selectedEntities.length === 0) return;
-    
-    const selectedEntityData = filteredEntities.filter(entity => selectedEntities.includes(entity.id));
-    if (onBulkOperationTriggered) {
-      onBulkOperationTriggered('edit', selectedEntityData);
-    } else {
-      setBulkOperation('edit');
-      setBulkModalOpen(true);
-    }
-  };
-
-  const handleBulkDelete = () => {
-    if (selectedEntities.length === 0) return;
-    
-    const selectedEntityData = filteredEntities.filter(entity => selectedEntities.includes(entity.id));
-    if (onBulkOperationTriggered) {
-      onBulkOperationTriggered('delete', selectedEntityData);
-    } else {
-      setBulkOperation('delete');
-      setBulkModalOpen(true);
-    }
-  };
-
-  const handleBulkOperationSuccess = (operation: string, count: number) => {
-    setBulkModalOpen(false);
-    // Clear selection after successful operation
-    if (onSelectionChange) {
-      onSelectionChange([]);
-    }
-    
-    // TODO: Show success toast and refresh data
-    console.log(`Bulk ${operation} completed for ${count} entities`);
-  };
-
-  const handleSelectAll = () => {
-    if (!onSelectionChange) return;
-    
-    if (selectedEntities.length === filteredEntities.length) {
-      // Deselect all
-      onSelectionChange([]);
-    } else {
-      // Select all
-      onSelectionChange(filteredEntities.map(entity => entity.id));
-    }
-  };
-
-  // POI link handlers
-  const handleOpenPoiLinkModal = async (entity: Entity) => {
-    try {
-      // Determine the entity type (use entityType when available, fallback to activeView)
-      const entityType = entity.entityType || activeView;
-      
-      if (entityType === 'items') {
-        // Fetch item with location data
-        const itemWithLocations = await getItemWithLocations(entity.id);
-        if (itemWithLocations) {
-          setPoiLinkModal({
-            isOpen: true,
-            item: itemWithLocations
-          });
-        }
-      } else if (entityType === 'schematics') {
-        // Fetch schematic with location data
-        const schematicWithLocations = await getSchematicWithLocations(entity.id);
-        if (schematicWithLocations) {
-          setPoiLinkModal({
-            isOpen: true,
-            schematic: schematicWithLocations
-          });
+    // Step 2: Apply hierarchical filters (categories, types, tiers)
+    if (filters) {
+      // Category filtering - only show entities whose categories are selected
+      if (filters.categories) {
+        if (filters.categories.length > 0) {
+          entities = entities.filter(entity => 
+            filters.categories.includes(entity.category_id)
+          );
+        } else {
+          // Empty array means hide all
+          entities = [];
         }
       }
-    } catch (error) {
-      console.error('Failed to fetch entity with locations:', error);
-      // Fallback: open modal with basic entity data
-      const entityType = entity.entityType || activeView;
-      if (entityType === 'items') {
-        setPoiLinkModal({
-          isOpen: true,
-          item: entity as ItemWithLocations
-        });
-      } else {
-        setPoiLinkModal({
-          isOpen: true,
-          schematic: entity as SchematicWithLocations
-        });
+
+      // Type filtering - only show entities whose types are selected (or have no type)
+      if (filters.types && filters.types.length > 0) {
+        entities = entities.filter(entity => 
+          !entity.type_id || filters.types.includes(entity.type_id)
+        );
+      }
+
+      // Tier filtering - only show entities whose tiers are selected (or have no tier)
+      if (filters.tiers) {
+        if (filters.tiers.length > 0) {
+          entities = entities.filter(entity => 
+            !entity.tier_id || filters.tiers.includes(entity.tier_id)
+          );
+        } else {
+          // Empty array means hide all - filter out all entities
+          entities = [];
+        }
+      }
+
+      // Search filtering
+      if (filters.searchTerm && filters.searchTerm.trim()) {
+        const searchLower = filters.searchTerm.toLowerCase();
+        entities = entities.filter(entity =>
+          entity.name.toLowerCase().includes(searchLower) ||
+          (entity.description && entity.description.toLowerCase().includes(searchLower))
+        );
+      }
+
+      // Advanced filters
+      if (filters.createdBy && filters.createdBy.trim()) {
+        entities = entities.filter(entity =>
+          entity.created_by && entity.created_by.toLowerCase().includes(filters.createdBy.toLowerCase())
+        );
+      }
+
+      if (filters.hasDescription) {
+        entities = entities.filter(entity => entity.description && entity.description.trim() !== '');
+      }
+
+      // Date range filtering
+      if (filters.dateFrom) {
+        entities = entities.filter(entity => 
+          entity.created_at && entity.created_at >= filters.dateFrom
+        );
+      }
+
+      if (filters.dateTo) {
+        entities = entities.filter(entity => 
+          entity.created_at && entity.created_at <= filters.dateTo
+        );
       }
     }
+
+    console.log('After all filtering:', entities.length, 'entities');
+    return entities;
   };
 
-  const handleClosePoisLinkModal = () => {
-    setPoiLinkModal({ isOpen: false });
-  };
+  const filteredEntities = getFilteredEntities();
 
-  const handlePoiLinkSuccess = () => {
-    // Refresh data to show updated POI links
-    // This could be optimized to only refresh the specific entity
-    window.location.reload(); // Simple approach for now
-  };
-
-  // Get the appropriate data based on activeView
-  const getEntitiesForView = () => {
-    if (activeView === 'all') {
-      // Combine items and schematics, but add a 'type' field to distinguish them
-      const itemsWithType = allItems.map(item => ({ ...item, entityType: 'items' as const }));
-      const schematicsWithType = allSchematics.map(schematic => ({ ...schematic, entityType: 'schematics' as const }));
-      return [...itemsWithType, ...schematicsWithType];
-    } else if (activeView === 'items') {
-      return allItems.map(item => ({ ...item, entityType: 'items' as const }));
-    } else {
-      return allSchematics.map(schematic => ({ ...schematic, entityType: 'schematics' as const }));
-    }
-  };
-
-  const entities = getEntitiesForView();
-  const loading = false; // Since we're using the pre-loaded data
-  const error = null;
-
-  // Refresh data when refreshTrigger changes
-  useEffect(() => {
-    if (refreshTrigger) {
-      // Force component re-render by updating a local state if needed
-      // The useItemsSchematics hook should handle data refresh automatically
-    }
-  }, [refreshTrigger]);
-
-  // Apply additional client-side filters and search
-  const filteredEntities = entities.filter(entity => {
-    // Search filter
-    if (searchTerm) {
-      const searchLower = searchTerm.toLowerCase();
-      const nameMatch = entity.name.toLowerCase().includes(searchLower);
-      const descMatch = entity.description?.toLowerCase().includes(searchLower);
-      const categoryMatch = getCategoryName(entity.category_id).toLowerCase().includes(searchLower);
-      const typeMatch = entity.type_id ? getTypeName(entity.type_id).toLowerCase().includes(searchLower) : false;
-      
-      if (!nameMatch && !descMatch && !categoryMatch && !typeMatch) {
-        return false;
-      }
-    }
-
-    // Category filtering - if categories are specified, entity must be in one of them
-    if (filters.categories?.length) {
-      if (!entity.category_id || !filters.categories.includes(entity.category_id)) {
-        return false;
-      }
-    }
-
-    // Type filtering - if types are specified, entity must be one of them
-    if (filters.types?.length) {
-      if (!entity.type_id || !filters.types.includes(entity.type_id)) {
-        return false;
-      }
-    }
-
-    // Tier filtering - if tiers are specified, entity must be one of them
-    if (filters.tiers?.length) {
-      if (!entity.tier_id || !filters.tiers.includes(entity.tier_id)) {
-        return false;
-      }
-    }
-
-    // Additional date range filtering
-    if (filters.dateRange?.start) {
-      const entityDate = new Date(entity.created_at);
-      const startDate = new Date(filters.dateRange.start);
-      if (entityDate < startDate) return false;
-    }
-    
-    if (filters.dateRange?.end) {
-      const entityDate = new Date(entity.created_at);
-      const endDate = new Date(filters.dateRange.end);
-      if (entityDate > endDate) return false;
-    }
-
-    // Creator filtering
-    if (filters.creators?.length && !filters.creators.includes(entity.created_by || '')) {
-      return false;
-    }
-    
-    return true;
-  }).sort((a, b) => {
-    // Apply sorting
+  // Apply sorting to filtered entities
+  const sortedEntities = filteredEntities.sort((a, b) => {
     let comparison = 0;
     
-    switch (sortField) {
+    switch (sortBy) {
       case 'name':
         comparison = a.name.localeCompare(b.name);
         break;
       case 'category':
-        comparison = getCategoryName(a.category_id || '').localeCompare(getCategoryName(b.category_id || ''));
-        break;
-      case 'type':
-        comparison = (a.type_id ? getTypeName(a.type_id) : '').localeCompare(b.type_id ? getTypeName(b.type_id) : '');
+        comparison = getCategoryName(a.category_id).localeCompare(getCategoryName(b.category_id));
         break;
       case 'tier':
-        comparison = (a.tier_id ? getTierName(a.tier_id) : '').localeCompare(b.tier_id ? getTierName(b.tier_id) : '');
+        const tierA = a.tier_id ? getTierName(a.tier_id) : '';
+        const tierB = b.tier_id ? getTierName(b.tier_id) : '';
+        comparison = tierA.localeCompare(tierB);
         break;
       case 'created_at':
         comparison = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
         break;
       case 'updated_at':
-        comparison = new Date(a.updated_at || a.created_at).getTime() - new Date(b.updated_at || b.created_at).getTime();
+        const updatedA = a.updated_at || a.created_at;
+        const updatedB = b.updated_at || b.created_at;
+        comparison = new Date(updatedA).getTime() - new Date(updatedB).getTime();
         break;
       default:
         comparison = 0;
     }
     
-    return sortDirection === 'asc' ? comparison : -comparison;
+    return sortOrder === 'asc' ? comparison : -comparison;
   });
 
-  if (loading) return <LoadingSpinner />;
-  if (error) return <ErrorMessage error={error} />;
-
-  const renderContent = () => {
-    switch (localViewMode) {
-      case 'tree':
-        return (
-          <TreeView
-            entities={filteredEntities}
-            activeView={activeView}
-            selectedCategory={selectedCategory}
-            onItemSelect={onItemSelect}
-            getCategoryName={getCategoryName}
-            getTypeName={getTypeName}
-            getTierName={getTierName}
-          />
-        );
-      case 'grid':
-        return (
-          <GridView
-            entities={filteredEntities}
-            activeView={activeView}
-            onItemSelect={onItemSelect}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
-            onPoiLink={handleOpenPoiLinkModal}
-            getCategoryName={getCategoryName}
-            getTypeName={getTypeName}
-            getTierName={getTierName}
-            selectedEntities={selectedEntities}
-            onSelectionToggle={handleSelectionToggle}
-            selectionMode={selectionMode}
-          />
-        );
-      case 'list':
-        return (
-          <ListView
-            entities={filteredEntities}
-            activeView={activeView}
-            onItemSelect={onItemSelect}
-            getCategoryName={getCategoryName}
-            getTypeName={getTypeName}
-            getTierName={getTierName}
-          />
-        );
-      default:
-        return (
-          <GridView 
-            entities={filteredEntities} 
-            activeView={activeView} 
-            onItemSelect={onItemSelect}
-            getCategoryName={getCategoryName}
-            getTypeName={getTypeName}
-            getTierName={getTierName}
-          />
-        );
-    }
-  };
-
   return (
-    <div className="h-full flex flex-col">
-      {/* Bulk Operations Toolbar - Only show when in selection mode */}
-      {selectionMode && (
-        <div className="group relative">
-          <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950" />
-          <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-800/40 to-slate-900/60" />
-          <div className="absolute inset-0 bg-gradient-to-b from-amber-600/10 via-amber-500/5 to-transparent" />
-          
-          <div className="relative border-b border-amber-400/20 px-4 py-3">
-            <div className="flex items-center justify-between">
-              <div className="text-sm text-amber-200/70 font-light"
-                   style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-                {selectedEntities.length} selected
-              </div>
-              
-              <div className="flex items-center space-x-3">
-                <button
-                  onClick={handleSelectAll}
-                  className="text-sm text-amber-300 hover:text-amber-200 transition-colors duration-200 font-light tracking-wide"
-                  style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
-                >
-                  {selectedEntities.length === filteredEntities.length ? 'Deselect All' : 'Select All'}
-                </button>
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={handleBulkEdit}
-                    className="group relative px-3 py-1.5 text-sm text-amber-300 hover:text-amber-200 border border-amber-300/40 
-                             hover:bg-amber-300/10 rounded transition-all duration-200 flex items-center gap-1 font-light"
-                    style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
-                  >
-                    <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm rounded" />
-                    <span className="relative flex items-center gap-1">
-                      <Edit2 className="w-4 h-4" />
-                      Edit {selectedEntities.length}
-                    </span>
-                  </button>
-                  <button
-                    onClick={handleBulkDelete}
-                    className="group relative px-3 py-1.5 text-sm text-red-300 hover:text-red-200 border border-red-400/40 
-                             hover:bg-red-400/20 rounded transition-all duration-200 flex items-center gap-1 font-light"
-                    style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
-                  >
-                    <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm rounded" />
-                    <span className="relative flex items-center gap-1">
-                      <Trash className="w-4 h-4" />
-                      Delete {selectedEntities.length}
-                    </span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+    <div className="h-full overflow-hidden">
+      {/* Content Controls Bar */}
+      <div className="flex items-center justify-end gap-3 p-4 border-b border-amber-400/20">
+        {/* Sort Controls */}
+        <div className="flex items-center gap-2">
+          <select 
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as 'name' | 'created_at' | 'updated_at' | 'category' | 'tier')}
+            className="px-3 py-1.5 bg-slate-800 border border-slate-600 rounded text-amber-100 text-sm
+                     focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all duration-200"
+            style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
+          >
+            <option value="name">Name</option>
+            <option value="created_at">Created</option>
+            <option value="updated_at">Modified</option>
+            <option value="category">Category</option>
+            <option value="tier">Tier</option>
+          </select>
 
-      {/* Main Content Area with Top Controls */}
+          <button
+            onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+            className="p-1.5 text-amber-200/70 hover:text-amber-300 hover:bg-amber-500/20 rounded transition-colors"
+            title={`Sort ${sortOrder === 'asc' ? 'Descending' : 'Ascending'}`}
+          >
+            {sortOrder === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />}
+          </button>
+        </div>
+
+        {/* View Mode Selector */}
+        <div className="flex items-center border border-slate-600 rounded-lg overflow-hidden">
+          <button
+            onClick={() => setLocalViewMode('grid')}
+            className={`p-2 transition-colors ${
+              localViewMode === 'grid' 
+                ? 'bg-amber-500/20 text-amber-200' 
+                : 'text-amber-200/70 hover:text-amber-200 hover:bg-amber-500/10'
+            }`}
+            title="Grid View"
+          >
+            <Grid3X3 className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => setLocalViewMode('list')}
+            className={`p-2 transition-colors ${
+              localViewMode === 'list' 
+                ? 'bg-amber-500/20 text-amber-200' 
+                : 'text-amber-200/70 hover:text-amber-200 hover:bg-amber-500/10'
+            }`}
+            title="List View"
+          >
+            <List className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => setLocalViewMode('tree')}
+            className={`p-2 transition-colors ${
+              localViewMode === 'tree' 
+                ? 'bg-amber-500/20 text-amber-200' 
+                : 'text-amber-200/70 hover:text-amber-200 hover:bg-amber-500/10'
+            }`}
+            title="Tree View"
+          >
+            <TreePine className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* Content Area */}
       <div className="flex-1 overflow-y-auto">
-        {/* Top Right Controls */}
-        <div className="p-4 pb-2">
-          <div className="flex items-center justify-between">
-            <div className="text-sm text-amber-200/70 font-light tracking-wide"
-                 style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-              {filteredEntities.length} {activeView} found
-            </div>
-            
-            <div className="flex items-center gap-4">
-              {/* Sorting Controls */}
-              <div className="flex items-center gap-2">
-                <label className="text-sm text-amber-200/70 whitespace-nowrap font-light tracking-wide"
-                       style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-                  Sort by:
-                </label>
-                <select
-                  value={sortField}
-                  onChange={(e) => setSortField(e.target.value as SortField)}
-                  className="px-3 py-2 bg-slate-800 border border-slate-600 rounded text-amber-100 text-sm focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
-                  style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
-                >
-                  {[
-                    { value: 'name', label: 'Name' },
-                    { value: 'category', label: 'Category' },
-                    { value: 'type', label: 'Type' },
-                    { value: 'tier', label: 'Tier' },
-                    { value: 'created_at', label: 'Created Date' },
-                    { value: 'updated_at', label: 'Updated Date' },
-                  ].map(option => (
-                    <option key={option.value} value={option.value}>{option.label}</option>
-                  ))}
-                </select>
-                <button
-                  onClick={() => setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}
-                  className="p-2 bg-slate-800 text-amber-200/70 hover:bg-slate-700 hover:text-amber-300 border border-slate-600 rounded transition-colors duration-150"
-                  title={`Sort direction: ${sortDirection === 'asc' ? 'Ascending' : 'Descending'}`}
-                >
-                  {sortDirection === 'asc' ? <SortAsc className="w-4 h-4" /> : <SortDesc className="w-4 h-4" />}
-                </button>
-              </div>
-
-              {/* View Mode Toggle */}
-              <div className="flex border border-slate-600 rounded">
-                <button
-                  onClick={() => setLocalViewMode('tree')}
-                  className={`p-2 transition-colors duration-150 ${
-                    localViewMode === 'tree' 
-                      ? 'bg-slate-700 text-amber-300' 
-                      : 'bg-slate-800 hover:bg-slate-700 text-amber-200/70 hover:text-amber-200'
-                  }`}
-                  title="Tree View"
-                >
-                  <TreePine className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => setLocalViewMode('grid')}
-                  className={`p-2 transition-colors duration-150 ${
-                    localViewMode === 'grid' 
-                      ? 'bg-slate-700 text-amber-300' 
-                      : 'bg-slate-800 hover:bg-slate-700 text-amber-200/70 hover:text-amber-200'
-                  }`}
-                  title="Grid View"
-                >
-                  <Grid3X3 className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => setLocalViewMode('list')}
-                  className={`p-2 transition-colors duration-150 ${
-                    localViewMode === 'list' 
-                      ? 'bg-slate-700 text-amber-300' 
-                      : 'bg-slate-800 hover:bg-slate-700 text-amber-200/70 hover:text-amber-200'
-                  }`}
-                  title="List View"
-                >
-                  <List className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
+        {loading.items || loading.schematics ? (
+          <div className="flex items-center justify-center h-64">
+            <div className="w-8 h-8 border-2 border-amber-400/40 border-t-amber-400 rounded-full animate-spin" />
+            <span className="ml-3 text-amber-200/70 font-light tracking-wide"
+                  style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+              Loading {activeView}...
+            </span>
           </div>
-        </div>
-
-        {/* Content */}
-        {renderContent()}
+        ) : filteredEntities.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-64 text-center">
+            <Package className="w-16 h-16 text-amber-200/30 mb-4" />
+            <p className="text-lg font-light text-amber-200/70 tracking-wide mb-2"
+               style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+              No {activeView === 'all' ? 'items or schematics' : activeView} found
+            </p>
+            <p className="text-sm text-amber-200/50 font-light"
+               style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+              Try adjusting your filters or search terms
+            </p>
+          </div>
+        ) : (
+                     <div className="p-4">
+             {/* Render based on view mode */}
+             {localViewMode === 'grid' && (
+               <GridView 
+                 entities={sortedEntities}
+                 activeView={activeView}
+                 onItemSelect={onItemSelect}
+                 onEdit={handleEdit}
+                 onDelete={handleDelete}
+                 onPoiLink={handlePoiLink}
+                 selectedEntities={selectedEntities}
+                 onSelectionToggle={(entityId) => {
+                   if (onSelectionChange) {
+                     const newSelection = selectedEntities.includes(entityId)
+                       ? selectedEntities.filter(id => id !== entityId)
+                       : [...selectedEntities, entityId];
+                     onSelectionChange(newSelection);
+                   }
+                 }}
+                 selectionMode={selectedEntities.length > 0}
+                 getCategoryName={getCategoryName}
+                 getTypeName={getTypeName}
+                 getTierName={getTierName}
+               />
+             )}
+             {localViewMode === 'list' && (
+               <ListView 
+                 entities={sortedEntities}
+                 activeView={activeView}
+                 onItemSelect={onItemSelect}
+                 getCategoryName={getCategoryName}
+                 getTypeName={getTypeName}
+                 getTierName={getTierName}
+               />
+             )}
+             {localViewMode === 'tree' && (
+               <TreeView 
+                 entities={sortedEntities}
+                 activeView={activeView}
+                 selectedCategory={selectedCategory}
+                 onItemSelect={onItemSelect}
+                 getCategoryName={getCategoryName}
+                 getTypeName={getTypeName}
+                 getTierName={getTierName}
+               />
+             )}
+           </div>
+        )}
       </div>
 
       {/* Edit Modal */}
-      {editModalOpen && selectedEntity && (
+      {editingEntity && (
         <CreateEditItemSchematicModal
+          isOpen={true}
+          onClose={() => setEditingEntity(null)}
           mode="edit"
-          entityType={activeView}
-          entity={selectedEntity}
-          isOpen={editModalOpen}
-          onClose={() => {
-            setEditModalOpen(false);
-            setSelectedEntity(null);
+          entityType={editingEntity.entityType}
+          entity={editingEntity}
+          onSuccess={(updatedEntity) => {
+            handleEntitySaved(updatedEntity);
           }}
-          onSuccess={handleEditSuccess}
         />
       )}
 
       {/* Delete Confirmation Modal */}
-      {deleteConfirmOpen && selectedEntity && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="group relative max-w-md w-full">
-            <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 rounded-lg" />
-            <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-800/40 to-slate-900/60 rounded-lg" />
-            <div className="absolute inset-0 bg-gradient-to-b from-red-600/10 via-red-500/5 to-transparent rounded-lg" />
-            
-            <div className="relative p-6 rounded-lg border border-red-400/40">
-              <h3 className="text-lg font-medium text-red-300 mb-4 tracking-wide"
-                  style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-                Delete {(() => {
-                  const entityType = selectedEntity.entityType || activeView;
-                  return entityType === 'items' ? 'Item' : 'Schematic';
-                })()}
-              </h3>
-              <p className="text-amber-200/70 mb-6 font-light"
-                 style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-                Are you sure you want to delete "{selectedEntity.name}"? This action cannot be undone.
-              </p>
-              <div className="flex space-x-3 justify-end">
-                <button
-                  onClick={() => {
-                    setDeleteConfirmOpen(false);
-                    setSelectedEntity(null);
-                  }}
-                  className="group relative px-4 py-2 text-amber-200 border border-amber-400/40 
-                           hover:bg-amber-400/10 rounded-lg transition-all duration-200 font-light"
-                  style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
-                >
-                  <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm rounded-lg" />
-                  <span className="relative">Cancel</span>
-                </button>
-                <button
-                  onClick={handleDeleteConfirm}
-                  className="group relative px-4 py-2 text-red-200 border border-red-400/40 
-                           hover:bg-red-400/20 rounded-lg transition-all duration-200 font-light"
-                  style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
-                >
-                  <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm rounded-lg" />
-                  <span className="relative">Delete</span>
-                </button>
-              </div>
+      {deletingEntity && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-slate-800 rounded-lg p-6 max-w-md w-full mx-4 border border-slate-600">
+            <h3 className="text-lg font-bold text-amber-200 mb-4"
+                style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+              Confirm Delete
+            </h3>
+            <p className="text-amber-200/80 mb-6"
+               style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+              Are you sure you want to delete "{deletingEntity.name}"? This action cannot be undone.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setDeletingEntity(null)}
+                className="px-4 py-2 text-amber-200 border border-slate-600 rounded hover:bg-slate-700 transition-colors"
+                style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+                style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
+              >
+                Delete
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Bulk Operations Modal */}
-      {bulkModalOpen && (
-        <BulkOperationsModal
-          isOpen={bulkModalOpen}
-          onClose={() => setBulkModalOpen(false)}
-          selectedEntities={filteredEntities.filter(entity => selectedEntities.includes(entity.id))}
-          entityType={activeView}
-          operation={bulkOperation}
-          onSuccess={handleBulkOperationSuccess}
+      {/* POI Link Modal */}
+      {poiLinkEntity && (
+        <PoiItemLinkModal
+          isOpen={true}
+          onClose={() => setPoiLinkEntity(null)}
+          entity={{
+            id: poiLinkEntity.id,
+            name: poiLinkEntity.name,
+            type: poiLinkEntity.entityType === 'items' ? 'item' : 'schematic'
+          }}
+          onLinksUpdated={() => {
+            // Refresh data if needed
+            console.log('POI links updated for:', poiLinkEntity.name);
+          }}
         />
       )}
-
-      {/* POI Link Modal */}
-      <PoiItemLinkModal
-        isOpen={poiLinkModal.isOpen}
-        onClose={handleClosePoisLinkModal}
-        onSuccess={handlePoiLinkSuccess}
-        item={poiLinkModal.item}
-        schematic={poiLinkModal.schematic}
-        availablePois={availablePois}
-        availableItems={allItems}
-        availableSchematics={allSchematics}
-        poiTypes={poiTypes}
-      />
     </div>
   );
 };
