@@ -1,77 +1,231 @@
 import React, { useState } from 'react';
-import ItemsSchematicsLayout from '../components/items-schematics/ItemsSchematicsLayout';
-import ItemsContent from '../components/items-schematics/ItemsContent';
-import SchematicsContent from '../components/items-schematics/SchematicsContent';
-import { Package, FileText } from 'lucide-react';
+import { Package, FileText, Grid3X3, List, TreePine, Search, Plus, Settings, ChevronRight, ChevronLeft } from 'lucide-react';
+import { useAuth } from '../components/auth/AuthProvider';
+import { useEntityCounts } from '../hooks/useItemsSchematicsData';
+import CategoryHierarchyNav from '../components/items-schematics/CategoryHierarchyNav';
+import ItemsSchematicsContent from '../components/items-schematics/ItemsSchematicsContent';
+import DetailsPanel from '../components/items-schematics/DetailsPanel';
+
+// Import types (these will need to be created)
+interface Category {
+  id: string;
+  name: string;
+  icon?: string;
+  icon_image_id?: string;
+  icon_fallback?: string;
+}
+
+interface ItemSchematicFilters {
+  categories?: string[];
+  types?: string[];
+  tiers?: string[];
+  creators?: string[];
+  dateRange?: {
+    start?: string;
+    end?: string;
+  };
+  dynamicFields?: Record<string, any>;
+}
+
+type ViewMode = 'tree' | 'grid' | 'list';
 
 const ItemsSchematicsPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'items' | 'schematics'>('items');
+  const { user } = useAuth();
+  
+  // State management
+  const [activeView, setActiveView] = useState<'all' | 'items' | 'schematics'>('all');
+  const [viewMode, setViewMode] = useState<ViewMode>('grid');
+  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filters, setFilters] = useState<ItemSchematicFilters>({});
+  const [selectedItem, setSelectedItem] = useState<any>(null);
+  const [leftSidebarCollapsed, setLeftSidebarCollapsed] = useState(false);
+  const [rightSidebarCollapsed, setRightSidebarCollapsed] = useState(false);
 
-  const TabButton: React.FC<{
-    tab: 'items' | 'schematics';
-    icon: React.ReactNode;
-    label: string;
-    isActive: boolean;
-    onClick: () => void;
-  }> = ({ tab, icon, label, isActive, onClick }) => (
-    <button
-      onClick={onClick}
-      className={`
-        relative flex items-center gap-2 px-6 py-3 font-medium text-sm tracking-wide transition-all duration-300
-        ${isActive 
-          ? 'text-amber-200 bg-slate-800/50 border-b-2 border-amber-400' 
-          : 'text-slate-400 hover:text-amber-300 bg-slate-900/30 hover:bg-slate-800/30'
-        }
-      `}
-    >
-      <span className={`transition-colors duration-300 ${isActive ? 'text-amber-400' : 'text-slate-500'}`}>
-        {icon}
-      </span>
-      {label}
-      
-      {/* Active tab indicator */}
-      {isActive && (
-        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-amber-400 to-transparent shadow-md shadow-amber-400/50" />
-      )}
-    </button>
-  );
+  // Force data refresh state
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  // Real data hooks for counts
+  const { itemCount, schematicCount, loading: countsLoading } = useEntityCounts();
+
+  // Bulk operations state
+  const [selectedEntities, setSelectedEntities] = useState<string[]>([]);
+
+  const handleSelectionChange = (selectedIds: string[]) => {
+    setSelectedEntities(selectedIds);
+  };
+
+  const handleBulkOperationTriggered = (operation: 'edit' | 'delete', entities: any[]) => {
+    console.log(`Bulk ${operation} triggered for ${entities.length} entities`);
+    // Clear selection after operation
+    setSelectedEntities([]);
+    // TODO: Refresh data when API is available
+  };
+
+  const handleAdvancedSearch = (criteria: any) => {
+    console.log('Advanced search criteria:', criteria);
+    // TODO: Implement advanced search logic
+    // This would typically filter the data based on the criteria
+  };
+
+  // Clear selection when changing views
+  const handleViewChange = (view: 'all' | 'items' | 'schematics') => {
+    setActiveView(view);
+  };
+
+  const handleCreateNew = () => {
+    // TODO: Implement create new item/schematic modal
+    console.log(`Create new ${activeView}`);
+  };
+
+  const handleEntityCreated = (newEntity: any) => {
+    console.log('New entity created:', newEntity);
+    // Force refresh of data by incrementing the refresh trigger
+    setRefreshTrigger(prev => prev + 1);
+  };
+
+  const handleEntityUpdated = (updatedEntity: any) => {
+    console.log('Entity updated:', updatedEntity);
+    // Force refresh of data by incrementing the refresh trigger
+    setRefreshTrigger(prev => prev + 1);
+  };
+
+  const handleEntityDeleted = (entityId: string) => {
+    console.log('Entity deleted:', entityId);
+    // Remove from selected if it was the deleted entity
+    if (selectedItem?.id === entityId) {
+      setSelectedItem(null);
+    }
+    // Force refresh of data by incrementing the refresh trigger
+    setRefreshTrigger(prev => prev + 1);
+  };
+
+  const openSettings = () => {
+    // TODO: Implement settings modal
+    console.log('Open settings');
+  };
 
   return (
-    <ItemsSchematicsLayout 
-      title="Items & Schematics Database"
-      subtitle="Manage and explore all items and crafting schematics in the Dune universe"
-    >
-      <div className="space-y-6">
-        {/* Tab Navigation */}
-        <div className="border-b border-slate-600/30">
-          <div className="flex">
-            <TabButton
-              tab="items"
-              icon={<Package className="w-4 h-4" />}
-              label="Items"
-              isActive={activeTab === 'items'}
-              onClick={() => setActiveTab('items')}
-            />
-            <TabButton
-              tab="schematics"
-              icon={<FileText className="w-4 h-4" />}
-              label="Schematics"
-              isActive={activeTab === 'schematics'}
-              onClick={() => setActiveTab('schematics')}
+    <div className="min-h-screen">
+      {/* Main background image */}
+      <div 
+        className="fixed inset-0 bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: `url(/images/main-bg.jpg)` }}
+      />
+      
+      {/* Content */}
+      <div className="relative z-10">
+{/* No header - view switching moved to control panel */}
+
+                  <div className="flex h-screen">
+          {/* Left Sidebar - Controls Panel */}
+          {!leftSidebarCollapsed ? (
+            <div className="w-[30rem] flex-shrink-0">
+              <div className="h-full group relative">
+                <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950" />
+                <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-800/40 to-slate-900/60" />
+                <div className="absolute inset-0 bg-gradient-to-b from-amber-600/10 via-amber-500/5 to-transparent" />
+                
+                <div className="relative h-full border-r border-amber-400/20">
+                  <CategoryHierarchyNav
+                    activeView={activeView}
+                    selectedCategory={selectedCategory}
+                    onCategorySelect={setSelectedCategory}
+                    filters={filters}
+                    onFiltersChange={setFilters}
+                    onClose={() => setLeftSidebarCollapsed(true)}
+                    filteredCount={0}
+                    onEntityCreated={handleEntityCreated}
+                    onViewChange={handleViewChange}
+                    searchTerm={searchTerm}
+                    onSearchChange={setSearchTerm}
+                  />
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* Collapsed Controls Panel - Reopen Button */
+            <div className="w-12 flex-shrink-0 border-r border-amber-400/20">
+              <div className="h-full group relative">
+                <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950" />
+                <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-800/40 to-slate-900/60" />
+                <div className="absolute inset-0 bg-gradient-to-b from-amber-600/10 via-amber-500/5 to-transparent" />
+                
+                <div className="relative h-full flex flex-col">
+                  <button
+                    onClick={() => setLeftSidebarCollapsed(false)}
+                    className="p-3 text-amber-200/70 hover:text-amber-300 hover:bg-amber-500/10 transition-all duration-200 border-b border-amber-400/10"
+                    title="Show Controls Panel"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Main Content Area */}
+          <div className="flex-1 overflow-hidden">
+            <ItemsSchematicsContent
+              activeView={activeView}
+              viewMode={viewMode}
+              selectedCategory={selectedCategory}
+              searchTerm={searchTerm}
+              filters={filters}
+              onItemSelect={setSelectedItem}
+              leftSidebarCollapsed={leftSidebarCollapsed}
+              onToggleLeftSidebar={() => setLeftSidebarCollapsed(!leftSidebarCollapsed)}
+              rightSidebarCollapsed={rightSidebarCollapsed}
+              onToggleRightSidebar={() => setRightSidebarCollapsed(!rightSidebarCollapsed)}
+              onEntityUpdated={handleEntityUpdated}
+              onEntityDeleted={handleEntityDeleted}
+              refreshTrigger={refreshTrigger}
+              selectedEntities={selectedEntities}
+              onSelectionChange={handleSelectionChange}
+              onBulkOperationTriggered={handleBulkOperationTriggered}
             />
           </div>
-        </div>
 
-        {/* Tab Content */}
-        <div className="min-h-[600px]">
-          {activeTab === 'items' ? (
-            <ItemsContent />
+          {/* Right Sidebar - Details Panel */}
+          {!rightSidebarCollapsed ? (
+            <div className="w-[30rem] flex-shrink-0">
+              <div className="h-full group relative">
+                <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950" />
+                <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-800/40 to-slate-900/60" />
+                <div className="absolute inset-0 bg-gradient-to-b from-amber-600/10 via-amber-500/5 to-transparent" />
+                
+                <div className="relative h-full border-l border-amber-400/20">
+                  <DetailsPanel
+                    activeView={activeView}
+                    selectedItem={selectedItem}
+                    onClose={() => setRightSidebarCollapsed(true)}
+                  />
+                </div>
+              </div>
+            </div>
           ) : (
-            <SchematicsContent />
+            /* Collapsed Details Panel - Reopen Button */
+            <div className="w-12 flex-shrink-0 border-l border-amber-400/20">
+              <div className="h-full group relative">
+                <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950" />
+                <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-800/40 to-slate-900/60" />
+                <div className="absolute inset-0 bg-gradient-to-b from-amber-600/10 via-amber-500/5 to-transparent" />
+                
+                <div className="relative h-full flex flex-col">
+                  <button
+                    onClick={() => setRightSidebarCollapsed(false)}
+                    className="p-3 text-amber-200/70 hover:text-amber-300 hover:bg-amber-500/10 transition-all duration-200 border-b border-amber-400/10"
+                    title="Show Details Panel"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
           )}
         </div>
       </div>
-    </ItemsSchematicsLayout>
+    </div>
   );
 };
 

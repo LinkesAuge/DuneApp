@@ -712,3 +712,109 @@ export interface PermissionContext {
 export interface BulkPermissionResult {
   [entityId: string]: PermissionCheckResult;
 }
+
+// ==========================================
+// POI Integration System Types
+// ==========================================
+
+// POI-Item linking interface
+export interface PoiItemLink {
+  id: string;
+  poi_id: string;
+  item_id: string | null;
+  schematic_id: string | null;
+  link_type: 'found_here' | 'crafted_here' | 'required_for' | 'material_source';
+  quantity?: number | null; // For recipe requirements
+  notes?: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  updated_by: string | null;
+}
+
+// POI with linked items for display
+export interface PoiWithItems extends Poi {
+  linked_items?: ItemWithRelations[];
+  linked_schematics?: SchematicWithRelations[];
+  item_links?: PoiItemLink[];
+}
+
+// Item/Schematic with POI locations
+export interface ItemWithLocations extends ItemWithRelations {
+  poi_locations?: PoiLocationInfo[];
+  crafting_locations?: PoiLocationInfo[];
+}
+
+export interface SchematicWithLocations extends SchematicWithRelations {
+  poi_locations?: PoiLocationInfo[];
+  crafting_locations?: PoiLocationInfo[];
+  required_materials?: MaterialRequirement[];
+}
+
+// Location information for items/schematics
+export interface PoiLocationInfo {
+  poi_id: string;
+  poi_title: string;
+  poi_type: PoiType;
+  map_type: MapType;
+  coordinate?: string; // For Deep Desert grid
+  coordinates_x?: number | null; // For Hagga Basin
+  coordinates_y?: number | null; // For Hagga Basin
+  link_type: 'found_here' | 'crafted_here';
+  quantity?: number | null;
+  notes?: string | null;
+  distance?: number; // For map sorting/filtering
+}
+
+// Recipe/crafting requirements
+export interface MaterialRequirement {
+  item_id: string;
+  item_name: string;
+  quantity: number;
+  tier?: Tier;
+  available_locations?: PoiLocationInfo[];
+}
+
+// Recipe information for schematics
+export interface RecipeInfo {
+  schematic_id: string;
+  required_materials: MaterialRequirement[];
+  crafting_locations: PoiLocationInfo[];
+  total_materials: number;
+  materials_with_known_locations: number;
+  completion_percentage: number;
+}
+
+// Map integration types
+export interface MapItemFilter {
+  item_ids: string[];
+  schematic_ids: string[];
+  link_types: ('found_here' | 'crafted_here' | 'required_for' | 'material_source')[];
+  show_only_linked_pois: boolean;
+}
+
+// POI search/filter with item integration
+export interface PoiSearchWithItems {
+  text_search?: string;
+  poi_type_ids?: string[];
+  item_ids?: string[];
+  schematic_ids?: string[];
+  link_types?: ('found_here' | 'crafted_here' | 'required_for' | 'material_source')[];
+  map_type?: MapType;
+  has_items?: boolean; // Show only POIs with linked items
+}
+
+// Statistics for POI-Item integration
+export interface PoiItemStats {
+  total_poi_item_links: number;
+  pois_with_items: number;
+  items_with_locations: number;
+  schematics_with_locations: number;
+  completed_recipes: number; // Schematics where all materials have known locations
+  link_types_count: {
+    found_here: number;
+    crafted_here: number;
+    required_for: number;
+    material_source: number;
+  };
+}

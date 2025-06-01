@@ -1276,6 +1276,7 @@ export async function createSchematic(
     }
 
     // Create schematic
+    console.log('Creating schematic with data:', schematicData);
     const { data, error } = await supabase
       .from('schematics')
       .insert([{

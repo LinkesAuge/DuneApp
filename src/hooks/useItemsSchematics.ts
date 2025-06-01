@@ -87,6 +87,7 @@ interface UseItemsSchematicsReturn extends ItemsSchematicsState {
   refetchTiers: () => Promise<void>;
   refetchCategories: (appliesTo?: AppliesTo) => Promise<void>;
   refetchTypes: (categoryId: string) => Promise<void>;
+  refetchAllTypes: () => Promise<void>;
   refetchSubtypes: (typeId: string) => Promise<void>;
   refetchItems: () => Promise<void>;
   refetchSchematics: () => Promise<void>;
@@ -200,6 +201,26 @@ export function useItemsSchematics(): UseItemsSchematicsReturn {
       setState(prev => ({ ...prev, types: data, loading: { ...prev.loading, types: false } }));
     } catch (error) {
       console.error('Error fetching types:', error);
+      setState(prev => ({ 
+        ...prev, 
+        loading: { ...prev.loading, types: false },
+        errors: { ...prev.errors, types: 'Failed to fetch types' }
+      }));
+    }
+  }, []);
+
+  const refetchAllTypes = useCallback(async () => {
+    setState(prev => ({ ...prev, loading: { ...prev.loading, types: true }, errors: { ...prev.errors, types: null } }));
+    try {
+      const { data, error } = await supabase
+        .from('types')
+        .select('*')
+        .order('name', { ascending: true });
+
+      if (error) throw error;
+      setState(prev => ({ ...prev, types: data || [], loading: { ...prev.loading, types: false } }));
+    } catch (error) {
+      console.error('Error fetching all types:', error);
       setState(prev => ({ 
         ...prev, 
         loading: { ...prev.loading, types: false },
@@ -427,7 +448,7 @@ export function useItemsSchematics(): UseItemsSchematicsReturn {
     }
   }, []);
 
-  const createSchematic = useCallback(async (schematic: Partial<Schematic>): Promise<Schematic | null> => {
+  const createSchematicLocal = useCallback(async (schematic: Partial<Schematic>): Promise<Schematic | null> => {
     try {
       const { data, error } = await supabase
         .from('schematics')
@@ -556,15 +577,19 @@ export function useItemsSchematics(): UseItemsSchematicsReturn {
   useEffect(() => {
     refetchTiers();
     refetchCategories();
+    refetchAllTypes();
+    refetchItems();
+    refetchSchematics();
     refetchFieldDefinitions();
     refetchDropdownGroups();
-  }, [refetchTiers, refetchCategories, refetchFieldDefinitions, refetchDropdownGroups]);
+  }, [refetchTiers, refetchCategories, refetchAllTypes, refetchItems, refetchSchematics, refetchFieldDefinitions, refetchDropdownGroups]);
 
   return {
     ...state,
     refetchTiers,
     refetchCategories,
     refetchTypes,
+    refetchAllTypes,
     refetchSubtypes,
     refetchItems,
     refetchSchematics,
