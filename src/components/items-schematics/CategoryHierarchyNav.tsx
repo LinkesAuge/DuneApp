@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronDown, ChevronRight, X, Plus, Package, FileText, Search, Filter, Check } from 'lucide-react';
+import { ChevronDown, ChevronRight, X, Plus, Package, FileText, Search, Filter, Check, Eye } from 'lucide-react';
 import { useItemsSchematics } from '../../hooks/useItemsSchematics';
 import CreateEditItemSchematicModal from './CreateEditItemSchematicModal';
 
@@ -203,49 +203,47 @@ const CategoryHierarchyNav: React.FC<CategoryHierarchyNavProps> = ({
     }
     
     setSelectedTiers(newSelectedTiers);
-    updateParentFilters(localActiveView, selectedCategories, selectedTypes, newSelectedTiers);
+    updateParentFilters(localActiveView, selectedCategories, newSelectedTypes, newSelectedTiers);
   };
 
-  // Handle "Show All" / "Hide All" toggle for categories and types only
+  // Toggle all categories
   const handleToggleAll = () => {
     const applicableCategories = getApplicableCategoriesForView(localActiveView);
-    const allCategoryIds = applicableCategories.map(cat => cat.id);
-    const allSelected = allCategoryIds.every(id => selectedCategories.has(id));
+    const allSelected = applicableCategories.every(cat => selectedCategories.has(cat.id));
     
     if (allSelected) {
-      // Hide all categories and types
+      // Hide all
       setSelectedCategories(new Set());
       setSelectedTypes(new Set());
-      updateParentFilters(localActiveView, new Set(), new Set(), selectedTiers);
     } else {
-      // Show all categories and types
-      const categoryIds = new Set(allCategoryIds);
-      const typeIds = new Set(types.map(type => type.id));
+      // Show all
+      const categoryIds = applicableCategories.map(cat => cat.id);
+      setSelectedCategories(new Set(categoryIds));
       
-      setSelectedCategories(categoryIds);
-      setSelectedTypes(typeIds);
-      updateParentFilters(localActiveView, categoryIds, typeIds, selectedTiers);
+      // Select all types from applicable categories
+      const typeIds = types
+        .filter(type => categoryIds.includes(type.category_id))
+        .map(type => type.id);
+      setSelectedTypes(new Set(typeIds));
     }
+    
+    updateParentFilters(localActiveView, selectedCategories, selectedTypes, selectedTiers);
   };
 
-  // Handle "Show All" / "Hide All" toggle for tiers only
+  // Toggle all tiers
   const handleToggleAllTiers = () => {
-    const allTierIds = tiers.map(tier => tier.id);
-    const allSelected = allTierIds.every(id => selectedTiers.has(id));
+    const allSelected = tiers.every(tier => selectedTiers.has(tier.id));
     
     if (allSelected) {
-      // Hide all tiers
       setSelectedTiers(new Set());
-      updateParentFilters(localActiveView, selectedCategories, selectedTypes, new Set());
     } else {
-      // Show all tiers
-      const tierIds = new Set(allTierIds);
-      setSelectedTiers(tierIds);
-      updateParentFilters(localActiveView, selectedCategories, selectedTypes, tierIds);
+      const tierIds = tiers.map(tier => tier.id);
+      setSelectedTiers(new Set(tierIds));
     }
+    
+    updateParentFilters(localActiveView, selectedCategories, selectedTypes, selectedTiers);
   };
 
-  // Get types for a specific category
   const getTypesForCategory = (categoryId: string) => {
     return types.filter(type => type.category_id === categoryId);
   };
@@ -266,380 +264,332 @@ const CategoryHierarchyNav: React.FC<CategoryHierarchyNavProps> = ({
 
   return (
     <>
-      <div className="h-full flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-amber-400/20">
-          <h2 className="text-lg font-light text-amber-200 tracking-wide"
-              style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-            Controls
-          </h2>
-          <button
-            onClick={onClose}
-            className="p-1 text-amber-200/70 hover:text-amber-300 hover:bg-amber-500/20 rounded transition-colors"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* View Selection */}
-        <div className="p-4 border-b border-amber-400/20">
-          <div className="space-y-3">
-            <h3 className="text-sm font-light text-amber-200/80 tracking-wide"
+      {/* Main Panel - Updated to match MapControlPanel styling */}
+      <div className="group relative h-full">
+        {/* Multi-layer background for Dune aesthetic */}
+        <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950" />
+        <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-800/40 to-slate-900/60" />
+        
+        <div className="relative h-full bg-slate-900 border-r border-amber-400/20 flex flex-col">
+          {/* Header */}
+          <div className="flex items-center justify-between p-4 border-b border-amber-400/20">
+            <h2 className="text-lg font-bold text-amber-200 tracking-wide"
                 style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-              View
-            </h3>
-            
-            <div className="flex border-b border-amber-400/20">
+              Controls
+            </h2>
+            <button
+              onClick={onClose}
+              className="text-amber-200/70 hover:text-amber-300 hover:bg-amber-500/20 rounded p-1 transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Compact Tab Navigation - matching MapControlPanel style */}
+          <div className="border-b border-amber-400/20">
+            <div className="flex">
               <button
                 onClick={() => handleViewChange('all')}
-                className={`relative px-4 py-3 text-sm font-light transition-all duration-700 group/all overflow-hidden ${
+                className={`flex-1 px-4 py-3 text-sm font-light transition-colors border-r border-amber-400/20 last:border-r-0 ${
                   localActiveView === 'all' 
-                    ? 'text-amber-200' 
-                    : 'text-amber-300/70 hover:text-amber-200'
+                    ? 'bg-slate-800/60 text-amber-200 border-b-2 border-amber-400' 
+                    : 'text-amber-300/70 hover:text-amber-200 hover:bg-slate-800/30'
                 }`}
                 style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
               >
-                {/* Background layers for active state */}
-                {localActiveView === 'all' && (
-                  <>
-                    <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900" />
-                    <div className="absolute inset-0 bg-gradient-to-b from-slate-950/90 via-slate-900/80 to-slate-800/60" />
-                  </>
-                )}
-                
-                {/* Interactive purple overlay */}
-                <div className="absolute inset-0 bg-gradient-to-r from-violet-600/20 via-violet-500/10 to-violet-600/20 opacity-0 group-hover/all:opacity-100 transition-opacity duration-300" />
-                
-                <div className="relative z-10 flex items-center tracking-wide">
-                  All
-                </div>
-                
-                {/* Expanding underline */}
-                <div className={`absolute bottom-0 left-0 h-0.5 bg-gradient-to-r from-transparent via-amber-400 to-transparent transition-all duration-700 ${
-                  localActiveView === 'all' ? 'w-full' : 'w-0 group-hover/all:w-full'
-                }`} />
+                All
               </button>
-              
               <button
                 onClick={() => handleViewChange('items')}
-                className={`relative px-4 py-3 text-sm font-light transition-all duration-700 group/items overflow-hidden ${
+                className={`flex-1 px-4 py-3 text-sm font-light transition-colors border-r border-amber-400/20 last:border-r-0 ${
                   localActiveView === 'items' 
-                    ? 'text-amber-200' 
-                    : 'text-amber-300/70 hover:text-amber-200'
+                    ? 'bg-slate-800/60 text-amber-200 border-b-2 border-amber-400' 
+                    : 'text-amber-300/70 hover:text-amber-200 hover:bg-slate-800/30'
                 }`}
                 style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
               >
-                {/* Background layers for active state */}
-                {localActiveView === 'items' && (
-                  <>
-                    <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900" />
-                    <div className="absolute inset-0 bg-gradient-to-b from-slate-950/90 via-slate-900/80 to-slate-800/60" />
-                  </>
-                )}
-                
-                {/* Interactive purple overlay */}
-                <div className="absolute inset-0 bg-gradient-to-r from-violet-600/20 via-violet-500/10 to-violet-600/20 opacity-0 group-hover/items:opacity-100 transition-opacity duration-300" />
-                
-                <div className="relative z-10 flex items-center tracking-wide">
-                  Items
-                </div>
-                
-                {/* Expanding underline */}
-                <div className={`absolute bottom-0 left-0 h-0.5 bg-gradient-to-r from-transparent via-amber-400 to-transparent transition-all duration-700 ${
-                  localActiveView === 'items' ? 'w-full' : 'w-0 group-hover/items:w-full'
-                }`} />
+                Items
               </button>
-              
               <button
                 onClick={() => handleViewChange('schematics')}
-                className={`relative px-4 py-3 text-sm font-light transition-all duration-700 group/schematics overflow-hidden ${
+                className={`flex-1 px-4 py-3 text-sm font-light transition-colors border-r border-amber-400/20 last:border-r-0 ${
                   localActiveView === 'schematics' 
-                    ? 'text-amber-200' 
-                    : 'text-amber-300/70 hover:text-amber-200'
+                    ? 'bg-slate-800/60 text-amber-200 border-b-2 border-amber-400' 
+                    : 'text-amber-300/70 hover:text-amber-200 hover:bg-slate-800/30'
                 }`}
                 style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
               >
-                {/* Background layers for active state */}
-                {localActiveView === 'schematics' && (
-                  <>
-                    <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900" />
-                    <div className="absolute inset-0 bg-gradient-to-b from-slate-950/90 via-slate-900/80 to-slate-800/60" />
-                  </>
-                )}
-                
-                {/* Interactive purple overlay */}
-                <div className="absolute inset-0 bg-gradient-to-r from-violet-600/20 via-violet-500/10 to-violet-600/20 opacity-0 group-hover/schematics:opacity-100 transition-opacity duration-300" />
-                
-                <div className="relative z-10 flex items-center tracking-wide">
-                  Schematics
-                </div>
-                
-                {/* Expanding underline */}
-                <div className={`absolute bottom-0 left-0 h-0.5 bg-gradient-to-r from-transparent via-amber-400 to-transparent transition-all duration-700 ${
-                  localActiveView === 'schematics' ? 'w-full' : 'w-0 group-hover/schematics:w-full'
-                }`} />
+                Schematics
               </button>
             </div>
           </div>
-        </div>
 
-        {/* Create New Button */}
-        <div className="p-4 border-b border-amber-400/20">
-          <button
-            onClick={handleCreateNew}
-            className="w-full flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-amber-500/20 to-amber-600/20 
-                     hover:from-amber-500/30 hover:to-amber-600/30 border border-amber-400/30 rounded-lg 
-                     text-amber-200 font-light tracking-wide transition-all duration-200"
-            style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
-          >
-            <Plus className="w-4 h-4" />
-            <Package className="w-4 h-4" />
-            Add Item / Schematic
-          </button>
-        </div>
-
-        {/* Search Section */}
-        <div className="p-4 border-b border-amber-400/20">
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-light text-amber-200/80 tracking-wide"
-                  style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-                Search
-              </h3>
-              <button
-                onClick={() => setShowAdvancedSearch(!showAdvancedSearch)}
-                className="text-xs text-amber-300/70 hover:text-amber-300 transition-colors font-light"
-                style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
-              >
-                {showAdvancedSearch ? 'Hide' : 'Advanced'}
-              </button>
-            </div>
-            
-            {/* Basic Search */}
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Search className="w-4 h-4 text-amber-300/60" />
-              </div>
-              <input
-                type="text"
-                value={localSearchTerm}
-                onChange={(e) => handleSearchChange(e.target.value)}
-                className="w-full pl-10 pr-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-amber-100 placeholder-slate-400
-                         focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all duration-200 text-sm"
-                style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
-                placeholder={`Search ${localActiveView === 'all' ? 'items & schematics' : localActiveView}...`}
-              />
-            </div>
-
-            {/* Advanced Search (Collapsible) */}
-            {showAdvancedSearch && (
-              <div className="space-y-3 p-3 bg-slate-800/40 border border-amber-400/10 rounded-lg">
-                <div>
-                  <label className="block text-xs text-amber-200/70 mb-1 font-light"
-                         style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-                    Created By
-                  </label>
-                  <input
-                    type="text"
-                    value={advancedFilters.createdBy}
-                    onChange={(e) => setAdvancedFilters(prev => ({ ...prev, createdBy: e.target.value }))}
-                    className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded text-amber-100 placeholder-slate-400
-                             focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all duration-200 text-sm"
-                    style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
-                    placeholder="Username or email"
-                  />
-                </div>
-                
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-xs text-amber-200/70 mb-1 font-light"
-                           style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-                      From Date
-                    </label>
-                    <input
-                      type="date"
-                      value={advancedFilters.dateFrom}
-                      onChange={(e) => setAdvancedFilters(prev => ({ ...prev, dateFrom: e.target.value }))}
-                      className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded text-amber-100
-                               focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all duration-200 text-sm"
-                      style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-amber-200/70 mb-1 font-light"
-                           style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-                      To Date
-                    </label>
-                    <input
-                      type="date"
-                      value={advancedFilters.dateTo}
-                      onChange={(e) => setAdvancedFilters(prev => ({ ...prev, dateTo: e.target.value }))}
-                      className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded text-amber-100
-                               focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all duration-200 text-sm"
-                      style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
-                    />
-                  </div>
-                </div>
-                
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={advancedFilters.hasDescription}
-                    onChange={(e) => setAdvancedFilters(prev => ({ ...prev, hasDescription: e.target.checked }))}
-                    className="rounded border-slate-600 bg-slate-800 text-amber-500 focus:ring-amber-500/30"
-                  />
-                  <span className="ml-2 text-sm text-amber-200/70 font-light"
-                        style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-                    Has description
-                  </span>
-                </label>
-              </div>
-            )}
+          {/* Create New Button */}
+          <div className="p-4 border-b border-amber-400/20">
+            <button
+              onClick={handleCreateNew}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-amber-500/20 to-amber-600/20 
+                       hover:from-amber-500/30 hover:to-amber-600/30 border border-amber-400/30 rounded-lg 
+                       text-amber-200 font-light tracking-wide transition-all duration-200"
+              style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
+            >
+              <Plus className="w-4 h-4" />
+              Add Item / Schematic
+            </button>
           </div>
-        </div>
 
-        {/* Filters Section */}
-        <div className="flex-1 overflow-y-auto p-4">
-          <div className="space-y-4">
-            {/* Category / Type Filter Header with All toggle */}
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-light text-amber-200/80 tracking-wide"
-                  style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-                Category / Type Filter
-              </h3>
-              <button
-                onClick={handleToggleAll}
-                className="text-xs text-amber-300/70 hover:text-amber-300 transition-colors font-light"
-                style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
-              >
-                {applicableCategories.every(cat => selectedCategories.has(cat.id)) ? 'Hide All' : 'Show All'}
-              </button>
-            </div>
-
-            {loading.categories ? (
-              <div className="flex items-center justify-center py-8">
-                <div className="w-6 h-6 border-2 border-amber-400/40 border-t-amber-400 rounded-full animate-spin" />
-                <span className="ml-2 text-amber-200/70 font-light">Loading...</span>
+          {/* Search Section */}
+          <div className="p-4 border-b border-amber-400/20">
+            <div className="space-y-3">
+              {/* Basic Search */}
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Search className="w-4 h-4 text-amber-300/60" />
+                </div>
+                <input
+                  type="text"
+                  value={localSearchTerm}
+                  onChange={(e) => handleSearchChange(e.target.value)}
+                  className="w-full pl-10 pr-10 py-2 bg-slate-800 border border-slate-600 rounded-lg text-amber-100 placeholder-slate-400
+                           focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all duration-200 text-sm"
+                  style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
+                  placeholder={`Search ${localActiveView === 'all' ? 'items & schematics' : localActiveView}...`}
+                />
+                {/* Advanced Search Toggle */}
+                <button
+                  onClick={() => setShowAdvancedSearch(!showAdvancedSearch)}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-amber-300/60 hover:text-amber-300 transition-colors"
+                  title="Advanced Search"
+                >
+                  <Filter className="w-4 h-4" />
+                </button>
               </div>
-            ) : (
-              <div className="space-y-3">
-                {/* Categories */}
-                {applicableCategories.map((category) => {
-                  const categoryTypes = getTypesForCategory(category.id);
-                  const isExpanded = expandedCategories.has(category.id);
-                  const isSelected = selectedCategories.has(category.id);
+
+              {/* Advanced Search (Collapsible) */}
+              {showAdvancedSearch && (
+                <div className="space-y-3 p-3 bg-slate-800/40 border border-amber-400/10 rounded-lg">
+                  <div>
+                    <label className="block text-xs text-amber-200/70 mb-1 font-light"
+                           style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                      Created By
+                    </label>
+                    <input
+                      type="text"
+                      value={advancedFilters.createdBy}
+                      onChange={(e) => setAdvancedFilters(prev => ({ ...prev, createdBy: e.target.value }))}
+                      className="w-full px-3 py-1.5 bg-slate-800 border border-slate-600 rounded text-amber-100 placeholder-slate-400
+                               focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all duration-200 text-xs"
+                      style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
+                      placeholder="Username or email"
+                    />
+                  </div>
                   
-                  return (
-                    <div key={category.id} className="space-y-2">
-                      {/* Category Header */}
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => toggleCategoryExpansion(category.id)}
-                          className="p-1 text-amber-200/60 hover:text-amber-300 rounded transition-colors"
-                          disabled={categoryTypes.length === 0}
-                        >
-                          {categoryTypes.length > 0 ? (
-                            isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />
-                          ) : (
-                            <div className="w-3 h-3" />
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs text-amber-200/70 mb-1 font-light"
+                             style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                        From Date
+                      </label>
+                      <input
+                        type="date"
+                        value={advancedFilters.dateFrom}
+                        onChange={(e) => setAdvancedFilters(prev => ({ ...prev, dateFrom: e.target.value }))}
+                        className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-amber-100
+                                 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all duration-200 text-xs"
+                        style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-amber-200/70 mb-1 font-light"
+                             style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                        To Date
+                      </label>
+                      <input
+                        type="date"
+                        value={advancedFilters.dateTo}
+                        onChange={(e) => setAdvancedFilters(prev => ({ ...prev, dateTo: e.target.value }))}
+                        className="w-full px-2 py-1.5 bg-slate-800 border border-slate-600 rounded text-amber-100
+                                 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all duration-200 text-xs"
+                        style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
+                      />
+                    </div>
+                  </div>
+                  
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={advancedFilters.hasDescription}
+                      onChange={(e) => setAdvancedFilters(prev => ({ ...prev, hasDescription: e.target.checked }))}
+                      className="rounded border-slate-600 bg-slate-800 text-amber-500 focus:ring-amber-500/30"
+                    />
+                    <span className="ml-2 text-xs text-amber-200/70 font-light"
+                          style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                      Has description
+                    </span>
+                  </label>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Scrollable Filters Section */}
+          <div className="flex-1 overflow-y-auto">
+            <div className="p-4 space-y-4">
+              {/* Category / Type Filter Header with All toggle */}
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-light text-amber-200/80 tracking-wide"
+                    style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                  Category / Type Filter
+                </h3>
+                <button
+                  onClick={handleToggleAll}
+                  className="text-xs text-amber-300/70 hover:text-amber-300 transition-colors font-light"
+                  style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
+                >
+                  {applicableCategories.every(cat => selectedCategories.has(cat.id)) ? 'Hide All' : 'Show All'}
+                </button>
+              </div>
+
+              {loading.categories ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="w-6 h-6 border-2 border-amber-400/40 border-t-amber-400 rounded-full animate-spin" />
+                  <span className="ml-2 text-amber-200/70 font-light text-sm">Loading...</span>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {/* Categories - Two Column Layout */}
+                  <div className="grid grid-cols-2 gap-2">
+                    {applicableCategories.map((category) => {
+                      const categoryTypes = getTypesForCategory(category.id);
+                      const isExpanded = expandedCategories.has(category.id);
+                      const isSelected = selectedCategories.has(category.id);
+                      
+                      return (
+                        <div key={category.id} className="space-y-1">
+                          {/* Category Header - Compact */}
+                          <div className="flex items-center justify-between p-2 rounded-lg bg-gradient-to-r from-slate-800/40 via-slate-700/30 to-slate-800/40 border border-amber-400/20">
+                            <div className="flex items-center gap-1 flex-1 min-w-0">
+                              <button
+                                onClick={() => toggleCategoryExpansion(category.id)}
+                                className="text-amber-400/70 hover:text-amber-300 transition-colors flex-shrink-0"
+                                disabled={categoryTypes.length === 0}
+                              >
+                                {categoryTypes.length > 0 ? (
+                                  isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />
+                                ) : (
+                                  <div className="w-3 h-3" />
+                                )}
+                              </button>
+                              
+                              <span className="text-xs font-light text-amber-200 truncate"
+                                    style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                                {category.name}
+                              </span>
+                              
+                              {categoryTypes.length > 0 && (
+                                <span className="text-xs bg-amber-500/20 text-amber-300 px-1 py-0.5 rounded-full flex-shrink-0">
+                                  {categoryTypes.length}
+                                </span>
+                              )}
+                            </div>
+                            
+                            {/* Category Toggle */}
+                            <button
+                              onClick={() => handleCategoryToggle(category.id)}
+                              className={`p-0.5 rounded transition-colors flex-shrink-0 ${
+                                isSelected 
+                                  ? 'text-amber-400 hover:text-amber-300' 
+                                  : 'text-amber-200/60 hover:text-amber-200'
+                              }`}
+                            >
+                              <Eye className="w-3 h-3" />
+                            </button>
+                          </div>
+
+                          {/* Types (when expanded) */}
+                          {isExpanded && categoryTypes.length > 0 && (
+                            <div className="ml-4 space-y-1">
+                              {categoryTypes.map((type) => {
+                                const isTypeSelected = selectedTypes.has(type.id);
+                                
+                                return (
+                                  <button
+                                    key={type.id}
+                                    onClick={() => handleTypeToggle(type.id)}
+                                    className={`w-full flex items-center gap-1 px-2 py-1 rounded transition-colors text-left ${
+                                      isTypeSelected 
+                                        ? 'bg-amber-500/10 text-amber-200' 
+                                        : 'text-amber-200/60 hover:text-amber-200 hover:bg-slate-800/30'
+                                    }`}
+                                  >
+                                    {isTypeSelected && <Check className="w-2 h-2 text-amber-400 flex-shrink-0" />}
+                                    <span className="text-xs flex-shrink-0">
+                                      {type.icon_fallback || type.icon || '📄'}
+                                    </span>
+                                    <span className="text-xs truncate"
+                                          style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                                      {type.name}
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                            </div>
                           )}
-                        </button>
-                        
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Tiers Section */}
+                  {tiers && tiers.length > 0 && (
+                    <div className="pt-3 border-t border-amber-400/20">
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="text-sm font-light text-amber-200/80 tracking-wide"
+                            style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                          Tiers
+                        </h4>
                         <button
-                          onClick={() => handleCategoryToggle(category.id)}
-                          className={`flex-1 flex items-center gap-2 p-2 rounded-lg text-left transition-all duration-200 font-light
-                                     ${isSelected 
-                                       ? 'bg-amber-500/20 text-amber-200 border border-amber-400/30' 
-                                       : 'text-amber-200/70 hover:text-amber-200 hover:bg-amber-500/10'}`}
+                          onClick={handleToggleAllTiers}
+                          className="text-xs text-amber-300/70 hover:text-amber-300 transition-colors font-light"
                           style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
                         >
-                          {isSelected && <Check className="w-3 h-3 text-amber-400" />}
-                          <span className="text-sm">
-                            {category.icon_fallback || category.icon || '📁'}
-                          </span>
-                          <span className="text-sm">{category.name}</span>
-                          {categoryTypes.length > 0 && (
-                            <span className="text-xs bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded-full ml-auto">
-                              {categoryTypes.length}
-                            </span>
-                          )}
+                          {tiers.every(tier => selectedTiers.has(tier.id)) ? 'Hide All' : 'Show All'}
                         </button>
                       </div>
-
-                      {/* Types (when expanded) */}
-                      {isExpanded && categoryTypes.length > 0 && (
-                        <div className="ml-6 space-y-1">
-                          {categoryTypes.map((type) => {
-                            const isTypeSelected = selectedTypes.has(type.id);
-                            
-                            return (
-                              <button
-                                key={type.id}
-                                onClick={() => handleTypeToggle(type.id)}
-                                className={`w-full flex items-center gap-2 p-2 rounded-lg text-left transition-all duration-200 font-light
-                                           ${isTypeSelected 
-                                             ? 'bg-amber-500/15 text-amber-200 border border-amber-400/20' 
-                                             : 'text-amber-200/60 hover:text-amber-200 hover:bg-amber-500/5'}`}
-                                style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
-                              >
-                                {isTypeSelected && <Check className="w-3 h-3 text-amber-400" />}
-                                <span className="text-xs">
-                                  {type.icon_fallback || type.icon || '📄'}
-                                </span>
-                                <span className="text-xs">{type.name}</span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
+                      
+                      {/* Tiers in Two Columns */}
+                      <div className="grid grid-cols-2 gap-1">
+                        {tiers.map((tier) => {
+                          const isSelected = selectedTiers.has(tier.id);
+                          
+                          return (
+                            <button
+                              key={tier.id}
+                              onClick={() => handleTierToggle(tier.id)}
+                              className={`flex items-center gap-1 px-2 py-1 rounded transition-colors text-left ${
+                                isSelected 
+                                  ? 'bg-amber-500/10 text-amber-200' 
+                                  : 'text-amber-200/60 hover:text-amber-200 hover:bg-slate-800/30'
+                              }`}
+                            >
+                              {isSelected && <Check className="w-2 h-2 text-amber-400 flex-shrink-0" />}
+                              <span 
+                                className="w-2 h-2 rounded-full flex-shrink-0"
+                                style={{ backgroundColor: tier.color || '#f59e0b' }}
+                              />
+                              <span className="text-xs truncate"
+                                    style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                                {tier.name}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
-                  );
-                })}
-
-                {/* Tiers Section */}
-                {tiers && tiers.length > 0 && (
-                  <div className="pt-4 border-t border-amber-400/20">
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="text-sm font-light text-amber-200/80 tracking-wide"
-                          style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-                        Tiers
-                      </h4>
-                      <button
-                        onClick={handleToggleAllTiers}
-                        className="text-xs text-amber-300/70 hover:text-amber-300 transition-colors font-light"
-                        style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
-                      >
-                        {tiers.every(tier => selectedTiers.has(tier.id)) ? 'Hide All' : 'Show All'}
-                      </button>
-                    </div>
-                    <div className="space-y-1">
-                      {tiers.map((tier) => {
-                        const isSelected = selectedTiers.has(tier.id);
-                        
-                        return (
-                          <button
-                            key={tier.id}
-                            onClick={() => handleTierToggle(tier.id)}
-                            className={`w-full flex items-center gap-2 p-2 rounded-lg text-left transition-all duration-200 font-light
-                                       ${isSelected 
-                                         ? 'bg-amber-500/15 text-amber-200 border border-amber-400/20' 
-                                         : 'text-amber-200/60 hover:text-amber-200 hover:bg-amber-500/5'}`}
-                            style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
-                          >
-                            {isSelected && <Check className="w-3 h-3 text-amber-400" />}
-                            <span 
-                              className="w-3 h-3 rounded-full"
-                              style={{ backgroundColor: tier.color || '#f59e0b' }}
-                            />
-                            <span className="text-sm">{tier.name}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

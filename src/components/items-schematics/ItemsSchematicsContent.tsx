@@ -365,70 +365,186 @@ const ListView: React.FC<{
   entities: Entity[];
   activeView: ActiveView;
   onItemSelect: (item: Entity) => void;
+  onEdit?: (entity: Entity) => void;
+  onDelete?: (entity: Entity) => void;
+  onPoiLink?: (entity: Entity) => void;
   // Helper functions
   getCategoryName: (categoryId: string) => string;
   getTypeName: (typeId: string) => string;
   getTierName: (tierId: string) => string;
-}> = ({ entities, activeView, onItemSelect, getCategoryName, getTypeName, getTierName }) => {
+  // Bulk selection props
+  selectedEntities?: string[];
+  onSelectionToggle?: (entityId: string) => void;
+  selectionMode?: boolean;
+}> = ({ 
+  entities, 
+  activeView, 
+  onItemSelect, 
+  onEdit, 
+  onDelete, 
+  onPoiLink, 
+  getCategoryName, 
+  getTypeName, 
+  getTierName,
+  selectedEntities = [], 
+  onSelectionToggle, 
+  selectionMode = false 
+}) => {
   if (entities.length === 0) {
     return <EmptyState activeView={activeView} />;
   }
 
   return (
-    <div className="p-6">
-      <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
-        <div className="divide-y divide-slate-200">
-          {entities.map(entity => (
-            <div
-              key={entity.id}
-              className="p-4 hover:bg-slate-50 cursor-pointer flex items-center justify-between"
-              onClick={() => onItemSelect(entity)}
-            >
-              <div className="flex items-center space-x-4">
+    <div className="space-y-2">
+      {entities.map(entity => {
+        const displayType = entity.entityType || (activeView === 'all' ? 'items' : activeView);
+        const isSelected = selectedEntities.includes(entity.id);
+        
+        return (
+          <div
+            key={entity.id}
+            className={`group relative bg-slate-900 border border-slate-700 rounded-lg overflow-hidden cursor-pointer transition-all duration-200 hover:shadow-xl ${
+              isSelected ? 'ring-2 ring-amber-400/50 border-amber-400/60' : 'hover:border-slate-600'
+            }`}
+            onClick={() => onItemSelect(entity)}
+          >
+            {/* Selection Checkbox */}
+            {selectionMode && onSelectionToggle && (
+              <div className="absolute top-3 right-3 z-10">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSelectionToggle(entity.id);
+                  }}
+                  className="p-1 hover:bg-amber-500/20 rounded"
+                >
+                  {isSelected ? (
+                    <CheckSquare className="w-4 h-4 text-amber-400" />
+                  ) : (
+                    <Square className="w-4 h-4 text-amber-200/60" />
+                  )}
+                </button>
+              </div>
+            )}
+
+            <div className="p-4 flex items-center justify-between">
+              <div className="flex items-center space-x-4 flex-1 min-w-0">
                 {/* Icon */}
-                <div className="w-10 h-10 bg-slate-100 rounded flex items-center justify-center">
+                <div className="w-12 h-12 flex items-center justify-center rounded-lg bg-slate-700 border border-slate-600 flex-shrink-0">
                   {entity.icon_url ? (
                     <img 
                       src={entity.icon_url} 
                       alt={entity.name}
-                      className="w-8 h-8 object-cover rounded"
+                      className="w-8 h-8 object-contain"
                     />
                   ) : (
-                    activeView === 'items' ? (
-                      <Package className="w-5 h-5 text-slate-400" />
+                    displayType === 'items' ? (
+                      <Package className="w-6 h-6 text-amber-400" />
                     ) : (
-                      <FileText className="w-5 h-5 text-slate-400" />
+                      <FileText className="w-6 h-6 text-amber-400" />
                     )
                   )}
                 </div>
 
-                {/* Info */}
-                <div>
-                  <h3 className="font-medium text-slate-900">{entity.name}</h3>
-                  <p className="text-sm text-slate-500">
-                    {getCategoryName(entity.category_id)} {entity.type_id ? `• ${getTypeName(entity.type_id)}` : ''}
-                    {entity.tier_id ? ` • ${getTierName(entity.tier_id)}` : ''}
-                  </p>
+                {/* Content */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center space-x-2 mb-1">
+                    <h3 className="text-lg font-bold text-amber-200 truncate"
+                        style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                      {entity.name}
+                    </h3>
+                    {/* Entity type badge when in 'all' view */}
+                    {activeView === 'all' && (
+                      <span className={`px-2 py-0.5 text-xs rounded ${
+                        displayType === 'items' ? 'bg-amber-600/70 text-amber-200' : 'bg-blue-600/70 text-blue-200'
+                      }`}>
+                        {displayType === 'items' ? 'Item' : 'Schematic'}
+                      </span>
+                    )}
+                  </div>
+                  
+                  {/* Tags */}
+                  <div className="flex items-center space-x-2 mb-2">
+                    {entity.category_id && (
+                      <span className="px-2 py-0.5 text-xs bg-slate-700 text-amber-300 rounded">
+                        {getCategoryName(entity.category_id)}
+                      </span>
+                    )}
+                    {entity.type_id && (
+                      <span className="px-2 py-0.5 text-xs bg-blue-600/70 text-blue-200 rounded">
+                        {getTypeName(entity.type_id)}
+                      </span>
+                    )}
+                    {entity.tier_id && (
+                      <span className="px-2 py-0.5 text-xs bg-amber-600/70 text-amber-200 rounded">
+                        {getTierName(entity.tier_id)}
+                      </span>
+                    )}
+                  </div>
+                  
+                  {/* Description */}
+                  {entity.description && (
+                    <p className="text-sm text-slate-300 line-clamp-1"
+                       style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                      {entity.description}
+                    </p>
+                  )}
                 </div>
               </div>
 
-              {/* Actions */}
-              <div className="flex items-center space-x-2">
+              {/* Action Buttons */}
+              <div className="flex items-center space-x-1 ml-4">
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     onItemSelect(entity);
                   }}
-                  className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded"
+                  className="p-1.5 text-slate-400 hover:text-amber-300 hover:bg-slate-700/50 rounded transition-colors"
                   title="View Details"
                 >
                   <Eye className="w-4 h-4" />
                 </button>
+                {onPoiLink && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onPoiLink(entity);
+                    }}
+                    className="p-1.5 text-slate-400 hover:text-purple-300 hover:bg-slate-700/50 rounded transition-colors"
+                    title="Manage POI Links"
+                  >
+                    <Link2 className="w-4 h-4" />
+                  </button>
+                )}
+                {onEdit && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onEdit(entity);
+                    }}
+                    className="p-1.5 text-slate-400 hover:text-blue-300 hover:bg-slate-700/50 rounded transition-colors"
+                    title="Edit"
+                  >
+                    <Edit className="w-4 h-4" />
+                  </button>
+                )}
+                {onDelete && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDelete(entity);
+                    }}
+                    className="p-1.5 text-slate-400 hover:text-red-300 hover:bg-slate-700/50 rounded transition-colors"
+                    title="Delete"
+                  >
+                    <Trash className="w-4 h-4" />
+                  </button>
+                )}
               </div>
             </div>
-          ))}
-        </div>
-      </div>
+          </div>
+        );
+      })}
     </div>
   );
 };
@@ -438,11 +554,32 @@ const TreeView: React.FC<{
   activeView: ActiveView;
   selectedCategory: Category | null;
   onItemSelect: (item: Entity) => void;
+  onEdit?: (entity: Entity) => void;
+  onDelete?: (entity: Entity) => void;
+  onPoiLink?: (entity: Entity) => void;
   // Helper functions
   getCategoryName: (categoryId: string) => string;
   getTypeName: (typeId: string) => string;
   getTierName: (tierId: string) => string;
-}> = ({ entities, activeView, selectedCategory, onItemSelect, getCategoryName, getTypeName, getTierName }) => {
+  // Bulk selection props
+  selectedEntities?: string[];
+  onSelectionToggle?: (entityId: string) => void;
+  selectionMode?: boolean;
+}> = ({ 
+  entities, 
+  activeView, 
+  selectedCategory, 
+  onItemSelect, 
+  onEdit, 
+  onDelete, 
+  onPoiLink, 
+  getCategoryName, 
+  getTypeName, 
+  getTierName,
+  selectedEntities = [], 
+  onSelectionToggle, 
+  selectionMode = false 
+}) => {
   if (entities.length === 0) {
     return <EmptyState activeView={activeView} />;
   }
@@ -463,53 +600,175 @@ const TreeView: React.FC<{
   }, {} as Record<string, { category: { id: string; name: string }; entities: Entity[] }>);
 
   return (
-    <div className="p-6">
-      <div className="space-y-6">
-        {Object.values(groupedEntities).map(group => (
-          <div key={group.category.id} className="bg-white rounded-lg border border-slate-200 overflow-hidden">
-            <div className="bg-slate-50 px-4 py-2 border-b border-slate-200">
-              <h3 className="font-medium text-slate-900">{group.category.name}</h3>
-              <p className="text-sm text-slate-500">{group.entities.length} {activeView}</p>
+    <div className="space-y-4">
+      {Object.values(groupedEntities).map(group => (
+        <div key={group.category.id} className="group relative">
+          <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 rounded-lg" />
+          <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-800/40 to-slate-900/60 rounded-lg" />
+          
+          <div className="relative bg-slate-900 border border-slate-700 rounded-lg overflow-hidden">
+            {/* Category Header */}
+            <div className="bg-slate-800/50 px-4 py-3 border-b border-slate-700">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-bold text-amber-200"
+                    style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                  {group.category.name}
+                </h3>
+                <span className="px-2 py-1 bg-amber-600/70 text-amber-200 text-xs rounded"
+                      style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                  {group.entities.length} {group.entities.length === 1 ? 'item' : 'items'}
+                </span>
+              </div>
             </div>
-            <div className="divide-y divide-slate-200">
-              {group.entities.map(entity => (
-                <div
-                  key={entity.id}
-                  className="p-3 hover:bg-slate-50 cursor-pointer flex items-center space-x-3"
-                  onClick={() => onItemSelect(entity)}
-                >
-                  <div className="w-8 h-8 bg-slate-100 rounded flex items-center justify-center">
-                    {entity.icon_url ? (
-                      <img 
-                        src={entity.icon_url} 
-                        alt={entity.name}
-                        className="w-6 h-6 object-cover rounded"
-                      />
-                    ) : (
-                      activeView === 'items' ? (
-                        <Package className="w-4 h-4 text-slate-400" />
-                      ) : (
-                        <FileText className="w-4 h-4 text-slate-400" />
-                      )
+
+            {/* Entities List */}
+            <div className="divide-y divide-slate-700">
+              {group.entities.map(entity => {
+                const displayType = entity.entityType || (activeView === 'all' ? 'items' : activeView);
+                const isSelected = selectedEntities.includes(entity.id);
+                
+                return (
+                  <div
+                    key={entity.id}
+                    className={`relative p-3 cursor-pointer transition-all duration-200 hover:bg-slate-700/30 ${
+                      isSelected ? 'bg-amber-500/10 border-r-2 border-amber-400' : ''
+                    }`}
+                    onClick={() => onItemSelect(entity)}
+                  >
+                    {/* Selection Checkbox */}
+                    {selectionMode && onSelectionToggle && (
+                      <div className="absolute top-2 right-2 z-10">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onSelectionToggle(entity.id);
+                          }}
+                          className="p-1 hover:bg-amber-500/20 rounded"
+                        >
+                          {isSelected ? (
+                            <CheckSquare className="w-4 h-4 text-amber-400" />
+                          ) : (
+                            <Square className="w-4 h-4 text-amber-200/60" />
+                          )}
+                        </button>
+                      </div>
                     )}
+
+                    <div className="flex items-center space-x-3">
+                      {/* Icon */}
+                      <div className="w-10 h-10 flex items-center justify-center rounded-lg bg-slate-700 border border-slate-600 flex-shrink-0">
+                        {entity.icon_url ? (
+                          <img 
+                            src={entity.icon_url} 
+                            alt={entity.name}
+                            className="w-6 h-6 object-contain"
+                          />
+                        ) : (
+                          displayType === 'items' ? (
+                            <Package className="w-5 h-5 text-amber-400" />
+                          ) : (
+                            <FileText className="w-5 h-5 text-amber-400" />
+                          )
+                        )}
+                      </div>
+                      
+                      {/* Content */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center space-x-2 mb-1">
+                          <h4 className="font-bold text-amber-200 truncate"
+                              style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                            {entity.name}
+                          </h4>
+                          {/* Entity type badge when in 'all' view */}
+                          {activeView === 'all' && (
+                            <span className={`px-2 py-0.5 text-xs rounded ${
+                              displayType === 'items' ? 'bg-amber-600/70 text-amber-200' : 'bg-blue-600/70 text-blue-200'
+                            }`}>
+                              {displayType === 'items' ? 'Item' : 'Schematic'}
+                            </span>
+                          )}
+                        </div>
+                        
+                        {/* Tags */}
+                        <div className="flex items-center space-x-2 mb-1">
+                          {entity.type_id && (
+                            <span className="px-2 py-0.5 text-xs bg-blue-600/70 text-blue-200 rounded">
+                              {getTypeName(entity.type_id)}
+                            </span>
+                          )}
+                          {entity.tier_id && (
+                            <span className="px-2 py-0.5 text-xs bg-amber-600/70 text-amber-200 rounded">
+                              {getTierName(entity.tier_id)}
+                            </span>
+                          )}
+                        </div>
+                        
+                        {/* Description */}
+                        {entity.description && (
+                          <p className="text-sm text-slate-300 line-clamp-1"
+                             style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                            {entity.description}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onItemSelect(entity);
+                          }}
+                          className="p-1.5 text-slate-400 hover:text-amber-300 hover:bg-slate-700/50 rounded transition-colors"
+                          title="View Details"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        {onPoiLink && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onPoiLink(entity);
+                            }}
+                            className="p-1.5 text-slate-400 hover:text-purple-300 hover:bg-slate-700/50 rounded transition-colors"
+                            title="Manage POI Links"
+                          >
+                            <Link2 className="w-4 h-4" />
+                          </button>
+                        )}
+                        {onEdit && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onEdit(entity);
+                            }}
+                            className="p-1.5 text-slate-400 hover:text-blue-300 hover:bg-slate-700/50 rounded transition-colors"
+                            title="Edit"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                        )}
+                        {onDelete && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onDelete(entity);
+                            }}
+                            className="p-1.5 text-slate-400 hover:text-red-300 hover:bg-slate-700/50 rounded transition-colors"
+                            title="Delete"
+                          >
+                            <Trash className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex-1">
-                    <h4 className="font-medium text-slate-900">{entity.name}</h4>
-                    {entity.description && (
-                      <p className="text-sm text-slate-500 truncate">{entity.description}</p>
-                    )}
-                  </div>
-                  {entity.tier_id && (
-                    <span className="text-xs px-2 py-1 bg-slate-100 text-slate-600 rounded">
-                      {getTierName(entity.tier_id)}
-                    </span>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
-        ))}
-      </div>
+        </div>
+      ))}
     </div>
   );
 };
@@ -560,6 +819,54 @@ const ItemsSchematicsContent: React.FC<ItemsSchematicsContentProps> = ({
   const [editingEntity, setEditingEntity] = useState<Entity | null>(null);
   const [deletingEntity, setDeletingEntity] = useState<Entity | null>(null);
   const [poiLinkEntity, setPoiLinkEntity] = useState<Entity | null>(null);
+
+  // POI data for link modal
+  const [availablePois, setAvailablePois] = useState<Poi[]>([]);
+  const [poiTypes, setPoiTypes] = useState<PoiType[]>([]);
+  const [loadingPoiData, setLoadingPoiData] = useState(false);
+
+  // Fetch POI data when modal opens
+  useEffect(() => {
+    const fetchPoiData = async () => {
+      if (!poiLinkEntity) return;
+      
+      setLoadingPoiData(true);
+      try {
+        // Fetch POIs
+        const { data: poisData, error: poisError } = await supabase
+          .from('pois')
+          .select('*')
+          .order('title');
+        
+        if (poisError) throw poisError;
+        setAvailablePois(poisData || []);
+
+        // Fetch POI types
+        const { data: typesData, error: typesError } = await supabase
+          .from('poi_types')
+          .select('*')
+          .order('name');
+        
+        if (typesError) throw typesError;
+        setPoiTypes(typesData || []);
+      } catch (error) {
+        console.error('Error fetching POI data:', error);
+      } finally {
+        setLoadingPoiData(false);
+      }
+    };
+
+    fetchPoiData();
+  }, [poiLinkEntity]);
+
+  // Handle refresh trigger from parent
+  useEffect(() => {
+    if (refreshTrigger > 0) {
+      console.log('🔄 Refresh trigger detected, refreshing data...');
+      refetchItems();
+      refetchSchematics();
+    }
+  }, [refreshTrigger, refetchItems, refetchSchematics]);
 
   // Helper functions to get display names
   const getCategoryName = (categoryId: string): string => {
@@ -626,6 +933,25 @@ const ItemsSchematicsContent: React.FC<ItemsSchematicsContentProps> = ({
 
   const handlePoiLink = (entity: Entity) => {
     setPoiLinkEntity(entity);
+  };
+
+  // Get proper typed entity for POI link modal
+  const getTypedEntityForModal = () => {
+    if (!poiLinkEntity) return { item: undefined, schematic: undefined };
+    
+    if (poiLinkEntity.entityType === 'items') {
+      const fullItem = getItemById(poiLinkEntity.id);
+      return { 
+        item: fullItem, 
+        schematic: undefined 
+      };
+    } else {
+      const fullSchematic = getSchematicById(poiLinkEntity.id);
+      return { 
+        item: undefined, 
+        schematic: fullSchematic 
+      };
+    }
   };
 
   const handleEntitySaved = (savedEntity: Entity) => {
@@ -903,6 +1229,19 @@ const ItemsSchematicsContent: React.FC<ItemsSchematicsContentProps> = ({
                  entities={sortedEntities}
                  activeView={activeView}
                  onItemSelect={onItemSelect}
+                 onEdit={handleEdit}
+                 onDelete={handleDelete}
+                 onPoiLink={handlePoiLink}
+                 selectedEntities={selectedEntities}
+                 onSelectionToggle={(entityId) => {
+                   if (onSelectionChange) {
+                     const newSelection = selectedEntities.includes(entityId)
+                       ? selectedEntities.filter(id => id !== entityId)
+                       : [...selectedEntities, entityId];
+                     onSelectionChange(newSelection);
+                   }
+                 }}
+                 selectionMode={selectedEntities.length > 0}
                  getCategoryName={getCategoryName}
                  getTypeName={getTypeName}
                  getTierName={getTierName}
@@ -914,6 +1253,19 @@ const ItemsSchematicsContent: React.FC<ItemsSchematicsContentProps> = ({
                  activeView={activeView}
                  selectedCategory={selectedCategory}
                  onItemSelect={onItemSelect}
+                 onEdit={handleEdit}
+                 onDelete={handleDelete}
+                 onPoiLink={handlePoiLink}
+                 selectedEntities={selectedEntities}
+                 onSelectionToggle={(entityId) => {
+                   if (onSelectionChange) {
+                     const newSelection = selectedEntities.includes(entityId)
+                       ? selectedEntities.filter(id => id !== entityId)
+                       : [...selectedEntities, entityId];
+                     onSelectionChange(newSelection);
+                   }
+                 }}
+                 selectionMode={selectedEntities.length > 0}
                  getCategoryName={getCategoryName}
                  getTypeName={getTypeName}
                  getTierName={getTierName}
@@ -970,21 +1322,28 @@ const ItemsSchematicsContent: React.FC<ItemsSchematicsContentProps> = ({
       )}
 
       {/* POI Link Modal */}
-      {poiLinkEntity && (
-        <PoiItemLinkModal
-          isOpen={true}
-          onClose={() => setPoiLinkEntity(null)}
-          entity={{
-            id: poiLinkEntity.id,
-            name: poiLinkEntity.name,
-            type: poiLinkEntity.entityType === 'items' ? 'item' : 'schematic'
-          }}
-          onLinksUpdated={() => {
-            // Refresh data if needed
-            console.log('POI links updated for:', poiLinkEntity.name);
-          }}
-        />
-      )}
+      {poiLinkEntity && (() => {
+        const { item, schematic } = getTypedEntityForModal();
+        return (
+          <PoiItemLinkModal
+            isOpen={true}
+            onClose={() => setPoiLinkEntity(null)}
+            onSuccess={() => {
+              // Refresh data if needed
+              console.log('POI links updated for:', poiLinkEntity.name);
+              setPoiLinkEntity(null);
+            }}
+            // Pass the properly typed entity
+            item={item}
+            schematic={schematic}
+            // Provide all available data for selections
+            availablePois={availablePois}
+            availableItems={items}
+            availableSchematics={schematics}
+            poiTypes={poiTypes}
+          />
+        );
+      })()}
     </div>
   );
 };
