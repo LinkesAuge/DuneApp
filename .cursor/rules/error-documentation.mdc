@@ -293,3 +293,43 @@ This document tracks known issues, their states, context, and resolutions encoun
 -   **Lesson Learned**: When implementing complex async state management with multiple callback functions, always verify that variables referenced in callbacks are defined in the correct function scope. Variable scope errors can create silent failures that break functionality without throwing visible exceptions. Use consistent variable naming patterns and verify each callback function uses only variables from its own scope or properly passed parameters. Always test all combinations of filter interactions to catch cross-functional state management issues.
 
 ---
+
+-   **Date**: 2025-01-30
+-   **Error Description**: "Hide All" filter buttons not working - empty filter arrays treated as "skip filtering" instead of "hide all entities".
+-   **Context/Symptoms**: 
+    1. User reported that "Show All" toggle buttons worked correctly, but "Hide All" buttons did nothing
+    2. Console logs showed filter arrays correctly becoming empty `[]` when "Hide All" was clicked
+    3. Entities continued to display even when filters should have hidden everything
+    4. No JavaScript errors or warnings, making it appear to be a logic issue rather than a runtime error
+-   **Investigation/Diagnosis**:
+    -   **Root Cause**: Filtering logic in `ItemsSchematicsContent.tsx` had conditional checks `if (filters.categories && filters.categories.length > 0)` that skipped entire filtering blocks when arrays were empty
+    -   **Logic Flaw**: When "Hide All" was clicked, filter arrays became empty `[]`, causing `filters.categories.length > 0` to be false, which skipped filtering entirely instead of filtering out all entities
+    -   **Pattern Issue**: The code only handled two cases: "all selected" (show all) and "some selected" (filter), but missed the third case: "none selected" (hide all)
+    -   **Silent Failure**: The bug didn't throw exceptions but caused filtering to fail silently, making entities appear when they should have been hidden
+-   **Solution/Fix**:
+    1.  **Enhanced Category Filtering**: Changed from conditional execution to always-execute pattern:
+        ```typescript
+        // Before (buggy):
+        if (filters.categories && filters.categories.length > 0) {
+          // filtering logic only ran when array had items
+        }
+        
+        // After (fixed):
+        if (filters.categories) {
+          if (filters.categories.length === 0) {
+            entities = []; // Empty array = hide all
+          } else {
+            // normal filtering logic for non-empty arrays
+          }
+        }
+        ```
+    2.  **Applied Same Fix to Tier Filtering**: Updated tier filtering logic to handle empty arrays as "hide all" rather than "skip filtering"
+    3.  **Three-Case Logic**: Now properly handles all filtering states:
+        - All items selected → Show all (no filtering)
+        - Some items selected → Show only selected items
+        - No items selected (empty array) → Hide all items
+-   **Files Affected**:
+    -   `src/components/items-schematics/ItemsSchematicsContent.tsx` (Fixed category and tier filtering logic)
+-   **Lesson Learned**: When implementing toggle-based filtering systems with "Show All/Hide All" functionality: (1) Always handle empty filter arrays explicitly as "hide all" rather than "skip filtering", (2) Design filtering logic to handle three distinct states rather than just two, (3) Test all toggle combinations including the "Hide All" state which often gets overlooked, (4) Be careful with conditional filtering logic that might skip execution entirely when arrays are empty, (5) Consider using explicit state values instead of inferring behavior from array length.
+
+---

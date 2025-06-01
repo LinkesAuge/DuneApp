@@ -62,36 +62,61 @@ const CategoryHierarchyNav: React.FC<CategoryHierarchyNavProps> = ({
     setLocalActiveView(activeView);
   }, [activeView]);
 
-  // Initialize filters when data loads
+  // Initialize filters when data loads or view changes
   useEffect(() => {
     if (!filtersInitialized && categories.length > 0 && tiers.length > 0) {
-      console.log('Initializing filters...');
-      console.log('Categories:', categories);
-      console.log('Types:', types); 
-      console.log('Tiers:', tiers);
-      
       // Get categories that apply to current view
       const applicableCategories = getApplicableCategoriesForView(localActiveView);
-      console.log('Applicable categories for view', localActiveView, ':', applicableCategories);
       
-      // Select all applicable categories
+      // Start with all categories/tiers selected (show all entities)
       const categoryIds = applicableCategories.map(cat => cat.id);
       setSelectedCategories(new Set(categoryIds));
       
-      // Select all types (we'll filter them by applicable categories later)
-      const typeIds = types.map(type => type.id);
+      // Select all types from applicable categories
+      const typeIds = types
+        .filter(type => categoryIds.includes(type.category_id))
+        .map(type => type.id);
       setSelectedTypes(new Set(typeIds));
       
-      // Select all tiers independently
+      // Select all tiers
       const tierIds = tiers.map(tier => tier.id);
       setSelectedTiers(new Set(tierIds));
       
       setFiltersInitialized(true);
       
-      // Update parent with initial filters
+      // Update parent with initial filters (all selected = show all)
       updateParentFilters(localActiveView, new Set(categoryIds), new Set(typeIds), new Set(tierIds));
+    } else if (categories.length === 0 || tiers.length === 0) {
+      // If data isn't loaded yet, send empty filters but don't mark as initialized
+      // This ensures the parent component shows all entities while data is loading
+      updateParentFilters(localActiveView, new Set(), new Set(), new Set());
     }
   }, [categories, types, tiers, localActiveView, filtersInitialized]);
+
+  // Also handle immediate view changes even if filters aren't fully initialized
+  useEffect(() => {
+    if (categories.length > 0 && tiers.length > 0) {
+      // Get categories that apply to current view
+      const applicableCategories = getApplicableCategoriesForView(localActiveView);
+      
+      // Update selected categories to only include applicable ones
+      const applicableCategoryIds = new Set(applicableCategories.map(cat => cat.id));
+      const updatedSelectedCategories = new Set(
+        Array.from(selectedCategories).filter(catId => applicableCategoryIds.has(catId))
+      );
+      
+      // If no applicable categories are selected, select all applicable ones (default show all)
+      if (updatedSelectedCategories.size === 0 && applicableCategories.length > 0) {
+        applicableCategories.forEach(cat => updatedSelectedCategories.add(cat.id));
+      }
+      
+      // Update if there was a change
+      if (updatedSelectedCategories.size !== selectedCategories.size) {
+        setSelectedCategories(updatedSelectedCategories);
+        updateParentFilters(localActiveView, updatedSelectedCategories, selectedTypes, selectedTiers);
+      }
+    }
+  }, [localActiveView]);  // Only depend on view changes
 
   // Get categories that apply to a specific view
   const getApplicableCategoriesForView = (view: ActiveView) => {
@@ -118,13 +143,11 @@ const CategoryHierarchyNav: React.FC<CategoryHierarchyNavProps> = ({
       ...advancedFilters
     };
     
-    console.log('Updating parent filters:', filters);
     onFiltersChange(filters);
   };
 
   // Handle view change
   const handleViewChange = (view: ActiveView) => {
-    console.log('View changed to:', view);
     setLocalActiveView(view);
     
     // Reset filters when view changes to ensure we show applicable categories
@@ -206,26 +229,27 @@ const CategoryHierarchyNav: React.FC<CategoryHierarchyNavProps> = ({
     updateParentFilters(localActiveView, selectedCategories, selectedTypes, newSelectedTiers);
   };
 
-  // Toggle all categories
+  // Toggle all categories - Fixed for new filtering logic
   const handleToggleAll = () => {
     const applicableCategories = getApplicableCategoriesForView(localActiveView);
-    const allSelected = applicableCategories.every(cat => selectedCategories.has(cat.id));
+    const applicableCategoryIds = applicableCategories.map(cat => cat.id);
+    const allSelected = applicableCategoryIds.length > 0 && 
+      applicableCategoryIds.every(catId => selectedCategories.has(catId));
     
     let newSelectedCategories: Set<string>;
     let newSelectedTypes: Set<string>;
     
     if (allSelected) {
-      // Hide all
+      // Currently showing all (all categories selected) -> Hide all (select none)
       newSelectedCategories = new Set();
       newSelectedTypes = new Set();
     } else {
-      // Show all
-      const categoryIds = applicableCategories.map(cat => cat.id);
-      newSelectedCategories = new Set(categoryIds);
+      // Currently filtered -> Show all (select all categories)
+      newSelectedCategories = new Set(applicableCategoryIds);
       
       // Select all types from applicable categories
       const typeIds = types
-        .filter(type => categoryIds.includes(type.category_id))
+        .filter(type => applicableCategoryIds.includes(type.category_id))
         .map(type => type.id);
       newSelectedTypes = new Set(typeIds);
     }
@@ -235,16 +259,19 @@ const CategoryHierarchyNav: React.FC<CategoryHierarchyNavProps> = ({
     updateParentFilters(localActiveView, newSelectedCategories, newSelectedTypes, selectedTiers);
   };
 
-  // Toggle all tiers
+  // Toggle all tiers - Fixed for new filtering logic  
   const handleToggleAllTiers = () => {
-    const allSelected = tiers.every(tier => selectedTiers.has(tier.id));
+    const tierIds = tiers.map(tier => tier.id);
+    const allSelected = tierIds.length > 0 && 
+      tierIds.every(tierId => selectedTiers.has(tierId));
     
     let newSelectedTiers: Set<string>;
     
     if (allSelected) {
+      // Currently showing all (all tiers selected) -> Hide all (select none)
       newSelectedTiers = new Set();
     } else {
-      const tierIds = tiers.map(tier => tier.id);
+      // Currently filtered -> Show all (select all tiers)
       newSelectedTiers = new Set(tierIds);
     }
     
@@ -504,7 +531,13 @@ const CategoryHierarchyNav: React.FC<CategoryHierarchyNavProps> = ({
                   className="text-xs text-amber-300/70 hover:text-amber-300 transition-colors font-light"
                   style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
                 >
-                  {applicableCategories.every(cat => selectedCategories.has(cat.id)) ? 'Hide All' : 'Show All'}
+                  {(() => {
+                    const applicableCategories = getApplicableCategoriesForView(localActiveView);
+                    const applicableCategoryIds = applicableCategories.map(cat => cat.id);
+                    const allSelected = applicableCategoryIds.length > 0 && 
+                      applicableCategoryIds.every(catId => selectedCategories.has(catId));
+                    return allSelected ? 'Hide All' : 'Show All';
+                  })()}
                 </button>
               </div>
 
@@ -611,7 +644,12 @@ const CategoryHierarchyNav: React.FC<CategoryHierarchyNavProps> = ({
                           className="text-xs text-amber-300/70 hover:text-amber-300 transition-colors font-light"
                           style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
                         >
-                          {tiers.every(tier => selectedTiers.has(tier.id)) ? 'Hide All' : 'Show All'}
+                          {(() => {
+                            const tierIds = tiers.map(tier => tier.id);
+                            const allSelected = tierIds.length > 0 && 
+                              tierIds.every(tierId => selectedTiers.has(tierId));
+                            return allSelected ? 'Hide All' : 'Show All';
+                          })()}
                         </button>
                       </div>
                       

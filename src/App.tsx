@@ -13,6 +13,7 @@ import GridPage from './pages/GridPage';
 import UITestPage from './pages/UITestPage';
 import ProfilePage from './pages/ProfilePage';
 import ItemsSchematicsPage from './pages/ItemsSchematicsPage';
+import PoiLinkingPage from './pages/PoiLinkingPage';
 import { SharedImagesTest } from './pages/SharedImagesTest';
 import { useAuth } from './components/auth/AuthProvider';
 import { AlertTriangle } from 'lucide-react';
@@ -136,6 +137,22 @@ const AppRoutes: React.FC = () => {
         element={
           <ProtectedRoute>
             <ItemsSchematicsPage />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/items/:entityId/link-pois" 
+        element={
+          <ProtectedRoute>
+            <PoiLinkingPage />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/schematics/:entityId/link-pois" 
+        element={
+          <ProtectedRoute>
+            <PoiLinkingPage />
           </ProtectedRoute>
         } 
       />

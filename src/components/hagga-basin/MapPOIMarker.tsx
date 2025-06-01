@@ -16,6 +16,9 @@ interface MapPOIMarkerProps {
   onShare?: (poi: Poi) => void;
   onImageClick?: () => void;
   isHighlighted?: boolean;
+  // Selection mode props
+  selectionMode?: boolean;
+  isSelected?: boolean;
 }
 
 // Helper function to determine if an icon is a URL or emoji
@@ -71,7 +74,9 @@ const MapPOIMarker: React.FC<MapPOIMarkerProps> = ({
   onDelete,
   onShare,
   onImageClick,
-  isHighlighted
+  isHighlighted,
+  selectionMode = false,
+  isSelected = false
 }) => {
   const [showCard, setShowCard] = useState(false);
   const [hoverTimeout, setHoverTimeout] = useState<NodeJS.Timeout | null>(null);
@@ -106,14 +111,7 @@ const MapPOIMarker: React.FC<MapPOIMarkerProps> = ({
     fetchUserInfo();
   }, [poi.created_by]);
 
-  // Debug highlighting changes
-  useEffect(() => {
-    if (isHighlighted) {
-      console.log('MapPOIMarker: POI', poi.title, 'is now highlighted!');
-    } else {
-      console.log('MapPOIMarker: POI', poi.title, 'highlighting removed');
-    }
-  }, [isHighlighted, poi.title]);
+  // Note: Removed debug highlighting logs to reduce console noise
 
   // Calculate icon size with subtle scaling from admin settings
   const baseSize = mapSettings?.iconBaseSize || 72;
@@ -178,7 +176,15 @@ const MapPOIMarker: React.FC<MapPOIMarkerProps> = ({
       <div className="relative">
         {/* POI Icon */}
         <div 
-          className="rounded-full border-2 border-white shadow-lg flex items-center justify-center transition-all duration-200 cursor-pointer hover:scale-110"
+          className={`rounded-full border-2 shadow-lg flex items-center justify-center transition-all duration-200 cursor-pointer hover:scale-110 ${
+            selectionMode 
+              ? isSelected 
+                ? 'border-amber-400 ring-2 ring-amber-400/50' 
+                : 'border-white hover:border-amber-300'
+              : isHighlighted 
+                ? 'border-amber-400 ring-2 ring-amber-400/50' 
+                : 'border-white'
+          }`}
           style={{
             width: `${iconSize}px`,
             height: `${iconSize}px`,
@@ -272,9 +278,20 @@ const MapPOIMarker: React.FC<MapPOIMarkerProps> = ({
           </div>
         )}
 
+        {/* Selection Indicator */}
+        {selectionMode && isSelected && (
+          <div className="absolute -top-2 -right-2 w-6 h-6 bg-amber-500 rounded-full border-2 border-white flex items-center justify-center shadow-lg">
+            <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+            </svg>
+          </div>
+        )}
+
         {/* Privacy Indicator */}
         {poi.privacy_level !== 'global' && (
-          <div className="absolute -top-1 -right-1 w-4 h-4 bg-white rounded-full border border-sand-200 flex items-center justify-center">
+          <div className={`absolute -top-1 w-4 h-4 bg-white rounded-full border border-sand-200 flex items-center justify-center ${
+            selectionMode && isSelected ? '-right-8' : '-right-1'
+          }`}>
             <PrivacyIcon className={`w-2.5 h-2.5 ${privacyColor}`} />
           </div>
         )}

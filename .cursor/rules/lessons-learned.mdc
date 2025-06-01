@@ -745,6 +745,22 @@ This document serves as a learning journal for the Dune Awakening Deep Desert Tr
 
 ---
 
+### 2025-01-30: Toggle-Based Filtering Logic Pattern - Critical Design Consideration
+-   **Topic/Feature**: Toggle-Based Filtering Systems - Empty Array Handling Pattern.
+-   **Observation/Pattern**: When implementing "Show All/Hide All" toggle functionality, there's a critical difference between "skip filtering" and "hide all" that can create subtle but serious bugs. Empty filter arrays `[]` should explicitly mean "hide all entities" rather than "skip the filtering step".
+-   **Decision/Action Taken**: 
+    1.  **Three-State Logic Pattern**: Always design filtering logic to handle three distinct states:
+        - All items selected → Show all (no filtering applied)
+        - Some items selected → Show only selected items (apply filter)
+        - No items selected (empty array) → Hide all items (explicit empty result)
+    2.  **Always-Execute Pattern**: Use `if (filters.array)` instead of `if (filters.array && filters.array.length > 0)` to ensure filtering logic always executes
+    3.  **Explicit Empty Handling**: Check for `array.length === 0` first and handle it explicitly rather than letting it fall through
+-   **Rationale**: To prevent silent filtering failures where "Hide All" buttons appear to work (state updates correctly) but don't actually hide entities because the filtering logic is bypassed entirely.
+-   **Impact/Outcome**: Robust toggle-based filtering that works correctly for all user interactions including edge cases like "Hide All" which are often overlooked during testing.
+-   **Future Consideration**: This pattern should be applied to any toggle-based filtering system. Always test "Hide All", "Show All", and partial selection scenarios. Consider using TypeScript union types to make filter states more explicit (e.g., `'all' | 'none' | string[]` instead of just `string[]`).
+
+---
+
 ### 2025-01-30: Final UI Polish - Navbar Spacing & Filter State Management Success
 -   **Topic/Feature**: Final UI Polish - Navbar Spacing Optimization & Filter Bug Resolution.
 -   **Observation/Pattern**: 

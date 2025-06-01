@@ -17,16 +17,16 @@ import POIEditModal from './POIEditModal';
 import POICard from '../common/POICard';
 
 interface InteractiveMapProps {
-  baseMap: HaggaBasinBaseMap;
-  overlays: HaggaBasinOverlay[];
+  baseMap?: HaggaBasinBaseMap;
+  overlays?: HaggaBasinOverlay[];
   pois: Poi[];
-  poiTypes: PoiType[];
-  onPoiCreated: (poi: Poi) => void;
+  poiTypes?: PoiType[];
+  onPoiCreated?: (poi: Poi) => void;
   onPoiUpdated?: (poi: Poi) => void;
   onPoiDeleted?: (poiId: string) => void;
   onPoiShare?: (poi: Poi) => void;
   onPoiGalleryOpen?: (poi: Poi) => void;
-  customIcons: CustomIcon[];
+  customIcons?: CustomIcon[];
   placementMode?: boolean;
   onPlacementModeChange?: (mode: boolean) => void;
   // Help tooltip props
@@ -34,6 +34,12 @@ interface InteractiveMapProps {
   onHelpTooltipChange?: (show: boolean) => void;
   // Highlighting prop
   highlightedPoiId?: string | null;
+  // POI Selection mode props (for linking workflows)
+  selectionMode?: boolean;
+  selectedPoiIds?: Set<string>;
+  onPoiClick?: (poi: Poi) => void;
+  // Map type support
+  mapType?: 'hagga_basin' | 'deep_desert';
 }
 
 // Map configuration for zoom/pan (initialScale will be set dynamically)
@@ -62,22 +68,27 @@ const layerZIndex = {
 
 const InteractiveMap: React.FC<InteractiveMapProps> = ({
   baseMap,
-  overlays,
+  overlays = [],
   pois,
-  poiTypes,
+  poiTypes = [],
   onPoiCreated,
   onPoiUpdated,
   onPoiDeleted,
   onPoiShare,
   onPoiGalleryOpen,
-  customIcons,
+  customIcons = [],
   placementMode = false,
   onPlacementModeChange,
   // Help tooltip props
   showHelpTooltip = false,
   onHelpTooltipChange,
   // Highlighting prop
-  highlightedPoiId
+  highlightedPoiId,
+  // Selection mode props
+  selectionMode = false,
+  selectedPoiIds = new Set(),
+  onPoiClick,
+  mapType = 'hagga_basin'
 }) => {
   const transformRef = useRef<ReactZoomPanPinchRef | null>(null);
   const mapElementRef = useRef<HTMLDivElement | null>(null);
@@ -203,8 +214,14 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const handlePoiClick = useCallback((poi: Poi, event: React.MouseEvent) => {
     event.preventDefault();
     event.stopPropagation();
-    setSelectedPoi(poi);
-  }, []);
+    
+    // If in selection mode, trigger the onPoiClick callback instead of showing details
+    if (selectionMode && onPoiClick) {
+      onPoiClick(poi);
+    } else {
+      setSelectedPoi(poi);
+    }
+  }, [selectionMode, onPoiClick]);
 
   // Handle successful POI creation
   const handlePoiCreated = useCallback((newPoi: Poi) => {
@@ -280,20 +297,7 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
     };
   };
 
-  // Highlighted POI effect (no centering/zooming)
-  useEffect(() => {
-    if (highlightedPoiId) {
-      console.log('HaggaBasin: Highlighting POI:', highlightedPoiId);
-      const highlightedPoi = pois.find(poi => poi.id === highlightedPoiId);
-      if (highlightedPoi) {
-        console.log('HaggaBasin: Found POI to highlight:', highlightedPoi.title);
-      } else {
-        console.log('HaggaBasin: POI not found for highlighting');
-      }
-    } else {
-      console.log('HaggaBasin: No POI highlighted');
-    }
-  }, [highlightedPoiId, pois]);
+  // Note: Removed debug highlighting logs to reduce console noise
 
   return (
     <div className="w-full h-full relative overflow-hidden">
@@ -387,6 +391,8 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
                       console.log('Open gallery for POI:', poi.id);
                     }}
                     isHighlighted={highlightedPoiId === poi.id}
+                    selectionMode={selectionMode}
+                    isSelected={selectedPoiIds.has(poi.id)}
                   />
                 </div>
               );

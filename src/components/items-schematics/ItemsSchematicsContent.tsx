@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Package, FileText, Eye, Edit, Trash, PanelLeftOpen, PanelLeftClose, PanelRightOpen, PanelRightClose, CheckSquare, Square, Edit2, Link2, Cube, DocumentText, Search, Grid3X3, List, TreePine, SortAsc, SortDesc, Filter, ArrowUp, ArrowDown } from 'lucide-react';
+import { Package, FileText, Eye, Edit, Trash, PanelLeftOpen, PanelLeftClose, PanelRightOpen, PanelRightClose, CheckSquare, Square, Edit2, Link2, Cube, DocumentText, Search, Grid3X3, List, TreePine, SortAsc, SortDesc, Filter, ArrowUp, ArrowDown, MapPin } from 'lucide-react';
 import { useActiveViewData } from '../../hooks/useItemsSchematicsData';
 import { useItemsSchematics } from '../../hooks/useItemsSchematics';
 import CreateEditItemSchematicModal from './CreateEditItemSchematicModal';
 import BulkOperationsModal from './BulkOperationsModal';
 
-import PoiItemLinkModal from './PoiItemLinkModal';
+
+import LinkPoisButton from './LinkPoisButton';
+import LinkingButton from './LinkingButton';
+import PoiLinkCounter from './PoiLinkCounter';
 import { getItemWithLocations, getSchematicWithLocations } from '../../lib/api/poiItemLinks';
 import { supabase } from '../../lib/supabase';
 import type { ItemWithLocations, SchematicWithLocations, PoiLocationInfo, Poi, PoiType } from '../../types';
@@ -124,6 +127,7 @@ const EntityCard: React.FC<{
   onEdit?: (entity: Entity) => void;
   onDelete?: (entity: Entity) => void;
   onPoiLink?: (entity: Entity) => void;
+  onLinksUpdated?: () => void;
   // Helper functions
   getCategoryName: (categoryId: string) => string;
   getTypeName: (typeId: string) => string;
@@ -139,6 +143,7 @@ const EntityCard: React.FC<{
   onEdit, 
   onDelete, 
   onPoiLink, 
+  onLinksUpdated,
   getCategoryName,
   getTypeName,
   getTierName,
@@ -261,17 +266,25 @@ const EntityCard: React.FC<{
               <Eye className="w-4 h-4" />
             </button>
             {onPoiLink && (
-              <button
+              <LinkingButton
+                direction="manage_links"
                 onClick={(e) => {
                   e.stopPropagation();
                   onPoiLink(entity);
                 }}
-                className="p-1.5 text-slate-400 hover:text-purple-300 hover:bg-slate-700/50 rounded transition-colors"
-                title="Manage POI Links"
-              >
-                <Link2 className="w-4 h-4" />
-              </button>
+              />
             )}
+            <div className="flex items-center space-x-1">
+              <LinkPoisButton
+                entity={entity}
+                entityType={entity.entityType === 'schematics' ? 'schematic' : 'item'}
+                onLinksUpdated={onLinksUpdated}
+              />
+              <PoiLinkCounter
+                entityId={entity.id}
+                entityType={entity.entityType === 'schematics' ? 'schematic' : 'item'}
+              />
+            </div>
           </div>
           
           <div className="flex items-center space-x-1">
@@ -313,6 +326,7 @@ const GridView: React.FC<{
   onEdit?: (entity: Entity) => void;
   onDelete?: (entity: Entity) => void;
   onPoiLink?: (entity: Entity) => void;
+  onLinksUpdated?: () => void;
   // Helper functions
   getCategoryName: (categoryId: string) => string;
   getTypeName: (typeId: string) => string;
@@ -328,6 +342,7 @@ const GridView: React.FC<{
   onEdit, 
   onDelete, 
   onPoiLink, 
+  onLinksUpdated,
   getCategoryName,
   getTypeName,
   getTierName,
@@ -351,6 +366,7 @@ const GridView: React.FC<{
             onEdit={onEdit}
             onDelete={onDelete}
             onPoiLink={onPoiLink}
+            onLinksUpdated={onLinksUpdated}
             isSelected={selectedEntities.includes(entity.id)}
             onSelectionToggle={onSelectionToggle}
             selectionMode={selectionMode}
@@ -371,6 +387,7 @@ const ListView: React.FC<{
   onEdit?: (entity: Entity) => void;
   onDelete?: (entity: Entity) => void;
   onPoiLink?: (entity: Entity) => void;
+  onLinksUpdated?: () => void;
   // Helper functions
   getCategoryName: (categoryId: string) => string;
   getTypeName: (typeId: string) => string;
@@ -386,6 +403,7 @@ const ListView: React.FC<{
   onEdit, 
   onDelete, 
   onPoiLink, 
+  onLinksUpdated,
   getCategoryName, 
   getTypeName, 
   getTierName,
@@ -511,17 +529,25 @@ const ListView: React.FC<{
                   <Eye className="w-4 h-4" />
                 </button>
                 {onPoiLink && (
-                  <button
+                  <LinkingButton
+                    direction="manage_links"
                     onClick={(e) => {
                       e.stopPropagation();
                       onPoiLink(entity);
                     }}
-                    className="p-1.5 text-slate-400 hover:text-purple-300 hover:bg-slate-700/50 rounded transition-colors"
-                    title="Manage POI Links"
-                  >
-                    <Link2 className="w-4 h-4" />
-                  </button>
+                  />
                 )}
+                <div className="flex items-center space-x-1">
+                  <LinkPoisButton
+                    entity={entity}
+                    entityType={entity.entityType === 'schematics' ? 'schematic' : 'item'}
+                    onLinksUpdated={onLinksUpdated}
+                  />
+                  <PoiLinkCounter
+                    entityId={entity.id}
+                    entityType={entity.entityType === 'schematics' ? 'schematic' : 'item'}
+                  />
+                </div>
                 {onEdit && (
                   <button
                     onClick={(e) => {
@@ -563,6 +589,7 @@ const TreeView: React.FC<{
   onEdit?: (entity: Entity) => void;
   onDelete?: (entity: Entity) => void;
   onPoiLink?: (entity: Entity) => void;
+  onLinksUpdated?: () => void;
   // Helper functions
   getCategoryName: (categoryId: string) => string;
   getTypeName: (typeId: string) => string;
@@ -579,6 +606,7 @@ const TreeView: React.FC<{
   onEdit, 
   onDelete, 
   onPoiLink, 
+  onLinksUpdated,
   getCategoryName, 
   getTypeName, 
   getTierName,
@@ -734,17 +762,25 @@ const TreeView: React.FC<{
                           <Eye className="w-4 h-4" />
                         </button>
                         {onPoiLink && (
-                          <button
+                          <LinkingButton
+                            direction="manage_links"
                             onClick={(e) => {
                               e.stopPropagation();
                               onPoiLink(entity);
                             }}
-                            className="p-1.5 text-slate-400 hover:text-purple-300 hover:bg-slate-700/50 rounded transition-colors"
-                            title="Manage POI Links"
-                          >
-                            <Link2 className="w-4 h-4" />
-                          </button>
+                          />
                         )}
+                        <div className="flex items-center space-x-1">
+                          <LinkPoisButton
+                            entity={entity}
+                            entityType={entity.entityType === 'schematics' ? 'schematic' : 'item'}
+                            onLinksUpdated={onLinksUpdated}
+                          />
+                          <PoiLinkCounter
+                            entityId={entity.id}
+                            entityType={entity.entityType === 'schematics' ? 'schematic' : 'item'}
+                          />
+                        </div>
                         {onEdit && (
                           <button
                             onClick={(e) => {
@@ -827,46 +863,6 @@ const ItemsSchematicsContent: React.FC<ItemsSchematicsContentProps> = ({
   // Modal states
   const [editingEntity, setEditingEntity] = useState<Entity | null>(null);
   const [deletingEntity, setDeletingEntity] = useState<Entity | null>(null);
-  const [poiLinkEntity, setPoiLinkEntity] = useState<Entity | null>(null);
-
-  // POI data for link modal
-  const [availablePois, setAvailablePois] = useState<Poi[]>([]);
-  const [poiTypes, setPoiTypes] = useState<PoiType[]>([]);
-  const [loadingPoiData, setLoadingPoiData] = useState(false);
-
-  // Fetch POI data when modal opens
-  useEffect(() => {
-    const fetchPoiData = async () => {
-      if (!poiLinkEntity) return;
-      
-      setLoadingPoiData(true);
-      try {
-        // Fetch POIs
-        const { data: poisData, error: poisError } = await supabase
-          .from('pois')
-          .select('*')
-          .order('title');
-        
-        if (poisError) throw poisError;
-        setAvailablePois(poisData || []);
-
-        // Fetch POI types
-        const { data: typesData, error: typesError } = await supabase
-          .from('poi_types')
-          .select('*')
-          .order('name');
-        
-        if (typesError) throw typesError;
-        setPoiTypes(typesData || []);
-      } catch (error) {
-        console.error('Error fetching POI data:', error);
-      } finally {
-        setLoadingPoiData(false);
-      }
-    };
-
-    fetchPoiData();
-  }, [poiLinkEntity]);
 
   // Handle refresh trigger from parent
   useEffect(() => {
@@ -940,28 +936,7 @@ const ItemsSchematicsContent: React.FC<ItemsSchematicsContentProps> = ({
     }
   };
 
-  const handlePoiLink = (entity: Entity) => {
-    setPoiLinkEntity(entity);
-  };
 
-  // Get proper typed entity for POI link modal
-  const getTypedEntityForModal = () => {
-    if (!poiLinkEntity) return { item: undefined, schematic: undefined };
-    
-    if (poiLinkEntity.entityType === 'items') {
-      const fullItem = getItemById(poiLinkEntity.id);
-      return { 
-        item: fullItem, 
-        schematic: undefined 
-      };
-    } else {
-      const fullSchematic = getSchematicById(poiLinkEntity.id);
-      return { 
-        item: undefined, 
-        schematic: fullSchematic 
-      };
-    }
-  };
 
   const handleEntitySaved = (savedEntity: Entity) => {
     console.log('✅ Entity saved successfully:', savedEntity);
@@ -987,13 +962,18 @@ const ItemsSchematicsContent: React.FC<ItemsSchematicsContentProps> = ({
     }
   };
 
+  const handleLinksUpdated = () => {
+    // Refresh data to show updated link information
+    console.log('POI links updated, refreshing data...');
+    // Small delay to ensure database changes are committed
+    setTimeout(() => {
+      refetchItems();
+      refetchSchematics();
+    }, 100);
+  };
+
   // Simple, clean filtering logic
   const getFilteredEntities = () => {
-    console.log('Filtering entities...');
-    console.log('Active view:', activeView);
-    console.log('Filters:', filters);
-    console.log('Items count:', items.length);
-    console.log('Schematics count:', schematics.length);
 
     let entities: Entity[] = [];
 
@@ -1012,43 +992,76 @@ const ItemsSchematicsContent: React.FC<ItemsSchematicsContentProps> = ({
       entities = schematics.map(schematic => ({ ...schematic, entityType: 'schematics' as const }));
     }
 
-    console.log('After view filtering:', entities.length, 'entities');
+
 
     // Step 2: Apply hierarchical filters (categories, types, tiers)
     if (filters) {
-      // Category filtering - only show entities whose categories are selected
+      // Get available categories and tiers for comparison
+      const availableCategories = categories.filter(cat => {
+        if (viewFromFilters === 'all') return true;
+        if (Array.isArray(cat.applies_to)) {
+          return cat.applies_to.includes(viewFromFilters) || cat.applies_to.includes('both');
+        }
+        return cat.applies_to === 'both' || cat.applies_to === viewFromFilters;
+      });
+      const availableCategoryIds = availableCategories.map(cat => cat.id);
+      const availableTierIds = tiers.map(tier => tier.id);
+
+      // Category filtering - always apply, handle empty array as "hide all"
       if (filters.categories) {
-        if (filters.categories.length > 0) {
-          entities = entities.filter(entity => 
-            filters.categories.includes(entity.category_id)
-          );
-        } else {
-          // Empty array means hide all
+        if (filters.categories.length === 0) {
+          // Empty array means "Hide All" - filter out everything
           entities = [];
+        } else {
+          // Check if all available categories are selected (show all)
+          const allCategoriesSelected = availableCategoryIds.length > 0 && 
+            availableCategoryIds.every(catId => filters.categories.includes(catId));
+            
+          if (!allCategoriesSelected) {
+            // Some categories selected - filter to show only those
+            entities = entities.filter(entity => 
+              filters.categories.includes(entity.category_id)
+            );
+          }
+          // If allCategoriesSelected is true, don't filter (show all)
         }
       }
 
-      // Type filtering - only show entities whose types are selected (or have no type)
-      if (filters.types) {
-        if (filters.types.length > 0) {
+      // Type filtering - only filter if we have types selected and not all are selected
+      if (filters.types && filters.types.length > 0) {
+        // Get available types for current categories
+        const availableTypes = types.filter(type => 
+          filters.categories ? filters.categories.includes(type.category_id) : true
+        );
+        const availableTypeIds = availableTypes.map(type => type.id);
+        
+        const allTypesSelected = availableTypeIds.length > 0 && 
+          availableTypeIds.every(typeId => filters.types.includes(typeId));
+          
+        if (!allTypesSelected) {
           entities = entities.filter(entity => 
             !entity.type_id || filters.types.includes(entity.type_id)
           );
-        } else {
-          // Empty array means hide all
-          entities = [];
         }
       }
 
-      // Tier filtering - only show entities whose tiers are selected (or have no tier)
+      // Tier filtering - always apply, handle empty array as "hide all"
       if (filters.tiers) {
-        if (filters.tiers.length > 0) {
-          entities = entities.filter(entity => 
-            !entity.tier_id || filters.tiers.includes(entity.tier_id)
-          );
-        } else {
-          // Empty array means hide all - filter out all entities
+        if (filters.tiers.length === 0) {
+          // Empty array means "Hide All" - filter out everything
           entities = [];
+        } else {
+          // Check if all available tiers are selected (show all)
+          const allTiersSelected = availableTierIds.length > 0 && 
+            availableTierIds.every(tierId => filters.tiers.includes(tierId));
+            
+          if (!allTiersSelected) {
+            // Some tiers selected - filter to show only those
+            entities = entities.filter(entity => 
+              !entity.tier_id || filters.tiers.includes(entity.tier_id)
+            );
+          }
+          // If allTiersSelected is true, don't filter (show all)
         }
       }
 
@@ -1086,7 +1099,6 @@ const ItemsSchematicsContent: React.FC<ItemsSchematicsContentProps> = ({
       }
     }
 
-    console.log('After all filtering:', entities.length, 'entities');
     return entities;
   };
 
@@ -1225,7 +1237,7 @@ const ItemsSchematicsContent: React.FC<ItemsSchematicsContentProps> = ({
                 onItemSelect={onItemSelect}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
-                onPoiLink={handlePoiLink}
+                onLinksUpdated={handleLinksUpdated}
                 selectedEntities={selectedEntities}
                 onSelectionToggle={(entityId) => {
                   if (onSelectionChange) {
@@ -1248,7 +1260,7 @@ const ItemsSchematicsContent: React.FC<ItemsSchematicsContentProps> = ({
                 onItemSelect={onItemSelect}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
-                onPoiLink={handlePoiLink}
+                onLinksUpdated={handleLinksUpdated}
                 selectedEntities={selectedEntities}
                 onSelectionToggle={(entityId) => {
                   if (onSelectionChange) {
@@ -1272,7 +1284,7 @@ const ItemsSchematicsContent: React.FC<ItemsSchematicsContentProps> = ({
                 onItemSelect={onItemSelect}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
-                onPoiLink={handlePoiLink}
+                onLinksUpdated={handleLinksUpdated}
                 selectedEntities={selectedEntities}
                 onSelectionToggle={(entityId) => {
                   if (onSelectionChange) {
@@ -1338,29 +1350,7 @@ const ItemsSchematicsContent: React.FC<ItemsSchematicsContentProps> = ({
         </div>
       )}
 
-      {/* POI Link Modal */}
-      {poiLinkEntity && (() => {
-        const { item, schematic } = getTypedEntityForModal();
-        return (
-          <PoiItemLinkModal
-            isOpen={true}
-            onClose={() => setPoiLinkEntity(null)}
-            onSuccess={() => {
-              // Refresh data if needed
-              console.log('POI links updated for:', poiLinkEntity.name);
-              setPoiLinkEntity(null);
-            }}
-            // Pass the properly typed entity
-            item={item}
-            schematic={schematic}
-            // Provide all available data for selections
-            availablePois={availablePois}
-            availableItems={items}
-            availableSchematics={schematics}
-            poiTypes={poiTypes}
-          />
-        );
-      })()}
+
     </div>
   );
 };
