@@ -271,3 +271,25 @@ This document tracks known issues, their states, context, and resolutions encoun
 -   **Lesson Learned**: For complex database migrations involving conditional schema changes: (1) Always use existence checks before adding columns or updating data, (2) Avoid UNION statements with embedded ORDER BY clauses in PostgreSQL, (3) Build migrations that are idempotent and safe to re-run, (4) Use DO blocks for conditional logic rather than assuming database state, (5) Test migration scripts incrementally rather than attempting comprehensive changes at once, (6) Clean up failed migration files immediately to prevent confusion and re-use of broken scripts, (7) Design migrations that gracefully handle missing source columns (like `created_by` not existing in some tables).
 
 ---
+
+-   **Date**: 2025-01-30
+-   **Error Description**: Tiers filtering not working due to variable scope bug in async state management callback.
+-   **Context/Symptoms**: 
+    1. Users reported that the tiers filter on the Items & Schematics page was not functioning correctly
+    2. Other filters (categories/types) were working properly, but tier selections were not affecting displayed results
+    3. Console debugging showed state changes happening correctly but filtering logic was receiving incorrect data
+    4. No visible JavaScript errors in console, making the issue appear to be a logic problem rather than a runtime error
+-   **Investigation/Diagnosis**:
+    -   **Root Cause**: In `CategoryHierarchyNav.tsx`, the `handleTierToggle` function was incorrectly calling `updateParentFilters(localActiveView, selectedCategories, newSelectedTypes, newSelectedTiers)` where `newSelectedTypes` was undefined in that function scope
+    -   **Variable Scope Error**: The function was trying to reference `newSelectedTypes` which belonged to the `handleTypeToggle` function scope, not the `handleTierToggle` function scope
+    -   **Async State Issue**: This caused the parent filter update to receive incorrect type filter data when tier filtering was attempted, breaking the filtering logic
+    -   **Silent Failure**: The error didn't throw exceptions but caused filtering to fail silently by passing undefined values to the parent component
+-   **Solution/Fix**:
+    1.  **Fixed Variable Reference**: Changed `updateParentFilters(localActiveView, selectedCategories, newSelectedTypes, newSelectedTiers)` to `updateParentFilters(localActiveView, selectedCategories, selectedTypes, newSelectedTiers)` in `handleTierToggle`
+    2.  **Verified Scope**: Ensured all variables passed to `updateParentFilters` are defined in the current function scope
+    3.  **End-to-End Testing**: Performed comprehensive testing to verify all filtering combinations work correctly
+-   **Files Affected**:
+    -   `src/components/items-schematics/CategoryHierarchyNav.tsx` (Fixed variable scope in handleTierToggle function)
+-   **Lesson Learned**: When implementing complex async state management with multiple callback functions, always verify that variables referenced in callbacks are defined in the correct function scope. Variable scope errors can create silent failures that break functionality without throwing visible exceptions. Use consistent variable naming patterns and verify each callback function uses only variables from its own scope or properly passed parameters. Always test all combinations of filter interactions to catch cross-functional state management issues.
+
+---
