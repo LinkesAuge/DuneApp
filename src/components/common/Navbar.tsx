@@ -241,7 +241,7 @@ const Navbar: React.FC = () => {
           <div className="flex items-center h-16">
             
             {/* Expanded Logo Section - Use Trebuchet MS as per guide */}
-            <div className="flex-1 max-w-lg mr-12">
+            <div className="flex-1 max-w-lg mr-28">
               <Link to="/" className="group relative flex items-center h-16 px-8 transition-all duration-300" style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
                 {/* Logo button background image - Should align with NavButton styling */}
                 <div 
@@ -261,10 +261,10 @@ const Navbar: React.FC = () => {
                   <img 
                     src={`/images/dune-log.png?v=${Date.now()}`}
                     alt="DUNE AWAKENING TRACKER" 
-                    className="h-12 w-auto object-contain transition-all duration-300 group-hover:scale-105 drop-shadow-sm"
+                    className="h-14 w-auto object-contain transition-all duration-300 group-hover:scale-105 drop-shadow-sm"
                     style={{ 
                       filter: 'brightness(1.1) contrast(1.05)',
-                      maxWidth: '250px'
+                      maxWidth: '300px'
                     }}
                   />
                   {/* If "DUNE AWAKENING TRACKER" text is separate and needs styling: */}

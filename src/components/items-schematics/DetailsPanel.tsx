@@ -97,7 +97,7 @@ const EmptyDetailsPanel: React.FC<{ activeView: ActiveView }> = ({ activeView })
     ) : (
       <FileText className="w-16 h-16 text-amber-200/40 mb-4" />
     )}
-    <h3 className="text-lg font-light text-gold-300 mb-2 tracking-wide"
+    <h3 className="text-lg font-light text-amber-300 mb-2 tracking-wide"
         style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
       No {activeView === 'items' ? 'Item' : 'Schematic'} Selected
     </h3>
@@ -138,7 +138,7 @@ const EntityActions: React.FC<{ entity: Entity }> = ({ entity }) => {
     <div className="flex items-center gap-2">
       <button
         onClick={handleFavorite}
-        className="p-2 text-amber-200/70 hover:text-gold-300 hover:bg-gold-300/20 rounded-lg transition-colors"
+        className="p-2 text-amber-200/70 hover:text-amber-300 hover:bg-amber-500/20 rounded-lg transition-colors"
         title="Add to Favorites"
       >
         <Star className="w-4 h-4" />
@@ -146,7 +146,7 @@ const EntityActions: React.FC<{ entity: Entity }> = ({ entity }) => {
       
       <button
         onClick={handleShare}
-        className="p-2 text-amber-200/70 hover:text-gold-300 hover:bg-gold-300/20 rounded-lg transition-colors"
+        className="p-2 text-amber-200/70 hover:text-amber-300 hover:bg-amber-500/20 rounded-lg transition-colors"
         title="Share"
       >
         <Share className="w-4 h-4" />
@@ -155,7 +155,7 @@ const EntityActions: React.FC<{ entity: Entity }> = ({ entity }) => {
       {permissions.canEdit && (
         <button
           onClick={handleEdit}
-          className="p-2 text-amber-200/70 hover:text-gold-300 hover:bg-gold-300/20 rounded-lg transition-colors"
+          className="p-2 text-amber-200/70 hover:text-amber-300 hover:bg-amber-500/20 rounded-lg transition-colors"
           title="Edit"
         >
           <Edit className="w-4 h-4" />
@@ -165,7 +165,7 @@ const EntityActions: React.FC<{ entity: Entity }> = ({ entity }) => {
       {permissions.canDelete && (
         <button
           onClick={handleDelete}
-          className="p-2 text-amber-200/70 hover:text-red-300 hover:bg-red-300/20 rounded-lg transition-colors"
+          className="p-2 text-amber-200/70 hover:text-red-300 hover:bg-red-500/20 rounded-lg transition-colors"
           title="Delete"
         >
           <Trash className="w-4 h-4" />
@@ -181,7 +181,17 @@ const DetailsPanel: React.FC<DetailsPanelProps> = ({
   onClose
 }) => {
   if (!selectedItem) {
-    return <EmptyDetailsPanel activeView={activeView} />;
+    return (
+      <div className="group relative h-full">
+        {/* Multi-layer background for Dune aesthetic */}
+        <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950" />
+        <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-800/40 to-slate-900/60" />
+        
+        <div className="relative h-full bg-slate-900 border-l border-amber-400/20">
+          <EmptyDetailsPanel activeView={activeView} />
+        </div>
+      </div>
+    );
   }
 
   const formatDate = (dateString: string) => {
@@ -195,122 +205,146 @@ const DetailsPanel: React.FC<DetailsPanelProps> = ({
   };
 
   return (
-    <div className="h-full flex flex-col">
-      {/* Header */}
-      <div className="p-4 border-b border-amber-400/20">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-light text-amber-200 tracking-wide"
+    <div className="group relative h-full">
+      {/* Multi-layer background for Dune aesthetic */}
+      <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950" />
+      <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-800/40 to-slate-900/60" />
+      
+      <div className="relative h-full bg-slate-900 border-l border-amber-400/20 flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-amber-400/20">
+          <h2 className="text-lg font-bold text-amber-200 tracking-wide"
               style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
             Details
           </h2>
           {onClose && (
             <button
               onClick={onClose}
-              className="p-1 text-amber-200/70 hover:text-amber-300 hover:bg-amber-500/20 rounded transition-colors"
+              className="text-amber-200/70 hover:text-amber-300 hover:bg-amber-500/20 rounded p-1 transition-colors"
+              title="Close Details Panel"
             >
               <X className="w-4 h-4" />
             </button>
           )}
         </div>
-      </div>
 
-      {/* Details Content */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-6">
-        {/* Basic Information */}
-        <DetailSection title="Information">
-          <div className="space-y-4">
-            <DetailRow
-              label="Created"
-              value={formatDate(selectedItem.created_at)}
-              icon={<Calendar className="w-4 h-4" />}
-            />
+        {/* Entity Header */}
+        <div className="p-4 border-b border-amber-400/20">
+          <div className="flex items-start gap-4">
+            {/* Entity Icon */}
+            <div className="w-12 h-12 flex items-center justify-center rounded-lg bg-slate-700 border border-slate-600 flex-shrink-0">
+              {selectedItem.icon_url ? (
+                <img 
+                  src={selectedItem.icon_url} 
+                  alt={selectedItem.name}
+                  className="w-8 h-8 object-contain"
+                />
+              ) : (
+                activeView === 'items' ? (
+                  <Package className="w-6 h-6 text-amber-400" />
+                ) : (
+                  <FileText className="w-6 h-6 text-amber-400" />
+                )
+              )}
+            </div>
             
-            {selectedItem.updated_at && selectedItem.updated_at !== selectedItem.created_at && (
+            {/* Entity Info */}
+            <div className="flex-1 min-w-0">
+              <h3 className="text-xl font-bold text-amber-200 mb-1"
+                  style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                {selectedItem.name}
+              </h3>
+              {selectedItem.description && (
+                <p className="text-sm text-amber-200/70 font-light leading-relaxed"
+                   style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                  {selectedItem.description}
+                </p>
+              )}
+              
+              {/* Tags */}
+              <div className="flex flex-wrap items-center gap-2 mt-3">
+                {selectedItem.category && (
+                  <span className="px-2 py-0.5 text-xs bg-slate-700 text-amber-300 rounded">
+                    {selectedItem.category.name}
+                  </span>
+                )}
+                {selectedItem.type && (
+                  <span className="px-2 py-0.5 text-xs bg-blue-600/70 text-blue-200 rounded">
+                    {selectedItem.type.name}
+                  </span>
+                )}
+                {selectedItem.tier && <TierBadge tier={selectedItem.tier} />}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Details Content */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-6">
+          {/* Basic Information */}
+          <DetailSection title="Information">
+            <div className="space-y-4">
               <DetailRow
-                label="Last Updated"
-                value={formatDate(selectedItem.updated_at)}
+                label="Created"
+                value={formatDate(selectedItem.created_at)}
                 icon={<Calendar className="w-4 h-4" />}
               />
-            )}
-
-            {selectedItem.created_by && (
-              <DetailRow
-                label="Created By"
-                value={selectedItem.created_by}
-                icon={<User className="w-4 h-4" />}
-              />
-            )}
-          </div>
-        </DetailSection>
-
-        {/* Category & Type Information */}
-        <DetailSection title="Classification">
-          <div className="space-y-4">
-            {selectedItem.category && (
-              <DetailRow
-                label="Category"
-                value={
-                  <div className="flex items-center gap-2">
-                    {selectedItem.category.icon && (
-                      <span>{selectedItem.category.icon}</span>
-                    )}
-                    {selectedItem.category.name}
-                  </div>
-                }
-                icon={<Tag className="w-4 h-4" />}
-              />
-            )}
-
-            {selectedItem.type && (
-              <DetailRow
-                label="Type"
-                value={selectedItem.type.name}
-                icon={<Tag className="w-4 h-4" />}
-              />
-            )}
-
-            {selectedItem.tier && (
-              <DetailRow
-                label="Tier"
-                value={<TierBadge tier={selectedItem.tier} />}
-                icon={<Tag className="w-4 h-4" />}
-              />
-            )}
-          </div>
-        </DetailSection>
-
-        {/* Dynamic Fields */}
-        {selectedItem.field_values && Object.keys(selectedItem.field_values).length > 0 && (
-          <DetailSection title="Properties">
-            <div className="space-y-4">
-              {Object.entries(selectedItem.field_values).map(([key, value]) => (
+              
+              {selectedItem.updated_at && selectedItem.updated_at !== selectedItem.created_at && (
                 <DetailRow
-                  key={key}
-                  label={key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                  value={String(value)}
+                  label="Last Updated"
+                  value={formatDate(selectedItem.updated_at)}
+                  icon={<Calendar className="w-4 h-4" />}
                 />
-              ))}
+              )}
+
+              {selectedItem.created_by && (
+                <DetailRow
+                  label="Created By"
+                  value={selectedItem.created_by}
+                  icon={<User className="w-4 h-4" />}
+                />
+              )}
             </div>
           </DetailSection>
-        )}
 
-        {/* Additional Actions */}
-        <DetailSection title="Actions">
-          <div className="space-y-2">
-            <button className="w-full text-left px-3 py-2 text-sm text-amber-200/70 hover:text-gold-300 hover:bg-gold-300/20 rounded-lg transition-colors font-light"
-                    style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-              View Full History
-            </button>
-            <button className="w-full text-left px-3 py-2 text-sm text-amber-200/70 hover:text-gold-300 hover:bg-gold-300/20 rounded-lg transition-colors font-light"
-                    style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-              Export Data
-            </button>
-            <button className="w-full text-left px-3 py-2 text-sm text-amber-200/70 hover:text-gold-300 hover:bg-gold-300/20 rounded-lg transition-colors font-light"
-                    style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-              Report Issue
-            </button>
-          </div>
-        </DetailSection>
+          {/* Dynamic Fields */}
+          {selectedItem.field_values && Object.keys(selectedItem.field_values).length > 0 && (
+            <DetailSection title="Properties">
+              <div className="space-y-4">
+                {Object.entries(selectedItem.field_values).map(([key, value]) => (
+                  <DetailRow
+                    key={key}
+                    label={key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                    value={String(value)}
+                  />
+                ))}
+              </div>
+            </DetailSection>
+          )}
+
+          {/* Entity Actions */}
+          <DetailSection title="Actions">
+            <div className="space-y-2">
+              <EntityActions entity={selectedItem} />
+              
+              <div className="pt-2 border-t border-amber-400/10">
+                <button className="w-full text-left px-3 py-2 text-sm text-amber-200/70 hover:text-amber-300 hover:bg-amber-500/10 rounded-lg transition-colors font-light"
+                        style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                  View Full History
+                </button>
+                <button className="w-full text-left px-3 py-2 text-sm text-amber-200/70 hover:text-amber-300 hover:bg-amber-500/10 rounded-lg transition-colors font-light"
+                        style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                  Export Data
+                </button>
+                <button className="w-full text-left px-3 py-2 text-sm text-amber-200/70 hover:text-amber-300 hover:bg-amber-500/10 rounded-lg transition-colors font-light"
+                        style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                  Report Issue
+                </button>
+              </div>
+            </div>
+          </DetailSection>
+        </div>
       </div>
     </div>
   );

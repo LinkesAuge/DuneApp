@@ -203,7 +203,7 @@ const CategoryHierarchyNav: React.FC<CategoryHierarchyNavProps> = ({
     }
     
     setSelectedTiers(newSelectedTiers);
-    updateParentFilters(localActiveView, selectedCategories, newSelectedTypes, newSelectedTiers);
+    updateParentFilters(localActiveView, selectedCategories, selectedTypes, newSelectedTiers);
   };
 
   // Toggle all categories
@@ -211,37 +211,45 @@ const CategoryHierarchyNav: React.FC<CategoryHierarchyNavProps> = ({
     const applicableCategories = getApplicableCategoriesForView(localActiveView);
     const allSelected = applicableCategories.every(cat => selectedCategories.has(cat.id));
     
+    let newSelectedCategories: Set<string>;
+    let newSelectedTypes: Set<string>;
+    
     if (allSelected) {
       // Hide all
-      setSelectedCategories(new Set());
-      setSelectedTypes(new Set());
+      newSelectedCategories = new Set();
+      newSelectedTypes = new Set();
     } else {
       // Show all
       const categoryIds = applicableCategories.map(cat => cat.id);
-      setSelectedCategories(new Set(categoryIds));
+      newSelectedCategories = new Set(categoryIds);
       
       // Select all types from applicable categories
       const typeIds = types
         .filter(type => categoryIds.includes(type.category_id))
         .map(type => type.id);
-      setSelectedTypes(new Set(typeIds));
+      newSelectedTypes = new Set(typeIds);
     }
     
-    updateParentFilters(localActiveView, selectedCategories, selectedTypes, selectedTiers);
+    setSelectedCategories(newSelectedCategories);
+    setSelectedTypes(newSelectedTypes);
+    updateParentFilters(localActiveView, newSelectedCategories, newSelectedTypes, selectedTiers);
   };
 
   // Toggle all tiers
   const handleToggleAllTiers = () => {
     const allSelected = tiers.every(tier => selectedTiers.has(tier.id));
     
+    let newSelectedTiers: Set<string>;
+    
     if (allSelected) {
-      setSelectedTiers(new Set());
+      newSelectedTiers = new Set();
     } else {
       const tierIds = tiers.map(tier => tier.id);
-      setSelectedTiers(new Set(tierIds));
+      newSelectedTiers = new Set(tierIds);
     }
     
-    updateParentFilters(localActiveView, selectedCategories, selectedTypes, selectedTiers);
+    setSelectedTiers(newSelectedTiers);
+    updateParentFilters(localActiveView, selectedCategories, selectedTypes, newSelectedTiers);
   };
 
   const getTypesForCategory = (categoryId: string) => {
@@ -324,18 +332,68 @@ const CategoryHierarchyNav: React.FC<CategoryHierarchyNavProps> = ({
             </div>
           </div>
 
-          {/* Create New Button */}
+          {/* Create New Button - Hexagonal style matching Add POI */}
           <div className="p-4 border-b border-amber-400/20">
-            <button
-              onClick={handleCreateNew}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-amber-500/20 to-amber-600/20 
-                       hover:from-amber-500/30 hover:to-amber-600/30 border border-amber-400/30 rounded-lg 
-                       text-amber-200 font-light tracking-wide transition-all duration-200"
-              style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
-            >
-              <Plus className="w-4 h-4" />
-              Add Item / Schematic
-            </button>
+            <div className="flex justify-center">
+              <button
+                onClick={handleCreateNew}
+                className="group relative inline-flex items-center justify-center h-12 px-6 min-w-[140px] transition-all duration-300 overflow-hidden"
+                style={{ 
+                  clipPath: "polygon(12px 0%, calc(100% - 12px) 0%, 100% 50%, calc(100% - 12px) 100%, 12px 100%, 0% 50%)",
+                  fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif"
+                }}
+                onMouseEnter={(e) => {
+                  const purpleOverlay = e.currentTarget.querySelector('.purple-overlay') as HTMLElement;
+                  if (purpleOverlay) {
+                    purpleOverlay.style.background = 'radial-gradient(ellipse at center top, rgba(139, 92, 246, 0.15) 0%, rgba(124, 58, 237, 0.08) 40%, transparent 70%)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  const purpleOverlay = e.currentTarget.querySelector('.purple-overlay') as HTMLElement;
+                  if (purpleOverlay) {
+                    purpleOverlay.style.background = 'radial-gradient(ellipse at center top, rgba(139, 92, 246, 0) 0%, rgba(124, 58, 237, 0) 40%, transparent 70%)';
+                  }
+                }}
+              >
+                {/* Dark background */}
+                <div 
+                  className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950"
+                  style={{ clipPath: "polygon(12px 0%, calc(100% - 12px) 0%, 100% 50%, calc(100% - 12px) 100%, 12px 100%, 0% 50%)" }}
+                />
+                
+                {/* Amber border */}
+                <div 
+                  className="absolute inset-0 bg-gradient-to-r from-amber-400/70 via-amber-300/90 to-amber-400/70 group-hover:from-amber-300/90 group-hover:via-amber-200/100 group-hover:to-amber-300/90 transition-all duration-300"
+                  style={{
+                    clipPath: "polygon(12px 0%, calc(100% - 12px) 0%, 100% 50%, calc(100% - 12px) 100%, 12px 100%, 0% 50%)",
+                    padding: '1px'
+                  }}
+                />
+                
+                {/* Inner background */}
+                <div 
+                  className="absolute inset-0.5 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950"
+                  style={{ clipPath: "polygon(12px 0%, calc(100% - 12px) 0%, 100% 50%, calc(100% - 12px) 100%, 12px 100%, 0% 50%)" }}
+                />
+                
+                {/* Purple hover overlay */}
+                <div 
+                  className="absolute inset-0.5 transition-all duration-300 purple-overlay"
+                  style={{
+                    clipPath: "polygon(12px 0%, calc(100% - 12px) 0%, 100% 50%, calc(100% - 12px) 100%, 12px 100%, 0% 50%)",
+                    background: 'radial-gradient(ellipse at center top, rgba(139, 92, 246, 0) 0%, rgba(124, 58, 237, 0) 40%, transparent 70%)'
+                  }}
+                />
+                
+                {/* Content */}
+                <div className="relative z-10 flex items-center space-x-2">
+                  <Plus className="w-4 h-4 text-amber-300 group-hover:text-amber-100 transition-all duration-300" />
+                  <span className="text-sm font-light uppercase tracking-wide text-amber-200 group-hover:text-amber-50 transition-all duration-300">
+                    Add Item / Schematic
+                  </span>
+                </div>
+              </button>
+            </div>
           </div>
 
           {/* Search Section */}

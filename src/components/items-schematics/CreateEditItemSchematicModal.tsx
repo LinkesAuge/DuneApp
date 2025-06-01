@@ -765,7 +765,7 @@ const CreateEditItemSchematicModal: React.FC<CreateEditItemSchematicModalProps> 
 
   if (!isOpen) return null;
 
-  const modalTitle = `${mode === 'create' ? 'Create' : 'Edit'} ${entityType === 'items' ? 'Item' : 'Schematic'}`;
+  const modalTitle = `${mode === 'create' ? 'Create Entity' : 'Edit'} ${mode === 'edit' ? (entityType === 'items' ? 'Item' : 'Schematic') : ''}`;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">

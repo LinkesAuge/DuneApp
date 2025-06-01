@@ -159,7 +159,10 @@ const EntityCard: React.FC<{
       className={`group relative bg-slate-900 border border-slate-700 rounded-xl shadow-lg overflow-hidden cursor-pointer transition-all duration-200 hover:shadow-xl ${
         isSelected ? 'ring-2 ring-amber-400/50 border-amber-400/60' : 'hover:border-slate-600'
       }`}
-      onClick={() => onClick(entity)}
+      onClick={(e) => {
+        e.stopPropagation(); // Prevent closing details panel when clicking on card
+        onClick(entity);
+      }}
     >
       {/* Selection Checkbox */}
       {selectionMode && onSelectionToggle && (
@@ -406,7 +409,10 @@ const ListView: React.FC<{
             className={`group relative bg-slate-900 border border-slate-700 rounded-lg overflow-hidden cursor-pointer transition-all duration-200 hover:shadow-xl ${
               isSelected ? 'ring-2 ring-amber-400/50 border-amber-400/60' : 'hover:border-slate-600'
             }`}
-            onClick={() => onItemSelect(entity)}
+            onClick={(e) => {
+              e.stopPropagation(); // Prevent closing details panel when clicking on card
+              onItemSelect(entity);
+            }}
           >
             {/* Selection Checkbox */}
             {selectionMode && onSelectionToggle && (
@@ -633,7 +639,10 @@ const TreeView: React.FC<{
                     className={`relative p-3 cursor-pointer transition-all duration-200 hover:bg-slate-700/30 ${
                       isSelected ? 'bg-amber-500/10 border-r-2 border-amber-400' : ''
                     }`}
-                    onClick={() => onItemSelect(entity)}
+                    onClick={(e) => {
+                      e.stopPropagation(); // Prevent closing details panel when clicking on card
+                      onItemSelect(entity);
+                    }}
                   >
                     {/* Selection Checkbox */}
                     {selectionMode && onSelectionToggle && (
@@ -1020,10 +1029,15 @@ const ItemsSchematicsContent: React.FC<ItemsSchematicsContentProps> = ({
       }
 
       // Type filtering - only show entities whose types are selected (or have no type)
-      if (filters.types && filters.types.length > 0) {
-        entities = entities.filter(entity => 
-          !entity.type_id || filters.types.includes(entity.type_id)
-        );
+      if (filters.types) {
+        if (filters.types.length > 0) {
+          entities = entities.filter(entity => 
+            !entity.type_id || filters.types.includes(entity.type_id)
+          );
+        } else {
+          // Empty array means hide all
+          entities = [];
+        }
       }
 
       // Tier filtering - only show entities whose tiers are selected (or have no tier)
@@ -1199,79 +1213,82 @@ const ItemsSchematicsContent: React.FC<ItemsSchematicsContentProps> = ({
             </p>
           </div>
         ) : (
-                     <div className="p-4">
-             {/* Render based on view mode */}
-             {localViewMode === 'grid' && (
-               <GridView 
-                 entities={sortedEntities}
-                 activeView={activeView}
-                 onItemSelect={onItemSelect}
-                 onEdit={handleEdit}
-                 onDelete={handleDelete}
-                 onPoiLink={handlePoiLink}
-                 selectedEntities={selectedEntities}
-                 onSelectionToggle={(entityId) => {
-                   if (onSelectionChange) {
-                     const newSelection = selectedEntities.includes(entityId)
-                       ? selectedEntities.filter(id => id !== entityId)
-                       : [...selectedEntities, entityId];
-                     onSelectionChange(newSelection);
-                   }
-                 }}
-                 selectionMode={selectedEntities.length > 0}
-                 getCategoryName={getCategoryName}
-                 getTypeName={getTypeName}
-                 getTierName={getTierName}
-               />
-             )}
-             {localViewMode === 'list' && (
-               <ListView 
-                 entities={sortedEntities}
-                 activeView={activeView}
-                 onItemSelect={onItemSelect}
-                 onEdit={handleEdit}
-                 onDelete={handleDelete}
-                 onPoiLink={handlePoiLink}
-                 selectedEntities={selectedEntities}
-                 onSelectionToggle={(entityId) => {
-                   if (onSelectionChange) {
-                     const newSelection = selectedEntities.includes(entityId)
-                       ? selectedEntities.filter(id => id !== entityId)
-                       : [...selectedEntities, entityId];
-                     onSelectionChange(newSelection);
-                   }
-                 }}
-                 selectionMode={selectedEntities.length > 0}
-                 getCategoryName={getCategoryName}
-                 getTypeName={getTypeName}
-                 getTierName={getTierName}
-               />
-             )}
-             {localViewMode === 'tree' && (
-               <TreeView 
-                 entities={sortedEntities}
-                 activeView={activeView}
-                 selectedCategory={selectedCategory}
-                 onItemSelect={onItemSelect}
-                 onEdit={handleEdit}
-                 onDelete={handleDelete}
-                 onPoiLink={handlePoiLink}
-                 selectedEntities={selectedEntities}
-                 onSelectionToggle={(entityId) => {
-                   if (onSelectionChange) {
-                     const newSelection = selectedEntities.includes(entityId)
-                       ? selectedEntities.filter(id => id !== entityId)
-                       : [...selectedEntities, entityId];
-                     onSelectionChange(newSelection);
-                   }
-                 }}
-                 selectionMode={selectedEntities.length > 0}
-                 getCategoryName={getCategoryName}
-                 getTypeName={getTypeName}
-                 getTierName={getTierName}
-               />
-             )}
-           </div>
+          <div 
+            className="p-4"
+            onClick={(e) => e.stopPropagation()} // Prevent closing details panel when clicking on content
+          >
+            {/* Render based on view mode */}
+            {localViewMode === 'grid' && (
+              <GridView 
+                entities={sortedEntities}
+                activeView={activeView}
+                onItemSelect={onItemSelect}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+                onPoiLink={handlePoiLink}
+                selectedEntities={selectedEntities}
+                onSelectionToggle={(entityId) => {
+                  if (onSelectionChange) {
+                    const newSelection = selectedEntities.includes(entityId)
+                      ? selectedEntities.filter(id => id !== entityId)
+                      : [...selectedEntities, entityId];
+                    onSelectionChange(newSelection);
+                  }
+                }}
+                selectionMode={selectedEntities.length > 0}
+                getCategoryName={getCategoryName}
+                getTypeName={getTypeName}
+                getTierName={getTierName}
+              />
+            )}
+            {localViewMode === 'list' && (
+              <ListView 
+                entities={sortedEntities}
+                activeView={activeView}
+                onItemSelect={onItemSelect}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+                onPoiLink={handlePoiLink}
+                selectedEntities={selectedEntities}
+                onSelectionToggle={(entityId) => {
+                  if (onSelectionChange) {
+                    const newSelection = selectedEntities.includes(entityId)
+                      ? selectedEntities.filter(id => id !== entityId)
+                      : [...selectedEntities, entityId];
+                    onSelectionChange(newSelection);
+                  }
+                }}
+                selectionMode={selectedEntities.length > 0}
+                getCategoryName={getCategoryName}
+                getTypeName={getTypeName}
+                getTierName={getTierName}
+              />
+            )}
+            {localViewMode === 'tree' && (
+              <TreeView 
+                entities={sortedEntities}
+                activeView={activeView}
+                selectedCategory={selectedCategory}
+                onItemSelect={onItemSelect}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+                onPoiLink={handlePoiLink}
+                selectedEntities={selectedEntities}
+                onSelectionToggle={(entityId) => {
+                  if (onSelectionChange) {
+                    const newSelection = selectedEntities.includes(entityId)
+                      ? selectedEntities.filter(id => id !== entityId)
+                      : [...selectedEntities, entityId];
+                    onSelectionChange(newSelection);
+                  }
+                }}
+                selectionMode={selectedEntities.length > 0}
+                getCategoryName={getCategoryName}
+                getTypeName={getTypeName}
+                getTierName={getTierName}
+              />
+            )}
+          </div>
         )}
       </div>
 

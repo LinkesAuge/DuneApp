@@ -100,6 +100,28 @@ const ItemsSchematicsPage: React.FC = () => {
     setRefreshTrigger(prev => prev + 1);
   };
 
+  // Handle item selection - open details panel when item is selected
+  const handleItemSelect = (item: any | null) => {
+    setSelectedItem(item);
+    // Open the details panel when an item is selected
+    if (item && rightSidebarCollapsed) {
+      setRightSidebarCollapsed(false);
+    }
+  };
+
+  // Handle clicking in empty areas to close details panel
+  const handleContentAreaClick = (event: React.MouseEvent) => {
+    // Only close if clicking directly on the content area wrapper (not on child elements)
+    if (event.target === event.currentTarget) {
+      setSelectedItem(null);
+    }
+  };
+
+  // Handle close from details panel
+  const handleDetailsClose = () => {
+    setSelectedItem(null);
+  };
+
   const openSettings = () => {
     // TODO: Implement settings modal
     console.log('Open settings');
@@ -115,9 +137,9 @@ const ItemsSchematicsPage: React.FC = () => {
       
       {/* Content */}
       <div className="relative z-10">
-{/* No header - view switching moved to control panel */}
+        {/* No header - view switching moved to control panel */}
 
-                  <div className="flex h-screen">
+        <div className="flex h-screen">
           {/* Left Sidebar - Controls Panel */}
           {!leftSidebarCollapsed ? (
             <div className="w-[30rem] flex-shrink-0">
@@ -164,15 +186,18 @@ const ItemsSchematicsPage: React.FC = () => {
             </div>
           )}
 
-          {/* Main Content Area */}
-          <div className="flex-1 overflow-hidden">
+          {/* Main Content Area - with click handling to close details panel */}
+          <div 
+            className="flex-1 overflow-hidden cursor-pointer" 
+            onClick={handleContentAreaClick}
+          >
             <ItemsSchematicsContent
               activeView={activeView}
               viewMode={viewMode}
               selectedCategory={selectedCategory}
               searchTerm={searchTerm}
               filters={filters}
-              onItemSelect={setSelectedItem}
+              onItemSelect={handleItemSelect}
               leftSidebarCollapsed={leftSidebarCollapsed}
               onToggleLeftSidebar={() => setLeftSidebarCollapsed(!leftSidebarCollapsed)}
               rightSidebarCollapsed={rightSidebarCollapsed}
@@ -186,8 +211,8 @@ const ItemsSchematicsPage: React.FC = () => {
             />
           </div>
 
-          {/* Right Sidebar - Details Panel */}
-          {!rightSidebarCollapsed ? (
+          {/* Right Sidebar - Details Panel - Only show when item is selected */}
+          {selectedItem && !rightSidebarCollapsed ? (
             <div className="w-[30rem] flex-shrink-0">
               <div className="h-full group relative">
                 <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950" />
@@ -198,13 +223,13 @@ const ItemsSchematicsPage: React.FC = () => {
                   <DetailsPanel
                     activeView={activeView}
                     selectedItem={selectedItem}
-                    onClose={() => setRightSidebarCollapsed(true)}
+                    onClose={handleDetailsClose}
                   />
                 </div>
               </div>
             </div>
-          ) : (
-            /* Collapsed Details Panel - Reopen Button */
+          ) : selectedItem && rightSidebarCollapsed ? (
+            /* Collapsed Details Panel - Reopen Button (only when item is selected) */
             <div className="w-12 flex-shrink-0 border-l border-amber-400/20">
               <div className="h-full group relative">
                 <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950" />
@@ -222,7 +247,7 @@ const ItemsSchematicsPage: React.FC = () => {
                 </div>
               </div>
             </div>
-          )}
+          ) : null}
         </div>
       </div>
     </div>
