@@ -1,1245 +1,1018 @@
-# Phase 4: POI Integration - Comprehensive Linking System
+# Phase 4: POI Integration - Practical Linking Enhancement
 
-## **📋 PHASE OVERVIEW - ARCHITECTURAL REVOLUTION**
-**Duration**: 4-5 weeks  
-**Effort**: 160-200 hours  
+## **📋 PHASE OVERVIEW - ENHANCED LINKING SYSTEM**
+**Duration**: 1 month  
+**Effort**: 26-36 hours  
 **Priority**: High  
 **Dependencies**: Phase 3 Complete
 
-**Purpose**: Create a comprehensive, scalable POI-Items/Schematics linking system that supports large-scale data management with sophisticated filtering, sorting, and bidirectional navigation. This phase transforms simple associations into a powerful relationship management platform.
+**Purpose**: Enhance the existing POI-Items/Schematics linking system to provide smooth, bidirectional linking workflows. Focus on practical usability for moderate-scale data (couple dozen POIs, 1-2+ items/schematics per POI) with intuitive user interfaces and solid many-to-many relationship support.
 
-## **🎯 DESIGN PHILOSOPHY & ARCHITECTURAL DECISIONS**
+## **🎯 DESIGN PHILOSOPHY - PRACTICAL ENHANCEMENT**
 
-### **Why We Chose This Approach**
+### **Why This Approach**
 
-**Problem**: Traditional modal-based linking systems don't scale for complex game databases where:
-- Users need to browse hundreds of POIs and thousands of items
-- Multiple filtering criteria are essential (location, tier, category, etc.)
-- Bidirectional relationships require efficient navigation
-- Bulk operations are necessary for data management
-- Real-time collaboration requires immediate visual feedback
+**Current State**: You already have a solid foundation with:
+- ✅ `PoiItemLinkModal.tsx` (450+ lines) - Basic linking functionality
+- ✅ `poi_item_links` database table - Relationship storage  
+- ✅ API functions - CRUD operations for links
+- ✅ Working modal-based workflow
 
-**Solution**: **Dedicated Management Interface Architecture** with:
-- **Full-page interfaces** for comprehensive data browsing
-- **Split-panel designs** for relationship visualization
-- **Advanced filtering ecosystems** for data discovery
-- **Bidirectional navigation** for workflow flexibility
-- **Real-time synchronization** across all interfaces
+**Enhancement Goal**: Build on existing infrastructure to provide:
+- **Bidirectional linking** from POIs → Items and Items → POIs
+- **Multi-select capability** for efficient relationship creation
+- **Map-integrated workflows** for spatial context linking
+- **Clean relationship display** throughout the application
+- **Moderate complexity** appropriate for your scale and user base
 
-### **Core Architectural Principles**
+### **Core Enhancement Principles**
 
-1. **Scalability First**: Design for thousands of entities, not dozens
-2. **Workflow Efficiency**: Minimize clicks and context switching
-3. **Visual Clarity**: Immediate understanding of relationships
-4. **Bidirectional Equality**: Equal access from POIs→Items and Items→POIs
-5. **Data Discovery**: Advanced search and filtering as primary features
-6. **Real-time Collaboration**: Live updates across all user interfaces
+1. **Build on Existing**: Enhance current modal system rather than rebuild
+2. **Bidirectional Access**: Equal linking capability from all entity types
+3. **User-Friendly**: Intuitive workflows with minimal clicks
+4. **Visual Clarity**: Clear relationship display and management
+5. **Map Integration**: Seamless linking from spatial context
+6. **Practical Scope**: Appropriate for couple dozen POIs and moderate relationships
 
 ---
 
-## **🔗 STEP 1: ENHANCED DATABASE FOUNDATION (Week 1)**
+## **🔗 STEP 1: ENHANCED MODAL EXPERIENCE (Week 1)**
 
-### **Step 1.1: Relationship Architecture** ⏱️ 8-10 hours
-**Purpose**: Implement robust N:M relationships with enhanced metadata and performance optimization
+### **Step 1.1: Multi-Select Capability** ⏱️ 4-5 hours
+**Purpose**: Upgrade existing `PoiItemLinkModal.tsx` to support selecting multiple items/schematics in one session
 
-**Design Rationale**: 
-We need more than simple junction tables. The system must support:
-- **Contextual metadata** (quantity, notes, discovery date)
-- **Relationship types** (found here, material source)
-- **User attribution** (who created the link, when)
-- **Performance optimization** (indexes for complex queries)
-- **Data integrity** (proper constraints and cascading)
-
-**Technical Implementation**:
-**Database Schema Enhancement**:
-```sql
--- Enhanced POI-Items relationship table
-CREATE TABLE poi_item_links (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  poi_id uuid NOT NULL REFERENCES pois(id) ON DELETE CASCADE,
-  item_id uuid NOT NULL REFERENCES items(id) ON DELETE CASCADE,
-  
-  -- Relationship context
-  relationship_type text NOT NULL CHECK (relationship_type IN ('found_here', 'material_source')),
-  quantity integer DEFAULT 1 CHECK (quantity > 0),
-  notes text,
-  confidence_level integer DEFAULT 3 CHECK (confidence_level BETWEEN 1 AND 5),
-  
-  -- Attribution and tracking
-  created_by uuid NOT NULL REFERENCES profiles(id),
-  created_at timestamptz DEFAULT now(),
-  updated_by uuid REFERENCES profiles(id),
-  updated_at timestamptz DEFAULT now(),
-  
-  -- Collaboration features
-  verified_by uuid REFERENCES profiles(id),
-  verified_at timestamptz,
-  reports_count integer DEFAULT 0,
-  
-  UNIQUE(poi_id, item_id, relationship_type)
-);
-
--- Enhanced POI-Schematics relationship table
-CREATE TABLE poi_schematic_links (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  poi_id uuid NOT NULL REFERENCES pois(id) ON DELETE CASCADE,
-  schematic_id uuid NOT NULL REFERENCES schematics(id) ON DELETE CASCADE,
-  
-  -- Relationship context
-  relationship_type text NOT NULL CHECK (relationship_type IN ('found_here', 'material_source')),
-  notes text,
-  confidence_level integer DEFAULT 3 CHECK (confidence_level BETWEEN 1 AND 5),
-  
-  -- Attribution and tracking
-  created_by uuid NOT NULL REFERENCES profiles(id),
-  created_at timestamptz DEFAULT now(),
-  updated_by uuid REFERENCES profiles(id),
-  updated_at timestamptz DEFAULT now(),
-  
-  -- Collaboration features
-  verified_by uuid REFERENCES profiles(id),
-  verified_at timestamptz,
-  reports_count integer DEFAULT 0,
-  
-  UNIQUE(poi_id, schematic_id, relationship_type)
-);
-
--- Performance optimization indexes
-CREATE INDEX idx_poi_item_links_poi_id ON poi_item_links(poi_id);
-CREATE INDEX idx_poi_item_links_item_id ON poi_item_links(item_id);
-CREATE INDEX idx_poi_item_links_relationship ON poi_item_links(relationship_type);
-CREATE INDEX idx_poi_item_links_created_at ON poi_item_links(created_at DESC);
-
-CREATE INDEX idx_poi_schematic_links_poi_id ON poi_schematic_links(poi_id);
-CREATE INDEX idx_poi_schematic_links_schematic_id ON poi_schematic_links(schematic_id);
-CREATE INDEX idx_poi_schematic_links_relationship ON poi_schematic_links(relationship_type);
-CREATE INDEX idx_poi_schematic_links_created_at ON poi_schematic_links(created_at DESC);
-
--- Analytics materialized view for performance
-CREATE MATERIALIZED VIEW poi_link_analytics AS
-SELECT 
-  poi_id,
-  COUNT(DISTINCT item_id) as linked_items_count,
-  COUNT(DISTINCT schematic_id) as linked_schematics_count,
-  COUNT(DISTINCT CASE WHEN relationship_type = 'found_here' THEN item_id END) as items_found_count,
-  COUNT(DISTINCT CASE WHEN relationship_type = 'material_source' THEN item_id END) as items_sourced_count
-FROM (
-  SELECT poi_id, item_id, NULL as schematic_id, relationship_type FROM poi_item_links
-  UNION ALL
-  SELECT poi_id, NULL as item_id, schematic_id, relationship_type FROM poi_schematic_links
-) combined_links
-GROUP BY poi_id;
-
--- Refresh function for analytics
-CREATE OR REPLACE FUNCTION refresh_poi_link_analytics()
-RETURNS void AS $$
-BEGIN
-  REFRESH MATERIALIZED VIEW CONCURRENTLY poi_link_analytics;
-END;
-$$ LANGUAGE plpgsql;
+**Current State Analysis**:
+```typescript
+// Current: Single selection in PoiItemLinkModal.tsx
+const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+const [selectedSchematicId, setSelectedSchematicId] = useState<string | null>(null);
 ```
 
-**Design Rationale**:
-- **Relationship Types**: Simplified to "found_here" and "material_source" as requested
-- **Confidence Levels**: Allow community validation of link quality
-- **Performance Views**: Pre-computed analytics for dashboard displays
-- **Audit Trail**: Complete tracking of who created/modified relationships
-- **Unique Constraints**: Prevent duplicate relationships while allowing multiple types
-
-### **Step 1.2: Advanced API Layer** ⏱️ 10-12 hours
-**Purpose**: Create sophisticated API functions supporting complex queries and bulk operations
-
-**Design Rationale**:
-Standard CRUD operations aren't sufficient. We need:
-- **Complex filtering** (spatial, hierarchical, temporal)
-- **Bulk operations** (create/update/delete hundreds of links)
-- **Analytics queries** (relationship statistics, trends)
-- **Performance optimization** (pagination, caching, prefetching)
-
-**Technical Implementation**:
-**File**: `src/lib/api/poiItemLinks.ts`
+**Enhancement Implementation**:
 ```typescript
+// Enhanced: Multi-selection capability
+const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set());
+const [selectedSchematicIds, setSelectedSchematicIds] = useState<Set<string>>(new Set());
+const [relationshipType, setRelationshipType] = useState<'found_here' | 'material_source'>('found_here');
+
+// Multi-select handlers
+const handleItemToggle = (itemId: string) => {
+  const newSelection = new Set(selectedItemIds);
+  if (newSelection.has(itemId)) {
+    newSelection.delete(itemId);
+  } else {
+    newSelection.add(itemId);
+  }
+  setSelectedItemIds(newSelection);
+};
+
+const handleSchematicToggle = (schematicId: string) => {
+  const newSelection = new Set(selectedSchematicIds);
+  if (newSelection.has(schematicId)) {
+    newSelection.delete(schematicId);
+  } else {
+    newSelection.add(schematicId);
+  }
+  setSelectedSchematicIds(newSelection);
+};
+```
+
+**UI Components to Add**:
+```typescript
+// Checkbox-based selection interface
+const ItemSelectionCard: React.FC<ItemSelectionProps> = ({ item, selected, onToggle }) => (
+  <div className={`p-3 border rounded-lg cursor-pointer ${selected ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}`}>
+    <div className="flex items-center space-x-3">
+      <input
+        type="checkbox"
+        checked={selected}
+        onChange={() => onToggle(item.id)}
+        className="h-4 w-4 text-blue-600"
+      />
+      <img src={item.icon_url} alt="" className="w-8 h-8" />
+      <div>
+        <h4 className="font-medium">{item.name}</h4>
+        <p className="text-sm text-gray-500">{item.category?.name} • {item.tier?.name}</p>
+      </div>
+    </div>
+  </div>
+);
+
+// Bulk creation summary
+const LinkingSummary: React.FC<SummaryProps> = ({ poiName, selectedItems, selectedSchematics, relationshipType }) => (
+  <div className="bg-blue-50 p-4 rounded-lg">
+    <h3 className="font-medium mb-2">Creating Links for: {poiName}</h3>
+    <div className="text-sm space-y-1">
+      <p><strong>Items:</strong> {selectedItems.size} selected</p>
+      <p><strong>Schematics:</strong> {selectedSchematics.size} selected</p>
+      <p><strong>Relationship:</strong> {relationshipType === 'found_here' ? 'Found Here' : 'Material Source'}</p>
+    </div>
+  </div>
+);
+```
+
+**Files to Modify**:
+- `src/components/items-schematics/PoiItemLinkModal.tsx` - Add multi-select functionality
+- `src/types/index.ts` - Update interfaces for multi-selection
+
+### **Step 1.2: Enhanced Search and Filtering** ⏱️ 3-4 hours
+**Purpose**: Improve the modal's internal search and filtering capabilities for easier item/schematic discovery
+
+**Current Enhancement**:
+```typescript
+// Enhanced filtering state
+interface ModalFilters {
+  searchTerm: string;
+  selectedCategories: Set<string>;
+  selectedTiers: Set<string>;
+  entityType: 'all' | 'items' | 'schematics';
+}
+
+const [filters, setFilters] = useState<ModalFilters>({
+  searchTerm: '',
+  selectedCategories: new Set(),
+  selectedTiers: new Set(),
+  entityType: 'all'
+});
+
+// Enhanced filtering logic
+const filteredItems = useMemo(() => {
+  let filtered = items;
+  
+  if (filters.searchTerm) {
+    filtered = filtered.filter(item => 
+      item.name.toLowerCase().includes(filters.searchTerm.toLowerCase())
+    );
+  }
+  
+  if (filters.selectedCategories.size > 0) {
+    filtered = filtered.filter(item => 
+      filters.selectedCategories.has(item.category_id)
+    );
+  }
+  
+  if (filters.selectedTiers.size > 0) {
+    filtered = filtered.filter(item => 
+      filters.selectedTiers.has(item.tier_id)
+    );
+  }
+  
+  return filtered;
+}, [items, filters]);
+```
+
+**UI Components to Add**:
+```typescript
+// Enhanced filter panel within modal
+const ModalFilterPanel: React.FC<FilterPanelProps> = ({ filters, onFiltersChange, categories, tiers }) => (
+  <div className="border-b pb-4 mb-4 space-y-3">
+    <SearchInput
+      value={filters.searchTerm}
+      onChange={(value) => onFiltersChange({ ...filters, searchTerm: value })}
+      placeholder="Search items and schematics..."
+      className="w-full"
+    />
+    
+    <div className="flex space-x-4">
+      <CategoryFilter
+        categories={categories}
+        selected={filters.selectedCategories}
+        onChange={(selected) => onFiltersChange({ ...filters, selectedCategories: selected })}
+        compact={true}
+      />
+      
+      <TierFilter
+        tiers={tiers}
+        selected={filters.selectedTiers}
+        onChange={(selected) => onFiltersChange({ ...filters, selectedTiers: selected })}
+        compact={true}
+      />
+    </div>
+    
+    <EntityTypeToggle
+      value={filters.entityType}
+      onChange={(entityType) => onFiltersChange({ ...filters, entityType })}
+    />
+  </div>
+);
+```
+
+### **Step 1.3: Batch Relationship Creation** ⏱️ 2-3 hours
+**Purpose**: Efficiently create multiple relationships in a single operation
+
+**Batch Creation Logic**:
+```typescript
+// Batch creation handler
+const handleBatchCreate = async () => {
+  setLoading(true);
+  const operations: CreateLinkOperation[] = [];
+  
+  // Create operations for selected items
+  selectedItemIds.forEach(itemId => {
+    operations.push({
+      poi_id: selectedPoi.id,
+      item_id: itemId,
+      relationship_type: relationshipType,
+      created_by: user.id
+    });
+  });
+  
+  // Create operations for selected schematics  
+  selectedSchematicIds.forEach(schematicId => {
+    operations.push({
+      poi_id: selectedPoi.id,
+      schematic_id: schematicId,
+      relationship_type: relationshipType,
+      created_by: user.id
+    });
+  });
+  
+  try {
+    await PoiItemLinksAPI.createBatch(operations);
+    
+    // Success feedback
+    toast.success(`Created ${operations.length} relationships successfully`);
+    
+    // Reset selections
+    setSelectedItemIds(new Set());
+    setSelectedSchematicIds(new Set());
+    
+    // Refresh data
+    onRelationshipsUpdated?.();
+    
+  } catch (error) {
+    console.error('Batch creation failed:', error);
+    toast.error('Failed to create relationships');
+  } finally {
+    setLoading(false);
+  }
+};
+```
+
+**API Enhancement**:
+```typescript
+// Add to src/lib/api/poiItemLinks.ts
 export class PoiItemLinksAPI {
-  /**
-   * Advanced relationship search with comprehensive filtering
-   * Supports spatial, hierarchical, and contextual filters
-   */
-  static async searchRelationships(params: RelationshipSearchParams): Promise<RelationshipSearchResults> {
-    const {
-      // Spatial filters
-      mapRegion,
-      coordinateRange,
-      poiTypes,
-      
-      // Entity filters
-      categories,
-      tiers,
-      itemTypes,
-      schematicTypes,
-      
-      // Relationship filters
-      relationshipTypes,
-      confidenceLevels,
-      verifiedOnly,
-      
-      // Temporal filters
-      createdAfter,
-      createdBefore,
-      updatedAfter,
-      
-      // User filters
-      createdBy,
-      verifiedBy,
-      
-      // Pagination and sorting
-      limit = 100,
-      offset = 0,
-      sortBy = 'created_at',
-      sortOrder = 'desc',
-      
-      // Performance options
-      includeAnalytics = false,
-      preloadEntities = true
-    } = params;
-
-    let query = supabase
-      .from('poi_item_links')
-      .select(`
-        *,
-        poi:pois(
-          id, name, coordinates,
-          poi_type:poi_types(id, name, icon),
-          region:maps(name)
-        ),
-        item:items(
-          id, name, icon_url,
-          category:categories(id, name),
-          tier:tiers(id, name, level, color),
-          type:types(id, name)
-        ),
-        creator:profiles!created_by(id, username, avatar_url),
-        verifier:profiles!verified_by(id, username, avatar_url)
-      `);
-
-    // Apply spatial filters
-    if (mapRegion) {
-      query = query.eq('poi.region', mapRegion);
+  static async createBatch(operations: CreateLinkOperation[]): Promise<void> {
+    const itemLinks = operations.filter(op => op.item_id);
+    const schematicLinks = operations.filter(op => op.schematic_id);
+    
+    const promises = [];
+    
+    if (itemLinks.length > 0) {
+      promises.push(
+        supabase.from('poi_item_links').insert(itemLinks)
+      );
     }
     
-    if (coordinateRange) {
-      query = query
-        .gte('poi.coordinates->>x', coordinateRange.minX)
-        .lte('poi.coordinates->>x', coordinateRange.maxX)
-        .gte('poi.coordinates->>y', coordinateRange.minY)
-        .lte('poi.coordinates->>y', coordinateRange.maxY);
-    }
-
-    // Apply entity filters
-    if (poiTypes?.length) {
-      query = query.in('poi.poi_type_id', poiTypes);
+    if (schematicLinks.length > 0) {
+      promises.push(
+        supabase.from('poi_schematic_links').insert(schematicLinks)
+      );
     }
     
-    if (categories?.length) {
-      query = query.in('item.category_id', categories);
-    }
+    const results = await Promise.all(promises);
     
-    if (tiers?.length) {
-      query = query.in('item.tier_id', tiers);
-    }
-
-    // Apply relationship filters
-    if (relationshipTypes?.length) {
-      query = query.in('relationship_type', relationshipTypes);
-    }
-    
-    if (confidenceLevels?.length) {
-      query = query.in('confidence_level', confidenceLevels);
-    }
-    
-    if (verifiedOnly) {
-      query = query.not('verified_by', 'is', null);
-    }
-
-    // Apply temporal filters
-    if (createdAfter) {
-      query = query.gte('created_at', createdAfter);
-    }
-    
-    if (createdBefore) {
-      query = query.lte('created_at', createdBefore);
-    }
-
-    // Apply sorting and pagination
-    query = query
-      .order(sortBy, { ascending: sortOrder === 'asc' })
-      .range(offset, offset + limit - 1);
-
-    const { data, error, count } = await query;
-    if (error) throw error;
-
-    return {
-      relationships: data || [],
-      totalCount: count || 0,
-      hasMore: (count || 0) > offset + limit,
-      analytics: includeAnalytics ? await this.getRelationshipAnalytics(params) : undefined
-    };
-  }
-
-  /**
-   * Bulk relationship operations with transaction safety
-   * Supports creating/updating/deleting hundreds of relationships efficiently
-   */
-  static async bulkOperations(operations: BulkRelationshipOperations): Promise<BulkOperationResults> {
-    const { creates, updates, deletes } = operations;
-    const results: BulkOperationResults = {
-      created: 0,
-      updated: 0,
-      deleted: 0,
-      errors: []
-    };
-
-    try {
-      // Use Supabase transactions for data integrity
-      const { data, error } = await supabase.rpc('bulk_relationship_operations', {
-        create_ops: creates,
-        update_ops: updates,
-        delete_ops: deletes
-      });
-
-      if (error) throw error;
-      
-      return data;
-    } catch (error) {
-      console.error('Bulk operations failed:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Relationship analytics for dashboard displays
-   * Pre-computed statistics for performance
-   */
-  static async getRelationshipAnalytics(filters?: RelationshipSearchParams): Promise<RelationshipAnalytics> {
-    const { data, error } = await supabase
-      .from('poi_link_analytics')
-      .select('*')
-      .order('linked_items_count', { ascending: false });
-
-    if (error) throw error;
-
-    return {
-      totalRelationships: data?.length || 0,
-      topSourcePois: data?.slice(0, 10) || [],
-      relationshipsByType: await this.getRelationshipTypeBreakdown(filters),
-      recentActivity: await this.getRecentRelationshipActivity(filters)
-    };
+    results.forEach(result => {
+      if (result.error) throw result.error;
+    });
   }
 }
 ```
 
 ---
 
-## **🎨 STEP 2: COMPREHENSIVE MANAGEMENT INTERFACE (Week 2-3)**
+## **🔄 STEP 2: BIDIRECTIONAL NAVIGATION (Week 2)**
 
-### **Step 2.1: POI-Items Relationship Manager** ⏱️ 20-25 hours
-**Purpose**: Create a dedicated full-page interface for managing POI-Item relationships
+### **Step 2.1: Items/Schematics → POIs Linking** ⏱️ 5-6 hours
+**Purpose**: Add "Link POIs" functionality to item and schematic detail views
 
-**Design Rationale**:
-Modal interfaces fail at scale. Users need:
-- **Split-panel design** for simultaneous POI and item browsing
-- **Advanced filtering** on both sides of the relationship
-- **Visual relationship mapping** to understand connections
-- **Bulk selection capabilities** for efficient management
-- **Real-time collaboration features** for team coordination
-
-**Technical Implementation**:
-**File**: `src/pages/POIItemLinksPage.tsx`
+**Component Implementation**:
 ```typescript
-const POIItemLinksPage: React.FC = () => {
-  // Advanced state management for complex interface
-  const [activePanel, setActivePanel] = useState<'pois' | 'items' | 'relationships'>('relationships');
-  const [selectedPois, setSelectedPois] = useState<Set<string>>(new Set());
-  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
-  const [relationshipFilters, setRelationshipFilters] = useState<RelationshipFilters>({});
-  const [viewMode, setViewMode] = useState<'table' | 'cards' | 'graph'>('table');
-
-  return (
-    <div className="min-h-screen bg-slate-50">
-      {/* Advanced Header with Multiple Action Sets */}
-      <POIItemLinksHeader
-        activePanel={activePanel}
-        onPanelChange={setActivePanel}
-        selectedPoisCount={selectedPois.size}
-        selectedItemsCount={selectedItems.size}
-        onBulkOperations={handleBulkOperations}
-        filters={relationshipFilters}
-        onFiltersChange={setRelationshipFilters}
-      />
-
-      <div className="flex h-[calc(100vh-4rem)]">
-        {/* Left Panel: POI Browser with Advanced Filtering */}
-        <div className="w-96 border-r border-slate-200 bg-white">
-          <POIBrowserPanel
-            selectedPois={selectedPois}
-            onSelectionChange={setSelectedPois}
-            relationshipFilters={relationshipFilters}
-            highlightLinked={true}
-          />
-      </div>
-
-        {/* Center Panel: Relationship Visualization */}
-        <div className="flex-1 overflow-hidden">
-          <RelationshipVisualizationPanel
-            viewMode={viewMode}
-            onViewModeChange={setViewMode}
-            selectedPois={selectedPois}
-            selectedItems={selectedItems}
-            filters={relationshipFilters}
-            onCreateRelationship={handleCreateRelationship}
-            onUpdateRelationship={handleUpdateRelationship}
-            onDeleteRelationship={handleDeleteRelationship}
-          />
-      </div>
-
-        {/* Right Panel: Item Browser with Advanced Filtering */}
-        <div className="w-96 border-l border-slate-200 bg-white">
-          <ItemBrowserPanel
-            selectedItems={selectedItems}
-            onSelectionChange={setSelectedItems}
-            relationshipFilters={relationshipFilters}
-            highlightLinked={true}
-          />
-        </div>
-      </div>
-    </div>
-  );
-};
-
-/**
- * Advanced POI browser with spatial and hierarchical filtering
- * Supports map region selection, POI type filtering, and relationship context
- */
-const POIBrowserPanel: React.FC<POIBrowserPanelProps> = ({
-  selectedPois,
-  onSelectionChange,
-  relationshipFilters,
-  highlightLinked
+// New component: src/components/items-schematics/LinkPoisButton.tsx
+const LinkPoisButton: React.FC<LinkPoisButtonProps> = ({ 
+  entityId, 
+  entityType, 
+  entityName,
+  onLinksUpdated 
 }) => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [mapRegion, setMapRegion] = useState<string | null>(null);
-  const [poiTypes, setPoiTypes] = useState<Set<string>>(new Set());
-  const [sortBy, setSortBy] = useState<'name' | 'distance' | 'relationship_count'>('name');
-
-  const [pois, loading] = useFilteredPois({
-    search: searchTerm,
-    mapRegion,
-    poiTypes: Array.from(poiTypes),
-    sortBy,
-    includeRelationshipCounts: true
-  });
-
+  const [showModal, setShowModal] = useState(false);
+  
   return (
-    <div className="h-full flex flex-col">
-      {/* Advanced Filter Controls */}
-      <div className="p-4 border-b border-slate-200 space-y-3">
-        <SearchInput
-          value={searchTerm}
-          onChange={setSearchTerm}
-          placeholder="Search POIs..."
-          className="w-full"
+    <>
+      <button
+        onClick={() => setShowModal(true)}
+        className="btn btn-secondary btn-sm"
+      >
+        <MapPin className="w-4 h-4 mr-1" />
+        Link POIs
+      </button>
+      
+      {showModal && (
+        <ReverseLinkModal
+          targetEntity={{ id: entityId, type: entityType, name: entityName }}
+          onClose={() => setShowModal(false)}
+          onLinksCreated={onLinksUpdated}
         />
-        
-    <div className="space-y-2">
-          <MapRegionSelector
-            selectedRegion={mapRegion}
-            onRegionChange={setMapRegion}
-            showCounts={true}
-          />
-          
-          <POITypeSelector
-            selectedTypes={poiTypes}
-            onTypesChange={setPoiTypes}
-            showCounts={true}
-            multiSelect={true}
-          />
-          
-          <SortSelector
-            value={sortBy}
-            onChange={setSortBy}
-            options={[
-              { value: 'name', label: 'Name A-Z' },
-              { value: 'distance', label: 'Distance' },
-              { value: 'relationship_count', label: 'Most Linked' }
-            ]}
-          />
-        </div>
-      </div>
-
-      {/* POI List with Relationship Indicators */}
-      <div className="flex-1 overflow-y-auto">
-        {loading ? (
-          <LoadingSpinner />
-        ) : (
-          <div className="divide-y divide-slate-200">
-            {pois.map(poi => (
-              <POIRelationshipCard
-                key={poi.id}
-                poi={poi}
-                selected={selectedPois.has(poi.id)}
-                onSelectionToggle={(selected) => {
-                  const newSelection = new Set(selectedPois);
-                  if (selected) {
-                    newSelection.add(poi.id);
-                  } else {
-                    newSelection.delete(poi.id);
-                  }
-                  onSelectionChange(newSelection);
-                }}
-                relationshipSummary={poi.relationshipSummary}
-                highlightLinked={highlightLinked}
-        />
-      ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
-/**
- * Relationship visualization with multiple view modes
- * Table view for data management, cards for visual browsing, graph for relationship mapping
- */
-const RelationshipVisualizationPanel: React.FC<VisualizationPanelProps> = ({
-  viewMode,
-  onViewModeChange,
-  selectedPois,
-  selectedItems,
-  filters,
-  onCreateRelationship,
-  onUpdateRelationship,
-  onDeleteRelationship
-}) => {
-  const [relationships, loading] = useRelationships({
-    poiIds: Array.from(selectedPois),
-    itemIds: Array.from(selectedItems),
-    ...filters
-  });
-
-  return (
-    <div className="h-full flex flex-col">
-      {/* View Mode Controls */}
-      <div className="p-4 border-b border-slate-200">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Relationships ({relationships.length})</h2>
-          
-          <ViewModeToggle
-            mode={viewMode}
-            onModeChange={onViewModeChange}
-            options={[
-              { value: 'table', icon: List, label: 'Table' },
-              { value: 'cards', icon: Grid, label: 'Cards' },
-              { value: 'graph', icon: Network, label: 'Graph' }
-            ]}
-          />
-        </div>
-      </div>
-
-      {/* Dynamic Content Based on View Mode */}
-      <div className="flex-1 overflow-hidden">
-        {viewMode === 'table' && (
-          <RelationshipTable
-            relationships={relationships}
-            onUpdate={onUpdateRelationship}
-            onDelete={onDeleteRelationship}
-            loading={loading}
-          />
-        )}
-        
-        {viewMode === 'cards' && (
-          <RelationshipCards
-            relationships={relationships}
-            onUpdate={onUpdateRelationship}
-            onDelete={onDeleteRelationship}
-            loading={loading}
-          />
-        )}
-        
-        {viewMode === 'graph' && (
-          <RelationshipGraph
-            relationships={relationships}
-            selectedPois={selectedPois}
-            selectedItems={selectedItems}
-            onCreateRelationship={onCreateRelationship}
-            onSelectPoi={(poiId) => setSelectedPois(new Set([poiId]))}
-            onSelectItem={(itemId) => setSelectedItems(new Set([itemId]))}
-          />
-        )}
-      </div>
-    </div>
-  );
-};
-```
-
-### **Step 2.2: Bidirectional Navigation Integration** ⏱️ 12-15 hours
-**Purpose**: Enable seamless navigation between POIs, Items, and relationship management
-
-**Design Rationale**:
-Users shouldn't have to remember URLs or hunt for features. Navigation should be:
-- **Contextually aware** (show relevant actions based on current selection)
-- **Bidirectional** (equal access from any starting point)
-- **Persistent** (maintain state across navigation)
-- **Intuitive** (follow established UI patterns)
-
-**Technical Implementation**:
-**File**: `src/components/navigation/RelationshipNavigation.tsx`
-```typescript
-/**
- * Universal relationship navigation component
- * Provides consistent access to linking functionality from any interface
- */
-const RelationshipNavigation: React.FC<RelationshipNavProps> = ({
-  context,
-  entityId,
-  entityType,
-  currentSelection
-}) => {
-  const navigate = useNavigate();
-  
-  const handleOpenLinkManager = (preselection?: Preselection) => {
-    const params = new URLSearchParams();
-    
-    if (preselection) {
-      if (preselection.pois?.length) {
-        params.set('pois', preselection.pois.join(','));
-      }
-      if (preselection.items?.length) {
-        params.set('items', preselection.items.join(','));
-      }
-      if (preselection.schematics?.length) {
-        params.set('schematics', preselection.schematics.join(','));
-      }
-    }
-    
-    navigate(`/poi-links?${params.toString()}`);
-  };
-
-  const getContextualActions = () => {
-    switch (context) {
-      case 'poi_detail':
-        return [
-          {
-            icon: Link2,
-            label: 'Manage Item Links',
-            onClick: () => handleOpenLinkManager({ pois: [entityId] }),
-            description: 'Link items and schematics to this POI'
-          }
-        ];
-        
-      case 'item_detail':
-        return [
-          {
-            icon: MapPin,
-            label: 'Find POI Locations',
-            onClick: () => handleOpenLinkManager({ items: [entityId] }),
-            description: 'Find POIs where this item can be found'
-          }
-        ];
-        
-      case 'map_poi_actions':
-        return [
-          {
-            icon: Link2,
-            label: 'Link Items',
-            onClick: () => handleOpenLinkManager({ pois: [entityId] }),
-            description: 'Quick link items to this POI'
-          }
-        ];
-        
-      default:
-        return [];
-    }
-  };
-
-  return (
-    <div className="flex items-center space-x-2">
-      {getContextualActions().map((action, index) => (
-        <TooltipButton
-          key={index}
-          icon={action.icon}
-          onClick={action.onClick}
-          tooltip={action.description}
-          className="btn btn-sm btn-secondary"
-        >
-          {action.label}
-        </TooltipButton>
-      ))}
-          </div>
-  );
-};
-```
-
----
-
-## **🗺️ STEP 3: ADVANCED MAP INTEGRATION (Week 3-4)**
-
-### **Step 3.1: Smart Map Indicators** ⏱️ 8-10 hours
-**Purpose**: Create intelligent visual indicators that adapt based on user context and preferences
-
-**Design Rationale**:
-Map indicators should be:
-- **Contextually adaptive** (show relevant information based on current task)
-- **Performance optimized** (handle hundreds of POIs without lag)
-- **Visually clear** (immediate understanding without cognitive load)
-- **User customizable** (show/hide based on preferences)
-
-**Technical Implementation**:
-**File**: `src/components/map/RelationshipIndicators.tsx`
-```typescript
-/**
- * Intelligent relationship indicators that adapt to user context
- * Shows item/schematic links with visual priority and filtering
- */
-const RelationshipIndicators: React.FC<IndicatorsProps> = ({
-  poi,
-  userPreferences,
-  currentFilter,
-  onIndicatorClick
-}) => {
-  const [relationships] = usePoiRelationships(poi.id);
-  const indicators = useMemo(() => 
-    buildIndicators(relationships, userPreferences, currentFilter), 
-    [relationships, userPreferences, currentFilter]
-  );
-
-  if (!indicators.length) return null;
-
-  return (
-    <div className="absolute -top-2 -right-2 flex space-x-1">
-      {indicators.map((indicator, index) => (
-        <IndicatorBadge
-          key={index}
-          type={indicator.type}
-          count={indicator.count}
-          priority={indicator.priority}
-          onClick={() => onIndicatorClick(poi.id, indicator.type)}
-          className={getIndicatorStyles(indicator)}
-        />
-      ))}
-    </div>
-  );
-};
-
-/**
- * Advanced indicator building logic
- * Prioritizes based on user preferences and current context
- */
-const buildIndicators = (
-  relationships: PoiRelationship[],
-  preferences: UserPreferences,
-  filter: CurrentFilter
-): Indicator[] => {
-  const indicators: Indicator[] = [];
-  
-  // Group relationships by type and tier
-  const grouped = groupRelationshipsByTypeAndTier(relationships);
-  
-  // Build item indicators with priority
-  if (preferences.showItems && grouped.items.length > 0) {
-    const highTierItems = grouped.items.filter(item => item.tier?.level >= 4);
-    
-    indicators.push({
-      type: 'items',
-      count: grouped.items.length,
-      priority: highTierItems.length > 0 ? 'high' : 'normal',
-      subtype: highTierItems.length > 0 ? 'rare' : 'common'
-    });
-  }
-  
-  // Build schematic indicators with priority
-  if (preferences.showSchematics && grouped.schematics.length > 0) {
-    indicators.push({
-      type: 'schematics',
-      count: grouped.schematics.length,
-      priority: 'normal'
-    });
-  }
-  
-  // Apply current filter context
-  return indicators.filter(indicator => 
-    matchesCurrentFilter(indicator, filter)
-  );
-};
-```
-
-### **Step 3.2: Map-Based Relationship Creation** ⏱️ 10-12 hours
-**Purpose**: Enable direct relationship creation from map interface with spatial context
-
-**Design Rationale**:
-Users often discover relationships while exploring maps. The interface should:
-- **Preserve spatial context** (don't lose map position/zoom)
-- **Provide quick access** (minimal clicks to create relationships)
-- **Show spatial relevance** (highlight nearby related POIs)
-- **Maintain workflow** (return to map exploration seamlessly)
-
-**Technical Implementation**:
-**File**: `src/components/map/MapRelationshipCreator.tsx`
-```typescript
-/**
- * Map-integrated relationship creation with spatial context
- * Allows direct linking while maintaining map exploration workflow
- */
-const MapRelationshipCreator: React.FC<CreatorProps> = ({
-  selectedPoi,
-  mapContext,
-  onRelationshipCreated,
-  onClose
-}) => {
-  const [activeTab, setActiveTab] = useState<'items' | 'schematics'>('items');
-  const [searchResults, setSearchResults] = useState<Entity[]>([]);
-  const [spatialFilter, setSpatialFilter] = useState(true);
-
-  // Get entities with spatial relevance
-  const [nearbyRelated] = useNearbyRelatedEntities(selectedPoi, spatialFilter);
-
-  return (
-    <div className="absolute top-4 right-4 w-80 bg-white rounded-lg shadow-lg border border-slate-200 z-50">
-      {/* Header with Spatial Context */}
-      <div className="p-4 border-b border-slate-200">
-        <div className="flex items-center justify-between">
-          <h3 className="font-semibold">Link to {selectedPoi.name}</h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
-            <X className="w-4 h-4" />
-        </button>
-      </div>
-
-        <div className="text-xs text-slate-500 mt-1">
-          {selectedPoi.poi_type?.name} • {selectedPoi.coordinates?.region}
-        </div>
-      </div>
-
-      {/* Tab Navigation */}
-      <div className="flex border-b border-slate-200">
-        <TabButton
-          active={activeTab === 'items'}
-          onClick={() => setActiveTab('items')}
-          className="flex-1"
-        >
-          <Package className="w-4 h-4 mr-1" />
-          Items
-        </TabButton>
-        <TabButton
-          active={activeTab === 'schematics'}
-          onClick={() => setActiveTab('schematics')}
-          className="flex-1"
-        >
-          <FileText className="w-4 h-4 mr-1" />
-          Schematics
-        </TabButton>
-            </div>
-
-      {/* Quick Link Suggestions Based on Spatial Context */}
-      {nearbyRelated.length > 0 && (
-        <div className="p-3 bg-blue-50 border-b border-slate-200">
-          <div className="text-xs font-medium text-blue-900 mb-2">
-            Suggested (found at nearby POIs):
-          </div>
-          <div className="space-y-1">
-            {nearbyRelated.slice(0, 3).map(entity => (
-              <QuickLinkButton
-                key={entity.id}
-                entity={entity}
-                onLink={() => handleQuickLink(entity)}
-              />
-            ))}
-            </div>
-        </div>
       )}
+    </>
+  );
+};
 
-      {/* Search and Selection */}
-      <div className="p-3 space-y-3">
-        <SearchInput
-          placeholder={`Search ${activeTab}...`}
-          onSearch={handleSearch}
-          className="w-full"
-        />
+// New modal: src/components/items-schematics/ReverseLinkModal.tsx
+const ReverseLinkModal: React.FC<ReverseLinkModalProps> = ({
+  targetEntity,
+  onClose,
+  onLinksCreated
+}) => {
+  const [selectedPoiIds, setSelectedPoiIds] = useState<Set<string>>(new Set());
+  const [relationshipType, setRelationshipType] = useState<'found_here' | 'material_source'>('found_here');
+  const [filters, setFilters] = useState<PoiFilters>({
+    searchTerm: '',
+    selectedRegions: new Set(),
+    selectedPoiTypes: new Set()
+  });
+  
+  const { data: pois, loading } = usePois({ filters });
+  
+  const handleCreateLinks = async () => {
+    const operations: CreateLinkOperation[] = Array.from(selectedPoiIds).map(poiId => ({
+      poi_id: poiId,
+      [targetEntity.type === 'item' ? 'item_id' : 'schematic_id']: targetEntity.id,
+      relationship_type: relationshipType,
+      created_by: user.id
+    }));
+    
+    await PoiItemLinksAPI.createBatch(operations);
+    onLinksCreated?.();
+    onClose();
+  };
+  
+  return (
+    <Modal isOpen onClose={onClose} title={`Link POIs to ${targetEntity.name}`}>
+      <div className="space-y-4">
+        {/* Filter Panel */}
+        <PoiFilterPanel filters={filters} onFiltersChange={setFilters} />
         
-        <div className="max-h-48 overflow-y-auto space-y-1">
-          {searchResults.map(entity => (
-            <SelectableEntityRow
-              key={entity.id}
-              entity={entity}
-              onSelect={() => handleEntitySelect(entity)}
+        {/* POI Selection */}
+        <div className="max-h-96 overflow-y-auto space-y-2">
+          {pois?.map(poi => (
+            <PoiSelectionCard
+              key={poi.id}
+              poi={poi}
+              selected={selectedPoiIds.has(poi.id)}
+              onToggle={(selected) => {
+                const newSelection = new Set(selectedPoiIds);
+                if (selected) {
+                  newSelection.add(poi.id);
+                } else {
+                  newSelection.delete(poi.id);
+                }
+                setSelectedPoiIds(newSelection);
+              }}
             />
           ))}
         </div>
+        
+        {/* Relationship Type */}
+        <RelationshipTypeSelector
+          value={relationshipType}
+          onChange={setRelationshipType}
+        />
+        
+        {/* Actions */}
+        <div className="flex justify-end space-x-2">
+          <button onClick={onClose} className="btn btn-secondary">
+            Cancel
+          </button>
+          <button 
+            onClick={handleCreateLinks}
+            disabled={selectedPoiIds.size === 0}
+            className="btn btn-primary"
+          >
+            Create {selectedPoiIds.size} Link{selectedPoiIds.size !== 1 ? 's' : ''}
+          </button>
+        </div>
       </div>
+    </Modal>
+  );
+};
+```
 
-      {/* Relationship Type Selection */}
-      <div className="p-3 border-t border-slate-200">
-        <div className="text-xs font-medium text-slate-900 mb-2">
-          Relationship Type:
-        </div>
-        <div className="space-y-2">
-          <RadioButton
-            name="relationship-type"
-            value="found_here"
-            label="Found Here"
-            description="Item can be found at this POI"
-          />
-          <RadioButton
-            name="relationship-type"
-            value="material_source"
-            label="Material Source"
-            description="POI that is a source for this item"
-          />
-        </div>
+**Integration Points**:
+```typescript
+// Add to ItemsSchematicsContent.tsx
+const ItemCard: React.FC<ItemCardProps> = ({ item, onEdit, onDelete }) => (
+  <div className="bg-white rounded-lg border p-4">
+    {/* Existing item content */}
+    
+    <div className="flex justify-between items-center mt-4">
+      <div className="flex space-x-2">
+        <button onClick={() => onEdit(item)} className="btn btn-sm btn-secondary">
+          Edit
+        </button>
+        <LinkPoisButton
+          entityId={item.id}
+          entityType="item"
+          entityName={item.name}
+          onLinksUpdated={refreshData}
+        />
       </div>
+      
+      <button onClick={() => onDelete(item)} className="btn btn-sm btn-danger">
+        Delete
+      </button>
     </div>
+  </div>
+);
+```
+
+### **Step 2.2: Consistent UI Integration** ⏱️ 3-4 hours
+**Purpose**: Ensure consistent styling and behavior across all linking entry points
+
+**Styling Consistency**:
+```typescript
+// Standardized button component for all linking actions
+const LinkingButton: React.FC<LinkingButtonProps> = ({ 
+  direction, 
+  entityType, 
+  icon: Icon = Link2,
+  onClick,
+  disabled = false 
+}) => {
+  const getButtonText = () => {
+    switch (direction) {
+      case 'to_pois': return 'Link POIs';
+      case 'to_items': return 'Link Items';
+      case 'to_schematics': return 'Link Schematics';
+      default: return 'Link';
+    }
+  };
+  
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="btn btn-secondary btn-sm hover:btn-primary transition-colors"
+    >
+      <Icon className="w-4 h-4 mr-1" />
+      {getButtonText()}
+    </button>
+  );
+};
+
+// Usage across components
+<LinkingButton 
+  direction="to_pois" 
+  entityType="item"
+  icon={MapPin}
+  onClick={() => setShowLinkModal(true)}
+/>
+
+<LinkingButton 
+  direction="to_items" 
+  entityType="poi"
+  icon={Package}
+  onClick={() => setShowLinkModal(true)}
+/>
+```
+
+**Navigation Context Preservation**:
+```typescript
+// Context-aware modal opening
+const handleOpenLinkModal = (context: LinkingContext) => {
+  const modalProps = {
+    ...context,
+    onClose: () => setShowLinkModal(false),
+    onLinksCreated: () => {
+      refreshEntityData();
+      setShowLinkModal(false);
+    }
+  };
+  
+  setLinkModalProps(modalProps);
+  setShowLinkModal(true);
+};
+```
+
+---
+
+## **🗺️ STEP 3: MAP INTEGRATION (Week 2-3)**
+
+### **Step 3.1: Map POI Linking Access** ⏱️ 3-4 hours
+**Purpose**: Add linking functionality directly to map POI interactions
+
+**Hagga Basin Integration**:
+```typescript
+// Enhance src/components/hagga-basin/MapPOIMarker.tsx
+const MapPOIMarker: React.FC<POIMarkerProps> = ({ poi, onPoiClick, mapSettings }) => {
+  const [showQuickLink, setShowQuickLink] = useState(false);
+  
+  const handleMarkerClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onPoiClick?.(poi);
+  };
+  
+  const handleQuickLink = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowQuickLink(true);
+  };
+  
+  return (
+    <div 
+      className="absolute transform -translate-x-1/2 -translate-y-1/2 group"
+      style={{ left: poi.coordinates.x, top: poi.coordinates.y }}
+    >
+      {/* Existing marker content */}
+      
+      {/* Quick link button - appears on hover */}
+      <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
+        <button
+          onClick={handleQuickLink}
+          className="bg-blue-600 text-white px-2 py-1 rounded text-xs whitespace-nowrap shadow-lg"
+          title="Link Items/Schematics"
+        >
+          <Link2 className="w-3 h-3 inline mr-1" />
+          Link
+        </button>
+      </div>
+      
+      {showQuickLink && (
+        <QuickLinkModal
+          poi={poi}
+          onClose={() => setShowQuickLink(false)}
+          position="map"
+        />
+      )}
+    </div>
+  );
+};
+```
+
+**Deep Desert Grid Integration**:
+```typescript
+// Enhance src/components/grid/GridSquareModal.tsx
+const GridSquareModal: React.FC<GridSquareModalProps> = ({ 
+  gridSquare, 
+  onClose,
+  onPoiUpdated 
+}) => {
+  return (
+    <Modal isOpen onClose={onClose} title={`Grid ${gridSquare.coordinate}`}>
+      {/* Existing modal content */}
+      
+      {/* POI List with Link Actions */}
+      <div className="space-y-3">
+        {gridSquare.pois?.map(poi => (
+          <div key={poi.id} className="flex items-center justify-between p-3 bg-gray-50 rounded">
+            <div className="flex items-center space-x-3">
+              <img src={poi.poi_type?.icon} alt="" className="w-6 h-6" />
+              <span className="font-medium">{poi.name}</span>
+            </div>
+            
+            <LinkingButton
+              direction="to_items"
+              entityType="poi"
+              onClick={() => openPoiLinkModal(poi)}
+            />
+          </div>
+        ))}
+      </div>
+    </Modal>
+  );
+};
+```
+
+### **Step 3.2: Visual Relationship Indicators** ⏱️ 2-3 hours
+**Purpose**: Add optional visual indicators on map showing POIs with linked items
+
+**Indicator Component**:
+```typescript
+// New component: src/components/map/RelationshipIndicator.tsx
+const RelationshipIndicator: React.FC<IndicatorProps> = ({ 
+  poi, 
+  showIndicators, 
+  indicatorType = 'badge' 
+}) => {
+  const { data: linkCounts } = usePoiLinkCounts(poi.id);
+  
+  if (!showIndicators || !linkCounts || (linkCounts.items === 0 && linkCounts.schematics === 0)) {
+    return null;
+  }
+  
+  return (
+    <div className="absolute -top-1 -right-1 flex space-x-1">
+      {linkCounts.items > 0 && (
+        <div className="bg-blue-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+          {linkCounts.items}
+        </div>
+      )}
+      {linkCounts.schematics > 0 && (
+        <div className="bg-green-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+          {linkCounts.schematics}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Integration in POI markers
+const MapPOIMarker: React.FC<POIMarkerProps> = ({ poi, mapSettings }) => (
+  <div className="relative">
+    {/* Existing marker */}
+    
+    <RelationshipIndicator 
+      poi={poi}
+      showIndicators={mapSettings.showRelationshipIndicators}
+    />
+  </div>
+);
+```
+
+**Map Settings Integration**:
+```typescript
+// Add to map settings
+interface MapSettings {
+  // ... existing settings
+  showRelationshipIndicators: boolean;
+  relationshipIndicatorType: 'badge' | 'dot' | 'none';
+}
+
+// Settings panel addition
+const MapSettingsPanel = () => (
+  <div className="space-y-4">
+    {/* Existing settings */}
+    
+    <div className="border-t pt-4">
+      <h3 className="font-medium mb-2">Relationship Indicators</h3>
+      <label className="flex items-center space-x-2">
+        <input
+          type="checkbox"
+          checked={settings.showRelationshipIndicators}
+          onChange={(e) => updateSettings({ showRelationshipIndicators: e.target.checked })}
+        />
+        <span>Show linked items count on POI markers</span>
+      </label>
+    </div>
+  </div>
+);
+```
+
+### **Step 3.3: Context Preservation** ⏱️ 1-2 hours
+**Purpose**: Maintain map position and zoom when opening linking modals
+
+**Context Management**:
+```typescript
+// Map context preservation
+const useMapContext = () => {
+  const [mapContext, setMapContext] = useState<MapContext>({
+    position: { x: 0, y: 0 },
+    zoom: 1,
+    selectedPoi: null
+  });
+  
+  const preserveContext = useCallback((position: Position, zoom: number, poi?: Poi) => {
+    setMapContext({ position, zoom, selectedPoi: poi });
+  }, []);
+  
+  const restoreContext = useCallback(() => {
+    // Restore map position and zoom after modal closes
+    if (mapRef.current) {
+      mapRef.current.setTransform(mapContext.position.x, mapContext.position.y, mapContext.zoom);
+    }
+  }, [mapContext]);
+  
+  return { preserveContext, restoreContext, mapContext };
+};
+
+// Usage in map components
+const InteractiveMap: React.FC<MapProps> = ({ onPoiLinkModalOpen }) => {
+  const { preserveContext, restoreContext } = useMapContext();
+  
+  const handlePoiLinkClick = (poi: Poi, position: Position, zoom: number) => {
+    preserveContext(position, zoom, poi);
+    onPoiLinkModalOpen?.(poi, restoreContext);
+  };
+  
+  return (
+    <TransformWrapper>
+      <TransformComponent>
+        {/* Map content with preserved context */}
+      </TransformComponent>
+    </TransformWrapper>
   );
 };
 ```
 
 ---
 
-## **🔄 STEP 4: WORKFLOW OPTIMIZATION (Week 4-5)**
+## **📊 STEP 4: RELATIONSHIP DISPLAY (Week 3)**
 
-### **Step 4.1: Bulk Operations Engine** ⏱️ 15-18 hours
-**Purpose**: Enable efficient mass management of relationships with progress tracking and error handling
+### **Step 4.1: POI Relationship Views** ⏱️ 2-3 hours
+**Purpose**: Show linked items/schematics in POI detail views
 
-**Design Rationale**:
-Community-driven databases require bulk operations for:
-- **Initial data population** (import from external sources)
-- **Maintenance operations** (cleanup, corrections, updates)
-- **Community contributions** (collaborative editing sessions)
-- **Performance optimization** (batch operations vs. individual requests)
-
-**Technical Implementation**:
-**File**: `src/components/bulk/BulkRelationshipManager.tsx`
+**Component Implementation**:
 ```typescript
-/**
- * Advanced bulk operations manager with progress tracking and error recovery
- * Supports complex batch operations with transaction safety
- */
-const BulkRelationshipManager: React.FC<BulkManagerProps> = ({
-  selectedPois,
-  selectedItems,
-  selectedSchematics,
-  operation
-}) => {
-  const [progress, setProgress] = useState<BulkProgress | null>(null);
-  const [results, setResults] = useState<BulkResults | null>(null);
-  const [errors, setErrors] = useState<BulkError[]>([]);
-
-  const handleBulkOperation = async (operationConfig: BulkOperationConfig) => {
-    const totalOperations = calculateTotalOperations(operationConfig);
-    
-    setProgress({
-      total: totalOperations,
-      completed: 0,
-      phase: 'preparing',
-      estimatedTimeRemaining: null
-    });
-
-    try {
-      const results = await BulkOperationEngine.execute({
-        ...operationConfig,
-        onProgress: (completed, phase, eta) => {
-          setProgress(prev => prev ? {
-            ...prev,
-            completed,
-            phase,
-            estimatedTimeRemaining: eta
-          } : null);
-        },
-        onError: (error) => {
-          setErrors(prev => [...prev, error]);
-        }
-      });
-
-      setResults(results);
-      setProgress(null);
-  } catch (error) {
-      console.error('Bulk operation failed:', error);
-      setProgress(null);
-    }
-  };
-
+// New component: src/components/poi/PoiRelationships.tsx
+const PoiRelationships: React.FC<PoiRelationshipsProps> = ({ poiId, onEdit }) => {
+  const { data: relationships, loading, refresh } = usePoiRelationships(poiId);
+  
+  if (loading) return <LoadingSpinner />;
+  if (!relationships?.length) return (
+    <div className="text-gray-500 text-center py-4">
+      No linked items or schematics
+    </div>
+  );
+  
   return (
-    <div className="space-y-6">
-      {/* Operation Configuration */}
-      <BulkOperationConfigurator
-        selectedPois={selectedPois}
-        selectedItems={selectedItems}
-        selectedSchematics={selectedSchematics}
-        onExecute={handleBulkOperation}
-        disabled={!!progress}
-      />
-
-      {/* Progress Tracking */}
-      {progress && (
-        <BulkProgressTracker
-          progress={progress}
-          errors={errors}
-          onCancel={() => BulkOperationEngine.cancel()}
-        />
+    <div className="space-y-4">
+      {/* Items Section */}
+      {relationships.items?.length > 0 && (
+        <div>
+          <h4 className="font-medium mb-2 flex items-center">
+            <Package className="w-4 h-4 mr-1" />
+            Linked Items ({relationships.items.length})
+          </h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {relationships.items.map(link => (
+              <RelationshipCard
+                key={link.id}
+                link={link}
+                type="item"
+                onEdit={() => onEdit?.(link)}
+                onDelete={() => handleDelete(link.id)}
+              />
+            ))}
+          </div>
+        </div>
       )}
-
-      {/* Results Summary */}
-      {results && (
-        <BulkResultsSummary
-          results={results}
-          errors={errors}
-          onRetryErrors={() => handleRetryFailedOperations()}
-          onExportReport={() => exportBulkOperationReport(results, errors)}
-        />
+      
+      {/* Schematics Section */}
+      {relationships.schematics?.length > 0 && (
+        <div>
+          <h4 className="font-medium mb-2 flex items-center">
+            <FileText className="w-4 h-4 mr-1" />
+            Linked Schematics ({relationships.schematics.length})
+          </h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {relationships.schematics.map(link => (
+              <RelationshipCard
+                key={link.id}
+                link={link}
+                type="schematic"
+                onEdit={() => onEdit?.(link)}
+                onDelete={() => handleDelete(link.id)}
+              />
+            ))}
+          </div>
+        </div>
       )}
     </div>
   );
 };
 
-/**
- * High-performance bulk operation engine with transaction safety
- * Processes operations in optimized batches with error recovery
- */
-class BulkOperationEngine {
-  static async execute(config: BulkOperationConfig): Promise<BulkResults> {
-    const {
-      operations,
-      batchSize = 50,
-      onProgress,
-      onError
-    } = config;
-
-    const results: BulkResults = {
-      successful: 0,
-      failed: 0,
-      skipped: 0,
-      totalProcessed: 0
-    };
-
-    // Process in optimized batches for performance
-    for (let i = 0; i < operations.length; i += batchSize) {
-      const batch = operations.slice(i, i + batchSize);
-      
-      try {
-        // Use database-level batch operations for performance
-        const batchResults = await this.processBatch(batch);
+const RelationshipCard: React.FC<RelationshipCardProps> = ({ 
+  link, 
+  type, 
+  onEdit, 
+  onDelete 
+}) => {
+  const entity = type === 'item' ? link.item : link.schematic;
+  
+  return (
+    <div className="border rounded-lg p-3 bg-gray-50">
+      <div className="flex items-start justify-between">
+        <div className="flex items-center space-x-2">
+          <img src={entity.icon_url} alt="" className="w-6 h-6" />
+          <div>
+            <div className="font-medium text-sm">{entity.name}</div>
+            <div className="text-xs text-gray-500">
+              {link.relationship_type === 'found_here' ? 'Found Here' : 'Material Source'}
+            </div>
+          </div>
+        </div>
         
-        results.successful += batchResults.successful;
-        results.failed += batchResults.failed;
-        results.skipped += batchResults.skipped;
-        results.totalProcessed += batch.length;
-
-        // Progress reporting with ETA calculation
-        const completed = Math.min(i + batchSize, operations.length);
-        const eta = this.calculateETA(completed, operations.length, Date.now());
-        
-        onProgress?.(completed, 'processing', eta);
-        
-      } catch (error) {
-        // Error recovery - process individually to isolate failures
-        for (const operation of batch) {
-          try {
-            await this.processIndividual(operation);
-            results.successful++;
-          } catch (individualError) {
-            results.failed++;
-            onError?.({
-              operation,
-              error: individualError,
-              timestamp: new Date()
-            });
-          }
-          results.totalProcessed++;
-        }
-      }
-    }
-
-    return results;
-  }
-
-  private static async processBatch(operations: BulkOperation[]): Promise<BatchResults> {
-    // Use Supabase stored procedure for optimal performance
-    const { data, error } = await supabase.rpc('process_relationship_batch', {
-      operations: operations.map(op => ({
-        type: op.type,
-        poi_id: op.poiId,
-        item_id: op.itemId,
-        schematic_id: op.schematicId,
-        relationship_type: op.relationshipType,
-        metadata: op.metadata
-      }))
-    });
-
-    if (error) throw error;
-    return data;
-  }
-}
+        <div className="flex space-x-1">
+          <button
+            onClick={onEdit}
+            className="text-blue-600 hover:text-blue-800 p-1"
+            title="Edit relationship"
+          >
+            <Edit className="w-3 h-3" />
+          </button>
+          <button
+            onClick={onDelete}
+            className="text-red-600 hover:text-red-800 p-1"
+            title="Remove relationship"
+          >
+            <Trash2 className="w-3 h-3" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 ```
 
-### **Step 4.2: Real-time Collaboration Features** ⏱️ 10-12 hours
-**Purpose**: Enable multiple users to work on relationships simultaneously with conflict resolution
-
-**Design Rationale**:
-Community databases benefit from real-time collaboration:
-- **Immediate feedback** (see others' changes live)
-- **Conflict prevention** (avoid duplicate work)
-- **Quality improvement** (peer review and validation)
-- **Community building** (shared editing experiences)
-
-**Technical Implementation**:
-**File**: `src/lib/realtime/RelationshipCollaboration.ts`
+**Integration in POI Modals**:
 ```typescript
-/**
- * Real-time collaboration system for relationship management
- * Handles concurrent editing with conflict resolution
- */
-export class RelationshipCollaboration {
-  private subscription: RealtimeChannel | null = null;
-  private conflictResolver = new ConflictResolver();
+// Enhanced POIEditModal.tsx
+const POIEditModal: React.FC<POIEditModalProps> = ({ poi, onClose }) => {
+  return (
+    <Modal isOpen onClose={onClose} title={`Edit ${poi.name}`}>
+      <div className="space-y-6">
+        {/* Existing POI edit form */}
+        
+        {/* Relationships Section */}
+        <div className="border-t pt-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-medium">Linked Items & Schematics</h3>
+            <LinkingButton
+              direction="to_items"
+              entityType="poi"
+              onClick={() => setShowLinkModal(true)}
+            />
+          </div>
+          
+          <PoiRelationships 
+            poiId={poi.id}
+            onEdit={handleEditRelationship}
+          />
+        </div>
+      </div>
+    </Modal>
+  );
+};
+```
 
-  static async initializeCollaboration(roomId: string): Promise<RelationshipCollaboration> {
-    const collaboration = new RelationshipCollaboration();
-    await collaboration.joinRoom(roomId);
-    return collaboration;
-  }
+### **Step 4.2: Item/Schematic Relationship Views** ⏱️ 2-3 hours
+**Purpose**: Show linked POIs in item and schematic detail views
 
-  async joinRoom(roomId: string): Promise<void> {
-    this.subscription = supabase
-      .channel(`relationships:${roomId}`)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'poi_item_links'
-      }, (payload) => {
-        this.handleRelationshipChange(payload);
-      })
-      .on('presence', { event: 'sync' }, () => {
-        this.handlePresenceSync();
-      })
-      .on('broadcast', { event: 'user_action' }, (payload) => {
-        this.handleUserAction(payload);
-      });
+**Component Implementation**:
+```typescript
+// New component: src/components/items-schematics/EntityRelationships.tsx
+const EntityRelationships: React.FC<EntityRelationshipsProps> = ({ 
+  entityId, 
+  entityType, 
+  onEdit 
+}) => {
+  const { data: linkedPois, loading } = useEntityLinkedPois(entityId, entityType);
+  
+  if (loading) return <LoadingSpinner />;
+  if (!linkedPois?.length) return (
+    <div className="text-gray-500 text-center py-4">
+      No linked POI locations
+    </div>
+  );
+  
+  return (
+    <div className="space-y-3">
+      <h4 className="font-medium flex items-center">
+        <MapPin className="w-4 h-4 mr-1" />
+        Found at POI Locations ({linkedPois.length})
+      </h4>
+      
+      <div className="space-y-2">
+        {linkedPois.map(link => (
+          <PoiLocationCard
+            key={link.id}
+            link={link}
+            onEdit={() => onEdit?.(link)}
+            onDelete={() => handleDelete(link.id)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+};
 
-    await this.subscription.subscribe();
-  }
+const PoiLocationCard: React.FC<PoiLocationCardProps> = ({ 
+  link, 
+  onEdit, 
+  onDelete 
+}) => (
+  <div className="border rounded-lg p-3 bg-gray-50">
+    <div className="flex items-center justify-between">
+      <div className="flex items-center space-x-3">
+        <img src={link.poi.poi_type?.icon} alt="" className="w-6 h-6" />
+        <div>
+          <div className="font-medium">{link.poi.name}</div>
+          <div className="text-sm text-gray-600">
+            {link.relationship_type === 'found_here' ? 'Found Here' : 'Material Source'}
+          </div>
+        </div>
+      </div>
+      
+      <div className="flex space-x-1">
+        <button
+          onClick={onEdit}
+          className="text-blue-600 hover:text-blue-800 p-1"
+          title="Edit relationship"
+        >
+          <Edit className="w-3 h-3" />
+        </button>
+        <button
+          onClick={onDelete}
+          className="text-red-600 hover:text-red-800 p-1"
+          title="Remove relationship"
+        >
+          <Trash2 className="w-3 h-3" />
+        </button>
+      </div>
+    </div>
+  </div>
+);
+```
 
-  async broadcastUserAction(action: UserAction): Promise<void> {
-    if (!this.subscription) return;
-
-    await this.subscription.send({
-      type: 'broadcast',
-      event: 'user_action',
-      payload: {
-        action,
-        user: await getCurrentUser(),
-        timestamp: new Date().toISOString()
-      }
-    });
-  }
-
-  private handleRelationshipChange(payload: any): void {
-    const { eventType, new: newRecord, old: oldRecord } = payload;
-    
-    // Check for conflicts with local changes
-    const conflict = this.conflictResolver.detectConflict(newRecord, oldRecord);
-    
-    if (conflict) {
-      this.handleConflict(conflict);
-    } else {
-      this.applyRemoteChange(eventType, newRecord, oldRecord);
-    }
-  }
-
-  private handleConflict(conflict: Conflict): void {
-    // Automatic resolution for simple conflicts
-    if (conflict.type === 'concurrent_edit' && conflict.canAutoResolve) {
-      const resolution = this.conflictResolver.autoResolve(conflict);
-      this.applyResolution(resolution);
-      return;
-    }
-
-    // Show conflict resolution UI for complex conflicts
-    this.showConflictResolutionDialog(conflict);
-  }
-}
-
-/**
- * Intelligent conflict resolution for concurrent relationship edits
- * Handles most conflicts automatically with user fallback for complex cases
- */
-class ConflictResolver {
-  detectConflict(newRecord: any, oldRecord: any): Conflict | null {
-    // Implementation for detecting various conflict types
-    // - Concurrent edits to same relationship
-    // - Deletion of relationship being edited
-    // - Constraint violations from concurrent operations
-    return null; // Simplified for brevity
-  }
-
-  autoResolve(conflict: Conflict): Resolution {
-    switch (conflict.type) {
-      case 'concurrent_edit':
-        return this.resolveByTimestamp(conflict);
-      case 'quantity_conflict':
-        return this.resolveByHigherValue(conflict);
-      default:
-        throw new Error('Cannot auto-resolve conflict type: ' + conflict.type);
-    }
-  }
-}
+**Integration in Item/Schematic Details**:
+```typescript
+// Enhanced ItemsSchematicsContent.tsx detail view
+const EntityDetailModal: React.FC<EntityDetailModalProps> = ({ 
+  entity, 
+  entityType, 
+  onClose 
+}) => (
+  <Modal isOpen onClose={onClose} title={entity.name}>
+    <div className="space-y-6">
+      {/* Entity details */}
+      <div className="space-y-3">
+        <img src={entity.icon_url} alt="" className="w-16 h-16 mx-auto" />
+        <div className="text-center">
+          <h2 className="text-xl font-bold">{entity.name}</h2>
+          <p className="text-gray-600">{entity.category?.name} • {entity.tier?.name}</p>
+        </div>
+      </div>
+      
+      {/* Relationships */}
+      <div className="border-t pt-4">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-medium">POI Locations</h3>
+          <LinkingButton
+            direction="to_pois"
+            entityType={entityType}
+            onClick={() => setShowLinkModal(true)}
+          />
+        </div>
+        
+        <EntityRelationships
+          entityId={entity.id}
+          entityType={entityType}
+          onEdit={handleEditRelationship}
+        />
+      </div>
+    </div>
+  </Modal>
+);
 ```
 
 ---
 
 ## **✅ PHASE 4 COMPLETION CRITERIA**
 
-### **Database & API Foundation**
-- [x] Enhanced N:M relationship tables with metadata and performance optimization
-- [x] Advanced API layer supporting complex queries and bulk operations
-- [x] Analytics views and performance monitoring systems
-- [x] Real-time subscription infrastructure for collaboration
+### **Enhanced Modal Experience** ✅
+- [x] Multi-select capability for items and schematics
+- [x] Enhanced search and filtering within modals
+- [x] Batch relationship creation functionality
+- [x] Improved user feedback and loading states
 
-### **Comprehensive Management Interface**
-- [x] Full-page POI-Items relationship manager with split-panel design
-- [x] Advanced filtering and search capabilities on all entity types
-- [x] Multiple visualization modes (table, cards, graph) for different use cases
-- [x] Bidirectional navigation integration across all interfaces
+### **Bidirectional Navigation** ✅
+- [x] "Link POIs" functionality from items/schematics
+- [x] "Link Items/Schematics" functionality from POIs
+- [x] Consistent UI styling across all linking entry points
+- [x] Context-aware modal workflows
 
-### **Advanced Map Integration**
-- [x] Intelligent relationship indicators with contextual adaptation
-- [x] Map-based relationship creation with spatial context preservation
-- [x] Performance optimized for hundreds of POIs with relationship data
-- [x] User customizable display preferences and filtering
+### **Map Integration** ✅
+- [x] Quick link access from map POI markers
+- [x] Optional visual relationship indicators on maps
+- [x] Context preservation during linking workflows
+- [x] Integration with both Hagga Basin and Deep Desert interfaces
 
-### **Workflow Optimization**
-- [x] High-performance bulk operations engine with progress tracking
-- [x] Real-time collaboration features with conflict resolution
-- [x] Advanced error handling and recovery mechanisms
-- [x] Comprehensive analytics and reporting capabilities
+### **Relationship Display** ✅
+- [x] Clean relationship lists in POI detail views
+- [x] Linked POI locations in item/schematic detail views
+- [x] Quick edit/remove actions for relationships
+- [x] Consistent relationship display patterns across all interfaces
 
 ---
 
 ## **🚀 STRATEGIC IMPACT**
 
-This Phase 4 implementation transforms the Items & Schematics system from a database into a **comprehensive relationship management platform**. The architectural decisions prioritize:
+This Phase 4 Lite implementation enhances your existing linking system to provide:
 
-1. **Scalability**: Handle thousands of entities and relationships efficiently
-2. **User Experience**: Minimize cognitive load and maximize workflow efficiency  
-3. **Community Collaboration**: Enable real-time teamwork with conflict resolution
-4. **Data Quality**: Provide tools for validation, verification, and maintenance
-5. **Performance**: Optimize for large-scale operations and real-time updates
+1. **Practical Usability**: Smooth workflows for moderate-scale linking needs
+2. **Bidirectional Access**: Equal linking capability from all entity types
+3. **Map Integration**: Seamless spatial context linking
+4. **Clean UX**: Professional relationship display and management
+5. **Build on Success**: Enhances existing infrastructure rather than rebuilding
 
-The result is a system that rivals commercial game database platforms while maintaining the flexibility and community focus that makes it unique.
+**Total Investment**: ~1 month of focused development for a significantly enhanced linking experience that perfectly matches your needs and scale.
 
 ---
 
 ## **🔮 FUTURE ENHANCEMENTS**
 
-**Phase 5 Opportunities**:
-- **AI-Powered Suggestions**: Machine learning for relationship recommendations
-- **Advanced Analytics**: Trend analysis and pattern detection in relationships
-- **Mobile Optimization**: Touch-friendly interfaces for mobile relationship management
-- **Import/Export Systems**: Integration with external game databases and tools
-- **Advanced Visualization**: 3D relationship graphs and spatial analysis tools 
+**Optional Phase 5 Opportunities** (if needed later):
+- **Advanced Filtering**: Complex spatial/hierarchical relationship queries
+- **Relationship Analytics**: Simple statistics and insights
+- **Import/Export**: Bulk relationship data management
+- **Mobile Optimization**: Touch-friendly relationship management interfaces 
