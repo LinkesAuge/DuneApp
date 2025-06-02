@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Mountain, Pyramid, Map, Grid, Search, X, CheckSquare, Square, Filter, Users, Eye, Lock, Calendar, User, Bookmark, MoreHorizontal } from 'lucide-react';
 import { Poi, PoiType, GridSquare, HaggaBasinBaseMap } from '../../types';
 import { supabase } from '../../lib/supabase';
@@ -6,6 +6,8 @@ import { useAuth } from '../auth/AuthProvider';
 import { useLocation, useNavigate } from 'react-router-dom';
 import InteractiveMap from '../hagga-basin/InteractiveMap';
 import DeepDesertSelectionMode from './DeepDesertSelectionMode';
+import { usePagination } from '../../hooks/usePagination';
+import { VirtualizedList, PaginationControls } from '../shared';
 
 interface PoiSelectionPanelProps {
   selectedPoiIds: Set<string>;
@@ -828,75 +830,110 @@ const PoiListView: React.FC<PoiListViewProps> = ({
     return isIconUrl(icon) ? icon : '';
   };
 
+  // Use pagination hook with 50 items per page
+  const pagination = usePagination(pois, {
+    itemsPerPage: 50,
+    urlParamPrefix: 'poi_',
+    persistInUrl: true
+  });
+
+  // Get paginated data
+  const paginatedPois = pagination.paginatedData(pois);
+
+  // Render individual POI item
+  const renderPoiItem = useCallback(({ item: poi, style }: { item: Poi; style: React.CSSProperties }) => {
+    const poiType = getPoiType(poi.poi_type_id);
+    const isSelected = selectedPoiIds.has(poi.id);
+    const imageUrl = poiType ? getDisplayImageUrl(poiType.icon) : '';
+
+    return (
+      <div
+        style={style}
+        className={`flex items-center space-x-3 p-3 mx-4 rounded-lg border transition-all duration-200 cursor-pointer ${
+          isSelected
+            ? 'bg-amber-900/20 border-amber-600/50 shadow-lg'
+            : 'bg-slate-800/50 border-slate-600 hover:border-slate-500 hover:bg-slate-800/70'
+        }`}
+        onClick={() => onPoiToggle(poi.id)}
+      >
+        {/* Selection Checkbox */}
+        <div className="flex-shrink-0">
+          {isSelected ? (
+            <CheckSquare className="w-5 h-5 text-amber-400" />
+          ) : (
+            <Square className="w-5 h-5 text-slate-400" />
+          )}
+        </div>
+
+        {/* POI Icon */}
+        <div className="w-10 h-10 flex items-center justify-center rounded-lg bg-slate-700 border border-slate-600 flex-shrink-0">
+          {imageUrl ? (
+            <img src={imageUrl} alt={poiType?.name} className="w-6 h-6 object-contain" />
+          ) : (
+            <span className="text-lg">{poiType?.icon || '📍'}</span>
+          )}
+        </div>
+
+        {/* POI Info */}
+        <div className="flex-1 min-w-0">
+          <h4 className="font-medium text-slate-100 truncate">{poi.title}</h4>
+          <div className="flex items-center space-x-2 text-xs text-slate-400 mt-1">
+            <span className="px-2 py-0.5 bg-slate-700 text-amber-300 rounded">
+              {poiType?.category || 'Unknown'}
+            </span>
+            <span>{poiType?.name || 'Unknown Type'}</span>
+            {poi.grid_squares?.coordinate && (
+              <span className="text-green-400">({poi.grid_squares.coordinate})</span>
+            )}
+          </div>
+          {poi.description && (
+            <p className="text-xs text-slate-400 mt-1 truncate">{poi.description}</p>
+          )}
+        </div>
+
+        {/* Privacy Indicator */}
+        <div className="flex-shrink-0">
+          {poi.privacy_level === 'global' && <Eye className="w-4 h-4 text-green-400" />}
+          {poi.privacy_level === 'private' && <Lock className="w-4 h-4 text-red-400" />}
+          {poi.privacy_level === 'shared' && <Users className="w-4 h-4 text-blue-400" />}
+        </div>
+      </div>
+    );
+  }, [poiTypes, selectedPoiIds, onPoiToggle, getPoiType, getDisplayImageUrl]);
+
+  if (pois.length === 0) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <p className="text-slate-400">No POIs match current filters</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="p-4 h-full overflow-y-auto">
-      {pois.length === 0 ? (
-        <div className="flex items-center justify-center h-32">
-          <p className="text-slate-400">No POIs match current filters</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 gap-3">
-          {pois.map(poi => {
-            const poiType = getPoiType(poi.poi_type_id);
-            const isSelected = selectedPoiIds.has(poi.id);
-            const imageUrl = poiType ? getDisplayImageUrl(poiType.icon) : '';
+    <div className="h-full flex flex-col">
+      {/* Pagination Controls */}
+      <div className="flex-shrink-0 px-4 py-2 border-b border-slate-700">
+        <PaginationControls
+          pagination={pagination}
+          compact={true}
+          showTotalItems={true}
+          showPageInfo={true}
+          itemsPerPageOptions={[25, 50, 100]}
+        />
+      </div>
 
-            return (
-              <div
-                key={poi.id}
-                className={`flex items-center space-x-3 p-3 rounded-lg border transition-all duration-200 cursor-pointer ${
-                  isSelected
-                    ? 'bg-amber-900/20 border-amber-600/50 shadow-lg'
-                    : 'bg-slate-800/50 border-slate-600 hover:border-slate-500 hover:bg-slate-800/70'
-                }`}
-                onClick={() => onPoiToggle(poi.id)}
-              >
-                {/* Selection Checkbox */}
-                <div className="flex-shrink-0">
-                  {isSelected ? (
-                    <CheckSquare className="w-5 h-5 text-amber-400" />
-                  ) : (
-                    <Square className="w-5 h-5 text-slate-400" />
-                  )}
-                </div>
-
-                {/* POI Icon */}
-                <div className="w-10 h-10 flex items-center justify-center rounded-lg bg-slate-700 border border-slate-600 flex-shrink-0">
-                  {imageUrl ? (
-                    <img src={imageUrl} alt={poiType?.name} className="w-6 h-6 object-contain" />
-                  ) : (
-                    <span className="text-lg">{poiType?.icon || '📍'}</span>
-                  )}
-                </div>
-
-                {/* POI Info */}
-                <div className="flex-1 min-w-0">
-                  <h4 className="font-medium text-slate-100 truncate">{poi.title}</h4>
-                  <div className="flex items-center space-x-2 text-xs text-slate-400 mt-1">
-                    <span className="px-2 py-0.5 bg-slate-700 text-amber-300 rounded">
-                      {poiType?.category || 'Unknown'}
-                    </span>
-                    <span>{poiType?.name || 'Unknown Type'}</span>
-                    {poi.grid_squares?.coordinate && (
-                      <span className="text-green-400">({poi.grid_squares.coordinate})</span>
-                    )}
-                  </div>
-                  {poi.description && (
-                    <p className="text-xs text-slate-400 mt-1 truncate">{poi.description}</p>
-                  )}
-                </div>
-
-                {/* Privacy Indicator */}
-                <div className="flex-shrink-0">
-                  {poi.privacy_level === 'global' && <Eye className="w-4 h-4 text-green-400" />}
-                  {poi.privacy_level === 'private' && <Lock className="w-4 h-4 text-red-400" />}
-                  {poi.privacy_level === 'shared' && <Users className="w-4 h-4 text-blue-400" />}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+      {/* Virtualized List */}
+      <div className="flex-1">
+        <VirtualizedList
+          items={paginatedPois}
+          height={600} // Will be constrained by parent
+          itemHeight={80} // Height for each POI item
+          renderItem={renderPoiItem}
+          getItemKey={(index, poi) => poi.id}
+          threshold={20} // Enable virtualization with 20+ items
+          className="h-full"
+        />
+      </div>
     </div>
   );
 };

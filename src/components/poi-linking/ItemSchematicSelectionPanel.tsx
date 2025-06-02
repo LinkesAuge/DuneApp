@@ -1,9 +1,11 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Package, FileText, Search, X, CheckSquare, Square, Grid, List, Filter, Users, Calendar, User, Bookmark, MoreHorizontal } from 'lucide-react';
 import { useAuth } from '../auth/AuthProvider';
 import { useItems, useSchematics, useCategories, useTypes, useTiers } from '../../hooks/useItemsSchematicsData';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { usePagination } from '../../hooks/usePagination';
+import { VirtualizedList, VirtualizedGrid, PaginationControls } from '../shared';
 import type { Item, Schematic, Category, Type, Tier } from '../../types';
 
 interface ItemSchematicSelectionPanelProps {
@@ -110,6 +112,11 @@ const ItemSchematicSelectionPanel: React.FC<ItemSchematicSelectionPanelProps> = 
   // Data state
   const [creators, setCreators] = useState<Array<{ id: string; username: string; display_name?: string }>>([]);
 
+  // Data hooks
+  const itemCategories = useCategories('items');
+  const schematicCategories = useCategories('schematics');
+  const tiers = useTiers();
+
   // Enhanced filter state
   const [filters, setFilters] = useState<FilterState>({
     searchTerm: '',
@@ -121,11 +128,6 @@ const ItemSchematicSelectionPanel: React.FC<ItemSchematicSelectionPanelProps> = 
     sortBy: 'name',
     sortOrder: 'asc'
   });
-
-  // Data hooks
-  const itemCategories = useCategories('items');
-  const schematicCategories = useCategories('schematics');
-  const tiers = useTiers();
 
   // Get current categories based on active tab
   const currentCategories = useMemo(() => {
@@ -304,6 +306,25 @@ const ItemSchematicSelectionPanel: React.FC<ItemSchematicSelectionPanelProps> = 
 
     return data;
   }, [activeTab, itemsData.items, schematicsData.schematics, filters, user?.id]);
+
+  // Pagination hooks using the filtered data
+  const itemsPagination = usePagination(activeTab === 'items' ? filteredData : [], {
+    itemsPerPage: 50,
+    urlParamPrefix: 'items_',
+    persistInUrl: true
+  });
+
+  const schematicsPagination = usePagination(activeTab === 'schematics' ? filteredData : [], {
+    itemsPerPage: 50,
+    urlParamPrefix: 'schematics_',
+    persistInUrl: true
+  });
+
+  // Get current pagination based on active tab
+  const currentPagination = activeTab === 'items' ? itemsPagination : schematicsPagination;
+
+  // Get paginated data using the hook's built-in method
+  const paginatedData = currentPagination.paginatedData(filteredData);
 
   // Loading and error states
   const isLoading = activeTab === 'items' 
@@ -784,17 +805,19 @@ const ItemSchematicSelectionPanel: React.FC<ItemSchematicSelectionPanelProps> = 
       <div className="flex-1 overflow-hidden">
         {viewMode === 'grid' ? (
           <ItemSchematicGridView
-            data={filteredData}
+            data={paginatedData}
             selectedIds={currentSelectedIds}
             onToggleSelection={toggleItemSelection}
             activeTab={activeTab}
+            pagination={currentPagination}
           />
         ) : (
           <ItemSchematicListView
-            data={filteredData}
+            data={paginatedData}
             selectedIds={currentSelectedIds}
             onToggleSelection={toggleItemSelection}
             activeTab={activeTab}
+            pagination={currentPagination}
           />
         )}
       </div>
@@ -808,89 +831,124 @@ interface ItemSchematicGridViewProps {
   selectedIds: Set<string>;
   onToggleSelection: (id: string) => void;
   activeTab: ActiveTab;
+  pagination: any; // UsePaginationReturn type
 }
 
 const ItemSchematicGridView: React.FC<ItemSchematicGridViewProps> = ({
   data,
   selectedIds,
   onToggleSelection,
-  activeTab
+  activeTab,
+  pagination
 }) => {
+  // Render individual item callback for virtualization
+  const renderItem = useCallback((index: number, item: Item | Schematic) => {
+    const isSelected = selectedIds.has(item.id);
+    
+    return (
+      <div
+        key={item.id}
+        className={`relative p-3 rounded-lg border transition-all duration-200 cursor-pointer ${
+          isSelected
+            ? 'bg-blue-900/20 border-blue-600/50 shadow-lg'
+            : 'bg-slate-800/50 border-slate-600 hover:border-slate-500 hover:bg-slate-800/70'
+        }`}
+        onClick={() => onToggleSelection(item.id)}
+      >
+        {/* Selection Checkbox */}
+        <div className="absolute top-2 right-2">
+          {isSelected ? (
+            <CheckSquare className="w-4 h-4 text-blue-400" />
+          ) : (
+            <Square className="w-4 h-4 text-slate-400" />
+          )}
+        </div>
+
+        {/* Content */}
+        <div className="pr-6">
+          <div className="flex items-start space-x-3">
+            {/* Icon */}
+            <div className="w-8 h-8 flex items-center justify-center rounded bg-slate-700 border border-slate-600 flex-shrink-0">
+              {item.icon_url ? (
+                <img src={item.icon_url} alt={item.name} className="w-5 h-5 object-contain" />
+              ) : (
+                activeTab === 'items' ? (
+                  <Package className="w-4 h-4 text-blue-400" />
+                ) : (
+                  <FileText className="w-4 h-4 text-purple-400" />
+                )
+              )}
+            </div>
+
+            {/* Info */}
+            <div className="flex-1 min-w-0">
+              <h4 className="font-medium text-slate-100 text-sm truncate">{item.name}</h4>
+              <div className="flex items-center space-x-2 text-xs text-slate-400 mt-1">
+                {item.category && (
+                  <span className="px-1.5 py-0.5 bg-slate-700 text-blue-300 rounded text-xs">
+                    {item.category.name}
+                  </span>
+                )}
+                {item.type && (
+                  <span className="text-slate-400">{item.type.name}</span>
+                )}
+                {item.tier && (
+                  <span className="text-slate-400">T{item.tier.level}</span>
+                )}
+              </div>
+              {item.description && (
+                <p className="text-xs text-slate-400 mt-1 line-clamp-2">{item.description}</p>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }, [selectedIds, onToggleSelection, activeTab]);
+
   if (data.length === 0) {
     return (
-      <div className="flex items-center justify-center h-32">
-        <p className="text-slate-400">No {activeTab} match current filters</p>
+      <div className="flex flex-col h-full">
+        <div className="flex items-center justify-center flex-1">
+          <p className="text-slate-400">No {activeTab} match current filters</p>
+        </div>
+        {pagination.totalPages > 0 && (
+          <div className="border-t border-slate-700 p-3">
+            <PaginationControls
+              pagination={pagination}
+              showItemsPerPage={true}
+              compactMode={true}
+            />
+          </div>
+        )}
       </div>
     );
   }
 
   return (
-    <div className="p-4 h-full overflow-y-auto">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {data.map(item => {
-          const isSelected = selectedIds.has(item.id);
-          
-          return (
-            <div
-              key={item.id}
-              className={`relative p-3 rounded-lg border transition-all duration-200 cursor-pointer ${
-                isSelected
-                  ? 'bg-blue-900/20 border-blue-600/50 shadow-lg'
-                  : 'bg-slate-800/50 border-slate-600 hover:border-slate-500 hover:bg-slate-800/70'
-              }`}
-              onClick={() => onToggleSelection(item.id)}
-            >
-              {/* Selection Checkbox */}
-              <div className="absolute top-2 right-2">
-                {isSelected ? (
-                  <CheckSquare className="w-4 h-4 text-blue-400" />
-                ) : (
-                  <Square className="w-4 h-4 text-slate-400" />
-                )}
-              </div>
-
-              {/* Content */}
-              <div className="pr-6">
-                <div className="flex items-start space-x-3">
-                  {/* Icon */}
-                  <div className="w-8 h-8 flex items-center justify-center rounded bg-slate-700 border border-slate-600 flex-shrink-0">
-                    {item.icon_url ? (
-                      <img src={item.icon_url} alt={item.name} className="w-5 h-5 object-contain" />
-                    ) : (
-                      activeTab === 'items' ? (
-                        <Package className="w-4 h-4 text-blue-400" />
-                      ) : (
-                        <FileText className="w-4 h-4 text-purple-400" />
-                      )
-                    )}
-                  </div>
-
-                  {/* Info */}
-                  <div className="flex-1 min-w-0">
-                    <h4 className="font-medium text-slate-100 text-sm truncate">{item.name}</h4>
-                    <div className="flex items-center space-x-2 text-xs text-slate-400 mt-1">
-                      {item.category && (
-                        <span className="px-1.5 py-0.5 bg-slate-700 text-blue-300 rounded text-xs">
-                          {item.category.name}
-                        </span>
-                      )}
-                      {item.type && (
-                        <span className="text-slate-400">{item.type.name}</span>
-                      )}
-                      {item.tier && (
-                        <span className="text-slate-400">T{item.tier.level}</span>
-                      )}
-                    </div>
-                    {item.description && (
-                      <p className="text-xs text-slate-400 mt-1 line-clamp-2">{item.description}</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          );
-        })}
+    <div className="flex flex-col h-full">
+      {/* Grid Content */}
+      <div className="flex-1 p-4">
+        <VirtualizedGrid
+          items={data}
+          itemHeight={120}
+          columnsCount={2}
+          renderItem={({ item, rowIndex, columnIndex, style }) => renderItem(rowIndex * 2 + columnIndex, item!)}
+          threshold={20}
+          gap={12}
+        />
       </div>
+      
+      {/* Pagination Controls */}
+      {pagination.totalPages > 1 && (
+        <div className="border-t border-slate-700 p-3">
+          <PaginationControls
+            pagination={pagination}
+            showItemsPerPage={true}
+            compactMode={true}
+          />
+        </div>
+      )}
     </div>
   );
 };
@@ -901,84 +959,118 @@ interface ItemSchematicListViewProps {
   selectedIds: Set<string>;
   onToggleSelection: (id: string) => void;
   activeTab: ActiveTab;
+  pagination: any; // UsePaginationReturn type
 }
 
 const ItemSchematicListView: React.FC<ItemSchematicListViewProps> = ({
   data,
   selectedIds,
   onToggleSelection,
-  activeTab
+  activeTab,
+  pagination
 }) => {
+  // Render individual item callback for virtualization
+  const renderItem = useCallback((index: number, item: Item | Schematic) => {
+    const isSelected = selectedIds.has(item.id);
+    
+    return (
+      <div
+        key={item.id}
+        className={`flex items-center space-x-3 p-3 rounded-lg border transition-all duration-200 cursor-pointer ${
+          isSelected
+            ? 'bg-blue-900/20 border-blue-600/50 shadow-lg'
+            : 'bg-slate-800/50 border-slate-600 hover:border-slate-500 hover:bg-slate-800/70'
+        }`}
+        onClick={() => onToggleSelection(item.id)}
+      >
+        {/* Selection Checkbox */}
+        <div className="flex-shrink-0">
+          {isSelected ? (
+            <CheckSquare className="w-4 h-4 text-blue-400" />
+          ) : (
+            <Square className="w-4 h-4 text-slate-400" />
+          )}
+        </div>
+
+        {/* Icon */}
+        <div className="w-8 h-8 flex items-center justify-center rounded bg-slate-700 border border-slate-600 flex-shrink-0">
+          {item.icon_url ? (
+            <img src={item.icon_url} alt={item.name} className="w-5 h-5 object-contain" />
+          ) : (
+            activeTab === 'items' ? (
+              <Package className="w-4 h-4 text-blue-400" />
+            ) : (
+              <FileText className="w-4 h-4 text-purple-400" />
+            )
+          )}
+        </div>
+
+        {/* Info */}
+        <div className="flex-1 min-w-0">
+          <h4 className="font-medium text-slate-100 truncate">{item.name}</h4>
+          <div className="flex items-center space-x-2 text-xs text-slate-400 mt-1">
+            {item.category && (
+              <span className="px-2 py-0.5 bg-slate-700 text-blue-300 rounded">
+                {item.category.name}
+              </span>
+            )}
+            {item.type && (
+              <span>{item.type.name}</span>
+            )}
+            {item.tier && (
+              <span className="text-amber-400">Tier {item.tier.level}</span>
+            )}
+          </div>
+          {item.description && (
+            <p className="text-xs text-slate-400 mt-1 truncate">{item.description}</p>
+          )}
+        </div>
+      </div>
+    );
+  }, [selectedIds, onToggleSelection, activeTab]);
+
   if (data.length === 0) {
     return (
-      <div className="flex items-center justify-center h-32">
-        <p className="text-slate-400">No {activeTab} match current filters</p>
+      <div className="flex flex-col h-full">
+        <div className="flex items-center justify-center flex-1">
+          <p className="text-slate-400">No {activeTab} match current filters</p>
+        </div>
+        {pagination.totalPages > 0 && (
+          <div className="border-t border-slate-700 p-3">
+            <PaginationControls
+              pagination={pagination}
+              showItemsPerPage={true}
+              compactMode={true}
+            />
+          </div>
+        )}
       </div>
     );
   }
 
   return (
-    <div className="p-4 h-full overflow-y-auto">
-      <div className="space-y-2">
-        {data.map(item => {
-          const isSelected = selectedIds.has(item.id);
-          
-          return (
-            <div
-              key={item.id}
-              className={`flex items-center space-x-3 p-3 rounded-lg border transition-all duration-200 cursor-pointer ${
-                isSelected
-                  ? 'bg-blue-900/20 border-blue-600/50 shadow-lg'
-                  : 'bg-slate-800/50 border-slate-600 hover:border-slate-500 hover:bg-slate-800/70'
-              }`}
-              onClick={() => onToggleSelection(item.id)}
-            >
-              {/* Selection Checkbox */}
-              <div className="flex-shrink-0">
-                {isSelected ? (
-                  <CheckSquare className="w-4 h-4 text-blue-400" />
-                ) : (
-                  <Square className="w-4 h-4 text-slate-400" />
-                )}
-              </div>
-
-              {/* Icon */}
-              <div className="w-8 h-8 flex items-center justify-center rounded bg-slate-700 border border-slate-600 flex-shrink-0">
-                {item.icon_url ? (
-                  <img src={item.icon_url} alt={item.name} className="w-5 h-5 object-contain" />
-                ) : (
-                  activeTab === 'items' ? (
-                    <Package className="w-4 h-4 text-blue-400" />
-                  ) : (
-                    <FileText className="w-4 h-4 text-purple-400" />
-                  )
-                )}
-              </div>
-
-              {/* Info */}
-              <div className="flex-1 min-w-0">
-                <h4 className="font-medium text-slate-100 truncate">{item.name}</h4>
-                <div className="flex items-center space-x-2 text-xs text-slate-400 mt-1">
-                  {item.category && (
-                    <span className="px-2 py-0.5 bg-slate-700 text-blue-300 rounded">
-                      {item.category.name}
-                    </span>
-                  )}
-                  {item.type && (
-                    <span>{item.type.name}</span>
-                  )}
-                  {item.tier && (
-                    <span className="text-amber-400">Tier {item.tier.level}</span>
-                  )}
-                </div>
-                {item.description && (
-                  <p className="text-xs text-slate-400 mt-1 truncate">{item.description}</p>
-                )}
-              </div>
-            </div>
-          );
-        })}
+    <div className="flex flex-col h-full">
+      {/* List Content */}
+      <div className="flex-1 p-4">
+        <VirtualizedList
+          items={data}
+          itemHeight={80}
+          renderItem={({ item, index, style }) => renderItem(index, item)}
+          threshold={20}
+          className="space-y-2"
+        />
       </div>
+      
+      {/* Pagination Controls */}
+      {pagination.totalPages > 1 && (
+        <div className="border-t border-slate-700 p-3">
+          <PaginationControls
+            pagination={pagination}
+            showItemsPerPage={true}
+            compactMode={true}
+          />
+        </div>
+      )}
     </div>
   );
 };
