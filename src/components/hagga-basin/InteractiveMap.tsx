@@ -156,7 +156,7 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
         mapElementRef.current
       );
 
-      console.log('Calculated coordinates:', coordinates);
+
 
       if (validateCoordinates(coordinates.x, coordinates.y)) {
         setPlacementCoordinates(coordinates);
@@ -387,7 +387,7 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
                     onShare={onPoiShare}
                     onImageClick={() => {
                       // TODO: Open gallery modal
-                      console.log('Open gallery for POI:', poi.id);
+                  
                     }}
                     isHighlighted={highlightedPoiId === poi.id}
                     selectionMode={selectionMode}

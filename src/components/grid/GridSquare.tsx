@@ -71,7 +71,7 @@ const GridSquare: React.FC<GridSquareProps> = ({ square, poisToDisplay = [], poi
     >
       {/* Enhanced Highlight Overlay */}
       {isHighlighted && (
-        <div className="absolute inset-0 bg-amber-500/20 pointer-events-none z-[5] animate-pulse"></div>
+        <div className="absolute inset-0 bg-amber-500/10 pointer-events-none z-[5]"></div>
       )}
 
       {/* Enhanced POI Count Badge */}

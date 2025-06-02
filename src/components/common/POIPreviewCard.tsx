@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Edit, Trash2, Share, Lock, Eye, Users, Image as ImageIcon, MessageCircle, Mountain, Pyramid, MapPin } from 'lucide-react';
+import { Edit, Trash2, Share, Lock, Eye, Users, Image as ImageIcon, MessageCircle, Mountain, Pyramid, MapPin, Link2 } from 'lucide-react';
 import { Poi, PoiType } from '../../types';
 import { Rank } from '../../types/profile';
 import { useAuth } from '../auth/AuthProvider';
@@ -9,6 +9,7 @@ import { getDisplayNameFromProfile } from '../../lib/utils';
 import UserAvatar from './UserAvatar';
 import RankBadge from './RankBadge';
 import CommentsList from '../comments/CommentsList';
+import LinkedItemsSection from '../poi/LinkedItemsSection';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 interface POIPreviewCardProps {
@@ -200,6 +201,11 @@ const POIPreviewCard: React.FC<POIPreviewCardProps> = ({
     if (onShare) onShare();
   };
 
+  const handleLinkItems = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigate(`/pois/${poi.id}/link-items`);
+  };
+
   const handleImageClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
@@ -342,6 +348,17 @@ const POIPreviewCard: React.FC<POIPreviewCardProps> = ({
                 title="Share POI"
               >
                 <Share className="w-4 h-4" />
+              </button>
+            )}
+
+            {/* Link Items button - show for members who own POI or editors/admins */}
+            {user && (user.role === 'admin' || user.role === 'editor' || (user.role === 'member' && user.id === poi.created_by)) && (
+              <button
+                onClick={handleLinkItems}
+                className="p-1.5 text-amber-300 hover:text-amber-100 hover:bg-slate-700/50 rounded transition-colors"
+                title="Link Items & Schematics"
+              >
+                <Link2 className="w-4 h-4" />
               </button>
             )}
           </div>
@@ -507,6 +524,14 @@ const POIPreviewCard: React.FC<POIPreviewCardProps> = ({
               </div>
             </div>
 
+            {/* Linked Items & Schematics Section */}
+            <div className="p-3 border-b border-slate-700">
+              <LinkedItemsSection 
+                poiId={poi.id}
+                showLinkButton={false}
+              />
+            </div>
+
             {/* Comments Section - Identical to Modal */}
             <div className="p-3">
               <CommentsList 
@@ -626,6 +651,16 @@ const POIPreviewCard: React.FC<POIPreviewCardProps> = ({
             </button>
           )}
 
+          {/* Link Items button - show for members who own POI or editors/admins */}
+          {user && (user.role === 'admin' || user.role === 'editor' || (user.role === 'member' && user.id === poi.created_by)) && (
+            <button
+              onClick={handleLinkItems}
+              className="p-1 text-amber-300 hover:text-amber-100 hover:bg-slate-700/50 rounded transition-colors"
+              title="Link Items & Schematics"
+            >
+              <Link2 className="w-3.5 h-3.5" />
+            </button>
+          )}
 
         </div>
       </div>
@@ -715,6 +750,14 @@ const POIPreviewCard: React.FC<POIPreviewCardProps> = ({
           </div>
         </div>
         
+        {/* Linked Items & Schematics Section for Grid View */}
+        <div className="mt-3 pt-3 border-t border-slate-700/50">
+          <LinkedItemsSection 
+            poiId={poi.id}
+            showLinkButton={false}
+          />
+        </div>
+
         {/* Comments Section for Grid View - Always Visible, Collapsed by Default */}
         <div className="mt-3 pt-3 border-t border-slate-700/50">
           <CommentsList

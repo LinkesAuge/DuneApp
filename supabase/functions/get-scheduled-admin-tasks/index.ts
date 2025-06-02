@@ -2,8 +2,6 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { corsHeaders } from '../_shared/cors.ts';
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-console.log("Get Scheduled Admin Tasks function booting up!");
-
 interface CronJob {
   jobid: number;
   schedule: string; // e.g., '0 2 * * *' (minute hour day_of_month month day_of_week)
@@ -56,7 +54,6 @@ serve(async (req: Request) => {
       global: { headers: { Authorization: authHeader } },
     });
 
-    console.log('Fetching scheduled tasks via RPC get_all_cron_jobs...');
     const { data: cronJobs, error: fetchError } = await supabaseAdmin.rpc('get_all_cron_jobs');
 
     if (fetchError) {
@@ -65,14 +62,11 @@ serve(async (req: Request) => {
     }
 
     if (!cronJobs) {
-        console.log('No cron jobs returned from RPC, or RPC returned null.');
         return new Response(JSON.stringify({ tasks: [] }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 200,
         });
     }
-
-    console.log('Raw cron jobs fetched via RPC:', cronJobs);
 
     const tasks: ScheduledTaskResponse[] = (cronJobs as CronJob[]).map(job => {
       let taskType: 'backup' | 'reset' | 'unknown' = 'unknown';
@@ -128,8 +122,6 @@ serve(async (req: Request) => {
         originalScheduledTimeUTC,
       };
     });
-
-    console.log('Processed scheduled tasks from RPC:', tasks);
 
     return new Response(JSON.stringify({ tasks }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

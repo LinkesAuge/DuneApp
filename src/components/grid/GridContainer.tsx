@@ -118,7 +118,7 @@ const GridContainer: React.FC = () => {
 
   // Set up real-time subscriptions for POI changes - same as Hagga Basin
   useEffect(() => {
-    console.log('[GridContainer] Setting up real-time subscriptions for Deep Desert POIs...');
+
     
     // Subscribe to POI table changes for Deep Desert
     const poiSubscription = supabase
@@ -132,38 +132,29 @@ const GridContainer: React.FC = () => {
           filter: 'map_type=eq.deep_desert' // Only Deep Desert POIs
         },
         async (payload) => {
-          console.log('[GridContainer] Real-time POI change detected:', payload);
-          
           if (payload.eventType === 'INSERT') {
             const newPoi = payload.new as Poi;
-            console.log('[GridContainer] Real-time INSERT - adding POI:', newPoi.id);
             
             setPois(prev => {
               // Check if POI already exists (to avoid duplicates)
               const exists = prev.some(p => p.id === newPoi.id);
               if (exists) {
-                console.log('[GridContainer] POI already exists, skipping insert');
                 return prev;
               }
-              console.log('[GridContainer] Adding new POI to state');
               return [newPoi, ...prev];
             });
           } 
           else if (payload.eventType === 'UPDATE') {
             const updatedPoi = payload.new as Poi;
-            console.log('[GridContainer] Real-time UPDATE - updating POI:', updatedPoi.id);
             
             setPois(prev => {
-              console.log('[GridContainer] Updating POI in state');
               return prev.map(p => p.id === updatedPoi.id ? updatedPoi : p);
             });
           }
           else if (payload.eventType === 'DELETE') {
             const deletedPoi = payload.old as Poi;
-            console.log('[GridContainer] Real-time DELETE - removing POI:', deletedPoi.id);
             
             setPois(prev => {
-              console.log('[GridContainer] Removing POI from state');
               return prev.filter(p => p.id !== deletedPoi.id);
             });
           }
@@ -173,7 +164,7 @@ const GridContainer: React.FC = () => {
 
     // Cleanup subscription when component unmounts
     return () => {
-      console.log('[GridContainer] Cleaning up real-time subscriptions');
+
       poiSubscription.unsubscribe();
     };
   }, []); // Empty dependency array - subscribe once on mount

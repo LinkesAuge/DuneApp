@@ -33,14 +33,12 @@ const AdminPanel: React.FC = () => {
   } = useAdminData();
 
   const handleSuccess = (message: string) => {
-    console.log('🎉 AdminPanel: handleSuccess called with message:', message);
     setSuccessMessage(message);
     setErrorMessage(null);
     setTimeout(() => setSuccessMessage(null), 5000);
   };
 
   const handleError = (error: string) => {
-    console.log('❌ AdminPanel: handleError called with error:', error);
     setErrorMessage(error);
     setSuccessMessage(null);
     setTimeout(() => setErrorMessage(null), 8000);

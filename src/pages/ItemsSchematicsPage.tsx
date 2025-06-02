@@ -56,14 +56,12 @@ const ItemsSchematicsPage: React.FC = () => {
   };
 
   const handleBulkOperationTriggered = (operation: 'edit' | 'delete', entities: any[]) => {
-    console.log(`Bulk ${operation} triggered for ${entities.length} entities`);
     // Clear selection after operation
     setSelectedEntities([]);
     // TODO: Refresh data when API is available
   };
 
   const handleAdvancedSearch = (criteria: any) => {
-    console.log('Advanced search criteria:', criteria);
     // TODO: Implement advanced search logic
     // This would typically filter the data based on the criteria
   };
@@ -75,23 +73,19 @@ const ItemsSchematicsPage: React.FC = () => {
 
   const handleCreateNew = () => {
     // TODO: Implement create new item/schematic modal
-    console.log(`Create new ${activeView}`);
   };
 
   const handleEntityCreated = (newEntity: any) => {
-    console.log('New entity created:', newEntity);
     // Force refresh of data by incrementing the refresh trigger
     setRefreshTrigger(prev => prev + 1);
   };
 
   const handleEntityUpdated = (updatedEntity: any) => {
-    console.log('Entity updated:', updatedEntity);
     // Force refresh of data by incrementing the refresh trigger
     setRefreshTrigger(prev => prev + 1);
   };
 
   const handleEntityDeleted = (entityId: string) => {
-    console.log('Entity deleted:', entityId);
     // Remove from selected if it was the deleted entity
     if (selectedItem?.id === entityId) {
       setSelectedItem(null);
@@ -124,7 +118,6 @@ const ItemsSchematicsPage: React.FC = () => {
 
   const openSettings = () => {
     // TODO: Implement settings modal
-    console.log('Open settings');
   };
 
   return (

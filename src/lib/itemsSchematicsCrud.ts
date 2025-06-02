@@ -558,7 +558,7 @@ export async function migrateCategoryContent(
 
     // Migrate types
     try {
-      console.log(`🔄 Migrating types from category ${fromCategoryId} to ${toCategoryId}`);
+  
       
       const { count: typeCount, error: typeError } = await supabase
         .from('types')
@@ -578,7 +578,7 @@ export async function migrateCategoryContent(
         });
         throw typeError;
       }
-      console.log(`✅ Successfully migrated ${typeCount || 0} types`);
+      
       migratedCount += typeCount || 0;
     } catch (error) {
       const errorMessage = `Failed to migrate types: ${error instanceof Error ? error.message : 'Unknown error'}`;
@@ -588,7 +588,7 @@ export async function migrateCategoryContent(
 
     // Migrate items  
     try {
-      console.log(`🔄 Migrating items from category ${fromCategoryId} to ${toCategoryId}`);
+
       const { count: itemCount, error: itemError } = await supabase
         .from('items')
         .update({ 
@@ -607,7 +607,7 @@ export async function migrateCategoryContent(
         });
         throw itemError;
       }
-      console.log(`✅ Successfully migrated ${itemCount || 0} items`);
+      
       migratedCount += itemCount || 0;
     } catch (error) {
       const errorMessage = `Failed to migrate items: ${error instanceof Error ? error.message : 'Unknown error'}`;
@@ -617,7 +617,7 @@ export async function migrateCategoryContent(
 
     // Migrate schematics
     try {
-      console.log(`🔄 Migrating schematics from category ${fromCategoryId} to ${toCategoryId}`);
+
       const { count: schematicCount, error: schematicError } = await supabase
         .from('schematics')
         .update({ 
@@ -636,7 +636,7 @@ export async function migrateCategoryContent(
         });
         throw schematicError;
       }
-      console.log(`✅ Successfully migrated ${schematicCount || 0} schematics`);
+      
       migratedCount += schematicCount || 0;
     } catch (error) {
       const errorMessage = `Failed to migrate schematics: ${error instanceof Error ? error.message : 'Unknown error'}`;
@@ -703,9 +703,7 @@ export async function deleteCategory(
 
     // If migration target is provided, migrate content first
     if (migrateToCategoryId) {
-      console.log(`🔄 Migration target provided: ${migrateToCategoryId}`);
       const migrationResult = await migrateCategoryContent(user, categoryId, migrateToCategoryId);
-      console.log(`🔄 Migration result:`, migrationResult);
       
       if (!migrationResult.success) {
         console.error(`🚨 Migration failed, aborting deletion:`, migrationResult.error);
@@ -715,11 +713,11 @@ export async function deleteCategory(
         };
       }
       
-      console.log(`✅ Migration completed successfully, proceeding with deletion`);
+      
       
       // Verify no remaining dependencies after migration
       const remainingDeps = await getCategoryDependencies(user, categoryId);
-      console.log(`🔍 Remaining dependencies after migration:`, remainingDeps);
+      
       
       if (remainingDeps.success && remainingDeps.data?.hasAny) {
         const errorMessage = `Migration incomplete: ${remainingDeps.data.types} types, ${remainingDeps.data.items} items, ${remainingDeps.data.schematics} schematics still remain`;
@@ -1276,7 +1274,7 @@ export async function createSchematic(
     }
 
     // Create schematic
-    console.log('Creating schematic with data:', schematicData);
+
     const { data, error } = await supabase
       .from('schematics')
       .insert([{

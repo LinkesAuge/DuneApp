@@ -308,7 +308,7 @@ const HierarchySelector: React.FC<{
   
   const appliesTo = entityType === 'items' ? 'items' : entityType === 'schematics' ? 'schematics' : null;
   
-  console.log('HierarchySelector - entityType:', entityType, 'appliesTo:', appliesTo);
+  
   
   // Fetch types when a category is selected
   useEffect(() => {
@@ -493,7 +493,7 @@ const IconSelector: React.FC<{
                     hover:border-amber-400/50 hover:text-amber-200 transition-all duration-200 bg-slate-800/30"
           onClick={() => {
             // TODO: Implement image upload functionality
-            console.log('Image upload coming soon...');
+      
           }}
         >
           <div className="flex items-center justify-center gap-2">
@@ -556,13 +556,10 @@ const CreateEditItemSchematicModal: React.FC<CreateEditItemSchematicModalProps> 
 
       setFieldsLoading(true);
       try {
-        console.log('🔍 Resolving fields for category:', formData.category_id, 'type:', formData.type_id);
         const fields = await resolveFields({
           category_id: formData.category_id,
           type_id: formData.type_id || undefined
         });
-        console.log('🔍 Resolved fields:', fields);
-        console.log('🔍 Current form field_values:', formData.field_values);
         setResolvedFields(fields);
       } catch (error) {
         console.error('Error resolving fields:', error);
@@ -578,8 +575,6 @@ const CreateEditItemSchematicModal: React.FC<CreateEditItemSchematicModalProps> 
   // Initialize form data when entity changes (for edit mode)
   useEffect(() => {
     if (mode === 'edit' && entity) {
-      console.log('🔄 Initializing edit form with entity:', entity);
-      console.log('🔄 Entity field_values:', entity.field_values);
       setFormData({
         name: entity.name || '',
         description: entity.description || '',
@@ -608,51 +603,29 @@ const CreateEditItemSchematicModal: React.FC<CreateEditItemSchematicModalProps> 
   const validateForm = (): boolean => {
     const errors: ValidationErrors = {};
 
-    console.log('=== VALIDATION DEBUG ===');
-    console.log('Mode:', mode);
-    console.log('Selected entity class:', selectedEntityClass);
-    console.log('Form data:', formData);
-    console.log('Resolved fields:', resolvedFields);
-
     // Entity class validation (create mode only)
     if (mode === 'create' && !selectedEntityClass) {
       errors.entityClass = 'Please select an entity class';
-      console.log('❌ Entity class validation failed');
-    } else {
-      console.log('✅ Entity class validation passed');
     }
 
     // Basic validations
     if (!formData.name.trim()) {
       errors.name = 'Name is required';
-      console.log('❌ Name validation failed');
-    } else {
-      console.log('✅ Name validation passed:', formData.name);
     }
 
     if (!formData.category_id) {
       errors.category_id = 'Category is required';
-      console.log('❌ Category validation failed');
-    } else {
-      console.log('✅ Category validation passed:', formData.category_id);
     }
 
     // Validate dynamic fields
-    console.log('Checking dynamic fields...');
     resolvedFields.forEach(field => {
       if (field.is_required) {
         const value = formData.field_values[field.name];
         if (value === null || value === undefined || value === '') {
           errors[`field_${field.name}`] = `${field.display_name} is required`;
-          console.log(`❌ Required field '${field.name}' validation failed:`, value);
-        } else {
-          console.log(`✅ Required field '${field.name}' validation passed:`, value);
         }
       }
     });
-
-    console.log('Final validation errors:', errors);
-    console.log('=== END VALIDATION DEBUG ===');
 
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
@@ -662,14 +635,7 @@ const CreateEditItemSchematicModal: React.FC<CreateEditItemSchematicModalProps> 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    console.log('Form submission started');
-    console.log('Mode:', mode);
-    console.log('Selected entity class:', selectedEntityClass);
-    console.log('Entity type:', entityType);
-    console.log('Form data:', formData);
-    
     if (!validateForm()) {
-      console.log('Validation failed');
       return;
     }
 
@@ -687,20 +653,13 @@ const CreateEditItemSchematicModal: React.FC<CreateEditItemSchematicModalProps> 
         ...(mode === 'edit' && entity ? { id: entity.id } : {})
       };
 
-      console.log('Entity data to be saved:', entityData);
-
       let result;
       
       if (mode === 'create') {
-        console.log('Creating new entity of type:', entityType);
         if (entityType === 'items') {
-          console.log('Calling createItem...');
           result = await createItem(entityData);
-          console.log('CreateItem result:', result);
         } else if (entityType === 'schematics') {
-          console.log('Calling createSchematic...');
           result = await createSchematic(entityData);
-          console.log('CreateSchematic result:', result);
         } else {
           throw new Error(`Invalid entity class: ${entityType}`);
         }
@@ -713,8 +672,6 @@ const CreateEditItemSchematicModal: React.FC<CreateEditItemSchematicModalProps> 
           result = await updateSchematic(id!, updates);
         }
       }
-
-      console.log('Final result:', result);
 
       if (result) {
         onSuccess(result);
@@ -816,7 +773,7 @@ const CreateEditItemSchematicModal: React.FC<CreateEditItemSchematicModalProps> 
                     value={selectedEntityClass}
                     onChange={(e) => {
                       const newValue = e.target.value as 'items' | 'schematics';
-                      console.log('Entity class changed to:', newValue);
+              
                       setSelectedEntityClass(newValue);
                       // Clear entity class validation error
                       if (validationErrors.entityClass) {

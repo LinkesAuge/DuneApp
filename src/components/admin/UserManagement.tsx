@@ -128,12 +128,12 @@ const UserManagement: React.FC<UserManagementProps> = ({
 
     setIsDeletingUser(userId);
     try {
-      console.log('Attempting to delete user:', userId);
+  
       const { data, error } = await supabase.functions.invoke('delete-user', {
         body: { userIdToDelete: userId }
       });
 
-      console.log('Delete function response:', { data, error });
+      
 
       if (error) {
         console.error('Supabase function invoke error:', error);

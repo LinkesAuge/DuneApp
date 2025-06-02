@@ -184,9 +184,7 @@ const ImageCropModal: React.FC<ImageCropModalProps> = ({
   };
 
   const handleConfirmCrop = async () => {
-    console.log('[ImageCropModal] handleConfirmCrop started.');
-    console.log('[ImageCropModal] Initial completedCrop:', JSON.parse(JSON.stringify(completedCrop || {})));
-    console.log('[ImageCropModal] Initial isFullImageRequestedByUser:', isFullImageRequestedByUser);
+
 
     let finalPixelCrop: PixelCrop | undefined;
     let isFullImageUpload = false;
@@ -197,19 +195,16 @@ const ImageCropModal: React.FC<ImageCropModalProps> = ({
       return;
     }
     const { naturalWidth, naturalHeight } = imgRef.current;
-    console.log(`[ImageCropModal] imgRef.current dimensions: naturalW=${naturalWidth}, naturalH=${naturalHeight}, displayW=${imgRef.current.width}, displayH=${imgRef.current.height}`);
+    
 
     if (isFullImageRequestedByUser) {
-      console.log('[ImageCropModal] Prioritizing full image due to isFullImageRequestedByUser=true.');
       finalPixelCrop = { unit: 'px', x: 0, y: 0, width: naturalWidth, height: naturalHeight };
       isFullImageUpload = true;
     } else if (!completedCrop || completedCrop.width === 0 || completedCrop.height === 0) {
-      console.log('[ImageCropModal] No valid user-defined completedCrop, defaulting to full natural image.');
       finalPixelCrop = { unit: 'px', x: 0, y: 0, width: naturalWidth, height: naturalHeight };
       setCrop({ unit: '%', x: 0, y: 0, width: 100, height: 100 });
       isFullImageUpload = true;
     } else {
-      console.log('[ImageCropModal] Using user-defined completedCrop.');
       finalPixelCrop = completedCrop;
       if (
         finalPixelCrop.x === 0 &&
@@ -217,16 +212,13 @@ const ImageCropModal: React.FC<ImageCropModalProps> = ({
         finalPixelCrop.width === naturalWidth &&
         finalPixelCrop.height === naturalHeight
       ) {
-        console.log('[ImageCropModal] User-defined completedCrop IS the full natural image.');
         isFullImageUpload = true;
       } else {
-        console.log('[ImageCropModal] User-defined completedCrop is a partial crop.');
         isFullImageUpload = false;
       }
     }
 
-    console.log('[ImageCropModal] Determined finalPixelCrop (before potential scaling):', JSON.parse(JSON.stringify(finalPixelCrop || {})));
-    console.log('[ImageCropModal] Determined isFullImageUpload:', isFullImageUpload);
+
 
     if (!finalPixelCrop || finalPixelCrop.width === 0 || finalPixelCrop.height === 0) {
        setError("Cannot confirm with an empty or invalid crop area. This shouldn't happen after defaulting logic.");
@@ -240,8 +232,7 @@ const ImageCropModal: React.FC<ImageCropModalProps> = ({
       const { naturalWidth, naturalHeight, width: displayWidth, height: displayHeight } = imgRef.current;
       
       if (displayWidth > 0 && displayHeight > 0) {
-        console.log('[ImageCropModal] Scaling partial crop coordinates from display to natural.');
-        console.log('[ImageCropModal] Before scaling: x=${cropForProcessing.x}, y=${cropForProcessing.y}, w=${cropForProcessing.width}, h=${cropForProcessing.height}');
+
         
         cropForProcessing.x = (cropForProcessing.x / displayWidth) * naturalWidth;
         cropForProcessing.y = (cropForProcessing.y / displayHeight) * naturalHeight;
@@ -253,7 +244,7 @@ const ImageCropModal: React.FC<ImageCropModalProps> = ({
         cropForProcessing.width = Math.round(cropForProcessing.width);
         cropForProcessing.height = Math.round(cropForProcessing.height);
 
-        console.log('[ImageCropModal] After scaling: x=${cropForProcessing.x}, y=${cropForProcessing.y}, w=${cropForProcessing.width}, h=${cropForProcessing.height}');
+
       } else {
         console.warn('[ImageCropModal] Display dimensions are zero, cannot scale crop. Using unscaled crop data.');
       }

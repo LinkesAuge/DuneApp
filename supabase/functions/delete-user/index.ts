@@ -3,8 +3,6 @@ import { createClient, SupabaseClient } from 'npm:@supabase/supabase-js@2.43.4';
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { corsHeaders } from '../_shared/cors.ts';
 
-console.log("Delete User function booting up!");
-
 // Helper function to extract file path from Supabase Storage URL
 const extractStorageFilePath = (url: string): string | null => {
   try {
@@ -34,7 +32,7 @@ const batchDeleteFiles = async (supabase: SupabaseClient, bucket: string, filePa
       console.error(`Error deleting batch ${i / batchSize + 1} from ${bucket}:`, error);
       // Continue with other batches even if one fails
     } else {
-      console.log(`Successfully deleted batch ${i / batchSize + 1} (${batch.length} files) from ${bucket}`);
+
     }
   }
 };
@@ -122,14 +120,10 @@ serve(async (req: Request) => {
         });
     }
 
-    console.log(`Admin user ${requestingUser.id} attempting to delete user ${userIdToDelete}`);
-
     // DATA PRESERVATION APPROACH: Update user data to "Deleted User" instead of deleting
-    console.log(`Starting data preservation for user ${userIdToDelete}...`);
 
     try {
       // 1. Update POIs - preserve POIs but anonymize creator
-      console.log('Updating POIs created by user to "Deleted User"...');
       const { error: updatePoisError } = await supabaseAdmin
         .from('pois')
         .update({ 
@@ -140,12 +134,9 @@ serve(async (req: Request) => {
 
       if (updatePoisError) {
         console.error('Error updating POIs:', updatePoisError);
-      } else {
-        console.log('Successfully updated POIs to preserve data');
       }
 
       // Also update POIs where user was the last updater but not original creator
-      console.log('Updating POIs last updated by user...');
       const { error: updatePoisUpdatedError } = await supabaseAdmin
         .from('pois')
         .update({ updated_by: null })
@@ -153,12 +144,9 @@ serve(async (req: Request) => {
 
       if (updatePoisUpdatedError) {
         console.error('Error updating POIs updated_by:', updatePoisUpdatedError);
-      } else {
-        console.log('Successfully updated POIs updated_by to preserve data');
       }
 
       // 2. Update grid squares - preserve screenshots but anonymize uploader
-      console.log('Updating grid squares uploaded by user...');
       const { error: updateGridSquaresError } = await supabaseAdmin
         .from('grid_squares')
         .update({ 
@@ -169,12 +157,9 @@ serve(async (req: Request) => {
 
       if (updateGridSquaresError) {
         console.error('Error updating grid squares:', updateGridSquaresError);
-      } else {
-        console.log('Successfully updated grid squares to preserve data');
       }
 
       // Also update grid squares where user was the last updater but not original uploader
-      console.log('Updating grid squares last updated by user...');
       const { error: updateGridSquaresUpdatedError } = await supabaseAdmin
         .from('grid_squares')
         .update({ updated_by: null })
@@ -182,12 +167,9 @@ serve(async (req: Request) => {
 
       if (updateGridSquaresUpdatedError) {
         console.error('Error updating grid squares updated_by:', updateGridSquaresUpdatedError);
-      } else {
-        console.log('Successfully updated grid squares updated_by to preserve data');
       }
 
       // 3. Update comments - preserve comments but anonymize author
-      console.log('Updating comments created by user...');
       const { error: updateCommentsError } = await supabaseAdmin
         .from('comments')
         .update({ 
@@ -198,12 +180,9 @@ serve(async (req: Request) => {
 
       if (updateCommentsError) {
         console.error('Error updating comments:', updateCommentsError);
-      } else {
-        console.log('Successfully updated comments to preserve data');
       }
 
       // Also update comments where user was the last updater but not original author
-      console.log('Updating comments last updated by user...');
       const { error: updateCommentsUpdatedError } = await supabaseAdmin
         .from('comments')
         .update({ updated_by: null })
@@ -211,12 +190,9 @@ serve(async (req: Request) => {
 
       if (updateCommentsUpdatedError) {
         console.error('Error updating comments updated_by:', updateCommentsUpdatedError);
-      } else {
-        console.log('Successfully updated comments updated_by to preserve data');
       }
 
       // 4. Update custom icons - preserve icons but anonymize creator
-      console.log('Updating custom icons created by user...');
       const { error: updateCustomIconsError } = await supabaseAdmin
         .from('custom_icons')
         .update({ user_id: null })
@@ -224,12 +200,9 @@ serve(async (req: Request) => {
 
       if (updateCustomIconsError) {
         console.error('Error updating custom icons:', updateCustomIconsError);
-      } else {
-        console.log('Successfully updated custom icons to preserve data');
       }
 
       // 5. Update POI types - preserve custom POI types but anonymize creator
-      console.log('Updating POI types created by user...');
       const { error: updatePoiTypesError } = await supabaseAdmin
         .from('poi_types')
         .update({ created_by: null })
@@ -237,12 +210,9 @@ serve(async (req: Request) => {
 
       if (updatePoiTypesError) {
         console.error('Error updating POI types:', updatePoiTypesError);
-      } else {
-        console.log('Successfully updated POI types to preserve data');
       }
 
       // 6. Update POI collections - preserve collections but anonymize creator
-      console.log('Updating POI collections created by user...');
       const { error: updateCollectionsError } = await supabaseAdmin
         .from('poi_collections')
         .update({ 
@@ -253,12 +223,9 @@ serve(async (req: Request) => {
 
       if (updateCollectionsError) {
         console.error('Error updating POI collections:', updateCollectionsError);
-      } else {
-        console.log('Successfully updated POI collections to preserve data');
       }
 
       // Also update collections where user was the last updater but not original creator
-      console.log('Updating POI collections last updated by user...');
       const { error: updateCollectionsUpdatedError } = await supabaseAdmin
         .from('poi_collections')
         .update({ updated_by: null })
@@ -266,12 +233,9 @@ serve(async (req: Request) => {
 
       if (updateCollectionsUpdatedError) {
         console.error('Error updating POI collections updated_by:', updateCollectionsUpdatedError);
-      } else {
-        console.log('Successfully updated POI collections updated_by to preserve data');
       }
 
       // 7. Delete POI shares involving the user (these don't need preservation)
-      console.log('Deleting POI shares involving user...');
       const { error: deleteSharesError1 } = await supabaseAdmin
         .from('poi_shares')
         .delete()
@@ -284,11 +248,7 @@ serve(async (req: Request) => {
 
       if (deleteSharesError1 || deleteSharesError2) {
         console.error('Error deleting POI shares:', deleteSharesError1 || deleteSharesError2);
-      } else {
-        console.log('Successfully deleted POI shares involving user');
       }
-
-      console.log('Data preservation completed successfully');
 
     } catch (dataPreservationError) {
       console.error('Error during data preservation:', dataPreservationError);
@@ -298,7 +258,6 @@ serve(async (req: Request) => {
     // Now proceed with user account deletion
 
     // 1. Delete from auth.users
-    console.log(`Deleting user ${userIdToDelete} from auth.users...`);
     const { data: deletedAuthUser, error: deleteAuthUserError } = await supabaseAdmin.auth.admin.deleteUser(userIdToDelete);
     
     if (deleteAuthUserError) {
@@ -308,12 +267,9 @@ serve(async (req: Request) => {
       } else {
         throw new Error(`Failed to delete user from authentication: ${deleteAuthUserError.message}`);
       }
-    } else {
-      console.log(`User ${userIdToDelete} successfully deleted from auth.users.`);
     }
 
     // 2. Delete from public.profiles
-    console.log(`Deleting profile for user ${userIdToDelete}...`);
     const { error: deleteProfileError } = await supabaseAdmin
       .from('profiles')
       .delete()
@@ -321,8 +277,6 @@ serve(async (req: Request) => {
 
     if (deleteProfileError) {
       console.warn(`Warning/Error trying to delete profile for user ${userIdToDelete}:`, deleteProfileError.message);
-    } else {
-      console.log(`Profile for user ${userIdToDelete} deleted from public.profiles.`);
     }
 
     return new Response(

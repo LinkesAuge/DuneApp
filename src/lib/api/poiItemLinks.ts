@@ -99,10 +99,7 @@ export async function getPoiWithItems(poi_id: string): Promise<PoiWithItems | nu
   // First get the POI
   const { data: poi, error: poiError } = await supabase
     .from('pois')
-    .select(`
-      *,
-      screenshots:poi_screenshots(*)
-    `)
+    .select('*')
     .eq('id', poi_id)
     .single();
 
@@ -144,7 +141,6 @@ export async function getPoisWithItems(filters?: PoiSearchWithItems) {
     .from('pois')
     .select(`
       *,
-      screenshots:poi_screenshots(*),
       poi_item_links(
         *,
         item:items(*),

@@ -3,8 +3,6 @@ import { createClient, SupabaseClient } from 'npm:@supabase/supabase-js@2.43.4';
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { corsHeaders } from '../_shared/cors.ts';
 
-console.log("Delete Map Backup function booting up!");
-
 // Corrected Configuration to match list-map-backups and perform-map-backup (Option B)
 const BACKUP_BUCKET = 'screenshots';
 const BACKUP_FOLDER = 'map-backups/scheduled';
@@ -33,14 +31,10 @@ serve(async (req: Request) => {
     );
 
     const filePath = `${BACKUP_FOLDER}/${fileName}`;
-    console.log(`Attempting to delete file: '${fileName}' at path: '${filePath}' from bucket: '${BACKUP_BUCKET}'`);
 
     const { data, error } = await supabaseAdmin.storage
       .from(BACKUP_BUCKET)
       .remove([filePath]);
-
-    console.log(`Data returned by storage.remove for ${filePath}:`, JSON.stringify(data, null, 2));
-    console.log(`Error from storage.remove for ${filePath}:`, JSON.stringify(error, null, 2));
 
     if (error) {
       console.error('Error deleting backup:', error);
@@ -69,7 +63,7 @@ serve(async (req: Request) => {
       });
     }
     
-    console.log(`Successfully processed deletion for backup: ${fileName}. Response data: ${JSON.stringify(data)}`);
+
     return new Response(JSON.stringify({ message: 'Backup deletion processed successfully', details: data }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,

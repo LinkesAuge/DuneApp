@@ -72,7 +72,7 @@ const PoiLinkingPage: React.FC = () => {
   
   // UI state
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
-  const [relationshipType, setRelationshipType] = useState<'found_here' | 'material_source'>('found_here');
+  // Simplified to just use 'found_here' as the default type (merging found_here and material_source)
   const [submitting, setSubmitting] = useState(false);
   
   // Panel visibility state
@@ -232,7 +232,7 @@ const PoiLinkingPage: React.FC = () => {
         const { data: gridSquaresData, error: gridSquaresError } = await supabase
           .from('grid_squares')
           .select('*')
-          .order('grid_id');
+          .order('coordinate');
 
         if (gridSquaresError) {
           console.warn('Error fetching grid squares:', gridSquaresError);
@@ -328,34 +328,82 @@ const PoiLinkingPage: React.FC = () => {
     });
   };
 
-  // Create links handler
-  const handleCreateLinks = async () => {
+  // Update links handler (create new + remove deselected)
+  const handleUpdateLinks = async () => {
     if (!targetEntity || !user) return;
 
     const newlySelectedPois = Array.from(selectedPoiIds).filter(poiId => !existingLinks.has(poiId));
+    const deselectedPois = Array.from(existingLinks).filter(poiId => !selectedPoiIds.has(poiId));
     
-    if (newlySelectedPois.length === 0) {
-      toast.error('No new POIs selected to link');
+    if (newlySelectedPois.length === 0 && deselectedPois.length === 0) {
+      toast.error('No changes to save');
       return;
     }
 
     try {
       setSubmitting(true);
       
-      const operations = newlySelectedPois.map(poiId => ({
-        poi_id: poiId,
-        [entityType === 'items' ? 'item_id' : 'schematic_id']: targetEntity.id,
-        link_type: relationshipType,
-        created_by: user.id
-      }));
+      // Create new links
+      if (newlySelectedPois.length > 0) {
+        const createOperations = newlySelectedPois.map(poiId => ({
+          poi_id: poiId,
+          [entityType === 'items' ? 'item_id' : 'schematic_id']: targetEntity.id,
+          link_type: 'found_here', // Simplified - no longer distinguish between found_here and material_source
+          created_by: user.id
+        }));
 
-      await createBulkPoiItemLinks(operations);
+        await createBulkPoiItemLinks(createOperations);
+      }
+
+      // Remove deselected links
+      if (deselectedPois.length > 0) {
+        // Get the link IDs for the deselected POIs
+        const linkField = entityType === 'items' ? 'item_id' : 'schematic_id';
+        const { data: linksToDelete, error: fetchError } = await supabase
+          .from('poi_item_links')
+          .select('id')
+          .eq(linkField, targetEntity.id)
+          .in('poi_id', deselectedPois);
+
+        if (fetchError) {
+          console.error('Error fetching links to delete:', fetchError);
+          throw fetchError;
+        }
+
+        if (linksToDelete && linksToDelete.length > 0) {
+          const linkIds = linksToDelete.map(link => link.id);
+          const { error: deleteError } = await supabase
+            .from('poi_item_links')
+            .delete()
+            .in('id', linkIds);
+
+          if (deleteError) {
+            console.error('Error deleting links:', deleteError);
+            throw deleteError;
+          }
+        }
+      }
+
+      // Update the existing links state to reflect the changes
+      const newExistingLinks = new Set(selectedPoiIds);
+      setExistingLinks(newExistingLinks);
       
-      toast.success(`Successfully linked ${newlySelectedPois.length} POI${newlySelectedPois.length !== 1 ? 's' : ''}`);
-      navigate('/database');
+      // Success message
+      const changes = [];
+      if (newlySelectedPois.length > 0) {
+        changes.push(`${newlySelectedPois.length} link${newlySelectedPois.length !== 1 ? 's' : ''} added`);
+      }
+      if (deselectedPois.length > 0) {
+        changes.push(`${deselectedPois.length} link${deselectedPois.length !== 1 ? 's' : ''} removed`);
+      }
+      
+      toast.success(`Successfully updated links: ${changes.join(', ')}`);
+      
+      // Stay on the current page instead of navigating away
+      
     } catch (error) {
-      console.error('Error creating links:', error);
-      toast.error('Failed to create links');
+      console.error('Error updating links:', error);
+      toast.error('Failed to update links');
     } finally {
       setSubmitting(false);
     }
@@ -372,8 +420,17 @@ const PoiLinkingPage: React.FC = () => {
     const haggaBasinCount = selectedPois.filter(poi => poi.map_type === 'hagga_basin').length;
     const deepDesertCount = selectedPois.filter(poi => poi.map_type === 'deep_desert').length;
     const newSelectionCount = Array.from(selectedPoiIds).filter(id => !existingLinks.has(id)).length;
+    const removedSelectionCount = Array.from(existingLinks).filter(id => !selectedPoiIds.has(id)).length;
+    const hasChanges = newSelectionCount > 0 || removedSelectionCount > 0;
     
-    return { haggaBasinCount, deepDesertCount, newSelectionCount, total: selectedPoiIds.size };
+    return { 
+      haggaBasinCount, 
+      deepDesertCount, 
+      newSelectionCount, 
+      removedSelectionCount,
+      hasChanges,
+      total: selectedPoiIds.size 
+    };
   };
 
   if (loading || !targetEntity) {
@@ -528,33 +585,7 @@ const PoiLinkingPage: React.FC = () => {
               </div>
 
               {/* Relationship Type */}
-              <div className="mb-6">
-                <label className="block text-amber-200/80 text-sm mb-2">Relationship Type</label>
-                <div className="space-y-2">
-                  <label className="flex items-center space-x-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="relationshipType"
-                      value="found_here"
-                      checked={relationshipType === 'found_here'}
-                      onChange={(e) => setRelationshipType(e.target.value as 'found_here')}
-                      className="border-slate-600 bg-slate-700 text-amber-400 focus:ring-amber-400"
-                    />
-                    <span className="text-amber-200/90 text-sm">Found Here</span>
-                  </label>
-                  <label className="flex items-center space-x-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="relationshipType"
-                      value="material_source"
-                      checked={relationshipType === 'material_source'}
-                      onChange={(e) => setRelationshipType(e.target.value as 'material_source')}
-                      className="border-slate-600 bg-slate-700 text-amber-400 focus:ring-amber-400"
-                    />
-                    <span className="text-amber-200/90 text-sm">Material Source</span>
-                  </label>
-                </div>
-              </div>
+
 
               {/* Current Map Info */}
               <div className="border-t border-slate-600 pt-4">
@@ -774,18 +805,97 @@ const PoiLinkingPage: React.FC = () => {
                 )
               ) : (
                 /* Deep Desert Mode */
-                <DeepDesertSelectionMode
-                  currentGridId={currentGridId}
-                  allGridSquares={allGridSquares}
-                  pois={pois}
-                  poiTypes={poiTypes}
+                viewMode === 'list' ? (
+                  /* List View */
+                  <div className="h-full overflow-y-auto p-4">
+                    {filteredPois.length === 0 ? (
+                      <div className="text-center py-12">
+                        <MapPin className="w-12 h-12 text-amber-200/40 mx-auto mb-4" />
+                        <p className="text-amber-200/60"
+                           style={{ fontFamily: "'Trebuchet MS', sans-serif" }}>
+                          No POIs match the current filters
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                        {filteredPois.map(poi => {
+                          const isSelected = selectedPoiIds.has(poi.id);
+                          const isExistingLink = existingLinks.has(poi.id);
+                          
+                          return (
+                            <div
+                              key={poi.id}
+                              onClick={() => handlePoiToggle(poi.id)}
+                              className={`
+                                p-4 rounded-lg border cursor-pointer transition-all relative
+                                ${isSelected
+                                  ? isExistingLink 
+                                    ? 'border-blue-400 bg-blue-400/10' // Existing links - blue
+                                    : 'border-amber-400 bg-amber-400/10' // New selections - amber
+                                  : 'border-slate-600 bg-slate-700 hover:border-slate-500 hover:bg-slate-650'
+                                }
+                              `}
+                            >
+                              {/* Existing link indicator */}
+                              {isExistingLink && (
+                                <div className="absolute top-2 right-2 bg-blue-500 text-white text-xs px-2 py-1 rounded">
+                                  Linked
+                                </div>
+                              )}
+                              
+                              <div className="flex items-center space-x-3">
+                                {/* Selection Indicator */}
+                                <div className={`
+                                  w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0
+                                  ${isSelected
+                                    ? isExistingLink
+                                      ? 'border-blue-400 bg-blue-400'
+                                      : 'border-amber-400 bg-amber-400'
+                                    : 'border-slate-500'
+                                  }
+                                `}>
+                                  {isSelected && (
+                                    <Check className="w-3 h-3 text-slate-900" />
+                                  )}
+                                </div>
 
-                  selectedPoiIds={selectedPoiIds}
-                  onPoiSelect={handlePoiSelect}
-                  onPoiDeselect={handlePoiDeselect}
-                  onGridNavigate={handleGridNavigate}
-                  filteredPois={filteredPois}
-                />
+                                {/* POI Icon */}
+                                <div className="w-8 h-8 flex items-center justify-center flex-shrink-0">
+                                  {renderPoiIcon(poi.poi_types?.icon, '📍', 'w-6 h-6')}
+                                </div>
+
+                                {/* POI Info */}
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-medium text-amber-200 truncate"
+                                       style={{ fontFamily: "'Trebuchet MS', sans-serif" }}>
+                                    {poi.title}
+                                  </div>
+                                  <div className="text-sm text-amber-200/60 truncate">
+                                    {poi.poi_types?.name} • Deep Desert
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  /* Map View */
+                  <DeepDesertSelectionMode
+                    currentGridId={currentGridId}
+                    allGridSquares={allGridSquares}
+                    pois={pois}
+                    poiTypes={poiTypes}
+
+                    selectedPoiIds={selectedPoiIds}
+                    onPoiSelect={handlePoiSelect}
+                    onPoiDeselect={handlePoiDeselect}
+                    onGridNavigate={handleGridNavigate}
+                    filteredPois={filteredPois}
+                  />
+                )
               )}
             </div>
           </div>
@@ -845,16 +955,22 @@ const PoiLinkingPage: React.FC = () => {
                             <div className="space-y-2">
                               {existingCount > 0 && (
                                 <div className="flex items-center justify-between p-2 bg-blue-500/10 border border-blue-500/20 rounded">
-                                  <span className="text-blue-300 text-sm">Already linked</span>
+                                  <span className="text-blue-300 text-sm">Currently linked</span>
                                   <span className="text-blue-200 font-medium">{existingCount}</span>
                                 </div>
                               )}
                               {selectionSummary.newSelectionCount > 0 && (
-                                <div className="flex items-center justify-between p-2 bg-amber-500/10 border border-amber-500/20 rounded">
-                                  <span className="text-amber-300 text-sm">
-                                    New ({relationshipType === 'found_here' ? 'Found Here' : 'Material Source'})
+                                <div className="flex items-center justify-between p-2 bg-green-500/10 border border-green-500/20 rounded">
+                                  <span className="text-green-300 text-sm">
+                                    Adding new links
                                   </span>
-                                  <span className="text-amber-200 font-medium">{selectionSummary.newSelectionCount}</span>
+                                  <span className="text-green-200 font-medium">{selectionSummary.newSelectionCount}</span>
+                                </div>
+                              )}
+                              {selectionSummary.removedSelectionCount > 0 && (
+                                <div className="flex items-center justify-between p-2 bg-red-500/10 border border-red-500/20 rounded">
+                                  <span className="text-red-300 text-sm">Removing</span>
+                                  <span className="text-red-200 font-medium">{selectionSummary.removedSelectionCount}</span>
                                 </div>
                               )}
                             </div>
@@ -938,11 +1054,11 @@ const PoiLinkingPage: React.FC = () => {
                   )}
                   
                   <button
-                    onClick={handleCreateLinks}
-                    disabled={selectionSummary.newSelectionCount === 0 || submitting}
+                    onClick={handleUpdateLinks}
+                    disabled={!selectionSummary.hasChanges || submitting}
                     className={`
                       w-full px-4 py-3 rounded font-medium transition-all flex items-center justify-center space-x-2
-                      ${selectionSummary.newSelectionCount > 0 && !submitting
+                      ${selectionSummary.hasChanges && !submitting
                         ? 'bg-amber-600 text-slate-900 hover:bg-amber-500 shadow-lg'
                         : 'bg-slate-700 text-slate-400 cursor-not-allowed'
                       }
@@ -952,17 +1068,26 @@ const PoiLinkingPage: React.FC = () => {
                     {submitting ? (
                       <>
                         <div className="w-4 h-4 border-2 border-slate-700 border-t-slate-900 rounded-full animate-spin" />
-                        <span>Creating Links...</span>
+                        <span>Saving Changes...</span>
                       </>
-                    ) : selectionSummary.newSelectionCount > 0 ? (
+                    ) : selectionSummary.hasChanges ? (
                       <>
                         <Check className="w-4 h-4" />
-                        <span>Create {selectionSummary.newSelectionCount} New Link{selectionSummary.newSelectionCount !== 1 ? 's' : ''}</span>
+                        <span>
+                          Save Changes 
+                          {(selectionSummary.newSelectionCount > 0 || selectionSummary.removedSelectionCount > 0) && (
+                            <span className="ml-1">
+                              ({selectionSummary.newSelectionCount > 0 ? `+${selectionSummary.newSelectionCount}` : ''}
+                              {selectionSummary.newSelectionCount > 0 && selectionSummary.removedSelectionCount > 0 ? ', ' : ''}
+                              {selectionSummary.removedSelectionCount > 0 ? `-${selectionSummary.removedSelectionCount}` : ''})
+                            </span>
+                          )}
+                        </span>
                       </>
                     ) : (
                       <>
                         <MapPin className="w-4 h-4" />
-                        <span>Select POIs to Create Links</span>
+                        <span>No Changes to Save</span>
                       </>
                     )}
                   </button>

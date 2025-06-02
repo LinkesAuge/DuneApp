@@ -37,8 +37,6 @@ async function uploadBackupFiles(supabaseAdmin: any, files: {
 }): Promise<{[originalUrl: string]: string}> {
   const urlMapping: {[originalUrl: string]: string} = {};
   
-  console.log('Starting file restoration...');
-  
   // Helper function to upload a single file
   const uploadFile = async (file: StorageFile): Promise<void> => {
     try {
@@ -70,7 +68,6 @@ async function uploadBackupFiles(supabaseAdmin: any, files: {
 
       // Map old URL to new URL
       urlMapping[file.originalUrl] = urlData.publicUrl;
-      console.log(`Restored file: ${file.path} -> ${urlData.publicUrl}`);
     } catch (err) {
       console.warn(`Error uploading file ${file.path}:`, err);
     }
@@ -83,18 +80,13 @@ async function uploadBackupFiles(supabaseAdmin: any, files: {
     ...files.comment_screenshots,
     ...files.custom_icons
   ];
-
-  console.log(`Uploading ${allFiles.length} files...`);
   
   // Upload files in batches to avoid overwhelming the system
   const batchSize = 10;
   for (let i = 0; i < allFiles.length; i += batchSize) {
     const batch = allFiles.slice(i, i + batchSize);
     await Promise.all(batch.map(uploadFile));
-    console.log(`Uploaded batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(allFiles.length/batchSize)}`);
   }
-
-  console.log(`File restoration complete. ${Object.keys(urlMapping).length} files uploaded successfully.`);
   return urlMapping;
 }
 
@@ -246,18 +238,13 @@ Deno.serve(async (req) => {
         throw new Error('Invalid backup data format - no data found');
       }
 
-      console.log(`Starting restore process. Database records: ${gridSquares.length} grid squares, ${pois.length} POIs, ${comments.length} comments`);
-
       // Restore files first if they exist
       let urlMapping: {[originalUrl: string]: string} = {};
       if (enhancedBackupData.files) {
-        console.log('Restoring storage files...');
         urlMapping = await uploadBackupFiles(supabaseAdmin, enhancedBackupData.files);
-        console.log(`File restoration complete. ${Object.keys(urlMapping).length} URL mappings created.`);
       }
 
       // Delete existing data first
-      console.log('Clearing existing data...');
 
       // Delete comments first (due to foreign key constraints)
       const { error: commentsDeleteError } = await supabaseAdmin
@@ -291,8 +278,6 @@ Deno.serve(async (req) => {
         console.error('Failed to delete grid squares:', gridDeleteError);
         throw gridDeleteError;
       }
-
-      console.log('Existing data cleared successfully.');
 
       // Insert backup data with updated URLs
       
@@ -330,7 +315,6 @@ Deno.serve(async (req) => {
           console.error('Failed to insert grid squares:', gridInsertError);
           throw gridInsertError;
         }
-        console.log(`Inserted ${validGridSquares.length} grid squares`);
       }
 
       if (validPois.length > 0) {
@@ -342,7 +326,6 @@ Deno.serve(async (req) => {
           console.error('Failed to insert POIs:', poisInsertError);
           throw poisInsertError;
         }
-        console.log(`Inserted ${validPois.length} POIs`);
       }
 
       if (comments.length > 0) {
@@ -357,7 +340,6 @@ Deno.serve(async (req) => {
           console.error('Failed to insert comments:', commentsInsertError);
           throw commentsInsertError;
         }
-        console.log(`Inserted ${validComments.length} comments`);
       }
 
       const totalFiles = Object.keys(urlMapping).length;

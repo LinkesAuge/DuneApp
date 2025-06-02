@@ -777,24 +777,14 @@ const PoiTypeManager: React.FC<PoiTypeManagerProps> = ({
   };
 
   const handlePoiTypeSubmit = async (e: FormEvent) => {
-    console.log('🚀 FORM SUBMIT TRIGGERED!', e); // First thing that should run
     e.preventDefault();
-    console.log('🔍 Current POI Type state:', currentPoiType); // Check form state
-    console.log('🔍 Required fields check:', {
-      name: currentPoiType.name,
-      icon: currentPoiType.icon,
-      category: currentPoiType.category,
-      allFilled: !(!currentPoiType.name || !currentPoiType.icon || !currentPoiType.category)
-    });
     
     if (!currentPoiType.name || !currentPoiType.icon || !currentPoiType.category) {
-      console.log('❌ Validation failed - missing required fields');
       handleError('Please fill in all required fields');
       return;
     }
 
     setIsSubmitting(true);
-    console.log('Submitting POI type:', currentPoiType); // Debug log
     
     try {
       // Get category info for default display settings
@@ -813,10 +803,7 @@ const PoiTypeManager: React.FC<PoiTypeManagerProps> = ({
         category_column_preference: categoryData?.columnPreference || 1,
       };
 
-      console.log('Submit data:', submitData); // Debug log
-
       if (isEditingType && currentPoiType.id) {
-        console.log('Updating existing POI type:', currentPoiType.id); // Debug log
         const { data, error } = await supabase
           .from('poi_types')
           .update(submitData)
@@ -824,37 +811,25 @@ const PoiTypeManager: React.FC<PoiTypeManagerProps> = ({
           .select(); // Return the updated record
 
         if (error) {
-          console.error('Update error:', error); // Debug log
           throw error;
         }
-        console.log('Update successful:', data); // Debug log
         handleSuccess('POI type updated successfully!');
       } else {
-        console.log('Creating new POI type'); // Debug log
         const { data, error } = await supabase
           .from('poi_types')
           .insert([submitData])
           .select(); // Return the inserted record
 
         if (error) {
-          console.error('Insert error:', error); // Debug log
           throw error;
         }
-        console.log('Insert successful:', data); // Debug log
         handleSuccess('POI type created successfully!');
       }
-
-      console.log('Fetching updated data...'); // Debug log
       await fetchData();
       handlePoiTypeCancel();
     } catch (err: any) {
       console.error('Error saving POI type:', err);
-      console.error('Error details:', {
-        message: err.message,
-        details: err.details,
-        hint: err.hint,
-        code: err.code
-      }); // Detailed error logging
+
       handleError('Failed to save POI type: ' + err.message);
     } finally {
       setIsSubmitting(false);
@@ -1323,7 +1298,7 @@ const PoiTypeManager: React.FC<PoiTypeManagerProps> = ({
                 <button
                   type="submit"
                   disabled={isSubmitting || isUploading || !currentPoiType.name || !currentPoiType.icon || !currentPoiType.category}
-                  onClick={() => console.log('🔍 Submit button clicked! Button disabled?', isSubmitting || isUploading || !currentPoiType.name || !currentPoiType.icon || !currentPoiType.category)}
+                  onClick={() => {}}
                   className="px-6 py-3 bg-gold-300 hover:bg-amber-200 text-void-950 rounded 
                            disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300
                            flex items-center font-medium tracking-wide"

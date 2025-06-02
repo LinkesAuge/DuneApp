@@ -52,7 +52,7 @@ export const uploadImageWithConversion = async (
     );
 
     if (shouldConvert) {
-      console.log(`Converting ${file.name} to WebP...`);
+  
       
       const preset = getQualityPresets()[quality];
       conversionStats = await convertToWebP(file, {
@@ -62,7 +62,7 @@ export const uploadImageWithConversion = async (
       
       fileToUpload = createWebPFile(conversionStats.blob, fileName);
       
-      console.log(`WebP conversion complete: ${(conversionStats.compressionRatio).toFixed(1)}% smaller`);
+
     }
 
     // Upload the file

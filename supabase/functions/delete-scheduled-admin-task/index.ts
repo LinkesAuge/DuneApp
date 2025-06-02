@@ -3,8 +3,6 @@ import { createClient, SupabaseClient } from 'npm:@supabase/supabase-js@2.43.4';
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { corsHeaders } from '../_shared/cors.ts'; // Import shared CORS headers
 
-console.log("Delete Scheduled Admin Task function booting up!");
-
 serve(async (req: Request) => {
   // Handle OPTIONS preflight request
   if (req.method === 'OPTIONS') {
@@ -36,7 +34,7 @@ serve(async (req: Request) => {
       });
     }
 
-    console.log(`Attempting to delete scheduled task: ${jobName} using Supabase client initialized with service role.`);
+
 
     const { error: rpcError, data: rpcData } = await supabaseAdmin.rpc('unschedule_cron_job', {
       job_name_to_delete: jobName,
@@ -51,7 +49,7 @@ serve(async (req: Request) => {
       throw new Error(`Database error unscheduling job: ${detailedErrorMessage}`);
     }
 
-    console.log(`Job ${jobName} unscheduled successfully via RPC. Response:`, rpcData);
+
 
     let successMessage = `Scheduled task '${jobName}' processed.`;
     if (typeof rpcData === 'boolean') {

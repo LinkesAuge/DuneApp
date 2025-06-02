@@ -45,13 +45,8 @@ const GridPage: React.FC = () => {
   // Get highlight parameter for POI highlighting
   const highlightPoiId = searchParams.get('highlight');
   
-  // Debug logging
-  console.log('GridPage rendered with gridId:', gridId);
-  console.log('Grid pattern test:', gridId ? VALID_GRID_PATTERN.test(gridId) : 'gridId is null/undefined');
-  
   // Validate grid ID format
   if (!gridId || !VALID_GRID_PATTERN.test(gridId)) {
-    console.log('Grid validation failed, redirecting to /deep-desert');
     return <Navigate to="/deep-desert" replace />;
   }
 
@@ -183,7 +178,6 @@ const GridPage: React.FC = () => {
   // Listen for admin panel changes to refresh POI types
   useEffect(() => {
     const handleAdminDataUpdate = () => {
-      console.log('Admin data updated, refreshing POI types...');
       fetchPoiTypes();
     };
 
@@ -463,7 +457,6 @@ const GridPage: React.FC = () => {
 
   // Handle opening the POI creation modal
   const handleOpenPoiModal = async () => {
-    console.log('Add POI clicked');
     
     // Clear any existing errors
     setError(null);
@@ -513,7 +506,6 @@ const GridPage: React.FC = () => {
 
   // Handle Add POI button - enter placement mode
   const handleAddPOI = async () => {
-    console.log('Add POI clicked');
     
     // Clear any existing errors
     setError(null);
@@ -562,14 +554,11 @@ const GridPage: React.FC = () => {
 
   // Handle POI click from POI panel - highlighting only
   const handlePoiHighlight = (poi: Poi) => {
-    console.log('GridPage handlePoiHighlight called for POI:', poi.title, 'coordinates:', poi.coordinates_x, poi.coordinates_y);
     // Highlight the POI with pulsing animation
     setHighlightedPoiId(poi.id);
-    console.log('GridPage: Set highlightedPoiId to:', poi.id);
     // Remove highlight after 6 seconds
     setTimeout(() => {
       setHighlightedPoiId(null);
-      console.log('GridPage: Cleared highlightedPoiId');
     }, 6000);
   };
 
@@ -577,11 +566,9 @@ const GridPage: React.FC = () => {
   const handlePoiClick = (poi: Poi, event: React.MouseEvent) => {
     event.preventDefault();
     event.stopPropagation();
-    console.log('GridPage handlePoiClick called for POI:', poi.title, 'coordinates:', poi.coordinates_x, poi.coordinates_y);
     
     // Open the POI details modal only
     setSelectedPoi(poi);
-    console.log('GridPage: Set selectedPoi to:', poi.id);
   };
 
   // Handle POI editing
@@ -638,7 +625,6 @@ const GridPage: React.FC = () => {
 
       // Delete screenshot files from storage first
       if (filesToDelete.length > 0) {
-        console.log(`Deleting ${filesToDelete.length} screenshot files for POI ${poiToDelete.id}`);
         const { error: storageError } = await supabase.storage
           .from('screenshots')
           .remove(filesToDelete);
@@ -646,8 +632,6 @@ const GridPage: React.FC = () => {
         if (storageError) {
           console.error('Error deleting POI screenshots from storage:', storageError);
           // Continue with POI deletion even if storage cleanup fails
-        } else {
-          console.log('POI screenshots deleted from storage successfully');
         }
       }
 
@@ -676,7 +660,7 @@ const GridPage: React.FC = () => {
         setSelectedPoi(null);
       }
 
-      console.log('POI deleted successfully');
+      
       
       // Close confirmation modal
       setShowDeleteConfirmation(false);
@@ -772,7 +756,6 @@ const GridPage: React.FC = () => {
   useEffect(() => {
     const fetchGridData = async () => {
       try {
-        console.log('Starting data fetch for grid:', gridId);
         setLoading(true);
         setError(null);
 
@@ -864,7 +847,6 @@ const GridPage: React.FC = () => {
         console.error('Error fetching grid data:', err);
         setError('Failed to load grid data');
       } finally {
-        console.log('Data fetch completed for grid:', gridId);
         setLoading(false);
       }
     };
@@ -874,7 +856,6 @@ const GridPage: React.FC = () => {
 
   // Set up real-time subscriptions for POI changes - same as Hagga Basin
   useEffect(() => {
-    console.log('[GridPage] Setting up real-time subscriptions for grid:', gridId);
     
     // Subscribe to POI table changes for this specific grid
     const poiSubscription = supabase
@@ -888,11 +869,9 @@ const GridPage: React.FC = () => {
           filter: `map_type=eq.deep_desert${gridSquare?.id ? `.and.grid_square_id=eq.${gridSquare.id}` : ''}` // Only this grid's POIs
         },
         async (payload) => {
-          console.log('[GridPage] Real-time POI change detected:', payload);
           
           if (payload.eventType === 'INSERT') {
             const newPoi = payload.new as Poi;
-            console.log('[GridPage] Real-time INSERT - adding POI:', newPoi.id);
             
             // Only add if it belongs to this grid
             if (newPoi.grid_square_id === gridSquare?.id) {
@@ -925,10 +904,8 @@ const GridPage: React.FC = () => {
                   // Check if POI already exists (to avoid duplicates)
                   const exists = prev.some(p => p.id === transformedPoi.id);
                   if (exists) {
-                    console.log('[GridPage] POI already exists, skipping insert');
                     return prev;
                   }
-                  console.log('[GridPage] Adding new POI to state');
                   return [transformedPoi, ...prev];
                 });
               }
@@ -936,7 +913,6 @@ const GridPage: React.FC = () => {
           } 
           else if (payload.eventType === 'UPDATE') {
             const updatedPoi = payload.new as Poi;
-            console.log('[GridPage] Real-time UPDATE - updating POI:', updatedPoi.id);
             
             // Fetch complete updated POI data with relations
             const { data: completePoiData, error } = await supabase
@@ -966,11 +942,9 @@ const GridPage: React.FC = () => {
               setPois(prev => {
                 // Check if POI belongs to this grid
                 if (transformedPoi.grid_square_id === gridSquare?.id) {
-                  console.log('[GridPage] Updating POI in state');
                   return prev.map(p => p.id === transformedPoi.id ? transformedPoi : p);
                 } else {
                   // POI was moved to another grid, remove it
-                  console.log('[GridPage] POI moved to another grid, removing from state');
                   return prev.filter(p => p.id !== transformedPoi.id);
                 }
               });
@@ -978,12 +952,8 @@ const GridPage: React.FC = () => {
           }
           else if (payload.eventType === 'DELETE') {
             const deletedPoi = payload.old as Poi;
-            console.log('[GridPage] Real-time DELETE - removing POI:', deletedPoi.id);
             
-            setPois(prev => {
-              console.log('[GridPage] Removing POI from state');
-              return prev.filter(p => p.id !== deletedPoi.id);
-            });
+            setPois(prev => prev.filter(p => p.id !== deletedPoi.id));
           }
         }
       )
@@ -991,7 +961,6 @@ const GridPage: React.FC = () => {
 
     // Cleanup subscription when component unmounts or grid changes
     return () => {
-      console.log('[GridPage] Cleaning up real-time subscriptions');
       poiSubscription.unsubscribe();
     };
   }, [gridSquare?.id]); // Re-subscribe when grid square changes
@@ -1087,7 +1056,6 @@ const GridPage: React.FC = () => {
       if (updateError) throw updateError;
 
       setGridSquare(data);
-      console.log('Screenshot uploaded successfully');
       
       // Broadcast exploration status change globally
       broadcastExplorationChange({
@@ -1159,7 +1127,6 @@ const GridPage: React.FC = () => {
       if (updateError) throw updateError;
 
       setGridSquare(data);
-      console.log('Screenshot updated successfully');
       
       // Broadcast exploration status change globally
       broadcastExplorationChange({
@@ -1232,7 +1199,6 @@ const GridPage: React.FC = () => {
       if (error) throw error;
 
       setGridSquare(data);
-      console.log('Screenshot uploaded successfully');
       
       // Broadcast exploration status change globally
       broadcastExplorationChange({
@@ -1264,13 +1230,7 @@ const GridPage: React.FC = () => {
       return;
     }
 
-    console.log('Starting crop edit with original URL:', gridSquare.original_screenshot_url);
-    console.log('Current crop data:', {
-      x: gridSquare.crop_x,
-      y: gridSquare.crop_y,
-      width: gridSquare.crop_width,
-      height: gridSquare.crop_height
-    });
+
 
     // Create a new image URL with cache-busting to avoid CORS issues
     const originalUrl = new URL(gridSquare.original_screenshot_url);
@@ -1307,7 +1267,6 @@ const GridPage: React.FC = () => {
 
       // Delete files from storage
       if (filesToDelete.length > 0) {
-        console.log(`Deleting ${filesToDelete.length} screenshot files from storage:`, filesToDelete);
         const { error: storageError } = await supabase.storage
             .from('screenshots')
           .remove(filesToDelete);
@@ -1315,8 +1274,6 @@ const GridPage: React.FC = () => {
         if (storageError) {
           console.error('Error deleting screenshot files from storage:', storageError);
           // Continue with database update even if storage deletion fails
-        } else {
-          console.log('Screenshot files deleted from storage successfully');
         }
       }
 
@@ -1343,7 +1300,6 @@ const GridPage: React.FC = () => {
       if (error) throw error;
 
       setGridSquare(data);
-      console.log('Screenshot deleted successfully from database');
       
       // Broadcast exploration status change globally
       broadcastExplorationChange({
@@ -1434,22 +1390,11 @@ const GridPage: React.FC = () => {
 
   // Highlighted POI effect (no centering/zooming)
   useEffect(() => {
-    if (highlightedPoiId) {
-      console.log('Deep Desert: Highlighting POI:', highlightedPoiId);
-      const highlightedPoi = pois.find(poi => poi.id === highlightedPoiId);
-      if (highlightedPoi) {
-        console.log('Deep Desert: Found POI to highlight:', highlightedPoi.title);
-      } else {
-        console.log('Deep Desert: POI not found for highlighting');
-      }
-    } else {
-      console.log('Deep Desert: No POI highlighted');
-    }
+    // Just manage highlighting state without verbose logging
   }, [highlightedPoiId, pois]);
 
   // Loading state
   if (loading) {
-    console.log('GridPage: Still loading data...');
     return (
       <div className="min-h-screen flex items-center justify-center relative">
         {/* Main background image */}
@@ -2065,7 +2010,7 @@ const GridPage: React.FC = () => {
           onClose={() => setEditingPoi(null)}
           onPositionChange={(poi) => {
             // TODO: Implement position change for Deep Desert if needed
-            console.log('Position change requested for POI:', poi);
+      
           }}
         />
       )}

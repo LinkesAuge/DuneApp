@@ -17,6 +17,8 @@ import PoiLinkingPage from './pages/PoiLinkingPage';
 import { SharedImagesTest } from './pages/SharedImagesTest';
 import { useAuth } from './components/auth/AuthProvider';
 import { AlertTriangle } from 'lucide-react';
+import ItemDetailPage from './pages/ItemDetailPage';
+import SchematicDetailPage from './pages/SchematicDetailPage';
 
 const PendingApprovalMessage: React.FC = () => (
   <div className="min-h-[60vh] flex items-center justify-center">
@@ -153,6 +155,30 @@ const AppRoutes: React.FC = () => {
         element={
           <ProtectedRoute>
             <PoiLinkingPage />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/pois/:poiId/link-items" 
+        element={
+          <ProtectedRoute>
+            <PoiLinkingPage />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/items/:itemId" 
+        element={
+          <ProtectedRoute>
+            <ItemDetailPage />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/schematics/:schematicId" 
+        element={
+          <ProtectedRoute>
+            <SchematicDetailPage />
           </ProtectedRoute>
         } 
       />

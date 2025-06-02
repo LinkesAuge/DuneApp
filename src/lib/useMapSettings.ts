@@ -44,17 +44,17 @@ export const useMapSettings = () => {
         throw fetchError;
       }
 
-      console.log('Map settings fetch result:', { data, error: fetchError });
+  
 
       if (data && data.setting_value) {
         const newSettings = {
           ...defaultMapSettings,
           ...data.setting_value
         };
-        console.log('Loaded map settings from database:', newSettings);
+
         setSettings(newSettings);
       } else {
-        console.log('No map settings found, using defaults:', defaultMapSettings);
+
         setSettings(defaultMapSettings);
       }
     } catch (err: any) {
@@ -71,7 +71,7 @@ export const useMapSettings = () => {
 
     // Listen for admin map settings updates
     const handleMapSettingsUpdate = () => {
-      console.log('Map settings updated by admin, reloading...');
+
       loadSettings();
     };
 

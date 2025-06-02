@@ -3,8 +3,6 @@ import { createClient, SupabaseClient } from 'npm:@supabase/supabase-js@2.43.4';
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { corsHeaders } from '../_shared/cors.ts'
 
-console.log('Update user function booting up...')
-
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -75,7 +73,6 @@ serve(async (req: Request) => {
 
     // Parse request body - handle both old and new field names for compatibility
     const requestBody = await req.json();
-    console.log('Request body received:', requestBody);
 
     // Support both old format (userIdToUpdate, newUsername, newEmail) and new format (userId, username, email, role)
     const userId = requestBody.userId || requestBody.userIdToUpdate;
@@ -109,15 +106,7 @@ serve(async (req: Request) => {
       })
     }
 
-    console.log(`Admin user ${requestingUser.id} attempting to update user ${userId}:`, {
-      username: username || '(unchanged)',
-      email: email || '(unchanged)', 
-      role: role || '(unchanged)',
-      rankId: rankId !== undefined ? rankId : '(unchanged)',
-      isRankOnlyUpdate,
-      isRoleOnlyUpdate,
-      isPartialUpdate
-    });
+
 
     // For Discord OAuth users, we should be careful about updating email in auth.users
     // Discord OAuth users have their email managed by Discord, not Supabase directly
@@ -134,11 +123,9 @@ serve(async (req: Request) => {
 
     // Check if this is a Discord OAuth user
     const isDiscordUser = currentAuthUser.app_metadata?.provider === 'discord';
-    console.log(`User ${userId} is Discord OAuth user: ${isDiscordUser}`);
 
     // Only update email in auth.users for non-Discord users
     if (!isPartialUpdate && !isDiscordUser && email && currentAuthUser.email !== email) {
-      console.log(`Email for user ${userId} is changing from ${currentAuthUser.email} to ${email}. Updating in auth.users.`);
       const { error: updateAuthEmailError } = await supabaseAdmin.auth.admin.updateUserById(
         userId,
         { email: email }
@@ -150,13 +137,11 @@ serve(async (req: Request) => {
         }
         throw new Error(`Failed to update email in authentication: ${updateAuthEmailError.message}`)
       }
-      console.log(`Email updated in auth.users for ${userId}.`);
     } else if (!isPartialUpdate && isDiscordUser && email && currentAuthUser.email !== email) {
-      console.log(`User ${userId} is Discord OAuth user - skipping auth.users email update, updating only in profiles`);
+      // Discord OAuth user - skip auth.users email update, update only in profiles
     }
 
     // Update profile data - build update object based on what fields are provided
-    console.log(`Updating profile for user ${userId}.`);
     const updateData: any = {};
     
     // Add fields to update based on what's provided
@@ -189,7 +174,6 @@ serve(async (req: Request) => {
       }
       throw new Error(`Failed to update profile: ${updateProfileError.message}`)
     }
-    console.log(`Profile updated for user ${userId}.`);
 
     return new Response(JSON.stringify({ 
       success: true,

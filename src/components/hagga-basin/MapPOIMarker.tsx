@@ -81,6 +81,8 @@ const MapPOIMarker: React.FC<MapPOIMarkerProps> = ({
     rank?: Rank | null;
   } | null>(null);
   const [tooltipPosition, setTooltipPosition] = useState<{ x: number; y: number } | null>(null);
+  const [linkedItems, setLinkedItems] = useState<Array<{ id: string; name: string; type: 'item' | 'schematic' }>>([]);
+  const [linkedItemsLoading, setLinkedItemsLoading] = useState(false);
   const markerRef = useRef<HTMLDivElement>(null);
   
   const imageUrl = getDisplayImageUrl(poi, poiType);
@@ -112,6 +114,59 @@ const MapPOIMarker: React.FC<MapPOIMarkerProps> = ({
 
     fetchUserInfo();
   }, [poi.created_by]);
+
+  // Fetch linked items and schematics for tooltip
+  useEffect(() => {
+    const fetchLinkedItems = async () => {
+      if (!showCard) return; // Only fetch when tooltip is about to show
+      
+      setLinkedItemsLoading(true);
+      try {
+        const { data: links, error } = await supabase
+          .from('poi_item_links')
+          .select(`
+            id,
+            item_id,
+            schematic_id,
+            items(id, name),
+            schematics(id, name)
+          `)
+          .eq('poi_id', poi.id);
+
+        if (error) {
+          console.error('Error fetching linked items:', error);
+          return;
+        }
+
+        const linkedItemsList: Array<{ id: string; name: string; type: 'item' | 'schematic' }> = [];
+        
+        links?.forEach(link => {
+          if (link.item_id && link.items) {
+            linkedItemsList.push({
+              id: link.items.id,
+              name: link.items.name,
+              type: 'item'
+            });
+          }
+          if (link.schematic_id && link.schematics) {
+            linkedItemsList.push({
+              id: link.schematics.id,
+              name: link.schematics.name,
+              type: 'schematic'
+            });
+          }
+        });
+
+        setLinkedItems(linkedItemsList);
+      } catch (error) {
+        console.error('Error fetching linked items:', error);
+      } finally {
+        setLinkedItemsLoading(false);
+      }
+    };
+
+    fetchLinkedItems();
+  }, [poi.id, showCard]);
 
   // Note: Removed debug highlighting logs to reduce console noise
 
@@ -183,9 +238,7 @@ const MapPOIMarker: React.FC<MapPOIMarkerProps> = ({
               ? isSelected 
                 ? 'ring-2 ring-amber-400/50' 
                 : 'hover:ring-1 hover:ring-amber-300/50'
-              : isHighlighted 
-                ? 'ring-2 ring-amber-400/50' 
-                : ''
+              : ''
           }`}
           style={{
             width: `${iconSize}px`,
@@ -218,7 +271,7 @@ const MapPOIMarker: React.FC<MapPOIMarkerProps> = ({
           )}
         </div>
 
-        {/* Highlight Effect - Complete Overlay */}
+        {/* Highlight Effect - Icon-focused overlay */}
         {isHighlighted && (
           <div 
             className="absolute pointer-events-none"
@@ -244,9 +297,9 @@ const MapPOIMarker: React.FC<MapPOIMarkerProps> = ({
               !
             </div>
             
-            {/* Outer ring - ping animation */}
+            {/* Outer circular ping animation */}
             <div 
-              className="absolute animate-ping border-4 border-green-500 opacity-75"
+              className="absolute animate-ping border-4 border-green-500 opacity-75 rounded-full"
               style={{
                 width: `${iconSize * 1.8}px`,
                 height: `${iconSize * 1.8}px`,
@@ -254,9 +307,9 @@ const MapPOIMarker: React.FC<MapPOIMarkerProps> = ({
                 left: `${iconSize * -0.4}px`
               }}
             />
-            {/* Middle ring - pulse animation */}
+            {/* Middle circular pulse animation */}
             <div 
-              className="absolute animate-pulse border-3 border-green-400 opacity-60"
+              className="absolute animate-pulse border-3 border-green-400 opacity-60 rounded-full"
               style={{
                 width: `${iconSize * 1.4}px`,
                 height: `${iconSize * 1.4}px`,
@@ -265,9 +318,9 @@ const MapPOIMarker: React.FC<MapPOIMarkerProps> = ({
                 animationDelay: '0.5s'
               }}
             />
-            {/* Inner glow */}
+            {/* Inner circular glow */}
             <div 
-              className="absolute bg-green-500/20"
+              className="absolute bg-green-500/20 rounded-full"
               style={{
                 width: `${iconSize}px`,
                 height: `${iconSize}px`,
@@ -413,6 +466,49 @@ const MapPOIMarker: React.FC<MapPOIMarkerProps> = ({
                   </div>
                 </div>
               )}
+
+              {/* Linked Items & Schematics */}
+              <div>
+                <h4 className="text-xs font-light text-amber-200/90 mb-2 tracking-wide flex items-center gap-2">
+                  🔗 Linked Items & Schematics
+                  {linkedItemsLoading && (
+                    <div className="w-3 h-3 border border-amber-400/30 border-t-amber-400 rounded-full animate-spin"></div>
+                  )}
+                </h4>
+                
+                {linkedItemsLoading ? (
+                  <div className="text-xs text-amber-300/70 font-light">Loading...</div>
+                ) : linkedItems.length > 0 ? (
+                  <div className="space-y-1">
+                    {linkedItems.slice(0, 4).map((item, index) => (
+                      <div key={item.id} className="flex items-center gap-2 text-xs">
+                        <span className={`w-2 h-2 rounded-full ${
+                          item.type === 'item' ? 'bg-blue-400' : 'bg-purple-400'
+                        }`}></span>
+                        <span className="text-amber-300/85 font-light truncate">
+                          {item.name}
+                        </span>
+                        <span className={`text-xs px-1.5 py-0.5 rounded ${
+                          item.type === 'item' 
+                            ? 'bg-blue-500/20 text-blue-300 border border-blue-400/30' 
+                            : 'bg-purple-500/20 text-purple-300 border border-purple-400/30'
+                        }`}>
+                          {item.type}
+                        </span>
+                      </div>
+                    ))}
+                    {linkedItems.length > 4 && (
+                      <div className="text-xs text-amber-300/60 font-light italic">
+                        +{linkedItems.length - 4} more linked {linkedItems.length - 4 === 1 ? 'item' : 'items'}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-xs text-amber-300/60 font-light italic">
+                    No linked items or schematics
+                  </div>
+                )}
+              </div>
 
               {/* Creator info - Enhanced with rank */}
               {userInfo && (

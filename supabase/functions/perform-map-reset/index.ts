@@ -2,8 +2,6 @@ import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import { corsHeaders } from '../_shared/cors.ts'
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-console.log('Perform Map Reset function booting up...');
-
 // Configuration
 const BACKUP_BUCKET = 'screenshots';
 const DEEP_DESERT_BACKUPS_FOLDER = 'map-backups/deep-desert/';
@@ -39,8 +37,6 @@ const batchDeleteFiles = async (supabase: SupabaseClient, bucket: string, filePa
     if (error) {
       console.error(`Error deleting batch ${i / batchSize + 1} from ${bucket}:`, error);
       // Continue with other batches even if one fails
-    } else {
-      console.log(`Successfully deleted batch ${i / batchSize + 1} (${batch.length} files) from ${bucket}`);
     }
   }
 };
@@ -52,7 +48,6 @@ serve(async (req: Request) => {
 
   try {
     const { backupBeforeReset = false, mapType = 'deep_desert' }: { backupBeforeReset?: boolean; mapType?: MapType } = await req.json().catch(() => ({}));
-    console.log(`Perform map reset invoked for ${mapType}. Backup before reset: ${backupBeforeReset}`);
 
     // Create Supabase admin client directly
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
@@ -71,7 +66,6 @@ serve(async (req: Request) => {
     });
 
     if (backupBeforeReset) {
-      console.log(`Backup before reset is requested for ${mapType}. Invoking perform-map-backup function...`);
       // Call the perform-map-backup function with map type
       const backupResponse = await fetch(`${supabaseUrl}/functions/v1/perform-map-backup`, {
         method: 'POST',
@@ -83,8 +77,6 @@ serve(async (req: Request) => {
         body: JSON.stringify({ mapType: mapType }),
       });
 
-      console.log(`Backup function call completed. Status: ${backupResponse.status}`);
-
       if (!backupResponse.ok) {
         const errorBody = await backupResponse.text();
         console.error(`Backup function call failed with status ${backupResponse.status}:`, errorBody);
@@ -93,24 +85,17 @@ serve(async (req: Request) => {
       
       try {
         const backupResult = await backupResponse.json();
-        console.log(`Backup performed successfully before reset for ${mapType}. Result:`, JSON.stringify(backupResult, null, 2));
       } catch (jsonError) {
         const textResult = await backupResponse.text();
         console.warn('Failed to parse backup response as JSON. Text response:', textResult);
         // Continue with reset even if backup response parsing fails
       }
-    } else {
-      console.log(`Backup before reset was not requested for ${mapType}.`);
     }
 
-    console.log(`Proceeding to delete ${mapType} data from database and storage...`);
-
     // Storage cleanup: Collect all files that need to be deleted before removing database records
-    console.log(`Starting storage cleanup for ${mapType}...`);
     const filesToDelete: string[] = [];
 
     // 1. Collect POI screenshot files for the specific map type
-    console.log(`Collecting POI screenshot files for ${mapType} deletion...`);
     const { data: poisData, error: poisQueryError } = await supabaseAdmin
       .from('pois')
       .select('screenshots')
@@ -132,12 +117,10 @@ serve(async (req: Request) => {
           }
         }
       }
-      console.log(`Found ${filesToDelete.length} POI screenshot files to delete for ${mapType}`);
     }
 
     // 2. Collect grid square screenshot files (only for Deep Desert)
     if (mapType === 'deep_desert') {
-      console.log('Collecting Deep Desert grid square screenshot files for deletion...');
       const { data: gridSquaresData, error: gridSquaresQueryError } = await supabaseAdmin
         .from('grid_squares')
         .select('screenshot_url, original_screenshot_url');
@@ -164,14 +147,10 @@ serve(async (req: Request) => {
             }
           }
         }
-        console.log(`Found ${filesToDelete.length - initialPoiFiles} additional grid square screenshot files to delete`);
       }
-    } else {
-      console.log(`Skipping grid square screenshot cleanup for ${mapType} (not applicable)`);
     }
 
     // 3. Collect comment screenshot files for the specific map type
-    console.log(`Collecting comment screenshot files for ${mapType} deletion...`);
     let commentsData: any[] = [];
     
     if (mapType === 'deep_desert') {
@@ -239,20 +218,16 @@ serve(async (req: Request) => {
         }
       }
     }
-    console.log(`Found ${filesToDelete.length - initialTotalFiles} comment screenshot files to delete for ${mapType}`);
 
     // 4. Delete all collected files from storage
-    console.log(`Deleting ${filesToDelete.length} total files from storage for ${mapType}...`);
     try {
       await batchDeleteFiles(supabaseAdmin, 'screenshots', filesToDelete);
-      console.log(`Storage cleanup completed successfully for ${mapType}`);
     } catch (storageError) {
       console.error(`Error during storage cleanup for ${mapType}:`, storageError);
       // Continue with database deletion even if storage cleanup fails
     }
 
     // 5. Delete comments for the specific map type
-    console.log(`Deleting comments for ${mapType}...`);
     if (mapType === 'deep_desert') {
       // Delete comments for Deep Desert POIs and grid squares
       const { data: deepDesertPois, error: poisError } = await supabaseAdmin
@@ -301,7 +276,6 @@ serve(async (req: Request) => {
         }
       }
     }
-    console.log(`Comments deleted successfully for ${mapType}.`);
 
     // 6. Delete POIs for the specific map type
     const { error: deletePoisError } = await supabaseAdmin
@@ -313,8 +287,6 @@ serve(async (req: Request) => {
       console.error(`Error deleting ${mapType} POIs:`, deletePoisError);
       throw new Error(`Failed to delete ${mapType} POIs: ${deletePoisError.message}`);
     }
-    console.log(`All ${mapType} POIs deleted successfully.`);
-
     // 7. Delete grid squares (only for Deep Desert)
     if (mapType === 'deep_desert') {
       const { error: deleteGridSquaresError } = await supabaseAdmin.from('grid_squares').delete().not('id', 'is', null);
@@ -322,9 +294,6 @@ serve(async (req: Request) => {
         console.error('Error deleting grid squares:', deleteGridSquaresError);
         throw new Error(`Failed to delete grid squares: ${deleteGridSquaresError.message}`);
       }
-      console.log('All grid squares deleted successfully.');
-    } else {
-      console.log(`Skipping grid square deletion for ${mapType} (not applicable)`);
     }
 
     return new Response(JSON.stringify({ 

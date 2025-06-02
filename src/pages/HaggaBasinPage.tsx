@@ -108,7 +108,6 @@ const HaggaBasinPage: React.FC = () => {
   // Listen for admin panel changes to refresh POI types
   useEffect(() => {
     const handleAdminDataUpdate = () => {
-      console.log('Admin data updated, refreshing POI types...');
       fetchPoiTypes();
     };
 
@@ -405,13 +404,8 @@ const HaggaBasinPage: React.FC = () => {
   // Handle POI creation
   const handlePoiCreated = async (newPoi: Poi) => {
     try {
-      console.log('[HaggaBasinPage] Adding new POI to local state:', newPoi);
       // Add to local state
-      setPois(prev => {
-        const updated = [newPoi, ...prev];
-        console.log('[HaggaBasinPage] Updated POI list length:', updated.length);
-        return updated;
-      });
+      setPois(prev => [newPoi, ...prev]);
       // Exit placement mode
       setPlacementMode(false);
     } catch (error) {
@@ -456,7 +450,6 @@ const HaggaBasinPage: React.FC = () => {
 
   // Handle POI editing
   const handlePoiUpdated = (updatedPoi: Poi) => {
-    console.log('[HaggaBasinPage] Updating local POI state with:', updatedPoi);
     // POI has already been updated in the database by the modal
     // Just update local state with the returned data
     setPois(prev => prev.map(p => p.id === updatedPoi.id ? updatedPoi : p));
@@ -479,7 +472,6 @@ const HaggaBasinPage: React.FC = () => {
     if (!poiToDelete) return;
     
     try {
-      console.log('[HaggaBasinPage] Deleting POI from database:', poiToDelete.id);
       const { error } = await supabase
         .from('pois')
         .delete()
@@ -487,13 +479,8 @@ const HaggaBasinPage: React.FC = () => {
 
       if (error) throw error;
 
-      console.log('[HaggaBasinPage] POI deleted successfully, updating local state');
       // Update local state
-      setPois(prev => {
-        const updated = prev.filter(p => p.id !== poiToDelete.id);
-        console.log('[HaggaBasinPage] Updated POI list length after deletion:', updated.length);
-        return updated;
-      });
+      setPois(prev => prev.filter(p => p.id !== poiToDelete.id));
 
       // Clear any highlighted POI if it was the deleted one
       if (highlightedPoiId === poiToDelete.id) {
@@ -525,14 +512,11 @@ const HaggaBasinPage: React.FC = () => {
 
   // Handle POI click for detail view
   const handlePoiClick = useCallback((poi: Poi) => {
-    console.log('HaggaBasin handlePoiClick called for POI:', poi.title, 'coordinates:', poi.coordinates_x, poi.coordinates_y);
     // Highlight the POI with pulsing animation
     setHighlightedPoiId(poi.id);
-    console.log('HaggaBasin: Set highlightedPoiId to:', poi.id);
     // Remove highlight after 6 seconds
     setTimeout(() => {
       setHighlightedPoiId(null);
-      console.log('HaggaBasin: Cleared highlightedPoiId');
     }, 6000);
   }, []);
 
@@ -565,8 +549,6 @@ const HaggaBasinPage: React.FC = () => {
 
   // Set up real-time subscriptions for POI changes
   useEffect(() => {
-    console.log('[HaggaBasinPage] Setting up real-time subscriptions...');
-    
     // Subscribe to POI table changes
     const poiSubscription = supabase
       .channel('hagga-basin-pois')
@@ -579,11 +561,9 @@ const HaggaBasinPage: React.FC = () => {
           filter: 'map_type=eq.hagga_basin' // Only listen to Hagga Basin POIs
         },
         async (payload) => {
-          console.log('[HaggaBasinPage] Real-time POI change detected:', payload);
           
           if (payload.eventType === 'INSERT') {
             const newPoi = payload.new as Poi;
-            console.log('[HaggaBasinPage] Real-time INSERT - adding POI:', newPoi.id);
             
             // Fetch complete POI data with relations
             const { data: completePoiData, error } = await supabase
@@ -614,23 +594,19 @@ const HaggaBasinPage: React.FC = () => {
                 // Check if POI already exists (to avoid duplicates)
                 const exists = prev.some(p => p.id === transformedPoi.id);
                 if (exists) {
-                  console.log('[HaggaBasinPage] POI already exists, skipping insert');
                   return prev;
                 }
-                console.log('[HaggaBasinPage] Adding new POI to state');
                 return [transformedPoi, ...prev];
               });
             }
           } 
           else if (payload.eventType === 'UPDATE') {
             const updatedPoi = payload.new as Poi;
-            console.log('[HaggaBasinPage] Real-time UPDATE - updating POI:', updatedPoi.id);
             
             // Check if POI still exists in our local state (it might have been deleted)
             setPois(prev => {
               const existsInState = prev.some(p => p.id === updatedPoi.id);
               if (!existsInState) {
-                console.log('[HaggaBasinPage] POI not in local state, skipping update');
                 return prev;
               }
               
@@ -664,28 +640,18 @@ const HaggaBasinPage: React.FC = () => {
                       // Double-check POI still exists in state before updating
                       const stillExists = prev.some(p => p.id === transformedPoi.id);
                       if (stillExists) {
-                        console.log('[HaggaBasinPage] Updating POI in state');
                         return prev.map(p => p.id === transformedPoi.id ? transformedPoi : p);
                       }
-                      console.log('[HaggaBasinPage] POI no longer in state, skipping update');
                       return prev;
                     });
                   } else if (error) {
-                    console.log('[HaggaBasinPage] POI no longer exists or error fetching update:', error);
                     // If the POI was deleted during the update, remove it from state
                     if (error.code === 'PGRST116') { // PostgREST "no rows found" error
-                      setPois(prev => {
-                        console.log('[HaggaBasinPage] Removing POI from state due to 404');
-                        return prev.filter(p => p.id !== updatedPoi.id);
-                      });
+                      setPois(prev => prev.filter(p => p.id !== updatedPoi.id));
                     }
                   } else {
                     // completePoiData is null (no results from maybeSingle)
-                    console.log('[HaggaBasinPage] POI not found during update, removing from state');
-                    setPois(prev => {
-                      console.log('[HaggaBasinPage] Removing POI from state due to missing data');
-                      return prev.filter(p => p.id !== updatedPoi.id);
-                    });
+                    setPois(prev => prev.filter(p => p.id !== updatedPoi.id));
                   }
                 });
               
@@ -694,17 +660,13 @@ const HaggaBasinPage: React.FC = () => {
           } 
           else if (payload.eventType === 'DELETE') {
             const deletedPoiId = payload.old.id;
-            console.log('[HaggaBasinPage] Real-time DELETE - removing POI:', deletedPoiId);
             
-            setPois(prev => {
-              console.log('[HaggaBasinPage] Removing POI from state');
-              return prev.filter(p => p.id !== deletedPoiId);
-            });
+            setPois(prev => prev.filter(p => p.id !== deletedPoiId));
           }
         }
       )
       .subscribe((status) => {
-        console.log('[HaggaBasinPage] Real-time subscription status:', status);
+
       });
 
     // Subscribe to POI shares table changes for privacy updates
@@ -718,7 +680,7 @@ const HaggaBasinPage: React.FC = () => {
           table: 'poi_shares'
         },
         async (payload) => {
-          console.log('[HaggaBasinPage] Real-time POI share change detected:', payload);
+
           
           // When shares change, refresh the affected POI to get updated privacy status
           let poiId: string | null = null;
@@ -730,7 +692,7 @@ const HaggaBasinPage: React.FC = () => {
           }
           
           if (poiId) {
-            console.log('[HaggaBasinPage] Refreshing POI data for share change:', poiId);
+
             
             // Fetch updated POI data
             const { data: updatedPoiData, error } = await supabase
@@ -762,27 +724,18 @@ const HaggaBasinPage: React.FC = () => {
                   // Check if POI still exists in state before updating
                   const stillExists = prev.some(p => p.id === transformedPoi.id);
                   if (stillExists) {
-                    console.log('[HaggaBasinPage] Updating POI in state after share change');
                     return prev.map(p => p.id === transformedPoi.id ? transformedPoi : p);
                   }
-                  console.log('[HaggaBasinPage] POI no longer in state, skipping share update');
                   return prev;
                 });
-              } else if (error) {
-                console.log('[HaggaBasinPage] Error or POI not found during share update:', error);
-              } else {
-                console.log('[HaggaBasinPage] POI not found during share update, may have been deleted');
               }
           }
         }
       )
-      .subscribe((status) => {
-        console.log('[HaggaBasinPage] Real-time shares subscription status:', status);
-      });
+      .subscribe();
 
     // Cleanup subscriptions on component unmount
     return () => {
-      console.log('[HaggaBasinPage] Cleaning up real-time subscriptions...');
       supabase.removeChannel(poiSubscription);
       supabase.removeChannel(sharesSubscription);
     };

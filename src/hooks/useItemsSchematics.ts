@@ -404,7 +404,7 @@ export function useItemsSchematics(): UseItemsSchematicsReturn {
 
   const updateItem = useCallback(async (id: string, updates: Partial<Item>): Promise<Item | null> => {
     try {
-      console.log('🔧 updateItem called with:', { id, updates });
+  
       
       const { data, error } = await supabase
         .from('items')
@@ -417,8 +417,6 @@ export function useItemsSchematics(): UseItemsSchematicsReturn {
         console.error('🔧 Supabase update error:', error);
         throw error;
       }
-
-      console.log('🔧 Supabase update result:', data);
 
       // Update local state
       setState(prev => ({
@@ -477,7 +475,7 @@ export function useItemsSchematics(): UseItemsSchematicsReturn {
 
   const updateSchematic = useCallback(async (id: string, updates: Partial<Schematic>): Promise<Schematic | null> => {
     try {
-      console.log('🔧 updateSchematic called with:', { id, updates });
+
       
       const { data, error } = await supabase
         .from('schematics')
@@ -490,8 +488,6 @@ export function useItemsSchematics(): UseItemsSchematicsReturn {
         console.error('🔧 Supabase update error:', error);
         throw error;
       }
-
-      console.log('🔧 Supabase update result:', data);
 
       // Update local state
       setState(prev => ({

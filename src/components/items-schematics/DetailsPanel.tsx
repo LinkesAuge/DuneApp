@@ -116,22 +116,18 @@ const EntityActions: React.FC<{ entity: Entity }> = ({ entity }) => {
 
   const handleEdit = () => {
     // TODO: Implement edit modal
-    console.log('Edit entity:', entity);
   };
 
   const handleDelete = () => {
     // TODO: Implement delete confirmation
-    console.log('Delete entity:', entity);
   };
 
   const handleFavorite = () => {
     // TODO: Implement favorites
-    console.log('Favorite entity:', entity);
   };
 
   const handleShare = () => {
     // TODO: Implement sharing
-    console.log('Share entity:', entity);
   };
 
   return (

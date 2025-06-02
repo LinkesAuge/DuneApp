@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Edit, Trash2, Share, MapPin, Clock, Users, Lock, Eye, User, Image as ImageIcon, Heart, Mountain, Pyramid } from 'lucide-react';
+import { X, Edit, Trash2, Share, MapPin, Clock, Users, Lock, Eye, User, Image as ImageIcon, Heart, Mountain, Pyramid, Link2 } from 'lucide-react';
 import { Poi, PoiType } from '../../types';
 import { Rank } from '../../types/profile';
 import { useAuth } from '../auth/AuthProvider';
@@ -9,6 +9,7 @@ import { getDisplayNameFromProfile } from '../../lib/utils';
 import UserAvatar from './UserAvatar';
 import RankBadge from './RankBadge';
 import CommentsList from '../comments/CommentsList';
+import LinkedItemsSection from '../poi/LinkedItemsSection';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 interface POICardProps {
@@ -294,6 +295,20 @@ const POICard: React.FC<POICardProps> = ({
               </button>
             )}
 
+            {/* Link Items button - show for members who own POI or editors/admins */}
+            {user && (user.role === 'admin' || user.role === 'editor' || (user.role === 'member' && user.id === poi.created_by)) && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(`/pois/${poi.id}/link-items`);
+                }}
+                className="p-1.5 text-amber-300 hover:text-amber-100 hover:bg-slate-700/50 rounded transition-colors"
+                title="Link Items & Schematics"
+              >
+                <Link2 className="w-4 h-4" />
+              </button>
+            )}
+
             <button
               onClick={onClose}
               className="p-1.5 text-slate-400 hover:text-amber-300 hover:bg-slate-700/50 rounded transition-colors"
@@ -328,12 +343,8 @@ const POICard: React.FC<POICardProps> = ({
                         className="w-full h-full object-cover rounded cursor-pointer transition-opacity group-hover:opacity-90"
                         onClick={(e) => {
                           e.stopPropagation();
-                          console.log(`Image clicked for screenshot ${index + 1}`);
                           if (onImageClick) {
-                            console.log('Calling onImageClick function');
                             onImageClick();
-                          } else {
-                            console.log('No onImageClick function provided');
                           }
                         }}
                       />
@@ -470,6 +481,14 @@ const POICard: React.FC<POICardProps> = ({
                 </div>
               )}
             </div>
+          </div>
+
+          {/* Linked Items & Schematics Section */}
+          <div className="p-3 border-b border-slate-700">
+            <LinkedItemsSection 
+              poiId={poi.id}
+              showLinkButton={false}
+            />
           </div>
 
           {/* Comments Section - Direct CommentsList */}

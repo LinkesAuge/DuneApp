@@ -465,7 +465,7 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
 
       // Handle sharing if privacy level is shared
       if (privacyLevel === 'shared' && selectedUsers.length > 0) {
-        console.log('[POIPlacementModal] Saving shares for POI:', poi.id, 'with users:', selectedUsers.map(u => u.id));
+  
         
         const newShares = selectedUsers.map(u => ({
           poi_id: poi.id,
@@ -473,7 +473,7 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
           shared_by_user_id: user?.id
         }));
         
-        console.log('[POIPlacementModal] Share data to insert:', newShares);
+
         
         const { data: shareData, error: shareError } = await supabase
           .from('poi_shares')
@@ -485,11 +485,6 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
           throw new Error('Failed to save POI sharing settings');
         }
         
-        console.log('[POIPlacementModal] Successfully saved shares:', shareData);
-      } else if (privacyLevel === 'shared') {
-        console.log('[POIPlacementModal] Privacy is shared but no users selected');
-      } else {
-        console.log('[POIPlacementModal] Privacy level is:', privacyLevel, 'not saving shares');
       }
 
       // Add screenshots to the POI object for immediate display

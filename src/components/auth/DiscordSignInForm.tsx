@@ -21,7 +21,7 @@ const DiscordSignInForm: React.FC = () => {
 
       if (data.session?.user) {
         // User successfully authenticated with Discord
-        console.log('Discord authentication successful');
+
       }
     };
 
@@ -34,7 +34,7 @@ const DiscordSignInForm: React.FC = () => {
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN' && session?.user) {
-        console.log('User signed in with Discord:', session.user);
+
       }
     });
 

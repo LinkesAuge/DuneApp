@@ -536,21 +536,13 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
       return;
     }
 
-    console.log('[GridSquareModal] handleEditExistingCrop starting.');
-    console.log('[GridSquareModal] currentSquare.screenshot_url:', currentSquare.screenshot_url);
-    console.log('[GridSquareModal] currentSquare.original_screenshot_url:', currentSquare.original_screenshot_url);
-    console.log('[GridSquareModal] Current crop data from square:', {
-      x: currentSquare.crop_x,
-      y: currentSquare.crop_y,
-      width: currentSquare.crop_width,
-      height: currentSquare.crop_height
-    });
+
 
     // Create a new image URL with cache-busting to avoid CORS issues with storage
     const originalUrlToLoad = new URL(currentSquare.original_screenshot_url);
     originalUrlToLoad.searchParams.set('t', Date.now().toString());
     const urlString = originalUrlToLoad.toString();
-    console.log('[GridSquareModal] Setting tempImageUrl for ImageCropModal to:', urlString);
+
     
     setTempImageUrl(urlString);
     setIsEditingExisting(true);
@@ -571,9 +563,6 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
         height: currentSquare.crop_height,
         unit: 'px' // Important: react-image-crop internally might use %, but our DB stores px
       };
-      console.log('[GridSquareModal] Passing initialCrop to ImageCropModal:', cropToPassAsInitial);
-    } else {
-      console.log('[GridSquareModal] No existing crop data, initialCrop will be undefined.');
     }
     // The initialCrop prop name in ImageCropModal is `initialCrop`
     // No need to set a separate state here, just ensure it's passed correctly in JSX
@@ -647,9 +636,7 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
       // Delete the *previous* cropped image if it existed and was different from the new one and original
       if (previousCroppedStoragePath && previousCroppedStoragePath !== newCroppedStoragePath && previousCroppedStoragePath !== new URL(currentSquare.original_screenshot_url).pathname.split('/screenshots/')[1]) {
         try {
-          console.log('Attempting to delete old cropped image from storage:', previousCroppedStoragePath);
           await supabase.storage.from('screenshots').remove([previousCroppedStoragePath]);
-          console.log('Successfully deleted old cropped image:', previousCroppedStoragePath);
         } catch (deleteError) {
           console.warn('Failed to delete old cropped image:', deleteError);
         }
@@ -725,7 +712,7 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
       }
 
       if (filesToDelete.length > 0) {
-        console.log('Attempting to delete from storage:', filesToDelete);
+
         const { error: deleteError } = await supabase.storage
           .from('screenshots')
           .remove(filesToDelete);

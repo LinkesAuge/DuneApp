@@ -173,11 +173,11 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
 
   const loadCurrentShares = async () => {
     if (poi.privacy_level !== 'shared') {
-      console.log('[POIEditModal] POI privacy is not shared, skipping share loading');
+
       return;
     }
     
-    console.log('[POIEditModal] Loading current shares for POI:', poi.id);
+    
     
     try {
       const { data: shares, error } = await supabase
@@ -190,10 +190,10 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
 
       if (error) throw error;
       
-      console.log('[POIEditModal] Raw shares data:', shares);
+      
       
       const currentSharedUsers = shares?.map(share => share.profiles).filter(Boolean) || [];
-      console.log('[POIEditModal] Processed shared users:', currentSharedUsers);
+      
       
       setSelectedUsers(currentSharedUsers);
     } catch (err) {
@@ -394,7 +394,7 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
       return;
     }
 
-    console.log(`[POIEditModal] handleEditExistingScreenshot called for id: ${screenshotId}, details:`, screenshotToEdit);
+
     
     const imageUrlForCropper = screenshotToEdit.original_url || screenshotToEdit.url;
     if (!imageUrlForCropper) {
@@ -415,7 +415,7 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
       setError('No screenshot selected for editing crop.');
       return;
     }
-    console.log(`[POIEditModal] handleEditCropComplete for existing screenshot id: ${editingScreenshot.id}`);
+
 
     const processedFile = new File([croppedImageBlob], `poi_screenshot_edited_${editingScreenshot.id}_${Date.now()}.jpg`, {
       type: 'image/jpeg',
@@ -443,7 +443,7 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
     if (tempImageUrl) URL.revokeObjectURL(tempImageUrl); 
     setTempImageUrl(null);
     setEditingScreenshot(null);
-    console.log('[POIEditModal] Added new version of edited screenshot to pendingCroppedFiles:', newPendingVersion);
+    
   };
 
   // Remove additional screenshot
@@ -688,7 +688,7 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
         }).filter(path => !!path) as string[];
         
         if (pathsToDelete.length > 0) {
-          console.log('[POIEditModal] Deleting from storage paths:', pathsToDelete);
+    
           const { error: deleteError } = await supabase.storage.from('screenshots').remove(pathsToDelete);
           if (deleteError) {
             // Log delete error but don't necessarily throw, as POI update was successful

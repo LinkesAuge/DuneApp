@@ -2,8 +2,6 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { corsHeaders } from '../_shared/cors.ts'
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-console.log("Perform Map Backup function booting up!");
-
 // Configuration - separate backup folders for each map type
 const BACKUP_BUCKET = 'screenshots'; 
 const DEEP_DESERT_BACKUPS_FOLDER = 'map-backups/deep-desert/'; 
@@ -51,7 +49,6 @@ function extractStoragePath(url: string): string | null {
 // Download file from storage and convert to base64
 async function downloadFileAsBase64(supabaseClient: SupabaseClient, filePath: string, originalUrl: string): Promise<StorageFile | null> {
   try {
-    console.log(`Downloading file: ${filePath}`);
     const { data, error } = await supabaseClient.storage
       .from('screenshots')
       .download(filePath);
@@ -182,7 +179,6 @@ async function downloadAllFiles(supabaseClient: SupabaseClient, fileUrls: any): 
   };
 
   // Download grid screenshots
-  console.log(`Downloading ${fileUrls.gridScreenshots.length} grid screenshots...`);
   for (const url of fileUrls.gridScreenshots) {
     const path = extractStoragePath(url);
     if (path) {
@@ -192,7 +188,6 @@ async function downloadAllFiles(supabaseClient: SupabaseClient, fileUrls: any): 
   }
 
   // Download POI screenshots
-  console.log(`Downloading ${fileUrls.poiScreenshots.length} POI screenshots...`);
   for (const url of fileUrls.poiScreenshots) {
     const path = extractStoragePath(url);
     if (path) {
@@ -202,7 +197,6 @@ async function downloadAllFiles(supabaseClient: SupabaseClient, fileUrls: any): 
   }
 
   // Download comment screenshots
-  console.log(`Downloading ${fileUrls.commentScreenshots.length} comment screenshots...`);
   for (const url of fileUrls.commentScreenshots) {
     const path = extractStoragePath(url);
     if (path) {
@@ -212,7 +206,6 @@ async function downloadAllFiles(supabaseClient: SupabaseClient, fileUrls: any): 
   }
 
   // Download custom icons
-  console.log(`Downloading ${fileUrls.customIcons.length} custom icons...`);
   for (const url of fileUrls.customIcons) {
     const path = extractStoragePath(url);
     if (path) {
@@ -344,7 +337,6 @@ async function fetchTableDataByMapType(supabaseClient: SupabaseClient, tableName
 }
 
 async function pruneOldBackups(supabaseClient: SupabaseClient, folder: string) {
-  console.log(`Pruning old backups from ${BACKUP_BUCKET}/${folder}, retaining last ${MAX_STORED_BACKUPS}...`);
   try {
     const { data: files, error: listError } = await supabaseClient
       .storage
@@ -366,7 +358,6 @@ async function pruneOldBackups(supabaseClient: SupabaseClient, folder: string) {
         .map(file => `${folder}${file.name}`); 
 
       if (filesToDelete.length > 0) {
-        console.log("Attempting to delete old backup files:", filesToDelete);
         const { data: deleteData, error: deleteError } = await supabaseClient
           .storage
           .from(BACKUP_BUCKET)
@@ -374,12 +365,8 @@ async function pruneOldBackups(supabaseClient: SupabaseClient, folder: string) {
 
         if (deleteError) {
           console.error("Error deleting old backup files:", deleteError);
-        } else {
-          console.log("Successfully deleted old backup files:", deleteData);
         }
       }
-    } else {
-      console.log("No old backups to prune or within limit.");
     }
   } catch (err) {
     console.error("Unexpected error during backup pruning:", err);
@@ -405,7 +392,6 @@ serve(async (req: Request) => {
   try {
     // Get mapType from request body, default to 'both' for backward compatibility
     const { mapType = 'both' }: { mapType?: MapType } = await req.json().catch(() => ({}));
-    console.log(`Starting map data backup process for map type: ${mapType}`);
 
     const authHeader = req.headers.get('Authorization') || `Bearer ${supabaseServiceRoleKey}`; 
     
@@ -418,7 +404,6 @@ serve(async (req: Request) => {
     const commentsData = await fetchTableDataByMapType(supabaseAdmin, 'comments', mapType);
 
     // Collect all storage file URLs from the data
-    console.log('Collecting storage file URLs...');
     const databaseData = {
       grid_squares: gridSquaresData,
       pois: poisData,
@@ -428,14 +413,8 @@ serve(async (req: Request) => {
     const fileUrls = await collectFileUrls(supabaseAdmin, databaseData, mapType);
     
     // Download all storage files
-    console.log('Downloading storage files...');
     const downloadedFiles = await downloadAllFiles(supabaseAdmin, fileUrls);
-    
-    console.log(`Downloaded files summary:
-      - Grid screenshots: ${downloadedFiles.grid_screenshots.length}
-      - POI screenshots: ${downloadedFiles.poi_screenshots.length} 
-      - Comment screenshots: ${downloadedFiles.comment_screenshots.length}
-      - Custom icons: ${downloadedFiles.custom_icons.length}`);
+
 
     const backupJson: BackupData = {
       timestamp: new Date().toISOString(),
@@ -461,8 +440,6 @@ serve(async (req: Request) => {
     
     const fullBackupPath = `${backupFolder}${backupFileName}`;
 
-    console.log(`Preparing to upload backup file: ${fullBackupPath} to bucket ${BACKUP_BUCKET}`);
-
     const backupBlob = new Blob([JSON.stringify(backupJson, null, 2)], { type: 'application/json' });
 
     const { data: uploadData, error: uploadError } = await supabaseAdmin
@@ -478,12 +455,8 @@ serve(async (req: Request) => {
       throw new Error(`Failed to upload backup file: ${uploadError.message}`);
     }
 
-    console.log("Backup file successfully uploaded:", uploadData?.path);
-
     // After successful backup, prune old ones from the same folder
     await pruneOldBackups(supabaseAdmin, backupFolder);
-
-    console.log(`Backup and pruning process completed for ${mapType}. Database records - grid_squares: ${gridSquaresData.length}, pois: ${poisData.length}, comments: ${commentsData.length}. Files - grid: ${downloadedFiles.grid_screenshots.length}, poi: ${downloadedFiles.poi_screenshots.length}, comments: ${downloadedFiles.comment_screenshots.length}, icons: ${downloadedFiles.custom_icons.length}`);
 
     return new Response(
       JSON.stringify({ 

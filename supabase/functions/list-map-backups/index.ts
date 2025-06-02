@@ -2,8 +2,6 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { corsHeaders } from '../_shared/cors.ts';
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-console.log("List Map Backups function booting up!");
-
 // Configuration - separate backup folders for each map type
 const BACKUP_BUCKET = 'screenshots';
 const DEEP_DESERT_BACKUPS_FOLDER = 'map-backups/deep-desert/';
@@ -49,8 +47,6 @@ interface BackupsByType {
 // Extract metadata from backup file content
 async function extractBackupMetadata(supabaseAdmin: SupabaseClient, filePath: string): Promise<BackupMetadata | null> {
   try {
-    console.log(`Extracting metadata from: ${filePath}`);
-    
     // Download the backup file content
     const { data, error } = await supabaseAdmin.storage
       .from(BACKUP_BUCKET)
@@ -106,7 +102,6 @@ async function extractBackupMetadata(supabaseAdmin: SupabaseClient, filePath: st
       };
     }
 
-    console.log(`Extracted metadata for ${filePath}:`, metadata);
     return metadata;
 
   } catch (err) {
@@ -120,7 +115,6 @@ async function listBackupsFromFolder(
   folder: string, 
   mapType: 'deep_desert' | 'hagga_basin' | 'combined'
 ): Promise<StoredBackupFile[]> {
-  console.log(`Listing files from folder: ${folder}`);
 
   const { data: files, error: listError } = await supabaseAdmin.storage
     .from(BACKUP_BUCKET)
@@ -136,11 +130,8 @@ async function listBackupsFromFolder(
   }
 
   if (!files || files.length === 0) {
-    console.log(`No backup files found in ${folder}`);
     return [];
   }
-
-  console.log(`Found ${files.length} backup files in ${folder}. Processing metadata...`);
 
   const backupsWithUrls = await Promise.all(
     files
@@ -218,8 +209,6 @@ serve(async (req: Request) => {
       hagga_basin: haggaBasinBackups,
       combined: combinedBackups
     };
-
-    console.log(`Returning backups grouped by type: Deep Desert (${deepDesertBackups.length}), Hagga Basin (${haggaBasinBackups.length}), Combined (${combinedBackups.length})`);
 
     return new Response(JSON.stringify({ backupsByType }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

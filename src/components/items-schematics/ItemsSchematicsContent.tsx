@@ -867,7 +867,7 @@ const ItemsSchematicsContent: React.FC<ItemsSchematicsContentProps> = ({
   // Handle refresh trigger from parent
   useEffect(() => {
     if (refreshTrigger > 0) {
-      console.log('🔄 Refresh trigger detected, refreshing data...');
+  
       refetchItems();
       refetchSchematics();
     }
@@ -891,20 +891,14 @@ const ItemsSchematicsContent: React.FC<ItemsSchematicsContentProps> = ({
 
   // Action handlers
   const handleEdit = (entity: Entity) => {
-    console.log('🔧 Edit button clicked, entity:', entity);
-    console.log('🔧 Entity field_values:', entity.field_values);
-    
     // Get the latest version from local state to ensure we have fresh data
     const latestEntity = entity.entityType === 'items' 
       ? getItemById(entity.id)
       : getSchematicById(entity.id);
     
     if (latestEntity) {
-      console.log('🔧 Using latest entity from state:', latestEntity);
-      console.log('🔧 Latest field_values:', latestEntity.field_values);
       setEditingEntity({ ...latestEntity, entityType: entity.entityType });
     } else {
-      console.log('🔧 Latest entity not found in state, using passed entity');
       setEditingEntity(entity);
     }
   };
@@ -939,8 +933,6 @@ const ItemsSchematicsContent: React.FC<ItemsSchematicsContentProps> = ({
 
 
   const handleEntitySaved = (savedEntity: Entity) => {
-    console.log('✅ Entity saved successfully:', savedEntity);
-    
     // Ensure entityType is preserved from the original editing entity
     const updatedEntity = {
       ...savedEntity,
@@ -964,7 +956,6 @@ const ItemsSchematicsContent: React.FC<ItemsSchematicsContentProps> = ({
 
   const handleLinksUpdated = () => {
     // Refresh data to show updated link information
-    console.log('POI links updated, refreshing data...');
     // Small delay to ensure database changes are committed
     setTimeout(() => {
       refetchItems();

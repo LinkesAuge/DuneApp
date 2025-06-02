@@ -176,15 +176,7 @@ const CategoryManager: React.FC<CategoryManagerProps> = () => {
 
     setIsSubmitting(true);
     try {
-      console.log('🔧 CategoryManager: Calling createCategoryAPI with data:', {
-        name: formData.name.trim(),
-        icon_image_id: formData.icon_image_id,
-        icon_fallback: formData.icon_fallback,
-        applies_to: formData.applies_to,
-        description: formData.description.trim() || null,
-        created_by: user?.id || null,
-        is_global: false
-      });
+
 
       // Use the CRUD function directly to get detailed error information
       const result = await createCategoryAPI(user, {
@@ -197,10 +189,7 @@ const CategoryManager: React.FC<CategoryManagerProps> = () => {
         is_global: true
       });
 
-      console.log('🔧 CategoryManager: API result:', result);
-
       if (result.success && result.data) {
-        console.log('🔧 CategoryManager: Success! Calling modal feedback');
         showSuccess('Category Created', `Category "${result.data.name}" created successfully!`);
         setIsCreateModalOpen(false);
         setModalError(null);
@@ -208,7 +197,6 @@ const CategoryManager: React.FC<CategoryManagerProps> = () => {
         refetchCategories(); // Refresh the categories list
       } else {
         // Show the specific error message in the modal
-        console.log('🔧 CategoryManager: API error, showing in modal:', result.error);
         setModalError(result.error || 'Failed to create category');
       }
     } catch (error) {
@@ -222,8 +210,6 @@ const CategoryManager: React.FC<CategoryManagerProps> = () => {
   // Handle edit submission
   const handleEditSubmit = async () => {
     if (!editingCategory) return;
-    
-    console.log('🔧 CategoryManager: Starting category edit for ID:', editingCategory.id);
     
     // Clear any previous modal errors
     setModalError(null);
@@ -240,13 +226,7 @@ const CategoryManager: React.FC<CategoryManagerProps> = () => {
 
     setIsSubmitting(true);
     try {
-      console.log('🔧 CategoryManager: Calling updateCategoryAPI with data:', {
-        name: editingCategory.name.trim(),
-        icon_image_id: editingCategory.icon_image_id,
-        icon_fallback: editingCategory.icon_fallback,
-        applies_to: editingCategory.applies_to,
-        description: editingCategory.description.trim() || null
-      });
+
 
       const result = await updateCategoryAPI(user, editingCategory.id, {
         name: editingCategory.name.trim(),
@@ -256,15 +236,11 @@ const CategoryManager: React.FC<CategoryManagerProps> = () => {
         description: editingCategory.description.trim() || null
       });
 
-      console.log('🔧 CategoryManager: updateCategoryAPI result:', result);
-
       if (result.success && result.data) {
-        console.log('🔧 CategoryManager: Category updated successfully');
         showSuccess('Category Updated', `Category "${result.data.name}" updated successfully`);
         setEditingCategory(null);
         await refetchCategories();
       } else {
-        console.log('🔧 CategoryManager: Edit failed:', result.error);
         setModalError(result.error || 'Failed to update category');
       }
     } catch (error) {
@@ -277,8 +253,6 @@ const CategoryManager: React.FC<CategoryManagerProps> = () => {
 
   // Handle delete - check dependencies first
   const handleDelete = async (category: Category) => {
-    console.log('🔧 CategoryManager: Checking dependencies for category:', category.id);
-    
     try {
       // Check dependencies first
       const dependencyResult = await getCategoryDependencies(user, category.id);
@@ -289,7 +263,6 @@ const CategoryManager: React.FC<CategoryManagerProps> = () => {
       }
 
       const dependencies = dependencyResult.data!;
-      console.log('🔧 CategoryManager: Dependencies found:', dependencies);
 
       if (dependencies.hasAny) {
         // Show migration dialog
@@ -317,15 +290,10 @@ const CategoryManager: React.FC<CategoryManagerProps> = () => {
 
   // Perform the actual deletion
   const performDeletion = async (categoryId: string, categoryName: string, migrateToCategoryId?: string) => {
-    console.log('🔧 CategoryManager: Starting category deletion for ID:', categoryId);
-    
     try {
       const result = await deleteCategoryAPI(user, categoryId, migrateToCategoryId);
       
-      console.log('🔧 CategoryManager: deleteCategoryAPI result:', result);
-
       if (result.success) {
-        console.log('🔧 CategoryManager: Category deleted successfully');
         const message = migrateToCategoryId 
           ? `Category "${categoryName}" deleted successfully and content migrated`
           : `Category "${categoryName}" deleted successfully`;
@@ -341,7 +309,6 @@ const CategoryManager: React.FC<CategoryManagerProps> = () => {
         
         await refetchCategories();
       } else {
-        console.log('🔧 CategoryManager: Delete failed:', result.error);
         showError('Delete Failed', result.error || 'Failed to delete category');
       }
     } catch (error) {

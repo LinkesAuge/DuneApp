@@ -313,14 +313,10 @@ const PoisPage: React.FC = () => {
   };
 
   const handleGalleryOpen = (poi: PoiWithGridSquare, index?: number) => {
-    console.log('handleGalleryOpen called with POI:', poi.title, 'Screenshots:', poi.screenshots?.length);
     if (poi.screenshots?.length) {
-      console.log('Opening gallery for POI:', poi.title);
       setSelectedPoi(poi);
       setGalleryIndex(index !== undefined && index < poi.screenshots.length ? index : 0); // Use provided index or default to 0
       setShowGallery(true);
-    } else {
-      console.log('No screenshots found for POI:', poi.title);
     }
   };
 
@@ -755,7 +751,7 @@ const PoisPage: React.FC = () => {
                           
                           navigator.clipboard.writeText(poiUrl).then(() => {
                             // You could add a toast notification here
-                            console.log('POI link copied to clipboard:', poiUrl);
+                      
                           }).catch(err => {
                             console.error('Failed to copy POI link:', err);
                           });

@@ -14,7 +14,7 @@ const Auth: React.FC = () => {
 
   // Only redirect if we have a user and we're not loading
   if (user && !isLoading) {
-    console.log('User authenticated, redirecting to:', from);
+
     return <Navigate to={from} replace />;
   }
 

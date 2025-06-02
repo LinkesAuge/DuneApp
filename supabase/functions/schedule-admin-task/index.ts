@@ -2,8 +2,6 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { corsHeaders } from '../_shared/cors.ts'; // Import shared CORS headers
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-console.log("Schedule Admin Task function booting up!");
-
 // TODO: Securely manage environment variables
 const supabaseUrl = Deno.env.get("SUPABASE_URL");
 const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -88,8 +86,6 @@ serve(async (req: Request) => {
       );
     }
 
-    console.log(`Scheduling task: ${taskName}, Function: ${edgeFunction}, Map: ${mapType}, CRON: ${cronExpression}`);
-
     // Create unique job name
     const jobName = `scheduled_${edgeFunction}_${Date.now()}`;
     
@@ -100,8 +96,6 @@ serve(async (req: Request) => {
       headers:='{"Authorization": "Bearer ${supabaseServiceRoleKey}", "Content-Type": "application/json"}'::jsonb,
       body:='${functionPayload}'::jsonb
     );`;
-    
-    console.log(`Scheduling job: ${jobName} with command: ${command}`);
 
     // Schedule the cron job using the schedule_cron_job RPC function
     const { error: scheduleError, data: scheduleData } = await supabaseAdmin.rpc('schedule_cron_job', {
@@ -114,8 +108,6 @@ serve(async (req: Request) => {
       console.error('Error scheduling cron job:', scheduleError);
       throw new Error(`Database error scheduling job: ${scheduleError.message}`);
     }
-
-    console.log('Cron job scheduled successfully:', scheduleData);
 
     return new Response(JSON.stringify({ 
       success: true,
