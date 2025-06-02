@@ -132,7 +132,7 @@ const ItemsSchematicsPage: React.FC = () => {
       {/* Main background image */}
       <div 
         className="fixed inset-0 bg-cover bg-center bg-no-repeat"
-        style={{ backgroundImage: `url(/images/main-bg.jpg)` }}
+        style={{ backgroundImage: `url(/images/main-bg.webp)` }}
       />
       
       {/* Content */}

@@ -1,7 +1,8 @@
 import React, { useState, useRef } from 'react';
 import { Upload, X, Check, Image as ImageIcon } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import { v4 as uuidv4 } from 'uuid';
+import { uploadAvatar, UploadResult } from '../../lib/imageUpload';
+import { formatConversionStats } from '../../lib/imageUtils';
 
 interface AvatarUploadProps {
   currentAvatarUrl?: string | null;
@@ -22,6 +23,7 @@ const AvatarUpload: React.FC<AvatarUploadProps> = ({
 }) => {
   const [dragOver, setDragOver] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [conversionStats, setConversionStats] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const validateFile = (file: File): string | null => {
@@ -31,39 +33,21 @@ const AvatarUpload: React.FC<AvatarUploadProps> = ({
       return 'Please upload a valid image file (JPEG, PNG, or WebP)';
     }
 
-    // Check file size (max 1MB)
-    const maxSize = 1 * 1024 * 1024; // 1MB
+    // Check file size (max 5MB - will be compressed to WebP)
+    const maxSize = 5 * 1024 * 1024; // 5MB
     if (file.size > maxSize) {
-      return 'File size must be less than 1MB';
+      return 'File size must be less than 5MB (will be optimized)';
     }
 
     return null;
   };
 
-  const uploadAvatar = async (file: File): Promise<string> => {
-    // Generate unique filename
-    const fileExt = file.name.split('.').pop();
-    const fileName = `avatar_${uuidv4()}.${fileExt}`;
-    const filePath = `avatars/${fileName}`;
-
-    // Upload to Supabase Storage
-    const { data, error } = await supabase.storage
-      .from('screenshots') // Using existing bucket
-      .upload(filePath, file, {
-        cacheControl: '3600',
-        upsert: false
-      });
-
-    if (error) {
-      throw new Error(`Upload failed: ${error.message}`);
-    }
-
-    // Get public URL
-    const { data: { publicUrl } } = supabase.storage
-      .from('screenshots')
-      .getPublicUrl(filePath);
-
-    return publicUrl;
+  const uploadAvatarFile = async (file: File): Promise<UploadResult> => {
+    // Generate unique filename (extension will be .webp after conversion)
+    const fileName = `avatar_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+    
+    // Upload with WebP conversion and high quality settings
+    return uploadAvatar(file, fileName);
   };
 
   const handleFileSelect = async (file: File) => {
@@ -81,8 +65,14 @@ const AvatarUpload: React.FC<AvatarUploadProps> = ({
     try {
       onUploadStart?.();
       
-      // Upload to storage
-      const avatarUrl = await uploadAvatar(file);
+      // Upload to storage with WebP conversion
+      const uploadResult = await uploadAvatarFile(file);
+      
+      // Show compression stats if available
+      if (uploadResult.compressionRatio) {
+        const stats = formatConversionStats(uploadResult);
+        setConversionStats(stats);
+      }
       
       // Update profile with new avatar URL
       const { error: updateError } = await supabase.auth.getUser().then(async ({ data: { user } }) => {
@@ -90,7 +80,7 @@ const AvatarUpload: React.FC<AvatarUploadProps> = ({
         
         return supabase
           .from('profiles')
-          .update({ custom_avatar_url: avatarUrl })
+          .update({ custom_avatar_url: uploadResult.url })
           .eq('id', user.id);
       });
 
@@ -98,14 +88,15 @@ const AvatarUpload: React.FC<AvatarUploadProps> = ({
         throw new Error(`Profile update failed: ${updateError.message}`);
       }
 
-      onAvatarChange(avatarUrl);
+      onAvatarChange(uploadResult.url);
       onUploadComplete?.();
       
-      // Clean up object URL
+      // Clean up object URL and show stats briefly
       setTimeout(() => {
         URL.revokeObjectURL(objectUrl);
         setPreviewUrl(null);
-      }, 1000);
+        setConversionStats(null);
+      }, 3000);
       
     } catch (error: any) {
       console.error('Avatar upload error:', error);
@@ -190,6 +181,11 @@ const AvatarUpload: React.FC<AvatarUploadProps> = ({
           <p className="text-amber-300/60 text-xs">
             {currentAvatarUrl ? 'Custom avatar active' : 'No custom avatar set'}
           </p>
+          {conversionStats && (
+            <p className="text-green-400 text-xs mt-1">
+              ✓ Optimized: {conversionStats}
+            </p>
+          )}
         </div>
       </div>
 

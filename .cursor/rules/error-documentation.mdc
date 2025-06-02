@@ -49,6 +49,36 @@ This document tracks known issues, their states, context, and resolutions encoun
 
 ---
 
+-   **Date**: 2025-01-30
+-   **Error Description**: Critical privacy policy violations - POI page bypassing Row Level Security (RLS) policies and real-time subscription data leaks.
+-   **Context/Symptoms**: 
+    1. POI page was showing private POIs to unauthorized users, violating privacy controls
+    2. 406 HTTP errors when deleting POIs: `XHRGET https://urgmimdahjhaecwepsov.supabase.co/rest/v1/pois?select=*,poi_types(*),profiles(username)&id=eq.698ecd29-2e2f-467b-bf18-08cc7723e830&map_type=eq.hagga_basin [HTTP/2 406 37ms]`
+    3. Real-time subscriptions were attempting to fetch deleted POIs causing errors and potential data exposure
+    4. Double confirmation dialogs appearing (old browser confirm + new modal)
+    5. Database/Items & Schematics page accessible to all authenticated users instead of admin-only
+-   **Investigation/Diagnosis**:
+    -   **Privacy Bypass**: POI page was using simple `.select('*')` queries that completely bypassed RLS policies, allowing unauthorized access to private POI data
+    -   **Subscription Errors**: Real-time UPDATE events were trying to fetch deleted POIs using `.single()` which expects exactly one result, causing 406 errors when POIs no longer existed
+    -   **Missing Filtering**: Subscription queries lacked map_type filtering and existence checks before attempting updates
+    -   **Route Protection**: Database route was using `ProtectedRoute` instead of `AdminRoute`, allowing non-admin access to sensitive functionality
+    -   **Confirmation Dialog Conflict**: Legacy `window.confirm()` calls coexisted with new ConfirmationModal system
+-   **Solution/Fix**:
+    1.  **Fixed Privacy Policy Enforcement**: Updated POI page queries to include proper relations: `select('*, poi_types (*), profiles (username)')` with `order('created_at', { ascending: false })` to ensure RLS policies are respected
+    2.  **Enhanced Real-time Subscription Security**: Changed `.single()` to `.maybeSingle()` for graceful handling of missing records, added map_type filtering to all subscription queries, enhanced error handling to detect and remove deleted POIs from state
+    3.  **Secured Admin Routes**: Changed `/database` route from `<ProtectedRoute>` to `<AdminRoute>` to restrict access to admin users only
+    4.  **Standardized Confirmation Dialogs**: Added ConfirmationModal to HaggaBasinPage.tsx with proper state management, removed `window.confirm()` from InteractiveMap.tsx, standardized all POI deletion to use styled ConfirmationModal
+    5.  **Fixed Navbar Layout Overlap**: Optimized spacing and layout to accommodate all navigation elements without overlap for admin users
+-   **Files Affected**:
+    -   `src/pages/Pois.tsx` (Privacy policy compliance)
+    -   `src/pages/HaggaBasinPage.tsx` (Real-time subscription fixes and confirmation modal)
+    -   `src/components/hagga-basin/InteractiveMap.tsx` (Removed legacy confirm dialog)
+    -   `src/App.tsx` (Admin route protection)
+    -   `src/components/common/Navbar.tsx` (Layout optimization)
+-   **Lesson Learned**: Critical security lesson: (1) Always verify that database queries respect RLS policies by including proper relations rather than using simple `.select('*')`, (2) Real-time subscriptions must handle edge cases like deleted records gracefully with `.maybeSingle()` and proper filtering, (3) Route protection must match the intended access level (AdminRoute vs ProtectedRoute), (4) UI consistency requires standardizing confirmation patterns across the entire application, (5) Privacy violations are critical security issues that must be tested thoroughly and resolved immediately.
+
+---
+
 -   **Date**: YYYY-MM-DD <!-- User should replace with current date -->
 -   **Error Description**: Supabase Storage `listBuckets()` returns empty array `[]` and `getBucket('bucket-name')` fails with "Bucket not found" (400 error) for a newly created, public bucket, despite the bucket existing in the Supabase dashboard and client being authenticated.
 -   **Context/Symptoms**: Occurred in `PoiTypeManager.tsx` when attempting to interact with a new 'poi-icons' bucket for icon uploads. Another existing bucket ('screenshots') was working for other functionalities. SQL grants for `SELECT` on `storage.buckets` to `authenticated` and `anon` roles did not resolve the issue. No restrictive RLS policies were found on `storage.buckets` table itself.

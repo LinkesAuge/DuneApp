@@ -1,26 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { X, MapPin, Lock, Users, Eye, Image, Upload, Plus } from 'lucide-react';
+import { X, MapPin, Lock, Users, Eye, Image, Upload, Plus, Search, UserPlus } from 'lucide-react';
 import type { 
   PixelCoordinates, 
   PoiType, 
-  CustomIcon, 
+ 
   Poi, 
   PrivacyLevel,
   PercentageCoordinates
 } from '../../types';
 import { formatCoordinates } from '../../lib/coordinates';
 import { useAuth } from '../auth/AuthProvider';
-import CustomPoiTypeModal from './CustomPoiTypeModal';
+
 import ImageCropModal from '../grid/ImageCropModal';
 import { PixelCrop } from 'react-image-crop';
 import { v4 as uuidv4 } from 'uuid';
 import { getScreenshotLabel } from '../../lib/cropUtils';
+import UserAvatar from '../common/UserAvatar';
+import { uploadPoiScreenshot } from '../../lib/imageUpload';
+import { formatConversionStats } from '../../lib/imageUtils';
 
 interface POIPlacementModalProps {
   coordinates: PixelCoordinates;
   poiTypes: PoiType[];
-  customIcons: CustomIcon[];
+
   onPoiCreated: (poi: Poi) => void;
   onClose: () => void;
   mapType?: 'deep_desert' | 'hagga_basin';
@@ -48,7 +51,7 @@ const privacyOptions = [
     value: 'shared' as PrivacyLevel,
     label: 'Shared',
     icon: Users,
-    description: 'Share with specific users',
+    description: 'Shared with specific users (select below)',
     color: 'text-blue-600'
   }
 ];
@@ -59,13 +62,7 @@ const isIconUrl = (icon: string): boolean => {
 };
 
 // Helper function to get display image URL for POI icons
-const getDisplayImageUrl = (icon: string, customIcons: CustomIcon[]): string | null => {
-  // Check if it's a custom icon reference
-  const customIcon = customIcons.find(ci => ci.id === icon || ci.name === icon);
-  if (customIcon) {
-    return customIcon.image_url;
-  }
-  
+const getDisplayImageUrl = (icon: string): string | null => {
   // Check if it's already a URL
   if (isIconUrl(icon)) {
     return icon;
@@ -86,7 +83,7 @@ interface ScreenshotFile {
 const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
   coordinates,
   poiTypes,
-  customIcons,
+
   onPoiCreated,
   onClose,
   mapType = 'hagga_basin',
@@ -106,14 +103,22 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
   const [showDetailedPoiSelection, setShowDetailedPoiSelection] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showCustomPoiTypeModal, setShowCustomPoiTypeModal] = useState(false);
-  const [userCreatedPoiTypes, setUserCreatedPoiTypes] = useState<PoiType[]>([]);
+  const [conversionStats, setConversionStats] = useState<string | null>(null);
+
+
 
   // Screenshot cropping state
   const [showCropModal, setShowCropModal] = useState(false);
   const [tempImageFile, setTempImageFile] = useState<File | null>(null);
   const [tempImageUrl, setTempImageUrl] = useState<string | null>(null);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+
+  // Sharing state
+  const [availableUsers, setAvailableUsers] = useState<any[]>([]);
+  const [selectedUsers, setSelectedUsers] = useState<any[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [showSharingSection, setShowSharingSection] = useState(false);
 
   // Get categories for organizing POI types
   const categories = [...new Set(poiTypes.map(type => type.category))];
@@ -126,39 +131,82 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
         setTitle(selectedType.name);
         setDescription(selectedType.default_description || '');
       }
-    } else if (selectedPoiTypeId.startsWith('custom_')) {
-      const customIconId = selectedPoiTypeId.replace('custom_', '');
-      const customIcon = customIcons.find(icon => icon.id === customIconId);
-      if (customIcon) {
-        setTitle(customIcon.name);
-        setDescription('');
+    }
+  }, [selectedPoiTypeId, poiTypes]);
+
+
+
+  // Load available users
+  useEffect(() => {
+    loadAvailableUsers();
+  }, []);
+
+  // Show sharing section when privacy level is shared
+  useEffect(() => {
+    setShowSharingSection(privacyLevel === 'shared');
+  }, [privacyLevel]);
+
+  // Clear conversion stats after 5 seconds
+  useEffect(() => {
+    if (conversionStats) {
+      const timer = setTimeout(() => setConversionStats(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [conversionStats]);
+
+  const loadAvailableUsers = async () => {
+    setLoadingUsers(true);
+    try {
+      const { data: users, error } = await supabase
+        .from('profiles')
+        .select('id, username, email, display_name, discord_username, custom_avatar_url, discord_avatar_url, use_discord_avatar')
+        .neq('id', user?.id || '') // Exclude current user
+        .order('username');
+
+      if (error) throw error;
+      setAvailableUsers(users || []);
+    } catch (err) {
+      console.error('Error loading users:', err);
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
+  // Handle adding a user to share with
+  const handleAddUser = (userToAdd: any) => {
+    if (!selectedUsers.find(u => u.id === userToAdd.id)) {
+      setSelectedUsers(prev => [...prev, userToAdd]);
+      // Automatically set privacy to shared when users are selected
+      if (privacyLevel !== 'shared') {
+        setPrivacyLevel('shared');
       }
     }
-  }, [selectedPoiTypeId, poiTypes, customIcons]);
-
-  // Get user-created POI types for the custom modal
-  useEffect(() => {
-    const userTypes = poiTypes.filter(type => type.created_by === user?.id);
-    setUserCreatedPoiTypes(userTypes);
-  }, [poiTypes, user?.id]);
-
-  // Handle custom POI type creation
-  const handleCustomPoiTypeCreated = (newPoiType: PoiType) => {
-    setUserCreatedPoiTypes(prev => [newPoiType, ...prev]);
-    setSelectedPoiTypeId(newPoiType.id);
-    setShowCustomPoiTypeModal(false);
   };
 
-  const handleCustomPoiTypeDeleted = (poiTypeId: string) => {
-    setUserCreatedPoiTypes(prev => prev.filter(type => type.id !== poiTypeId));
-    if (selectedPoiTypeId === poiTypeId) {
-      setSelectedPoiTypeId('');
+  // Handle removing a user from sharing
+  const handleRemoveUser = (userId: string) => {
+    setSelectedUsers(prev => prev.filter(u => u.id !== userId));
+    // If no users selected, change back to private
+    const remainingUsers = selectedUsers.filter(u => u.id !== userId);
+    if (remainingUsers.length === 0 && privacyLevel === 'shared') {
+      setPrivacyLevel('private');
     }
   };
 
-  const handleCustomPoiTypeUpdated = (updatedPoiType: PoiType) => {
-    setUserCreatedPoiTypes(prev => prev.map(type => type.id === updatedPoiType.id ? updatedPoiType : type));
-  };
+  // Filter available users based on search and already selected
+  const filteredAvailableUsers = availableUsers.filter(user => {
+    const matchesSearch = !searchTerm || 
+      user.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.display_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.discord_username?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const notAlreadySelected = !selectedUsers.find(su => su.id === user.id);
+    
+    return matchesSearch && notAlreadySelected;
+  });
+
+
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
@@ -328,38 +376,14 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
       return;
     }
 
-    // Handle custom icon selection
-    let finalPoiTypeId = selectedPoiTypeId;
-    let customIconId = null;
-    
-          // POIPlacementModal: Selected POI Type ID and available custom icons
-    
-    if (selectedPoiTypeId.startsWith('custom_')) {
-      customIconId = selectedPoiTypeId.replace('custom_', '');
-      const customIcon = customIcons.find(icon => icon.id === customIconId);
-      
-              // POIPlacementModal: Found custom icon
-      
-      if (!customIcon) {
-        setError('Selected custom icon not found.');
-        return;
-      }
-      
-      // Find a generic POI type to use as base, prefer "Custom" category or first available
-      const customCategoryType = poiTypes.find(type => type.category.toLowerCase() === 'custom');
-      const fallbackType = poiTypes.find(type => type.category.toLowerCase() === 'general') || poiTypes[0];
-      
-      finalPoiTypeId = customCategoryType?.id || fallbackType?.id;
-      
-      // POIPlacementModal: Final POI type ID determined
-      
-      if (!finalPoiTypeId) {
-        setError('No suitable POI type found for custom icon.');
-        return;
-      }
-      
-              // POIPlacementModal: Will save custom icon ID to database
+    // Validate shared privacy level workflow
+    if (privacyLevel === 'shared' && selectedUsers.length === 0) {
+      setError('Please select users to share with or change privacy level to Private.');
+      return;
     }
+
+    // Use the selected POI type directly
+    let finalPoiTypeId = selectedPoiTypeId;
 
     setIsSubmitting(true);
     setError(null);
@@ -375,8 +399,7 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
         coordinates_x: Math.round(coordinates.x),
         coordinates_y: Math.round(coordinates.y),
         privacy_level: privacyLevel,
-        grid_square_id: mapType === 'deep_desert' ? gridSquareId : null,
-        custom_icon_id: customIconId
+        grid_square_id: mapType === 'deep_desert' ? gridSquareId : null
       };
 
       const { data: poi, error: poiError } = await supabase
@@ -400,25 +423,23 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
       
       if (totalScreenshots > 0) {
         try {
-          // Upload screenshots one by one
+          // Upload screenshots one by one with WebP conversion
           for (const screenshot of screenshots) {
             if (screenshot.isNew) { // Only upload new files
               const fileName = `${user.id}/${uuidv4()}-${screenshot.file.name}`;
-              const filePath = `poi-screenshots/${fileName}`;
               
-              const { data: uploadData, error: uploadError } = await supabase.storage
-                .from('screenshots')
-                .upload(filePath, screenshot.file, { upsert: false });
-
-              if (uploadError) {
-                console.error('Error uploading screenshot:', uploadError);
-                throw new Error(`Failed to upload screenshot: ${screenshot.file.name}`);
+              // Upload with WebP conversion
+              const uploadResult = await uploadPoiScreenshot(screenshot.file, fileName);
+              
+              // Show conversion feedback for the first upload
+              if (finalScreenshots.length === 0 && uploadResult.compressionRatio) {
+                const stats = formatConversionStats(uploadResult);
+                setConversionStats(stats);
               }
               
-              const publicURL = supabase.storage.from('screenshots').getPublicUrl(filePath).data.publicUrl;
               finalScreenshots.push({
                 id: `${poi.id}_${Date.now()}_${finalScreenshots.length}`,
-                url: publicURL,
+                url: uploadResult.url,
                 uploaded_by: user.id,
                 upload_date: new Date().toISOString()
               });
@@ -440,6 +461,35 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
           // Don't fail the POI creation for screenshot upload failures
           setError('POI created successfully, but some screenshots failed to upload');
         }
+      }
+
+      // Handle sharing if privacy level is shared
+      if (privacyLevel === 'shared' && selectedUsers.length > 0) {
+        console.log('[POIPlacementModal] Saving shares for POI:', poi.id, 'with users:', selectedUsers.map(u => u.id));
+        
+        const newShares = selectedUsers.map(u => ({
+          poi_id: poi.id,
+          shared_with_user_id: u.id,
+          shared_by_user_id: user?.id
+        }));
+        
+        console.log('[POIPlacementModal] Share data to insert:', newShares);
+        
+        const { data: shareData, error: shareError } = await supabase
+          .from('poi_shares')
+          .insert(newShares)
+          .select();
+          
+        if (shareError) {
+          console.error('Error saving POI shares:', shareError);
+          throw new Error('Failed to save POI sharing settings');
+        }
+        
+        console.log('[POIPlacementModal] Successfully saved shares:', shareData);
+      } else if (privacyLevel === 'shared') {
+        console.log('[POIPlacementModal] Privacy is shared but no users selected');
+      } else {
+        console.log('[POIPlacementModal] Privacy level is:', privacyLevel, 'not saving shares');
       }
 
       // Add screenshots to the POI object for immediate display
@@ -504,7 +554,7 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
               </label>
               <button
                 type="button"
-                onClick={() => setShowCustomPoiTypeModal(true)}
+                onClick={() => {/* Custom POI type creation removed */}}
                 className="text-sm text-amber-400 hover:text-amber-300 font-medium flex items-center"
               >
                 <Plus className="w-4 h-4 mr-1" />
@@ -532,15 +582,7 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
                     ))}
                 </optgroup>
               ))}
-              {customIcons.length > 0 && (
-                <optgroup label="Custom Icons">
-                  {customIcons.map(icon => (
-                    <option key={`custom_${icon.id}`} value={`custom_${icon.id}`}>
-                      {icon.name} (Custom)
-                    </option>
-                  ))}
-                </optgroup>
-              )}
+
             </select>
 
             {/* Show More Details Toggle */}
@@ -565,7 +607,7 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
                       </h4>
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                         {categoryTypes.map(poiType => {
-                          const imageUrl = getDisplayImageUrl(poiType.icon, customIcons);
+                          const imageUrl = getDisplayImageUrl(poiType.icon);
                           
                           return (
                             <label
@@ -614,46 +656,7 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
                   );
                 })}
 
-                {/* Custom Icons */}
-                {customIcons.length > 0 && (
-                  <div>
-                    <h4 className="text-sm font-medium text-amber-300 mb-2">
-                      Custom Icons
-                    </h4>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                      {customIcons.map(customIcon => (
-                        <label
-                          key={`custom_${customIcon.id}`}
-                          className={`flex items-center space-x-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                            selectedPoiTypeId === `custom_${customIcon.id}`
-                              ? 'border-amber-500 bg-amber-900/20'
-                              : 'border-slate-600 hover:border-slate-500 bg-slate-800'
-                          }`}
-                        >
-                          <input
-                            type="radio"
-                            name="poiType"
-                            value={`custom_${customIcon.id}`}
-                            checked={selectedPoiTypeId === `custom_${customIcon.id}`}
-                            onChange={(e) => setSelectedPoiTypeId(e.target.value)}
-                            className="sr-only"
-                          />
-                          
-                          {/* Custom Icon */}
-                          <div className="w-6 h-6 rounded-full border border-slate-500 flex items-center justify-center mr-3 bg-slate-700">
-                            <img
-                              src={customIcon.image_url}
-                              alt={customIcon.name}
-                              className="w-4 h-4 object-contain"
-                            />
-                          </div>
-                          
-                          <span className="text-sm font-medium text-amber-200">{customIcon.name}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                )}
+
               </div>
             )}
           </div>
@@ -721,6 +724,127 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
               })}
             </div>
           </div>
+
+          {/* Sharing Section */}
+          {showSharingSection && (
+            <div>
+              <label className="block text-sm font-medium text-amber-200 mb-3">
+                Share with Users
+              </label>
+              
+              {/* Currently Selected Users */}
+              {selectedUsers.length > 0 && (
+                <div className="mb-4">
+                  <h4 className="text-sm font-medium text-amber-200 mb-2 flex items-center gap-2">
+                    <Users className="w-4 h-4" />
+                    Selected Users ({selectedUsers.length})
+                  </h4>
+                  <div className="space-y-2">
+                    {selectedUsers.map(selectedUser => (
+                      <div key={selectedUser.id} className="bg-slate-800 border border-slate-600 rounded-lg p-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <UserAvatar
+                              user={selectedUser}
+                              size="sm"
+                              className="w-8 h-8"
+                            />
+                            <div>
+                              <p className="text-amber-200 font-medium"
+                                 style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                                {selectedUser.display_name || selectedUser.username}
+                              </p>
+                              <p className="text-slate-400 text-xs">{selectedUser.email}</p>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveUser(selectedUser.id)}
+                            className="p-1.5 text-red-300 hover:text-red-100 hover:bg-slate-700/50 rounded transition-colors"
+                            title="Remove access"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Add Users Section */}
+              <div>
+                <h4 className="text-sm font-medium text-amber-200 mb-3 flex items-center gap-2">
+                  <UserPlus className="w-4 h-4" />
+                  Add Users
+                </h4>
+                
+                {/* Search Input */}
+                <div className="relative mb-4">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Search users by name or email..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 bg-slate-800 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-400 focus:outline-none focus:border-amber-400 transition-colors"
+                    style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
+                  />
+                </div>
+
+                {/* Available Users */}
+                <div className="max-h-60 overflow-y-auto space-y-2">
+                  {loadingUsers ? (
+                    <div className="text-center py-8">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-400 mx-auto mb-4"></div>
+                      <p className="text-slate-400">Loading users...</p>
+                    </div>
+                  ) : filteredAvailableUsers.length === 0 ? (
+                    <div className="text-center py-8">
+                      <Users className="w-12 h-12 text-slate-500 mx-auto mb-4" />
+                      <p className="text-slate-300 mb-2"
+                         style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                        {searchTerm ? 'No users found matching your search' : 'No more users to share with'}
+                      </p>
+                      <p className="text-slate-400 text-sm">
+                        {searchTerm ? 'Try adjusting your search terms' : 'All available users have already been selected'}
+                      </p>
+                    </div>
+                  ) : (
+                    filteredAvailableUsers.map(availableUser => (
+                      <div key={availableUser.id} className="bg-slate-800 border border-slate-600 rounded-lg p-3 hover:border-slate-500 transition-colors">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <UserAvatar
+                              user={availableUser}
+                              size="sm"
+                              className="w-8 h-8"
+                            />
+                            <div>
+                              <p className="text-amber-200 font-medium"
+                                 style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                                {availableUser.display_name || availableUser.username}
+                              </p>
+                              <p className="text-slate-400 text-xs">{availableUser.email}</p>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleAddUser(availableUser)}
+                            className="bg-green-600 hover:bg-green-500 text-white px-3 py-1.5 rounded text-sm transition-colors flex items-center gap-2"
+                            style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
+                          >
+                            <UserPlus className="w-3 h-3" />
+                            <span>Add</span>
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Screenshots - Matching Edit Modal Style */}
           <div>
@@ -790,6 +914,13 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
             </div>
           )}
 
+          {/* Conversion Stats Display */}
+          {conversionStats && (
+            <div className="bg-green-900/20 border border-green-800 rounded-lg p-3">
+              <p className="text-sm text-green-300">{conversionStats}</p>
+            </div>
+          )}
+
           {/* Actions */}
           <div className="flex justify-end space-x-3 pt-4 border-t border-slate-700">
             <button
@@ -818,15 +949,7 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
         </form>
       </div>
 
-      {/* Custom POI Type Modal */}
-      <CustomPoiTypeModal
-        isOpen={showCustomPoiTypeModal}
-        onClose={() => setShowCustomPoiTypeModal(false)}
-        customPoiTypes={userCreatedPoiTypes}
-        onPoiTypeCreated={handleCustomPoiTypeCreated}
-        onPoiTypeDeleted={handleCustomPoiTypeDeleted}
-        onPoiTypeUpdated={handleCustomPoiTypeUpdated}
-      />
+
 
       {/* Image Crop Modal */}
       {showCropModal && tempImageUrl && tempImageFile && (

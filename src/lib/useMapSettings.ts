@@ -36,20 +36,25 @@ export const useMapSettings = () => {
       const { data, error: fetchError } = await supabase
         .from('app_settings')
         .select('setting_value')
-        .eq('setting_key', 'hagga_basin_settings')
+        .eq('setting_key', 'map_settings')
         .single();
 
       if (fetchError && fetchError.code !== 'PGRST116') {
+        console.error('Map settings fetch error:', fetchError);
         throw fetchError;
       }
+
+      console.log('Map settings fetch result:', { data, error: fetchError });
 
       if (data && data.setting_value) {
         const newSettings = {
           ...defaultMapSettings,
           ...data.setting_value
         };
+        console.log('Loaded map settings from database:', newSettings);
         setSettings(newSettings);
       } else {
+        console.log('No map settings found, using defaults:', defaultMapSettings);
         setSettings(defaultMapSettings);
       }
     } catch (err: any) {
@@ -63,6 +68,18 @@ export const useMapSettings = () => {
 
   useEffect(() => {
     loadSettings();
+
+    // Listen for admin map settings updates
+    const handleMapSettingsUpdate = () => {
+      console.log('Map settings updated by admin, reloading...');
+      loadSettings();
+    };
+
+    window.addEventListener('mapSettingsUpdated', handleMapSettingsUpdate);
+
+    return () => {
+      window.removeEventListener('mapSettingsUpdated', handleMapSettingsUpdate);
+    };
   }, []);
 
   return { settings, loading, error, reloadSettings: loadSettings };

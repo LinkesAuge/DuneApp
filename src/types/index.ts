@@ -59,7 +59,7 @@ export interface PoiType {
   category: string;
   default_description: string | null;
   icon_has_transparent_background?: boolean;
-  created_by?: string | null; // NULL means system/admin created, user ID means user-created
+
   display_in_panel?: boolean; // Whether this category appears in main POI filter panels
   category_display_order?: number; // Order in which category appears (lower numbers first)
   category_column_preference?: number; // Which column: 1=left, 2=right
@@ -93,8 +93,7 @@ export interface Poi {
   coordinates_x: number | null; // pixel coordinates for Hagga Basin
   coordinates_y: number | null; // pixel coordinates for Hagga Basin
   privacy_level: PrivacyLevel;
-  // NEW: Custom icon support
-  custom_icon_id: string | null; // Reference to custom icon, overrides POI type icon when set
+
 }
 
 export interface PoiWithGridSquare extends Poi {
@@ -124,28 +123,7 @@ export interface HaggaBasinOverlay {
   created_by: string;
 }
 
-// NEW: POI Collections System
-export interface PoiCollection {
-  id: string;
-  name: string;
-  description: string | null;
-  created_by: string;
-  is_public: boolean;
-  created_at: string;
-  updated_at: string;
-  updated_by: string | null; // Who last updated/edited this collection
-}
 
-export interface PoiCollectionItem {
-  collection_id: string;
-  poi_id: string;
-  added_at: string;
-}
-
-export interface PoiCollectionWithItems extends PoiCollection {
-  items: PoiCollectionItem[];
-  pois?: Poi[];
-}
 
 // NEW: POI Sharing System
 export interface PoiShare {
@@ -155,14 +133,7 @@ export interface PoiShare {
   created_at: string;
 }
 
-// NEW: Custom Icons System
-export interface CustomIcon {
-  id: string;
-  user_id: string;
-  name: string;
-  image_url: string;
-  created_at: string;
-}
+
 
 // NEW: Coordinate conversion utilities interface
 export interface CoordinateConverter {
@@ -263,8 +234,6 @@ export interface AppState {
   // NEW: Hagga Basin state
   haggaBasinBaseMaps: HaggaBasinBaseMap[];
   haggaBasinOverlays: HaggaBasinOverlay[];
-  poiCollections: PoiCollection[];
-  customIcons: CustomIcon[];
   // NEW: Items & Schematics state
   tiers: Tier[];
   categories: Category[];
@@ -302,26 +271,25 @@ export interface DashboardStats {
   // NEW: Hagga Basin specific stats
   deepDesertPois: number;
   haggaBasinPois: number;
-  poiCollections: number;
   sharedPois: number;
   privatePois: number;
 }
 
 export interface ActivityItem {
   id: string;
-  type: 'poi_created' | 'poi_edited' | 'poi_deleted' | 'comment_added' | 'comment_edited' | 'comment_deleted' | 'grid_explored' | 'screenshot_uploaded' | 'screenshot_deleted' | 'collection_created' | 'poi_shared';
+  type: 'poi_created' | 'poi_edited' | 'poi_deleted' | 'comment_added' | 'comment_edited' | 'comment_deleted' | 'grid_explored' | 'screenshot_uploaded' | 'screenshot_deleted' | 'poi_shared';
   title: string;
   description: string;
   timestamp: string;
   icon: string; // This matches how it's used in ActivityFeed.tsx
   targetId?: string;
-  targetType?: 'poi' | 'grid_square' | 'comment' | 'collection';
+  targetType?: 'poi' | 'grid_square' | 'comment';
   metadata?: {
     coordinate?: string;
     poiTitle?: string;
     screenshotUrl?: string;
     mapType?: MapType;
-    collectionName?: string;
+
     editedBy?: string;
     deletedBy?: string;
   };

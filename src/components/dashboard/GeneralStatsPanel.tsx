@@ -8,7 +8,7 @@ interface GeneralStatsData {
   totalUsers: number;
   totalComments: number;
   totalScreenshots: number;
-  totalCollections: number;
+
   weeklyGrowth: {
     newUsers: number;
     newPois: number;
@@ -25,7 +25,7 @@ const GeneralStatsPanel: React.FC = () => {
     totalUsers: 0,
     totalComments: 0,
     totalScreenshots: 0,
-    totalCollections: 0,
+
     weeklyGrowth: {
       newUsers: 0,
       newPois: 0,
@@ -56,7 +56,7 @@ const GeneralStatsPanel: React.FC = () => {
         usersResult,
         commentsResult,
         screenshotsResult,
-        collectionsResult,
+  
         newUsersResult,
         newPoisResult,
         newCommentsResult,
@@ -66,7 +66,7 @@ const GeneralStatsPanel: React.FC = () => {
         supabase.from('profiles').select('id', { count: 'exact', head: true }),
         supabase.from('comments').select('id', { count: 'exact', head: true }),
         supabase.from('comment_screenshots').select('id', { count: 'exact', head: true }),
-        supabase.from('poi_collections').select('id', { count: 'exact', head: true }),
+
         supabase.from('profiles').select('id', { count: 'exact', head: true }).gte('updated_at', weekAgoISO),
         supabase.from('pois').select('id', { count: 'exact', head: true }).gte('created_at', weekAgoISO),
         supabase.from('comments').select('id', { count: 'exact', head: true }).gte('created_at', weekAgoISO),
@@ -76,7 +76,7 @@ const GeneralStatsPanel: React.FC = () => {
 
       // Check for errors
       const results = [
-        usersResult, commentsResult, screenshotsResult, collectionsResult,
+        usersResult, commentsResult, screenshotsResult,
         newUsersResult, newPoisResult, newCommentsResult,
         deepDesertPoisResult, haggaBasinPoisResult
       ];
@@ -96,7 +96,6 @@ const GeneralStatsPanel: React.FC = () => {
         totalUsers: usersResult.count || 0,
         totalComments: commentsResult.count || 0,
         totalScreenshots: (screenshotsResult.count || 0) + (poiScreenshotsCount || 0),
-        totalCollections: collectionsResult.count || 0,
         weeklyGrowth: {
           newUsers: newUsersResult.count || 0,
           newPois: newPoisResult.count || 0,
@@ -165,8 +164,8 @@ const GeneralStatsPanel: React.FC = () => {
           </h3>
         </div>
 
-        {/* Main Community Stats - 5 Column Layout */}
-        <div className="grid grid-cols-5 gap-2 mb-4">
+        {/* Main Community Stats - 4 Column Layout */}
+        <div className="grid grid-cols-4 gap-2 mb-4">
           <StatCard
             title="Total Users"
             value={stats.totalUsers}
@@ -199,14 +198,6 @@ const GeneralStatsPanel: React.FC = () => {
             icon={MapPin}
             color="orange"
             trend={stats.weeklyGrowth.newPois > 0 ? { direction: 'up', value: `+${stats.weeklyGrowth.newPois}` } : undefined}
-          />
-
-          <StatCard
-            title="Collections"
-            value={stats.totalCollections}
-            subtitle="POI collections"
-            icon={BarChart3}
-            color="indigo"
           />
         </div>
 

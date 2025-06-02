@@ -135,9 +135,9 @@ const AppRoutes: React.FC = () => {
       <Route 
         path="/database" 
         element={
-          <ProtectedRoute>
+          <AdminRoute>
             <ItemsSchematicsPage />
-          </ProtectedRoute>
+          </AdminRoute>
         } 
       />
       <Route 
@@ -188,7 +188,7 @@ function App() {
         <div 
           className="min-h-screen flex flex-col bg-center bg-cover bg-no-repeat"
           style={{
-            backgroundImage: 'url(/images/main-bg.jpg)',
+            backgroundImage: 'url(/images/main-bg.webp)',
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             backgroundAttachment: 'fixed'

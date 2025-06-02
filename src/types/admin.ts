@@ -43,7 +43,7 @@ export interface StoredBackupFile {
       grid_screenshots?: number;
       poi_screenshots?: number;
       comment_screenshots?: number;
-      custom_icons?: number;
+    
     };
   };
 }

@@ -7,6 +7,7 @@ interface AuthContextType {
   isLoading: boolean;
   error: string | null;
   setError: (error: string | null) => void;
+  signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -222,8 +223,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const signIn = async (email: string, password: string) => {
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      const { data, error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (authError) {
+        // Check if it's an invalid credentials error
+        if (authError.message.includes('Invalid login credentials') || 
+            authError.message.includes('Email not confirmed') ||
+            authError.message.includes('User not found')) {
+          throw new Error('Invalid email or password. Please check your credentials or try signing in with Discord.');
+        }
+        throw authError;
+      }
+
+      if (!data.user) {
+        throw new Error('Authentication failed. Please try again.');
+      }
+
+      // The auth state change will be handled by the listener
+      // which will call handleAuthStateChange and set up the user profile
+    } catch (err: any) {
+      console.error('Email sign in error:', err);
+      setError(err.message || 'Failed to sign in. Please try again.');
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, error, setError, signOut, refreshUser }}>
+    <AuthContext.Provider value={{ user, isLoading, error, setError, signIn, signOut, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

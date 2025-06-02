@@ -24,7 +24,7 @@ const Auth: React.FC = () => {
       <div 
         className="fixed inset-0 bg-cover bg-center bg-no-repeat"
         style={{
-          backgroundImage: `url(/images/main-bg.jpg)`
+                      backgroundImage: `url(/images/main-bg.webp)`
         }}
       />
       

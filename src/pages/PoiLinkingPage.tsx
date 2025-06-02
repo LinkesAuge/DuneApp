@@ -7,7 +7,7 @@ import { useAuth } from '../components/auth/AuthProvider';
 import { supabase } from '../lib/supabase';
 import InteractiveMap from '../components/hagga-basin/InteractiveMap';
 import DeepDesertSelectionMode from '../components/poi-linking/DeepDesertSelectionMode';
-import type { Poi, PoiType, Item, Schematic, HaggaBasinBaseMap, CustomIcon, GridSquare } from '../types';
+import type { Poi, PoiType, Item, Schematic, HaggaBasinBaseMap, GridSquare } from '../types';
 
 interface PoiFilters {
   searchTerm: string;
@@ -67,7 +67,7 @@ const PoiLinkingPage: React.FC = () => {
   
   // Map-specific data
   const [baseMap, setBaseMap] = useState<HaggaBasinBaseMap | null>(null);
-  const [customIcons, setCustomIcons] = useState<CustomIcon[]>([]);
+
   const [allGridSquares, setAllGridSquares] = useState<GridSquare[]>([]);
   
   // UI state
@@ -180,7 +180,7 @@ const PoiLinkingPage: React.FC = () => {
             poi_type_id,
             created_by,
             privacy_level,
-            custom_icon_id,
+
             screenshots,
             poi_types!inner (
               id,
@@ -226,15 +226,7 @@ const PoiLinkingPage: React.FC = () => {
           console.warn('No base map found, using fallback');
         }
 
-        // Fetch custom icons
-        const { data: iconsData, error: iconsError } = await supabase
-          .from('custom_icons')
-          .select('*')
-          .order('name');
 
-        if (iconsError) {
-          console.warn('Error fetching custom icons:', iconsError);
-        }
 
         // Fetch all grid squares for Deep Desert minimap
         const { data: gridSquaresData, error: gridSquaresError } = await supabase
@@ -249,7 +241,7 @@ const PoiLinkingPage: React.FC = () => {
         setPois(poisWithTransformedScreenshots);
         setPoiTypes(typesData || []);
         setBaseMap(baseMapData || null);
-        setCustomIcons(iconsData || []);
+
         setAllGridSquares(gridSquaresData || []);
 
         // Fetch existing links for this entity
@@ -749,7 +741,7 @@ const PoiLinkingPage: React.FC = () => {
                         overlays={[]}
                         pois={filteredPois}
                         poiTypes={poiTypes}
-                        customIcons={customIcons}
+
                         onPoiClick={handleMapPoiClick}
                         selectedPoiIds={selectedPoiIds}
                         selectionMode={true}
@@ -787,7 +779,7 @@ const PoiLinkingPage: React.FC = () => {
                   allGridSquares={allGridSquares}
                   pois={pois}
                   poiTypes={poiTypes}
-                  customIcons={customIcons}
+
                   selectedPoiIds={selectedPoiIds}
                   onPoiSelect={handlePoiSelect}
                   onPoiDeselect={handlePoiDeselect}

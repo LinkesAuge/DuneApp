@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Users, Pencil, Trash2, RefreshCw, Shield, AlertCircle, Award } from 'lucide-react';
+import { Users, Pencil, Trash2, RefreshCw, Shield, AlertCircle } from 'lucide-react';
 import { Profile, UserRole } from '../../types/admin';
-import { Rank } from '../../types/profile';
+import { Rank, EnhancedProfile } from '../../types/profile';
 import UserAvatar from '../common/UserAvatar';
+import RankBadge from '../common/RankBadge';
 
 interface UserManagementProps {
   profiles: Profile[];
@@ -185,8 +186,6 @@ const UserManagement: React.FC<UserManagementProps> = ({
   };
 
   const formatDate = (dateString: string | null | undefined): string => {
-
-    
     if (!dateString) {
       console.warn('Date string is null or undefined:', dateString);
       return 'Unknown';
@@ -217,7 +216,6 @@ const UserManagement: React.FC<UserManagementProps> = ({
         hour: '2-digit',
         minute: '2-digit'
       }).format(date);
-      
   
       return `${berlinTime} (Berlin Time)`;
     } catch (error) {
@@ -239,30 +237,7 @@ const UserManagement: React.FC<UserManagementProps> = ({
     }
   };
 
-  // Rank Badge Component
-  const RankBadge: React.FC<{ rank?: Rank | null; className?: string }> = ({ rank, className = '' }) => {
-    if (!rank) {
-      return (
-        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-900/50 text-gray-400 border border-gray-600/40 ${className}`}>
-          No rank
-        </span>
-      );
-    }
 
-    return (
-      <span 
-        className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${className}`}
-        style={{ 
-          backgroundColor: rank.color, 
-          color: rank.text_color,
-          border: `1px solid ${rank.color}40`
-        }}
-      >
-        <Award className="w-3 h-3 mr-1" />
-        {rank.name}
-      </span>
-    );
-  };
 
   if (isLoading) {
     return (
@@ -377,7 +352,7 @@ const UserManagement: React.FC<UserManagementProps> = ({
                           </span>
                           <span className="text-amber-200/50 text-xs"
                                 style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-                            Joined {new Date(profile.created_at).toLocaleDateString()}
+                            Joined {formatDate(profile.created_at)}
                           </span>
                         </div>
                         
@@ -398,13 +373,7 @@ const UserManagement: React.FC<UserManagementProps> = ({
                           </span>
                           
                           {profile.rank && (
-                            <div className="flex items-center space-x-2 px-3 py-1 rounded-full border border-purple-300/30 bg-purple-300/10">
-                              <Award size={12} className="text-purple-300" />
-                              <span className="text-xs font-light text-purple-200 tracking-wide"
-                                    style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-                                {profile.rank.name}
-                              </span>
-                            </div>
+                            <RankBadge rank={profile.rank} size="xxs" />
                           )}
                         </div>
                       </div>

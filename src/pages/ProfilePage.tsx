@@ -171,7 +171,7 @@ const ProfilePage: React.FC = () => {
       <div className="min-h-screen">
         <div 
           className="fixed inset-0 bg-cover bg-center bg-no-repeat"
-          style={{ backgroundImage: `url(/images/main-bg.jpg)` }}
+          style={{ backgroundImage: `url(/images/main-bg.webp)` }}
         />
         <div className="relative z-10 backdrop-blur-sm bg-slate-950/20">
           <div className="container mx-auto px-6 py-8">
@@ -195,7 +195,7 @@ const ProfilePage: React.FC = () => {
       {/* Main background image */}
       <div 
         className="fixed inset-0 bg-cover bg-center bg-no-repeat"
-        style={{ backgroundImage: `url(/images/main-bg.jpg)` }}
+        style={{ backgroundImage: `url(/images/main-bg.webp)` }}
       />
       
       {/* Content with backdrop blur for readability */}

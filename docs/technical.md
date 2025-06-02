@@ -199,6 +199,10 @@ The project uses a **streamlined two-environment approach**: Local Development a
     http://localhost:5173/auth/callback
     http://localhost:5173/
     ```
+    
+    **Authentication Methods Enabled**:
+    - **Discord OAuth**: Primary registration method for new users
+    - **Email/Password**: Login-only for existing users (signup disabled)
 
 6.  **Run the development server**:
     ```bash
@@ -281,7 +285,82 @@ The project uses a **streamlined two-environment approach**: Local Development a
 -   **Event-driven architecture**: Efficient event cleanup and minimal re-renders for real-time updates.
 -   **Optimized rendering**: React memoization and component-level optimizations.
 
-## 7. Security Considerations
+## 7. Authentication System
+
+### 7.1. Dual Authentication Methods
+
+The application supports two authentication methods with different access levels:
+
+#### **Discord OAuth (Primary Registration)**
+- **Purpose**: New user registration and login
+- **Features**: 
+  - Automatic profile creation with Discord username and avatar
+  - Community-focused authentication for gaming platform
+  - Seamless integration with Discord ecosystem
+- **Implementation**: `DiscordSignInForm.tsx` with OAuth2 flow
+
+#### **Email/Password (Existing Users Only)**
+- **Purpose**: Alternative login method for users with existing accounts
+- **Restrictions**: 
+  - **No email signup** - registration disabled in Supabase Auth settings
+  - Only works for users who previously registered via Discord
+  - Cannot create new accounts through email
+- **Implementation**: `SignInForm.tsx` with `signInWithPassword()`
+
+### 7.2. Authentication Flow
+
+#### **New Users**
+1. Must use Discord OAuth to create account
+2. Profile automatically created in `profiles` table
+3. Can subsequently login via either Discord or email/password
+
+#### **Existing Users**
+1. Can choose between Discord OAuth or email/password
+2. Both methods access same user profile and permissions
+3. Profile data remains synchronized regardless of login method
+
+### 7.3. UI/UX Design
+
+#### **AuthTabs Component**
+- **Tab Interface**: Toggle between "Discord" and "Email" authentication
+- **Clear Messaging**: Explains registration vs login limitations
+- **Consistent Styling**: Matches application's Dune-inspired theme
+
+#### **User Guidance**
+- **Discord Tab**: "New users must register with Discord. Existing users can use either method."
+- **Email Tab**: "Email login is only available for existing users. New users must register with Discord."
+
+### 7.4. Technical Implementation
+
+#### **AuthProvider Enhancements**
+```typescript
+interface AuthContextType {
+  signIn: (email: string, password: string) => Promise<void>; // Added
+  signOut: () => Promise<void>;
+  refreshUser: () => Promise<void>;
+  // ... other methods
+}
+```
+
+#### **Error Handling**
+- Clear error messages for invalid credentials
+- Guidance to try Discord OAuth if email login fails
+- Proper validation and user feedback throughout
+
+### 7.5. Supabase Configuration
+
+#### **Auth Settings**
+- **Enable**: Email/Password authentication
+- **Disable**: Email signup (prevents new registrations)
+- **Enable**: Discord OAuth provider
+- **Configure**: Redirect URLs for both local and production
+
+#### **Database Integration**
+- Single `profiles` table handles both auth methods
+- Discord metadata preserved regardless of login method
+- Consistent user experience across authentication types
+
+## 8. Security Considerations
 
 -   Row Level Security (RLS) on all Supabase tables.
 -   Role-Based Access Control (RBAC).
@@ -290,37 +369,38 @@ The project uses a **streamlined two-environment approach**: Local Development a
 -   Admin-only access to sensitive database operations via Edge Functions.
 -   **Database operation safety**: UPSERT operations with conflict resolution prevent constraint violations.
 -   **File cleanup security**: Proper cleanup of both current and original files during deletion operations.
+-   **Authentication security**: Dual authentication methods with controlled registration access.
 
-## 8. Client-Side Image Processing
+## 9. Client-Side Image Processing
 
 -   **POI Icon Uploads**: In `PoiTypeManager.tsx`, when an admin uploads an image for a POI Type icon:
     -   The image is resized client-side to a maximum dimension of 48px (maintaining aspect ratio).
     -   The resized image is converted to PNG format before being uploaded to Supabase Storage.
     -   This reduces storage requirements and ensures a consistent format for icons.
 
-## 9. Enhanced Screenshot Management System
+## 10. Enhanced Screenshot Management System
 
-### 9.1. Screenshot Upload & Crop Operations
+### 10.1. Screenshot Upload & Crop Operations
 -   **UPSERT Operations**: All screenshot upload operations use `supabase.from('grid_squares').upsert()` with `onConflict: 'coordinate'` to handle both new and existing grid squares safely.
 -   **Exploration Tracking**: Automatic `is_explored: true` setting during all upload and crop operations.
 -   **File Management**: Comprehensive handling of both original and cropped screenshot files with proper cleanup.
 
-### 9.2. Screenshot Deletion Workflow
+### 10.2. Screenshot Deletion Workflow
 1. **File Storage Cleanup**: Removes both current screenshot and original files from Supabase Storage
 2. **Database Field Reset**: Sets all screenshot-related fields to null (`screenshot_url`, `original_screenshot_url`, crop data)
 3. **Exploration Status Update**: Marks grid as `is_explored: false` to remove from exploration progress
 4. **Global Event Broadcasting**: Notifies dashboard components of exploration change via custom browser events
 5. **UI State Synchronization**: Grid squares return to proper empty state styling with sand-200 background
 
-### 9.3. Real-time Progress System
+### 10.3. Real-time Progress System
 -   **Event Sources**: Tracks 'crop', 'upload', 'recrop', 'delete' operations through global event system
 -   **Component Listeners**: Dashboard components (ExplorationProgress, StatisticsCards, RegionalStatsPanel) automatically refresh on changes
 -   **Performance Optimized**: Efficient event cleanup with minimal component re-renders
 -   **Debug Support**: Console logging for troubleshooting exploration updates
 
-## 10. Grammar Correction System
+## 11. Grammar Correction System
 
-### 10.1. Date/Time Grammar Utility
+### 11.1. Date/Time Grammar Utility
 -   **Function**: `formatDateWithPreposition()` in `src/lib/dateUtils.ts`
 -   **Purpose**: Smart grammar detection for relative time vs actual dates
 -   **Implementation**: 
@@ -329,7 +409,7 @@ The project uses a **streamlined two-environment approach**: Local Development a
     - Maintains "on" for actual dates like "on January 27, 2025"
 -   **Components Using**: HaggaBasinPoiCard, PoiCard, CommentItem
 
-### 10.2. Professional Text Standards
+### 11.2. Professional Text Standards
 -   All user-facing date/time text now uses grammatically correct English
 -   Consistent application across all metadata display components
 -   Enhanced perceived professionalism of the application

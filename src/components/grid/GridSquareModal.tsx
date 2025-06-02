@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
-import { GridSquare as GridSquareType, Poi, PoiType, CustomIcon } from '../../types';
+import { GridSquare as GridSquareType, Poi, PoiType } from '../../types';
 import { useAuth } from '../auth/AuthProvider';
+import { uploadImageWithConversion, UploadResult } from '../../lib/imageUpload';
+import { formatConversionStats } from '../../lib/imageUtils';
 import { Upload, X, Plus, Image, Trash2, Clock, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Target, Edit, Check, MapPin } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import AddPoiForm from '../poi/AddPoiForm';
@@ -13,6 +15,9 @@ import POICard from '../common/POICard';
 import { PixelCrop } from 'react-image-crop';
 import { broadcastExplorationChange } from '../../lib/explorationEvents';
 import POIPreviewCard from '../common/POIPreviewCard';
+import { Rank } from '../../types/profile';
+import { uploadPoiScreenshot } from '../../lib/imageUpload';
+import { toast } from 'react-hot-toast';
 
 interface GridSquareModalProps {
   square: GridSquareType;
@@ -47,13 +52,21 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
   const [isUploading, setIsUploading] = useState(false);
   const [pois, setPois] = useState<Poi[]>([]);
   const [poiTypes, setPoiTypes] = useState<PoiType[]>([]);
-  const [customIcons, setCustomIcons] = useState<CustomIcon[]>([]);
-  const [userInfo, setUserInfo] = useState<Record<string, { username: string; display_name?: string | null; custom_avatar_url?: string | null; discord_avatar_url?: string | null; use_discord_avatar?: boolean }>>({});
+
+  const [userInfo, setUserInfo] = useState<Record<string, { 
+    username: string; 
+    display_name?: string | null; 
+    custom_avatar_url?: string | null; 
+    discord_avatar_url?: string | null; 
+    use_discord_avatar?: boolean;
+    rank?: Rank | null;
+  }>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [showAddPoiForm, setShowAddPoiForm] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [uploaderInfo, setUploaderInfo] = useState<{ username: string } | null>(null);
+  const [conversionStats, setConversionStats] = useState<string | null>(null);
+  const [uploaderInfo, setUploaderInfo] = useState<{ username: string; rank?: Rank | null } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
   const [currentSquare, setCurrentSquare] = useState<GridSquareType>(square);
@@ -101,6 +114,13 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
       return () => clearTimeout(timer);
     }
   }, [success]);
+
+  useEffect(() => {
+    if (conversionStats) {
+      const timer = setTimeout(() => setConversionStats(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [conversionStats]);
 
   const fetchGridSquare = async (coordinate: string) => {
     setIsLoading(true);
@@ -157,7 +177,7 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
       
       try {
         // Fetch POIs, POI types, and custom icons
-        const [poisResult, typesResult, customIconsResult] = await Promise.all([
+        const [poisResult, typesResult] = await Promise.all([
           supabase
             .from('pois')
             .select('*')
@@ -166,22 +186,17 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
           supabase
             .from('poi_types')
             .select('*')
-            .order('category', { ascending: true }),
-          supabase
-            .from('custom_icons')
-            .select('*')
-            .order('name', { ascending: true })
+            .order('category', { ascending: true })
         ]);
 
         if (poisResult.error) throw poisResult.error;
         if (typesResult.error) throw typesResult.error;
-        if (customIconsResult.error) throw customIconsResult.error;
 
-        // If there's an uploader, fetch their username
+        // If there's an uploader, fetch their username and rank
         if (currentSquare.uploaded_by) {
           const { data: uploaderData, error: uploaderError } = await supabase
             .from('profiles')
-            .select('username')
+            .select('username, rank:ranks(*)')
             .eq('id', currentSquare.uploaded_by)
             .single();
 
@@ -193,14 +208,13 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
         if (isMounted) {
           setPois(poisResult.data || []);
           setPoiTypes(typesResult.data || []);
-          setCustomIcons(customIconsResult.data || []);
           
           // Fetch user information for POI creators - Filter out null values to avoid UUID errors
           const userIds = [...new Set((poisResult.data || []).map(poi => poi.created_by).filter(id => id !== null && id !== undefined))];
           if (userIds.length > 0) {
             const { data: userProfiles, error: userError } = await supabase
               .from('profiles')
-              .select('id, username, display_name, custom_avatar_url, discord_avatar_url, use_discord_avatar')
+              .select('id, username, display_name, custom_avatar_url, discord_avatar_url, use_discord_avatar, rank:ranks(*)')
               .in('id', userIds);
             
             if (!userError && userProfiles) {
@@ -210,10 +224,18 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
                   display_name: profile.display_name, 
                   custom_avatar_url: profile.custom_avatar_url, 
                   discord_avatar_url: profile.discord_avatar_url,
-                  use_discord_avatar: profile.use_discord_avatar
+                  use_discord_avatar: profile.use_discord_avatar,
+                  rank: profile.rank
                 };
                 return acc;
-              }, {} as Record<string, { username: string; display_name?: string | null; custom_avatar_url?: string | null; discord_avatar_url?: string | null; use_discord_avatar?: boolean }>);
+              }, {} as Record<string, { 
+                username: string; 
+                display_name?: string | null; 
+                custom_avatar_url?: string | null; 
+                discord_avatar_url?: string | null; 
+                use_discord_avatar?: boolean;
+                rank?: Rank | null;
+              }>);
               setUserInfo(userInfoMap);
             }
           } else {
@@ -280,29 +302,39 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !user) return;
+    if (!file) return;
 
     // Validate file type
-    if (!file.type.startsWith('image/')) {
-      setError('Please select an image file');
+    const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('Please upload a valid image file (PNG, JPEG, GIF, WebP)');
       return;
     }
 
-    // Validate file size (10MB limit)
-    if (file.size > 10 * 1024 * 1024) {
-      setError('Image file must be smaller than 10MB');
+    // Validate file size (5MB limit to account for conversion)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('File size should be less than 5MB');
       return;
     }
 
-    // Set up for cropping
+    setIsUploading(true);
+    
+    try {
+      // Store the original file for cropping workflow
     setTempImageFile(file);
-    setTempImageUrl(URL.createObjectURL(file));
+      
+      // Create local URL for preview in crop modal
+      const localUrl = URL.createObjectURL(file);
+      setTempImageUrl(localUrl);
     setIsEditingExisting(false);
     setShowCropModal(true);
 
-    // Clear the file input
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+      toast.success('Image loaded for cropping');
+    } catch (error: any) {
+      console.error('Error processing image:', error);
+      toast.error('Failed to process image: ' + error.message);
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -314,33 +346,27 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
     setError(null);
 
     try {
-      const fileExt = tempImageFile.name.split('.').pop();
       const timestamp = Date.now();
       
-      const originalFileName = `grid_originals/grid-${currentSquare.coordinate}-${timestamp}.${fileExt}`;
-      const { error: originalUploadError } = await supabase.storage
-        .from('screenshots')
-        .upload(originalFileName, tempImageFile, { upsert: true });
+      // Upload original file with WebP conversion
+      const originalFileName = `grid_originals/grid-${currentSquare.coordinate}-${timestamp}`;
+      const originalUploadResult = await uploadPoiScreenshot(tempImageFile, originalFileName);
 
-      if (originalUploadError) throw originalUploadError;
-      const { data: originalUrlData } = supabase.storage
-        .from('screenshots')
-        .getPublicUrl(originalFileName);
-
-      let finalScreenshotUrl = originalUrlData.publicUrl;
+      let finalScreenshotUrl = originalUploadResult.url;
       let dbCropDataToSet = {};
+      let croppedUploadResult: UploadResult | undefined;
 
       if (!isFullImage) {
-        const croppedFileName = `grid_cropped/grid-${currentSquare.coordinate}-${timestamp}.${fileExt}`;
-        const { error: croppedUploadError } = await supabase.storage
-          .from('screenshots')
-          .upload(croppedFileName, croppedImageBlob, { upsert: true });
-        if (croppedUploadError) throw croppedUploadError;
-
-        const { data: croppedUrlData } = supabase.storage
-          .from('screenshots')
-          .getPublicUrl(croppedFileName);
-        finalScreenshotUrl = croppedUrlData.publicUrl;
+        // Convert cropped blob to File for consistent processing
+        const croppedFile = new File([croppedImageBlob], `cropped-${tempImageFile.name}`, {
+          type: croppedImageBlob.type || 'image/png'
+        });
+        
+        // Upload cropped image with WebP conversion
+        const croppedFileName = `grid_cropped/grid-${currentSquare.coordinate}-${timestamp}`;
+        croppedUploadResult = await uploadPoiScreenshot(croppedFile, croppedFileName);
+        
+        finalScreenshotUrl = croppedUploadResult.url;
         dbCropDataToSet = {
           crop_x: Math.round(cropData.x),
           crop_y: Math.round(cropData.y),
@@ -364,7 +390,7 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
         .upsert({
           coordinate: currentSquare.coordinate,
           screenshot_url: finalScreenshotUrl, // This is the cropped or original if isFullImage
-          original_screenshot_url: originalUrlData.publicUrl, // This is always the original
+          original_screenshot_url: originalUploadResult.url, // This is always the original
           ...dbCropDataToSet,
           uploaded_by: user.id,
           upload_date: new Date().toISOString(),
@@ -379,7 +405,24 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
 
       setCurrentSquare(data);
       onUpdate(data);
+      
+      // Show conversion feedback
+      let hasConversion = originalUploadResult.compressionRatio;
+      let statsToShow = originalUploadResult;
+      
+      // If we had a cropped upload, show those stats instead (more relevant to final result)
+      if (!isFullImage && croppedUploadResult?.compressionRatio) {
+        hasConversion = croppedUploadResult.compressionRatio;
+        statsToShow = croppedUploadResult;
+      }
+      
+      if (hasConversion) {
+        const stats = formatConversionStats(statsToShow);
+        setConversionStats(stats);
+        setSuccess('Screenshot uploaded and optimized with WebP conversion');
+      } else {
       setSuccess('Screenshot uploaded successfully');
+      }
       
       // Broadcast exploration status change globally
       broadcastExplorationChange({
@@ -417,28 +460,18 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
     setError(null);
 
     try {
-      const fileExt = tempImageFile.name.split('.').pop();
-      const fileName = `grid-${currentSquare.coordinate}-${Date.now()}.${fileExt}`;
+      const fileName = `grid-${currentSquare.coordinate}-${Date.now()}`;
       
-      // Upload original file
-      const { error: uploadError } = await supabase.storage
-        .from('screenshots')
-        .upload(fileName, tempImageFile, { upsert: true });
-
-      if (uploadError) throw uploadError;
-
-      // Get public URL
-      const { data: publicUrlData } = supabase.storage
-        .from('screenshots')
-        .getPublicUrl(fileName);
+      // Upload original file with WebP conversion
+      const uploadResult = await uploadPoiScreenshot(tempImageFile, fileName);
 
       // Update grid square (no crop data, original and current URL are the same)
       const { data, error } = await supabase
         .from('grid_squares')
         .upsert({
           coordinate: currentSquare.coordinate,
-          screenshot_url: publicUrlData.publicUrl,
-          original_screenshot_url: publicUrlData.publicUrl,
+          screenshot_url: uploadResult.url,
+          original_screenshot_url: uploadResult.url,
           crop_x: null,
           crop_y: null,
           crop_width: null,
@@ -457,7 +490,15 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
 
       setCurrentSquare(data);
       onUpdate(data);
+      
+      // Show conversion feedback
+      if (uploadResult.compressionRatio) {
+        const stats = formatConversionStats(uploadResult);
+        setConversionStats(stats);
+        setSuccess('Screenshot uploaded and optimized with WebP conversion');
+      } else {
       setSuccess('Screenshot uploaded successfully!');
+      }
       
       // Broadcast exploration status change globally
       broadcastExplorationChange({
@@ -977,7 +1018,6 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
                     imageAlt={`Grid ${currentSquare.coordinate}`}
                     pois={pois}
                     poiTypes={poiTypes}
-                    customIcons={customIcons}
                     selectedPoiTypes={selectedPoiTypes}
                     onPoiCreated={handlePoiCreated}
                     onPoiDeleted={handleDeletePoi}
@@ -1013,9 +1053,25 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
                 accept="image/*" 
               />
                {uploaderInfo && (
-                <p className={`text-xs ${getThemedTextColor('muted')} pt-2`}>
-                  Uploaded by: <span className={getThemedTextColor('secondary')}>{uploaderInfo.username}</span> on {new Date(currentSquare.updated_at || currentSquare.created_at).toLocaleDateString()}
-                </p>
+                <div className={`text-xs ${getThemedTextColor('muted')} pt-2 flex items-center flex-wrap gap-1`}>
+                  <span>Uploaded by:</span>
+                  <span className={getThemedTextColor('secondary')}>{uploaderInfo.username}</span>
+                  {uploaderInfo.rank && (
+                    <span 
+                      className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium border"
+                      style={{ 
+                        backgroundColor: `${uploaderInfo.rank.color}20`,
+                        borderColor: `${uploaderInfo.rank.color}40`, 
+                        color: uploaderInfo.rank.text_color,
+                        fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif"
+                      }}
+                    >
+                      <Award className="w-2.5 h-2.5 mr-1" style={{ color: uploaderInfo.rank.text_color }} />
+                      {uploaderInfo.rank.name}
+                    </span>
+                  )}
+                  <span>on {new Date(currentSquare.updated_at || currentSquare.created_at).toLocaleDateString()}</span>
+                </div>
               )}
             </div>
 
@@ -1091,7 +1147,6 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
                           key={poi.id}
                           poi={poi}
                           poiType={poiType}
-                          customIcons={customIcons}
                           userInfo={userInfo}
                           layout="grid"
                           onClick={() => setSelectedPoiId(poi.id)}
@@ -1121,7 +1176,6 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
           <POICard
             poi={selectedPoi}
             poiType={selectedPoiType}
-            customIcons={customIcons}
             isOpen={true}
             onClose={() => setSelectedPoiId(null)}
             onEdit={() => {

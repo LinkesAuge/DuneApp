@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Upload, Image, CheckCircle } from 'lucide-react';
 import { useAuth } from '../auth/AuthProvider';
+import { uploadImageWithConversion } from '../../lib/imageUpload';
+import { formatConversionStats } from '../../lib/imageUtils';
 
 const BaseMapUploader: React.FC = () => {
   const { user } = useAuth();
@@ -9,6 +11,15 @@ const BaseMapUploader: React.FC = () => {
   const [uploading, setUploading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [conversionStats, setConversionStats] = useState<string | null>(null);
+
+  // Clear conversion stats after 5 seconds
+  useEffect(() => {
+    if (conversionStats) {
+      const timer = setTimeout(() => setConversionStats(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [conversionStats]);
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -38,25 +49,21 @@ const BaseMapUploader: React.FC = () => {
     setError(null);
 
     try {
-      // Upload image to storage
-      const fileExt = selectedFile.name.split('.').pop();
-      const fileName = `hagga-basin-base-map.${fileExt}`;
+      // Upload image with WebP conversion
+      const fileName = 'hagga-basin-base-map';
       
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('screenshots')
-        .upload(fileName, selectedFile, {
-          cacheControl: '3600',
-          upsert: true
-        });
+      const uploadResult = await uploadImageWithConversion(selectedFile, fileName, {
+        quality: 'high', // Use high quality for base maps
+        bucket: 'screenshots',
+        maxWidth: 4000,
+        maxHeight: 4000
+      });
 
-      if (uploadError) {
-        throw new Error(`Upload failed: ${uploadError.message}`);
+      // Show conversion feedback
+      if (uploadResult.compressionRatio) {
+        const stats = formatConversionStats(uploadResult);
+        setConversionStats(stats);
       }
-
-      // Get public URL
-      const { data: urlData } = supabase.storage
-        .from('screenshots')
-        .getPublicUrl(fileName);
 
       // Deactivate any existing base maps
       await supabase
@@ -70,7 +77,7 @@ const BaseMapUploader: React.FC = () => {
         .insert({
           name: 'Hagga Basin Official Map',
           description: 'Official map of the Hagga Basin region showing terrain features, landmarks, and accessible areas.',
-          image_url: urlData.publicUrl,
+          image_url: uploadResult.url,
           is_active: true,
           created_by: user.id
         });
@@ -103,6 +110,12 @@ const BaseMapUploader: React.FC = () => {
             <CheckCircle className="w-5 h-5 text-green-500 mr-2" />
             <span className="text-green-700">Base map uploaded successfully! Refresh the Hagga Basin page to see it.</span>
           </div>
+        </div>
+      )}
+
+      {conversionStats && (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <p className="text-blue-700">{conversionStats}</p>
         </div>
       )}
 

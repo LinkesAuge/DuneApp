@@ -16,8 +16,11 @@ import {
   EyeOff,
   FolderPlus, 
   Edit,
-  Circle 
+  Circle,
+  AlertTriangle 
 } from 'lucide-react';
+
+import { formatConversionStats } from '../../lib/imageUtils';
 
 const MAX_ICON_SIZE = 48;
 const POI_ICON_BUCKET = 'screenshots';
@@ -331,7 +334,7 @@ const DeleteModal: React.FC<{
 
   return (
     <div 
-      className="fixed inset-0 bg-night-950/90 backdrop-blur-sm flex items-center justify-center p-4 z-[9999]"
+      className="fixed inset-0 bg-night-950/90 backdrop-blur-sm flex items-center justify-center p-4 z-[10001]"
       onClick={onClose}
     >
       <div 
@@ -461,6 +464,7 @@ const PoiTypeManager: React.FC<PoiTypeManagerProps> = ({
   const [isUploading, setIsUploading] = useState(false);
   const [isEditingType, setIsEditingType] = useState(false);
   const [currentPoiType, setCurrentPoiType] = useState<PoiTypeFormData>(initialFormState);
+  const [conversionStats, setConversionStats] = useState<string | null>(null);
 
   // Modal states
   const [categoryEditModal, setCategoryEditModal] = useState<{
@@ -519,6 +523,14 @@ const PoiTypeManager: React.FC<PoiTypeManagerProps> = ({
       fetchData();
     }
   }, [externalPoiTypes]);
+
+  // Clear conversion stats after 5 seconds
+  useEffect(() => {
+    if (conversionStats) {
+      const timer = setTimeout(() => setConversionStats(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [conversionStats]);
 
   const processCategories = (types: PoiType[]) => {
     const categoryMap = new Map<string, PoiType[]>();
@@ -727,48 +739,7 @@ const PoiTypeManager: React.FC<PoiTypeManagerProps> = ({
     }
   };
 
-  const resizeImage = (file: File): Promise<Blob> => {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.src = URL.createObjectURL(file);
-      img.onload = () => {
-        URL.revokeObjectURL(img.src); 
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
 
-        if (!ctx) {
-          reject(new Error('Failed to get canvas context'));
-          return;
-        }
-
-        const maxSize = MAX_ICON_SIZE;
-        let { width, height } = img;
-
-        if (width > height) {
-          if (width > maxSize) {
-            height = (height * maxSize) / width;
-            width = maxSize;
-          }
-        } else {
-          if (height > maxSize) {
-            width = (width * maxSize) / height;
-            height = maxSize;
-          }
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-
-        ctx.drawImage(img, 0, 0, width, height);
-
-        canvas.toBlob((blob) => {
-          if (blob) resolve(blob);
-          else reject(new Error('Failed to create blob'));
-        }, 'image/png');
-      };
-      img.onerror = () => reject(new Error('Failed to load image'));
-    });
-  };
 
   const handleFileUpload = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -787,26 +758,16 @@ const PoiTypeManager: React.FC<PoiTypeManagerProps> = ({
 
     setIsUploading(true);
     try {
-      const resizedBlob = await resizeImage(file);
       const uniqueId = uuidv4();
-      const fileName = `${uniqueId}-${file.name}`;
-      const path = `${POI_ICON_FOLDER}/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from(POI_ICON_BUCKET)
-        .upload(path, resizedBlob, {
-          cacheControl: '3600',
-          upsert: false
-        });
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from(POI_ICON_BUCKET)
-        .getPublicUrl(path);
-
-      setCurrentPoiType(prev => ({ ...prev, icon: publicUrl }));
-      handleSuccess('Icon uploaded successfully!');
+      const fileName = `${uniqueId}-${file.name.replace(/\.[^/.]+$/, '.webp')}`;
+      
+      // Upload functionality removed - custom icon uploads disabled
+      
+      handleError('Icon upload functionality has been disabled');
+      
+      // Show success message without calling handleSuccess to avoid triggering external callbacks
+      // that might close the form during the editing process
+      toast.success('Icon uploaded successfully!');
     } catch (err: any) {
       console.error('Upload error:', err);
       handleError('Failed to upload icon: ' + err.message);
@@ -816,14 +777,29 @@ const PoiTypeManager: React.FC<PoiTypeManagerProps> = ({
   };
 
   const handlePoiTypeSubmit = async (e: FormEvent) => {
+    console.log('🚀 FORM SUBMIT TRIGGERED!', e); // First thing that should run
     e.preventDefault();
+    console.log('🔍 Current POI Type state:', currentPoiType); // Check form state
+    console.log('🔍 Required fields check:', {
+      name: currentPoiType.name,
+      icon: currentPoiType.icon,
+      category: currentPoiType.category,
+      allFilled: !(!currentPoiType.name || !currentPoiType.icon || !currentPoiType.category)
+    });
+    
     if (!currentPoiType.name || !currentPoiType.icon || !currentPoiType.category) {
+      console.log('❌ Validation failed - missing required fields');
       handleError('Please fill in all required fields');
       return;
     }
 
     setIsSubmitting(true);
+    console.log('Submitting POI type:', currentPoiType); // Debug log
+    
     try {
+      // Get category info for default display settings
+      const categoryData = categories.find(c => c.name === currentPoiType.category);
+      
       const submitData = {
         name: currentPoiType.name,
         icon: currentPoiType.icon,
@@ -832,29 +808,53 @@ const PoiTypeManager: React.FC<PoiTypeManagerProps> = ({
         default_description: currentPoiType.default_description || null,
         icon_has_transparent_background: currentPoiType.icon_has_transparent_background || false,
         created_by: null, // Admin-created types have null created_by
+        display_in_panel: categoryData?.displayInPanel || false,
+        category_display_order: categoryData?.displayOrder || 1,
+        category_column_preference: categoryData?.columnPreference || 1,
       };
 
+      console.log('Submit data:', submitData); // Debug log
+
       if (isEditingType && currentPoiType.id) {
-        const { error } = await supabase
+        console.log('Updating existing POI type:', currentPoiType.id); // Debug log
+        const { data, error } = await supabase
           .from('poi_types')
           .update(submitData)
-          .eq('id', currentPoiType.id);
+          .eq('id', currentPoiType.id)
+          .select(); // Return the updated record
 
-        if (error) throw error;
+        if (error) {
+          console.error('Update error:', error); // Debug log
+          throw error;
+        }
+        console.log('Update successful:', data); // Debug log
         handleSuccess('POI type updated successfully!');
       } else {
-        const { error } = await supabase
+        console.log('Creating new POI type'); // Debug log
+        const { data, error } = await supabase
           .from('poi_types')
-          .insert([submitData]);
+          .insert([submitData])
+          .select(); // Return the inserted record
 
-        if (error) throw error;
+        if (error) {
+          console.error('Insert error:', error); // Debug log
+          throw error;
+        }
+        console.log('Insert successful:', data); // Debug log
         handleSuccess('POI type created successfully!');
       }
 
+      console.log('Fetching updated data...'); // Debug log
       await fetchData();
       handlePoiTypeCancel();
     } catch (err: any) {
       console.error('Error saving POI type:', err);
+      console.error('Error details:', {
+        message: err.message,
+        details: err.details,
+        hint: err.hint,
+        code: err.code
+      }); // Detailed error logging
       handleError('Failed to save POI type: ' + err.message);
     } finally {
       setIsSubmitting(false);
@@ -1027,6 +1027,16 @@ const PoiTypeManager: React.FC<PoiTypeManagerProps> = ({
             Refresh
           </button>
           <button
+            onClick={() => {
+              setCurrentPoiType(initialFormState);
+              setIsEditingType(true);
+            }}
+            className="text-green-300 hover:text-green-200 transition-all duration-300 p-2 rounded-md border border-green-300/30 hover:border-green-200/40 hover:bg-green-200/10 flex items-center"
+          >
+            <Plus size={18} className="mr-2" />
+            Add New POI Type
+          </button>
+          <button
             onClick={handleAddNewCategory}
             className="text-purple-300 hover:text-purple-200 transition-all duration-300 p-2 rounded-md border border-purple-300/30 hover:border-purple-200/40 hover:bg-purple-200/10 flex items-center"
           >
@@ -1108,18 +1118,30 @@ const PoiTypeManager: React.FC<PoiTypeManagerProps> = ({
         </div>
       </div>
 
-      {/* POI Type Form */}
+      {/* POI Type Form Modal */}
       {isEditingType && (
-        <div className="relative p-6 rounded-lg border border-gold-400/40 bg-gold-950/30 backdrop-blur-md">
-          {/* Purple accent overlay */}
+        <div 
+          className="fixed inset-0 bg-night-950/90 backdrop-blur-sm flex items-center justify-center p-4 z-[10000]"
+          onClick={(e) => {
+            // Only close if clicking the backdrop, not the modal content
+            if (e.target === e.currentTarget) {
+              handlePoiTypeCancel();
+            }
+          }}
+        >
           <div 
-            className="absolute inset-0 rounded-lg opacity-20"
-            style={{
-              background: 'radial-gradient(ellipse at center top, rgba(139, 92, 246, 0.15) 0%, rgba(124, 58, 237, 0.08) 40%, transparent 70%)'
-            }}
-          />
-          
-          <div className="relative z-10">
+            className="relative max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 rounded-lg border border-gold-400/40 bg-gold-950/30 backdrop-blur-md"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Purple accent overlay */}
+            <div 
+              className="absolute inset-0 rounded-lg opacity-20"
+              style={{
+                background: 'radial-gradient(ellipse at center top, rgba(139, 92, 246, 0.15) 0%, rgba(124, 58, 237, 0.08) 40%, transparent 70%)'
+              }}
+            />
+            
+            <div className="relative z-10">
             <h5 className="text-lg font-light text-gold-300 mb-6 tracking-wide"
                 style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
               {currentPoiType.id ? 'Edit POI Type' : 'Create New POI Type'}
@@ -1278,6 +1300,15 @@ const PoiTypeManager: React.FC<PoiTypeManagerProps> = ({
                 </label>
               </div>
 
+              {/* Conversion Stats Display */}
+              {conversionStats && (
+                <div className="p-3 bg-green-900/30 border border-green-700/50 rounded-lg">
+                  <p className="text-green-300 text-sm">
+                    ✓ {conversionStats}
+                  </p>
+                </div>
+              )}
+
               {/* Action Buttons */}
               <div className="flex items-center justify-end space-x-4 pt-4 border-t border-gold-300/20">
                 <button
@@ -1292,6 +1323,7 @@ const PoiTypeManager: React.FC<PoiTypeManagerProps> = ({
                 <button
                   type="submit"
                   disabled={isSubmitting || isUploading || !currentPoiType.name || !currentPoiType.icon || !currentPoiType.category}
+                  onClick={() => console.log('🔍 Submit button clicked! Button disabled?', isSubmitting || isUploading || !currentPoiType.name || !currentPoiType.icon || !currentPoiType.category)}
                   className="px-6 py-3 bg-gold-300 hover:bg-amber-200 text-void-950 rounded 
                            disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300
                            flex items-center font-medium tracking-wide"
@@ -1306,6 +1338,7 @@ const PoiTypeManager: React.FC<PoiTypeManagerProps> = ({
                 </button>
               </div>
             </form>
+            </div>
           </div>
         </div>
       )}

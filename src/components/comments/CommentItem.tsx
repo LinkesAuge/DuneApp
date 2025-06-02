@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { CommentWithUser } from '../../types';
+import { Rank } from '../../types/profile';
 import { useAuth } from '../auth/AuthProvider';
 import { Clock, Edit2, Trash2, User, Eye, Paperclip, X, AlertTriangle, Edit } from 'lucide-react';
+import RankBadge from '../common/RankBadge';
 import LikeButton from '../common/LikeButton';
 import EmojiTextArea from '../common/EmojiTextArea';
 import ImageCropModal from '../grid/ImageCropModal';
@@ -10,6 +12,8 @@ import { formatDateWithPreposition, wasUpdated } from '../../lib/dateUtils';
 import { getScreenshotLabel } from '../../lib/cropUtils';
 import { PixelCrop } from 'react-image-crop';
 import { v4 as uuidv4 } from 'uuid';
+import { uploadCommentScreenshot } from '../../lib/imageUpload';
+import { formatConversionStats } from '../../lib/imageUtils';
 
 interface CommentItemProps {
   comment: CommentWithUser;
@@ -42,6 +46,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
   const [editContent, setEditContent] = useState(comment.content);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [conversionStats, setConversionStats] = useState<string | null>(null);
   const [editScreenshots, setEditScreenshots] = useState<ScreenshotFile[]>([]);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -51,8 +56,8 @@ const CommentItem: React.FC<CommentItemProps> = ({
   const [tempImageFile, setTempImageFile] = useState<File | null>(null);
   const [tempImageUrl, setTempImageUrl] = useState<string | null>(null);
 
-  const [creatorInfo, setCreatorInfo] = useState<{ username: string } | null>(null);
-  const [editorInfo, setEditorInfo] = useState<{ username: string } | null>(null);
+  const [creatorInfo, setCreatorInfo] = useState<{ username: string; rank?: Rank | null } | null>(null);
+  const [editorInfo, setEditorInfo] = useState<{ username: string; rank?: Rank | null } | null>(null);
   const [loadingUserInfo, setLoadingUserInfo] = useState(true);
 
   const [editingScreenshot, setEditingScreenshot] = useState<ScreenshotFile | null>(null);
@@ -72,7 +77,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
         
         const { data: userData, error } = await supabase
           .from('profiles')
-          .select('id, username')
+          .select('id, username, rank:ranks(*)')
           .in('id', userIds);
         
         if (error) throw error;
@@ -80,8 +85,8 @@ const CommentItem: React.FC<CommentItemProps> = ({
         const creatorData = userData?.find(u => u.id === comment.created_by);
         const editorData = userData?.find(u => u.id === comment.updated_by);
         
-        setCreatorInfo(creatorData ? { username: creatorData.username } : null);
-        setEditorInfo(editorData ? { username: editorData.username } : null);
+        setCreatorInfo(creatorData ? { username: creatorData.username, rank: creatorData.rank } : null);
+        setEditorInfo(editorData ? { username: editorData.username, rank: editorData.rank } : null);
       } catch (error) {
         console.error('Error fetching user info:', error);
       } finally {
@@ -314,22 +319,21 @@ const CommentItem: React.FC<CommentItemProps> = ({
 
       // 3. Handle new screenshots and edited screenshots
       const newAndEditedScreenshots = editScreenshots.filter(s => s.isNew && !s.markedForDeletion);
-      for (const screenshot of newAndEditedScreenshots) {
+      for (let i = 0; i < newAndEditedScreenshots.length; i++) {
+        const screenshot = newAndEditedScreenshots[i];
         if (screenshot.file) {
-          const fileName = `${user.id}/${uuidv4()}-${screenshot.file.name}`;
-          const filePath = `comment-screenshots/${fileName}`;
+          const fileName = `${user.id}/${uuidv4()}-${screenshot.file.name.replace(/\.[^/.]+$/, '.webp')}`;
           
-          // Upload to Supabase Storage
-          const { data: uploadData, error: uploadError } = await supabase.storage
-            .from('screenshots')
-            .upload(filePath, screenshot.file);
+          const uploadResult = await uploadCommentScreenshot(screenshot.file, fileName);
+          
+          // Show conversion feedback for first upload
+          if (i === 0 && uploadResult.compressionRatio) {
+            const stats = formatConversionStats(uploadResult);
+            setConversionStats(stats);
 
-          if (uploadError) throw uploadError;
-
-          // Get public URL
-          const { data: urlData } = supabase.storage
-            .from('screenshots')
-            .getPublicUrl(filePath);
+            // Clear stats after 5 seconds
+            setTimeout(() => setConversionStats(null), 5000);
+          }
 
           // Check if this is editing an existing screenshot (has existing ID from original)
           const existingScreenshot = comment.screenshots?.find(s => s.id === screenshot.id);
@@ -339,7 +343,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
             const { error: screenshotError } = await supabase
               .from('comment_screenshots')
               .update({
-                url: urlData.publicUrl,
+                url: uploadResult.url,
                 file_size: screenshot.file.size,
                 file_name: screenshot.file.name,
                 upload_date: new Date().toISOString()
@@ -349,7 +353,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
             if (screenshotError) throw screenshotError;
 
             // Delete old file from storage if URL is different
-            if (existingScreenshot.url !== urlData.publicUrl) {
+            if (existingScreenshot.url !== uploadResult.url) {
               try {
                 const oldUrl = new URL(existingScreenshot.url);
                 const oldPathParts = oldUrl.pathname.split('/');
@@ -369,7 +373,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
               .from('comment_screenshots')
               .insert({
                 comment_id: comment.id,
-                url: urlData.publicUrl,
+                url: uploadResult.url,
                 uploaded_by: user.id,
                 file_size: screenshot.file.size,
                 file_name: screenshot.file.name
@@ -451,6 +455,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 flex-wrap">
               <span 
                 className="font-semibold text-amber-300 hover:underline cursor-pointer truncate"
                 onClick={() => onShouldNavigate && onShouldNavigate(`/profile/${comment.created_by}`)}
@@ -458,6 +463,10 @@ const CommentItem: React.FC<CommentItemProps> = ({
               >
                 {loadingUserInfo ? 'Loading...' : creatorInfo?.username || 'Unknown User'}
               </span>
+                {creatorInfo?.rank && (
+                  <RankBadge rank={creatorInfo.rank} size="xxs" />
+                )}
+              </div>
               <div className="flex items-center space-x-2 flex-shrink-0">
                 {canEdit && (
                   <button onClick={() => setIsEditing(true)} className="p-1 text-slate-400 hover:text-amber-200 transition-colors">

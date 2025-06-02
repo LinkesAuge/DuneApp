@@ -2,14 +2,14 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useParams, useNavigate, Navigate, useSearchParams } from 'react-router-dom';
 import { TransformWrapper, TransformComponent, ReactZoomPanPinchRef } from 'react-zoom-pan-pinch';
 import { supabase } from '../lib/supabase';
-import { GridSquare, Poi, PoiType, CustomIcon, PixelCoordinates, PoiCollection } from '../types';
+import { GridSquare, Poi, PoiType, PixelCoordinates } from '../types';
 import { ArrowLeft, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Upload, Image, Plus, MapPin, Target, ZoomIn, ZoomOut, RotateCcw, Filter, Settings, FolderOpen, Share, Edit, Eye, Lock, Users, HelpCircle, Map, ArrowUp, BarChart3, Grid3X3 } from 'lucide-react';
 import POIPlacementModal from '../components/hagga-basin/POIPlacementModal';
 import POIEditModal from '../components/hagga-basin/POIEditModal';
 import SharePoiModal from '../components/hagga-basin/SharePoiModal';
 import GridGallery from '../components/grid/GridGallery';
-import CollectionModal from '../components/hagga-basin/CollectionModal';
-import CustomPoiTypeModal from '../components/hagga-basin/CustomPoiTypeModal';
+import { ConfirmationModal } from '../components/shared/ConfirmationModal';
+
 import MapPOIMarker from '../components/hagga-basin/MapPOIMarker';
 import { useAuth } from '../components/auth/AuthProvider';
 import { gridDisplayVariations } from '../lib/coordinates';
@@ -24,6 +24,8 @@ import GridSquareModal from '../components/grid/GridSquareModal';
 import { getMapDisplayInfo } from '../lib/coordinates';
 import MapControlPanel from '../components/common/MapControlPanel';
 import POIPanel from '../components/common/POIPanel';
+import { uploadImageWithConversion } from '../lib/imageUpload';
+import { formatConversionStats } from '../lib/imageUtils';
 
 // Grid validation: A1-I9 pattern
 const VALID_GRID_PATTERN = /^[A-I][1-9]$/;
@@ -57,8 +59,7 @@ const GridPage: React.FC = () => {
   const [allGridSquares, setAllGridSquares] = useState<GridSquare[]>([]); // NEW: All grid squares for minimap
   const [pois, setPois] = useState<Poi[]>([]);
   const [poiTypes, setPoiTypes] = useState<PoiType[]>([]);
-  const [customIcons, setCustomIcons] = useState<CustomIcon[]>([]);
-  const [collections, setCollections] = useState<PoiCollection[]>([]);
+
   const [userInfo, setUserInfo] = useState<{ [key: string]: { username: string; display_name?: string | null; custom_avatar_url?: string | null; discord_avatar_url?: string | null; use_discord_avatar?: boolean } }>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -69,7 +70,7 @@ const GridPage: React.FC = () => {
   const [showMiniMap, setShowMiniMap] = useState(true);
 
   // Sidebar tab state
-  const [activeTab, setActiveTab] = useState<'filters' | 'customization' | 'layers'>('filters');
+  const [activeTab, setActiveTab] = useState<'filters' | 'layers'>('filters');
 
   // Filter state - Same as Hagga Basin  
   const [selectedPoiTypes, setSelectedPoiTypes] = useState<string[]>([]);
@@ -94,11 +95,8 @@ const GridPage: React.FC = () => {
   const [editingPoi, setEditingPoi] = useState<Poi | null>(null);
 
   // Modal state - Same as Hagga Basin
-  const [showCollectionModal, setShowCollectionModal] = useState(false);
-  const [showCustomPoiTypeModal, setShowCustomPoiTypeModal] = useState(false);
   const [showSharePoiModal, setShowSharePoiModal] = useState(false);
   const [selectedPoiForShare, setSelectedPoiForShare] = useState<Poi | null>(null);
-  const [editingPoiType, setEditingPoiType] = useState<PoiType | null>(null);
 
   // Gallery state
   const [showGallery, setShowGallery] = useState(false);
@@ -110,6 +108,10 @@ const GridPage: React.FC = () => {
 
   // Highlighted POI state for navigation focus
   const [highlightedPoiId, setHighlightedPoiId] = useState<string | null>(null);
+  
+  // Confirmation modal state for POI deletion
+  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  const [poiToDelete, setPoiToDelete] = useState<Poi | null>(null);
   
   // Set highlighted POI from URL parameter
   useEffect(() => {
@@ -145,6 +147,7 @@ const GridPage: React.FC = () => {
   const [tempImageFile, setTempImageFile] = useState<File | null>(null);
   const [tempImageUrl, setTempImageUrl] = useState<string | null>(null);
   const [isEditingExisting, setIsEditingExisting] = useState(false);
+  const [conversionStats, setConversionStats] = useState<string | null>(null);
 
   // Calculate adjacent grids for navigation with wrap-around
   const getAdjacentGrids = (currentGrid: string) => {
@@ -191,6 +194,14 @@ const GridPage: React.FC = () => {
       window.removeEventListener('adminDataUpdated', handleAdminDataUpdate);
     };
   }, []);
+
+  // Clear conversion stats after 5 seconds
+  useEffect(() => {
+    if (conversionStats) {
+      const timer = setTimeout(() => setConversionStats(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [conversionStats]);
 
   // Load map settings for base categories
   useEffect(() => {
@@ -255,8 +266,7 @@ const GridPage: React.FC = () => {
     });
   };
 
-  // Get user-created POI types for display in customization tab
-  const userCreatedPoiTypes = poiTypes.filter(type => type.created_by === user?.id);
+
 
   // Handle category toggle - Same as Hagga Basin  
   const handleCategoryToggle = (category: string, checked: boolean) => {
@@ -343,7 +353,7 @@ const GridPage: React.FC = () => {
       const { data, error } = await supabase
         .from('app_settings')
         .select('setting_value')
-        .eq('setting_key', 'deep_desert_settings')
+        .eq('setting_key', 'map_settings')
         .single();
 
       if (error && error.code !== 'PGRST116') throw error; // Ignore "not found" errors
@@ -357,40 +367,7 @@ const GridPage: React.FC = () => {
     }
   };
 
-  // Fetch functions - Extended from Hagga Basin pattern
-  const fetchCollections = async () => {
-    if (!user) return;
 
-    const { data, error } = await supabase
-      .from('poi_collections')
-      .select('*')
-      .or(`created_by.eq.${user.id},is_public.eq.true`)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('Error fetching collections:', error);
-      throw error;
-    }
-
-    setCollections(data || []);
-  };
-
-  const fetchCustomIcons = async () => {
-    if (!user) return;
-
-    const { data, error } = await supabase
-      .from('custom_icons')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('Error fetching custom icons:', error);
-      throw error;
-    }
-
-    setCustomIcons(data || []);
-  };
 
   const fetchUserInfo = async (pois: Poi[]) => {
     if (pois.length === 0) return;
@@ -427,24 +404,7 @@ const GridPage: React.FC = () => {
     setUserInfo(userInfoMap);
   };
 
-  // Handle custom POI type updates - Same as Hagga Basin
-  const handleCustomPoiTypeCreated = (newPoiType: PoiType) => {
-    setPoiTypes(prev => [newPoiType, ...prev]);
-  };
 
-  const handleCustomPoiTypeDeleted = (poiTypeId: string) => {
-    setPoiTypes(prev => prev.filter(type => type.id !== poiTypeId));
-  };
-
-  const handleCustomPoiTypeUpdated = (updatedPoiType: PoiType) => {
-    setPoiTypes(prev => prev.map(type => type.id === updatedPoiType.id ? updatedPoiType : type));
-    setEditingPoiType(null);
-  };
-
-  const handleCustomPoiTypeEdit = (poiType: PoiType) => {
-    setEditingPoiType(poiType);
-    setShowCustomPoiTypeModal(true);
-  };
 
   // Handle POI sharing - Same as Hagga Basin
   const handlePoiShare = (poi: Poi) => {
@@ -613,25 +573,15 @@ const GridPage: React.FC = () => {
     }, 6000);
   };
 
-  // Handle POI click (same as Hagga Basin)
+  // Handle POI click - only opens modal, no highlighting effect
   const handlePoiClick = (poi: Poi, event: React.MouseEvent) => {
     event.preventDefault();
     event.stopPropagation();
     console.log('GridPage handlePoiClick called for POI:', poi.title, 'coordinates:', poi.coordinates_x, poi.coordinates_y);
-    console.log('GridPage: Setting selectedPoi and highlightedPoiId to:', poi.id);
     
-    // Open the POI details modal
+    // Open the POI details modal only
     setSelectedPoi(poi);
-    
-    // Also highlight the POI with pulsing animation
-    setHighlightedPoiId(poi.id);
-    console.log('GridPage: Set selectedPoi and highlightedPoiId to:', poi.id);
-    
-    // Remove highlight after 6 seconds
-    setTimeout(() => {
-      setHighlightedPoiId(null);
-      console.log('GridPage: Cleared highlightedPoiId');
-    }, 6000);
+    console.log('GridPage: Set selectedPoi to:', poi.id);
   };
 
   // Handle POI editing
@@ -656,16 +606,23 @@ const GridPage: React.FC = () => {
     }
   };
 
-  // Handle POI deletion with storage cleanup
+  // Handle POI deletion request - shows confirmation first
   const handlePoiDelete = async (poiId: string) => {
-    try {
-      // First, get the POI data to extract screenshot URLs
-      const poiToDelete = pois.find(p => p.id === poiId);
-      if (!poiToDelete) {
+    const poi = pois.find(p => p.id === poiId);
+    if (!poi) {
         setError('POI not found');
         return;
       }
 
+    setPoiToDelete(poi);
+    setShowDeleteConfirmation(true);
+  };
+
+  // Perform actual POI deletion after confirmation
+  const performPoiDeletion = async () => {
+    if (!poiToDelete) return;
+    
+    try {
       // Collect screenshot files that need to be deleted
       const filesToDelete: string[] = [];
       if (poiToDelete.screenshots && Array.isArray(poiToDelete.screenshots)) {
@@ -681,7 +638,7 @@ const GridPage: React.FC = () => {
 
       // Delete screenshot files from storage first
       if (filesToDelete.length > 0) {
-        console.log(`Deleting ${filesToDelete.length} screenshot files for POI ${poiId}`);
+        console.log(`Deleting ${filesToDelete.length} screenshot files for POI ${poiToDelete.id}`);
         const { error: storageError } = await supabase.storage
           .from('screenshots')
           .remove(filesToDelete);
@@ -698,7 +655,7 @@ const GridPage: React.FC = () => {
       const { error } = await supabase
         .from('pois')
         .delete()
-        .eq('id', poiId);
+        .eq('id', poiToDelete.id);
 
       if (error) {
         console.error('Error deleting POI:', error);
@@ -707,14 +664,23 @@ const GridPage: React.FC = () => {
       }
 
       // Update local state to remove the deleted POI
-      setPois(prev => prev.filter(p => p.id !== poiId));
+      setPois(prev => prev.filter(p => p.id !== poiToDelete.id));
       
       // Clear any highlighted POI if it was the deleted one
-      if (selectedPoiId === poiId) {
+      if (selectedPoiId === poiToDelete.id) {
         setSelectedPoiId(null);
       }
 
+      // Close any open POI modal if it was the deleted POI
+      if (selectedPoi?.id === poiToDelete.id) {
+        setSelectedPoi(null);
+      }
+
       console.log('POI deleted successfully');
+      
+      // Close confirmation modal
+      setShowDeleteConfirmation(false);
+      setPoiToDelete(null);
     } catch (error) {
       console.error('Error in POI deletion:', error);
       setError('Failed to delete POI');
@@ -854,6 +820,7 @@ const GridPage: React.FC = () => {
         }
 
         // Fetch POIs for this grid (only if grid square exists in database)
+        // Uses RLS policies for privacy filtering - same as Hagga Basin
         let poisData = [];
         if (gridSquareData.id) {
           const { data, error: poisError } = await supabase
@@ -887,20 +854,8 @@ const GridPage: React.FC = () => {
         if (typesError) throw typesError;
         setPoiTypes(typesData || []);
 
-        // Fetch custom icons
-        const { data: iconsData, error: iconsError } = await supabase
-          .from('custom_icons')
-          .select('*')
-          .order('name', { ascending: true });
 
-        if (iconsError) throw iconsError;
-        setCustomIcons(iconsData || []);
 
-        // Fetch collections and custom icons like Hagga Basin
-        await Promise.all([
-          fetchCollections(),
-          fetchCustomIcons()
-        ]);
 
         // Fetch user info for POI creators
         await fetchUserInfo(poisData);
@@ -916,6 +871,130 @@ const GridPage: React.FC = () => {
 
     fetchGridData();
   }, [gridId, user]);
+
+  // Set up real-time subscriptions for POI changes - same as Hagga Basin
+  useEffect(() => {
+    console.log('[GridPage] Setting up real-time subscriptions for grid:', gridId);
+    
+    // Subscribe to POI table changes for this specific grid
+    const poiSubscription = supabase
+      .channel(`deep-desert-grid-${gridId}-pois`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
+          schema: 'public',
+          table: 'pois',
+          filter: `map_type=eq.deep_desert${gridSquare?.id ? `.and.grid_square_id=eq.${gridSquare.id}` : ''}` // Only this grid's POIs
+        },
+        async (payload) => {
+          console.log('[GridPage] Real-time POI change detected:', payload);
+          
+          if (payload.eventType === 'INSERT') {
+            const newPoi = payload.new as Poi;
+            console.log('[GridPage] Real-time INSERT - adding POI:', newPoi.id);
+            
+            // Only add if it belongs to this grid
+            if (newPoi.grid_square_id === gridSquare?.id) {
+              // Fetch complete POI data with relations
+              const { data: completePoiData, error } = await supabase
+                .from('pois')
+                .select(`
+                  *,
+                  poi_types (*),
+                  profiles (username)
+                `)
+                .eq('id', newPoi.id)
+                .single();
+              
+              if (!error && completePoiData) {
+                // Transform screenshots for compatibility
+                const transformedPoi = {
+                  ...completePoiData,
+                  screenshots: Array.isArray(completePoiData.screenshots) 
+                    ? completePoiData.screenshots.map((screenshot: any, index: number) => ({
+                        id: screenshot.id || `${completePoiData.id}_${index}`,
+                        url: screenshot.url || screenshot,
+                        uploaded_by: screenshot.uploaded_by || completePoiData.created_by,
+                        upload_date: screenshot.upload_date || completePoiData.created_at
+                      }))
+                    : []
+                };
+                
+                setPois(prev => {
+                  // Check if POI already exists (to avoid duplicates)
+                  const exists = prev.some(p => p.id === transformedPoi.id);
+                  if (exists) {
+                    console.log('[GridPage] POI already exists, skipping insert');
+                    return prev;
+                  }
+                  console.log('[GridPage] Adding new POI to state');
+                  return [transformedPoi, ...prev];
+                });
+              }
+            }
+          } 
+          else if (payload.eventType === 'UPDATE') {
+            const updatedPoi = payload.new as Poi;
+            console.log('[GridPage] Real-time UPDATE - updating POI:', updatedPoi.id);
+            
+            // Fetch complete updated POI data with relations
+            const { data: completePoiData, error } = await supabase
+              .from('pois')
+              .select(`
+                *,
+                poi_types (*),
+                profiles (username)
+              `)
+              .eq('id', updatedPoi.id)
+              .single();
+            
+            if (!error && completePoiData) {
+              // Transform screenshots for compatibility
+              const transformedPoi = {
+                ...completePoiData,
+                screenshots: Array.isArray(completePoiData.screenshots) 
+                  ? completePoiData.screenshots.map((screenshot: any, index: number) => ({
+                      id: screenshot.id || `${completePoiData.id}_${index}`,
+                      url: screenshot.url || screenshot,
+                      uploaded_by: screenshot.uploaded_by || completePoiData.created_by,
+                      upload_date: screenshot.upload_date || completePoiData.created_at
+                    }))
+                  : []
+              };
+              
+              setPois(prev => {
+                // Check if POI belongs to this grid
+                if (transformedPoi.grid_square_id === gridSquare?.id) {
+                  console.log('[GridPage] Updating POI in state');
+                  return prev.map(p => p.id === transformedPoi.id ? transformedPoi : p);
+                } else {
+                  // POI was moved to another grid, remove it
+                  console.log('[GridPage] POI moved to another grid, removing from state');
+                  return prev.filter(p => p.id !== transformedPoi.id);
+                }
+              });
+            }
+          }
+          else if (payload.eventType === 'DELETE') {
+            const deletedPoi = payload.old as Poi;
+            console.log('[GridPage] Real-time DELETE - removing POI:', deletedPoi.id);
+            
+            setPois(prev => {
+              console.log('[GridPage] Removing POI from state');
+              return prev.filter(p => p.id !== deletedPoi.id);
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    // Cleanup subscription when component unmounts or grid changes
+    return () => {
+      console.log('[GridPage] Cleaning up real-time subscriptions');
+      poiSubscription.unsubscribe();
+    };
+  }, [gridSquare?.id]); // Re-subscribe when grid square changes
 
   // Navigation handlers
   const handleBackToOverview = () => {
@@ -963,16 +1042,25 @@ const GridPage: React.FC = () => {
       const user = (await supabase.auth.getUser()).data.user;
       if (!user) throw new Error("User not authenticated");
 
-      const fileName = `${user.id}/${gridSquare.coordinate}-${Date.now()}.${tempImageFile.name.split('.').pop()}`;
-      const filePath = `grid-screenshots/${fileName}`;
+      const fileName = `${user.id}/${gridSquare.coordinate}-${Date.now()}.webp`;
+      
+      // Convert blob to file for WebP conversion
+      const croppedFile = new File([croppedImageBlob], fileName, { type: croppedImageBlob.type });
+      
+      const uploadResult = await uploadImageWithConversion(croppedFile, fileName, {
+        quality: 'medium',
+        bucket: 'screenshots',
+        folder: 'grid-screenshots',
+        maxWidth: 2000,
+        maxHeight: 2000
+      });
 
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('screenshots')
-        .upload(filePath, croppedImageBlob, { upsert: true });
+      // Show conversion feedback
+      if (uploadResult.compressionStats) {
+        setConversionStats(formatConversionStats(uploadResult.compressionStats));
+      }
 
-      if (uploadError) throw uploadError;
-
-      const publicURL = supabase.storage.from('screenshots').getPublicUrl(filePath).data.publicUrl;
+      const publicURL = uploadResult.url;
       const cropDetailsForDb = isFullImage ? null : cropData;
       const originalScreenshotUrlToStore = isFullImage ? publicURL : (gridSquare.original_screenshot_url || publicURL);
 
@@ -1031,16 +1119,25 @@ const GridPage: React.FC = () => {
       const user = (await supabase.auth.getUser()).data.user;
       if (!user) throw new Error("User not authenticated");
 
-      const fileName = `${user.id}/${gridSquare.coordinate}-recrop-${Date.now()}.${gridSquare.screenshot_url.split('.').pop()?.split('?')[0]}`;
-      const filePath = `grid-screenshots/${fileName}`;
-
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('screenshots')
-        .upload(filePath, croppedImageBlob, { upsert: true });
-
-      if (uploadError) throw uploadError;
+      const fileName = `${user.id}/${gridSquare.coordinate}-recrop-${Date.now()}.webp`;
       
-      const publicURL = supabase.storage.from('screenshots').getPublicUrl(filePath).data.publicUrl;
+      // Convert blob to file for WebP conversion
+      const croppedFile = new File([croppedImageBlob], fileName, { type: croppedImageBlob.type });
+      
+      const uploadResult = await uploadImageWithConversion(croppedFile, fileName, {
+        quality: 'medium',
+        bucket: 'screenshots',
+        folder: 'grid-screenshots',
+        maxWidth: 2000,
+        maxHeight: 2000
+      });
+
+      // Show conversion feedback
+      if (uploadResult.compressionStats) {
+        setConversionStats(formatConversionStats(uploadResult.compressionStats));
+      }
+      
+      const publicURL = uploadResult.url;
       const cropDetailsForDb = isFullImage ? null : cropData;
       const newOriginalScreenshotUrl = isFullImage ? publicURL : gridSquare.original_screenshot_url;
 
@@ -1095,28 +1192,28 @@ const GridPage: React.FC = () => {
     setError(null);
 
     try {
-      const fileExt = tempImageFile.name.split('.').pop();
-      const fileName = `grid-${gridId}-${Date.now()}.${fileExt}`;
+      const fileName = `grid-${gridId}-${Date.now()}.webp`;
       
-      // Upload original file
-      const { error: uploadError } = await supabase.storage
-        .from('screenshots')
-        .upload(fileName, tempImageFile, { upsert: true });
+      const uploadResult = await uploadImageWithConversion(tempImageFile, fileName, {
+        quality: 'medium',
+        bucket: 'screenshots',
+        folder: 'grid-screenshots',
+        maxWidth: 2000,
+        maxHeight: 2000
+      });
 
-      if (uploadError) throw uploadError;
-
-      // Get public URL
-      const { data: publicUrlData } = supabase.storage
-        .from('screenshots')
-        .getPublicUrl(fileName);
+      // Show conversion feedback
+      if (uploadResult.compressionStats) {
+        setConversionStats(formatConversionStats(uploadResult.compressionStats));
+      }
 
       // Use upsert to handle both existing and new grid squares (no crop data, original and current URL are the same)
       const { data, error } = await supabase
         .from('grid_squares')
         .upsert({
           coordinate: gridId,
-          screenshot_url: publicUrlData.publicUrl,
-          original_screenshot_url: publicUrlData.publicUrl,
+          screenshot_url: uploadResult.url,
+          original_screenshot_url: uploadResult.url,
           crop_x: null,
           crop_y: null,
           crop_width: null,
@@ -1359,7 +1456,7 @@ const GridPage: React.FC = () => {
         <div 
           className="absolute inset-0 bg-cover bg-center bg-no-repeat"
           style={{
-            backgroundImage: `url(/images/main-bg.jpg)`
+            backgroundImage: `url(/images/main-bg.webp)`
           }}
         />
         
@@ -1381,7 +1478,7 @@ const GridPage: React.FC = () => {
         <div 
           className="absolute inset-0 bg-cover bg-center bg-no-repeat"
           style={{
-            backgroundImage: `url(/images/main-bg.jpg)`
+            backgroundImage: `url(/images/main-bg.webp)`
           }}
         />
         
@@ -1404,7 +1501,7 @@ const GridPage: React.FC = () => {
       <div 
         className="absolute inset-0 bg-cover bg-center bg-no-repeat"
         style={{
-          backgroundImage: `url(/images/main-bg.jpg)`
+          backgroundImage: `url(/images/main-bg.webp)`
         }}
       />
 
@@ -1484,9 +1581,7 @@ const GridPage: React.FC = () => {
           pois={pois}
           filteredPois={filteredPois}
           poiTypes={poiTypes}
-          customIcons={customIcons}
-          collections={collections}
-          userCreatedPoiTypes={userCreatedPoiTypes}
+
           activeTab={activeTab}
           onActiveTabChange={setActiveTab}
           searchTerm={searchTerm}
@@ -1500,12 +1595,7 @@ const GridPage: React.FC = () => {
           onCategoryToggle={handleCategoryToggle}
           onToggleAllPois={handleToggleAllPois}
           onOtherTypesToggle={handleOtherTypesToggle}
-          onCustomPoiTypeEdit={handleCustomPoiTypeEdit}
-          onShowCollectionModal={() => setShowCollectionModal(true)}
-          onShowCustomPoiTypeModal={() => {
-                            setEditingPoiType(null);
-                            setShowCustomPoiTypeModal(true);
-                          }}
+
           isIconUrl={isIconUrl}
           getDisplayImageUrl={getDisplayImageUrl}
           additionalLayerContent={
@@ -1712,7 +1802,7 @@ const GridPage: React.FC = () => {
                           <MapPOIMarker
                             poi={poi}
                             poiType={poiType}
-                            customIcons={customIcons}
+              
                             zoom={currentZoom}
                             mapSettings={deepDesertMapSettings}
                             onEdit={handlePoiEdit}
@@ -1776,6 +1866,15 @@ const GridPage: React.FC = () => {
                       <Upload className="w-4 h-4" />
                       Choose File
                     </button>
+                  )}
+                  
+                  {/* Conversion Stats Display */}
+                  {conversionStats && (
+                    <div className="rounded-lg border border-green-500/30 bg-green-500/10 p-3 mt-4">
+                      <p className="text-green-300 text-sm font-light" style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                        {conversionStats}
+                      </p>
+                    </div>
                   )}
                   
                   <div className="text-xs text-amber-300/70 mt-4">
@@ -1873,7 +1972,7 @@ const GridPage: React.FC = () => {
           title={`POIs in ${gridId}`}
           pois={filteredPois}
           poiTypes={poiTypes}
-          customIcons={customIcons}
+          
           userInfo={userInfo}
           onPoiClick={(poi) => {
             // Highlight the POI on the map instead of opening a modal
@@ -1902,7 +2001,6 @@ const GridPage: React.FC = () => {
         <POIPlacementModal
           coordinates={placementCoordinates}
           poiTypes={poiTypes}
-          customIcons={customIcons}
           onPoiCreated={handlePoiSuccessfullyAdded}
           onClose={handleModalClose}
           mapType="deep_desert"
@@ -1919,7 +2017,6 @@ const GridPage: React.FC = () => {
           <POICard
             poi={selectedPoi}
             poiType={poiType}
-            customIcons={customIcons}
             isOpen={true}
             onClose={() => setSelectedPoi(null)}
             onEdit={() => handlePoiEdit(selectedPoi)}
@@ -1940,7 +2037,6 @@ const GridPage: React.FC = () => {
           <POICard
             poi={selectedPoiFromPanel}
             poiType={selectedPoiType}
-            customIcons={customIcons}
             isOpen={true}
             onClose={() => setSelectedPoiId(null)}
             onEdit={() => {
@@ -1965,7 +2061,6 @@ const GridPage: React.FC = () => {
         <POIEditModal
           poi={editingPoi}
           poiTypes={poiTypes}
-          customIcons={customIcons}
           onPoiUpdated={handlePoiUpdated}
           onClose={() => setEditingPoi(null)}
           onPositionChange={(poi) => {
@@ -1975,42 +2070,21 @@ const GridPage: React.FC = () => {
         />
       )}
 
-      {/* Collection Modal - Same as Hagga Basin */}
-      {showCollectionModal && (
-        <CollectionModal
-          isOpen={showCollectionModal}
-          existingCollections={collections}
-          onClose={() => setShowCollectionModal(false)}
-          onCollectionUpdated={() => {
-            fetchCollections();
-          }}
-        />
-      )}
 
-      {/* Custom POI Type Modal - Same as Hagga Basin */}
-      {showCustomPoiTypeModal && (
-        <CustomPoiTypeModal
-          isOpen={showCustomPoiTypeModal}
-          editingPoiType={editingPoiType}
-          customPoiTypes={userCreatedPoiTypes}
-          onPoiTypeCreated={handleCustomPoiTypeCreated}
-          onPoiTypeUpdated={handleCustomPoiTypeUpdated}
-          onPoiTypeDeleted={handleCustomPoiTypeDeleted}
-          onClose={() => {
-            setShowCustomPoiTypeModal(false);
-            setEditingPoiType(null);
-          }}
-        />
-      )}
 
       {/* Share POI Modal - Same as Hagga Basin */}
       {showSharePoiModal && selectedPoiForShare && (
         <SharePoiModal
           poi={selectedPoiForShare}
           isOpen={showSharePoiModal}
-          onClose={() => {
+          onClose={async () => {
             setShowSharePoiModal(false);
             setSelectedPoiForShare(null);
+            // Refresh POIs after sharing changes to ensure all users see updates
+            const gridData = await fetchGridData();
+            if (gridData) {
+              // fetchGridData already updates the POIs state
+            }
           }}
         />
       )}
@@ -2069,6 +2143,23 @@ const GridPage: React.FC = () => {
                 }
               : undefined
           }
+        />
+      )}
+
+      {/* POI Deletion Confirmation Modal */}
+      {showDeleteConfirmation && poiToDelete && (
+        <ConfirmationModal
+          isOpen={showDeleteConfirmation}
+          onClose={() => {
+            setShowDeleteConfirmation(false);
+            setPoiToDelete(null);
+          }}
+          onConfirm={performPoiDeletion}
+          title="Delete POI"
+          message={`Are you sure you want to delete "${poiToDelete.title}"? This action cannot be undone and will also delete all associated screenshots.`}
+          confirmButtonText="Delete POI"
+          cancelButtonText="Cancel"
+          variant="danger"
         />
       )}
 

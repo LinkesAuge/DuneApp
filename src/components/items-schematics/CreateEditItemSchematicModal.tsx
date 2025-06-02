@@ -426,7 +426,7 @@ const IconSelector: React.FC<{
   onIconSelect: (iconUrl: string) => void;
   error?: string;
 }> = ({ selectedIcon, onIconSelect, error }) => {
-  const [customIcon, setCustomIcon] = useState(selectedIcon);
+  const [iconInput, setIconInput] = useState(selectedIcon);
 
   return (
     <FormField
@@ -466,8 +466,8 @@ const IconSelector: React.FC<{
         <div className="flex gap-2">
           <input
             type="text"
-            value={customIcon}
-            onChange={(e) => setCustomIcon(e.target.value)}
+            value={iconInput}
+            onChange={(e) => setIconInput(e.target.value)}
             placeholder="Enter icon URL or emoji"
             className={`flex-1 px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-amber-100 placeholder-slate-400
                        focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition-all duration-200
@@ -476,11 +476,11 @@ const IconSelector: React.FC<{
           />
           <button
             type="button"
-            onClick={() => onIconSelect(customIcon)}
+            onClick={() => onIconSelect(iconInput)}
             className="px-4 py-2 bg-slate-700 hover:bg-slate-600 border border-slate-600 text-amber-200 
                       rounded-lg transition-all duration-200 font-light tracking-wide disabled:opacity-50 disabled:cursor-not-allowed"
             style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
-            disabled={!customIcon.trim()}
+            disabled={!iconInput.trim()}
           >
             Apply
           </button>

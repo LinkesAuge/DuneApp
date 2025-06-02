@@ -1,96 +1,71 @@
 import React, { useState } from 'react';
 import { useAuth } from './AuthProvider';
-import { User, Mail, Lock, Eye, EyeOff } from 'lucide-react';
-import { supabase } from '../../lib/supabase'; // Import supabase client
+import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
 
 const SignInForm: React.FC = () => {
-  const [identifier, setIdentifier] = useState(''); // Changed from email to identifier
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   
-  const authContextValue = useAuth(); // Get the whole context value
-  const { signIn, error: authError, setError: setAuthError } = authContextValue; // Destructure from the logged value
+  const { signIn, error: authError, setError: setAuthError } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setAuthError(null); // Clear previous errors
+    setAuthError(null);
+    setIsLoading(true);
 
-    let emailToSignIn = identifier;
-
-    if (!identifier.includes('@')) {
-      // Assume it's a username, try to find the email
-      try {
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('email')
-          .ilike('username', identifier) // Case-insensitive match for username
-          .single();
-
-        if (profileError) {
-          if (profileError.code === 'PGRST116') { // PGRST116: "Searched item was not found"
-            setAuthError('Invalid username or password.');
-            return;
-          }
-          throw profileError; // Re-throw other errors
-        }
-
-        if (profile && profile.email) {
-          emailToSignIn = profile.email;
-        } else {
-          setAuthError('Invalid username or password.');
-          return;
-        }
-      } catch (err: any) {
-        console.error('Error fetching profile by username:', err);
-        setAuthError(err.message || 'An error occurred. Please try again.');
-        return;
-      }
+    try {
+      await signIn(email, password);
+    } catch (error) {
+      // Error is already handled in the signIn method
+    } finally {
+      setIsLoading(false);
     }
-    
-    // Validate if emailToSignIn is a valid email format before attempting to sign in
-    // This is a basic check, more robust validation can be added
-    if (!emailToSignIn.includes('@')) {
-        setAuthError('Invalid email format provided or derived.');
-        return;
-    }
-
-    await signIn(emailToSignIn, password);
   };
 
   return (
     <div className="card p-6 w-full max-w-md mx-auto">
-      <h2 className="text-2xl font-bold mb-6 text-center">Sign In</h2>
+      <div className="text-center mb-6">
+        <div className="flex justify-center mb-4">
+          <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center">
+            <Mail size={24} className="text-white" />
+          </div>
+        </div>
+        <h2 className="text-2xl font-bold mb-2">Sign In with Email</h2>
+        <p className="text-sand-600 text-sm">
+          Access your account using your email and password
+        </p>
+      </div>
       
-      {authError && ( // Display authError from useAuth
+      {authError && (
         <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md text-sm">
           {authError}
         </div>
       )}
       
-      <form onSubmit={handleSubmit}>
-        <div className="mb-4">
-          <label className="label" htmlFor="identifier">
-            Email or Username
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="label" htmlFor="email">
+            Email Address
           </label>
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              {/* Dynamically change icon based on input type if desired, for now Mail or User icon */}
-              {identifier.includes('@') ? <Mail size={18} className="text-sand-500" /> : <User size={18} className="text-sand-500" />}
+              <Mail size={18} className="text-sand-500" />
             </div>
             <input
-              id="identifier"
-              type="text" // Changed from email to text
+              id="email"
+              type="email"
               className="input pl-10"
-              placeholder="you@example.com or your_username"
-              value={identifier}
-              onChange={(e) => setIdentifier(e.target.value)}
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               required
             />
           </div>
         </div>
         
-        <div className="mb-6">
+        <div>
           <label className="label" htmlFor="password">
             Password
           </label>
@@ -100,24 +75,52 @@ const SignInForm: React.FC = () => {
             </div>
             <input
               id="password"
-              type="password"
-              className="input pl-10"
+              type={showPassword ? 'text' : 'password'}
+              className="input pl-10 pr-10"
               placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
             />
+            <button
+              type="button"
+              className="absolute inset-y-0 right-0 pr-3 flex items-center"
+              onClick={() => setShowPassword(!showPassword)}
+            >
+              {showPassword ? (
+                <EyeOff size={18} className="text-sand-500 hover:text-sand-700" />
+              ) : (
+                <Eye size={18} className="text-sand-500 hover:text-sand-700" />
+              )}
+            </button>
           </div>
         </div>
         
         <button
           type="submit"
-          className="btn btn-primary w-full"
-          disabled={isLoading}
+          disabled={isLoading || !email || !password}
+          className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium py-3 px-4 rounded-lg transition-colors duration-200 flex items-center justify-center gap-3"
         >
-          {isLoading ? 'Signing in...' : 'Sign In'}
+          {isLoading ? (
+            <>
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+              <span>Signing in...</span>
+            </>
+          ) : (
+            <>
+              <Mail size={20} />
+              <span>Sign In</span>
+            </>
+          )}
         </button>
       </form>
+
+      <div className="mt-6 p-4 bg-amber-50 rounded-lg">
+        <div className="text-xs text-amber-800 text-center">
+          <p className="font-medium mb-1">Email login is for existing users only</p>
+          <p>New users must register with Discord. If you don't have an account, please use the Discord tab to create one.</p>
+        </div>
+      </div>
     </div>
   );
 };

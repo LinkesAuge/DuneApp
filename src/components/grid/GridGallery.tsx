@@ -1,74 +1,86 @@
 import React, { useState, useEffect } from 'react';
-import { GridSquare } from '../../types';
+import { GridSquare, Poi, PoiType } from '../../types';
 import { X, ChevronLeft, ChevronRight, Clock, User, MapPin } from 'lucide-react';
+import { Rank } from '../../types/profile';
 import { supabase } from '../../lib/supabase';
 import { formatDateWithPreposition } from '../../lib/dateUtils';
+import RankBadge from '../common/RankBadge';
 
 interface GridGalleryProps {
-  squares: GridSquare[];
-  initialIndex: number;
+  initialImageUrl: string;
+  allImages: Array<{
+    url: string;
+    source: 'grid' | 'poi';
+    gridSquare?: GridSquare;
+    poi?: Poi;
+    poiType?: PoiType;
+  }>;
   onClose: () => void;
-  poiInfo?: {
-    title: string;
-    description: string | null;
-    created_at: string;
-    created_by: string;
-  };
 }
 
 interface UserInfo {
-  [key: string]: { username: string; display_name?: string | null; custom_avatar_url?: string | null; discord_avatar_url?: string | null; use_discord_avatar?: boolean };
+  [key: string]: { 
+    username: string; 
+    display_name?: string | null; 
+    custom_avatar_url?: string | null; 
+    discord_avatar_url?: string | null; 
+    use_discord_avatar?: boolean;
+    rank?: Rank | null;
+  };
 }
 
-const GridGallery: React.FC<GridGalleryProps> = ({ squares, initialIndex, onClose, poiInfo }) => {
-  const [currentIndex, setCurrentIndex] = useState(initialIndex);
+const GridGallery: React.FC<GridGalleryProps> = ({ initialImageUrl, allImages, onClose }) => {
+  const [currentImageIndex, setCurrentImageIndex] = useState(() => {
+    return allImages.findIndex(img => img.url === initialImageUrl) || 0;
+  });
   const [userInfo, setUserInfo] = useState<UserInfo>({});
 
   useEffect(() => {
     const fetchUserInfo = async () => {
-      const userIds = [
-        ...new Set([
-          ...squares.map(square => square.uploaded_by),
-          poiInfo?.created_by,
-        ].filter((id): id is string => id !== null && id !== undefined && id !== ''))
-      ];
+      // Collect all user IDs from grid squares and POIs
+      const userIds = new Set<string>();
+      allImages.forEach(img => {
+        if (img.gridSquare?.uploaded_by) userIds.add(img.gridSquare.uploaded_by);
+        if (img.poi?.created_by) userIds.add(img.poi.created_by);
+      });
 
-      if (userIds.length === 0) return;
+      if (userIds.size === 0) return;
 
       try {
-        const { data, error } = await supabase
+        const { data: users, error } = await supabase
           .from('profiles')
-          .select('id, username, display_name, custom_avatar_url, discord_avatar_url, use_discord_avatar')
-          .in('id', userIds);
+          .select('id, username, display_name, custom_avatar_url, discord_avatar_url, use_discord_avatar, rank:ranks(*)')
+          .in('id', Array.from(userIds));
 
         if (error) throw error;
 
-        const infoMap = data.reduce((acc, user) => {
+        const userMap = users?.reduce((acc, user) => {
           acc[user.id] = { 
             username: user.username, 
             display_name: user.display_name, 
             custom_avatar_url: user.custom_avatar_url, 
             discord_avatar_url: user.discord_avatar_url,
-            use_discord_avatar: user.use_discord_avatar
+            use_discord_avatar: user.use_discord_avatar,
+            rank: user.rank
           };
           return acc;
-        }, {} as UserInfo);
+        }, {} as UserInfo) || {};
 
-        setUserInfo(infoMap);
-      } catch (err) {
-        console.error('Error fetching user info:', err);
+        setUserInfo(userMap);
+      } catch (error) {
+        console.error('Error fetching user info:', error);
       }
     };
 
     fetchUserInfo();
-  }, [squares, poiInfo]);
+  }, [allImages]);
 
   const handlePrevious = () => {
-    setCurrentIndex((prev) => (prev > 0 ? prev - 1 : squares.length - 1));
+    setCurrentImageIndex((prev) => (prev > 0 ? prev - 1 : allImages.length - 1));
   };
 
   const handleNext = () => {
-    setCurrentIndex((prev) => (prev < squares.length - 1 ? prev + 1 : 0));
+    setCurrentImageIndex((prev) => (prev < allImages.length - 1 ? prev + 1 : 0));
   };
 
   const handleKeyDown = (e: KeyboardEvent) => {
@@ -82,23 +94,30 @@ const GridGallery: React.FC<GridGalleryProps> = ({ squares, initialIndex, onClos
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const currentSquare = squares[currentIndex];
-  const uploader = currentSquare.uploaded_by ? userInfo[currentSquare.uploaded_by] : null;
+  const currentImage = allImages[currentImageIndex];
+  const uploader = currentImage.gridSquare?.uploaded_by ? userInfo[currentImage.gridSquare.uploaded_by] : null;
 
   // Format metadata for screenshot
-  const screenshotMeta = uploader && currentSquare.upload_date 
-    ? `Screenshot by ${uploader.username} ${(() => {
-        const { date, useOn } = formatDateWithPreposition(currentSquare.upload_date);
-        return useOn ? `on ${date}` : date;
-      })()}`
+   const screenshotMeta = uploader && currentImage.gridSquare?.upload_date 
+     ? (() => {
+         const { date, useOn } = formatDateWithPreposition(currentImage.gridSquare.upload_date);
+         return {
+           text: `Screenshot by ${uploader.username} ${useOn ? `on ${date}` : date}`,
+           rank: uploader.rank
+         };
+       })()
     : null;
 
   // Format metadata for POI
-  const poiMeta = poiInfo?.created_by && userInfo[poiInfo.created_by] 
-    ? `POI created by ${userInfo[poiInfo.created_by].username} ${(() => {
-        const { date, useOn } = formatDateWithPreposition(poiInfo.created_at);
-        return useOn ? `on ${date}` : date;
-      })()}`
+   const poiCreator = currentImage.poi?.created_by ? userInfo[currentImage.poi.created_by] : null;
+   const poiMeta = currentImage.poi?.created_by && poiCreator 
+     ? (() => {
+         const { date, useOn } = formatDateWithPreposition(currentImage.poi.created_at);
+         return {
+           text: `POI created by ${poiCreator.username} ${useOn ? `on ${date}` : date}`,
+           rank: poiCreator.rank
+         };
+       })()
     : null;
 
   return (
@@ -109,7 +128,7 @@ const GridGallery: React.FC<GridGalleryProps> = ({ squares, initialIndex, onClos
         onClose();
       }}
       style={{
-        backgroundImage: `url('/images/main-bg.jpg')`,
+                  backgroundImage: `url('/images/main-bg.webp')`,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat'
@@ -134,14 +153,19 @@ const GridGallery: React.FC<GridGalleryProps> = ({ squares, initialIndex, onClos
               className="text-2xl font-light text-amber-200 tracking-wide"
               style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
             >
-              {poiInfo?.title || `Grid Square ${currentSquare.coordinate}`}
+              {currentImage.poi?.title || `Grid Square ${currentImage.gridSquare?.coordinate}`}
             </h3>
             {screenshotMeta && (
-              <div className="flex items-center text-amber-300/70 text-sm mt-1 tracking-wide">
+              <div className="flex items-center flex-wrap gap-2 text-amber-300/70 text-sm mt-1 tracking-wide">
+                <div className="flex items-center">
                 <Clock size={14} className="mr-2 text-amber-400" />
                 <span style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-                  {screenshotMeta}
+                    {screenshotMeta.text}
                 </span>
+                </div>
+                {screenshotMeta.rank && (
+                  <RankBadge rank={screenshotMeta.rank} size="xxs" />
+                )}
               </div>
             )}
           </div>
@@ -160,7 +184,7 @@ const GridGallery: React.FC<GridGalleryProps> = ({ squares, initialIndex, onClos
         {/* Image container with clean styling */}
         <div className="relative flex-1 flex items-center justify-center p-8">
           {/* Navigation buttons with clean styling */}
-          {squares.length > 1 && (
+          {allImages.length > 1 && (
             <>
               <button
                 onClick={(e) => {
@@ -187,8 +211,8 @@ const GridGallery: React.FC<GridGalleryProps> = ({ squares, initialIndex, onClos
           {/* Image with clean presentation */}
           <div className="relative z-20 max-h-[calc(96vh-20rem)] max-w-full">
             <img
-              src={currentSquare.screenshot_url || ''}
-              alt={`Screenshot ${currentIndex + 1} of ${squares.length}`}
+              src={currentImage.url}
+              alt={`Screenshot ${currentImageIndex + 1} of ${allImages.length}`}
               className="max-h-[calc(96vh-20rem)] max-w-full object-contain rounded-lg shadow-2xl"
               style={{
                 border: '2px solid rgba(251, 191, 36, 0.2)'
@@ -201,20 +225,25 @@ const GridGallery: React.FC<GridGalleryProps> = ({ squares, initialIndex, onClos
         <div className="px-6 py-4 border-t border-amber-400/30">
           <div className="flex justify-between items-start">
             <div className="flex-1 space-y-2">
-              {poiInfo && (
+              {currentImage.poi && (
                 <>
                   <p 
                     className="text-amber-200/90 leading-relaxed font-light tracking-wide"
                     style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
                   >
-                    {poiInfo.description || 'No description provided'}
+                    {currentImage.poi.description || 'No description provided'}
                   </p>
                   {poiMeta && (
-                    <div className="flex items-center text-sm text-amber-300/70 tracking-wide">
+                    <div className="flex items-center flex-wrap gap-2 text-sm text-amber-300/70 tracking-wide">
+                      <div className="flex items-center">
                       <User size={12} className="mr-2 text-amber-400" />
                       <span style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-                        {poiMeta}
+                          {poiMeta.text}
                       </span>
+                      </div>
+                      {poiMeta.rank && (
+                        <RankBadge rank={poiMeta.rank} size="xxs" />
+                      )}
                     </div>
                   )}
                 </>
@@ -226,13 +255,13 @@ const GridGallery: React.FC<GridGalleryProps> = ({ squares, initialIndex, onClos
                 className="text-sm text-amber-300/80 font-light tracking-wide"
                 style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
               >
-                Screenshot {currentIndex + 1} of {squares.length}
+                Screenshot {currentImageIndex + 1} of {allImages.length}
               </div>
-              {currentSquare.coordinate && (
+              {currentImage.gridSquare?.coordinate && (
                 <div className="flex items-center text-xs text-amber-400/70 tracking-wider">
                   <MapPin size={10} className="mr-1 text-amber-400" />
                   <span style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-                    {currentSquare.coordinate}
+                    {currentImage.gridSquare.coordinate}
                   </span>
                 </div>
               )}

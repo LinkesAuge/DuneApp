@@ -1,6 +1,6 @@
 import React, { ReactNode } from 'react';
 import { Filter, Plus, Settings, Eye, Lock, Users, Edit, ChevronRight, FolderOpen } from 'lucide-react';
-import { Poi, PoiType, CustomIcon, PoiCollection } from '../../types';
+import { Poi, PoiType } from '../../types';
 import { isIconUrl, getDisplayImageUrlFromIcon } from '../../lib/helpers';
 
 interface MapControlPanelProps {
@@ -16,13 +16,11 @@ interface MapControlPanelProps {
   pois: Poi[];
   filteredPois: Poi[];
   poiTypes: PoiType[];
-  customIcons: CustomIcon[];
-  collections: PoiCollection[];
-  userCreatedPoiTypes: PoiType[];
+
   
   // Filter state
-  activeTab: 'filters' | 'customization' | 'layers';
-  onActiveTabChange: (tab: 'filters' | 'customization' | 'layers') => void;
+  activeTab: 'filters' | 'layers';
+  onActiveTabChange: (tab: 'filters' | 'layers') => void;
   searchTerm: string;
   onSearchTermChange: (term: string) => void;
   selectedPoiTypes: string[];
@@ -36,9 +34,7 @@ interface MapControlPanelProps {
   onCategoryToggle: (category: string, checked: boolean) => void;
   onToggleAllPois: () => void;
   onOtherTypesToggle: () => void;
-  onCustomPoiTypeEdit: (poiType: PoiType) => void;
-  onShowCollectionModal: () => void;
-  onShowCustomPoiTypeModal: () => void;
+
   
   // Utility functions
   isIconUrl: (icon: string) => boolean;
@@ -59,9 +55,7 @@ const MapControlPanel: React.FC<MapControlPanelProps> = ({
   pois,
   filteredPois,
   poiTypes,
-  customIcons,
-  collections,
-  userCreatedPoiTypes,
+
   activeTab,
   onActiveTabChange,
   searchTerm,
@@ -75,9 +69,7 @@ const MapControlPanel: React.FC<MapControlPanelProps> = ({
   onCategoryToggle,
   onToggleAllPois,
   onOtherTypesToggle,
-  onCustomPoiTypeEdit,
-  onShowCollectionModal,
-  onShowCustomPoiTypeModal,
+
   isIconUrl,
   getDisplayImageUrl,
   additionalLayerContent,
@@ -264,36 +256,7 @@ const MapControlPanel: React.FC<MapControlPanelProps> = ({
                 }`} />
               </button>
               
-              <button
-                onClick={() => onActiveTabChange('customization')}
-                className={`relative px-4 py-3 text-sm font-light transition-all duration-700 group overflow-hidden ${
-                  activeTab === 'customization' 
-                    ? 'text-amber-200' 
-                    : 'text-amber-300/70 hover:text-amber-200'
-                }`}
-                style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
-              >
-                {/* Background layers for active state */}
-                {activeTab === 'customization' && (
-                  <>
-                    <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900" />
-                    <div className="absolute inset-0 bg-gradient-to-b from-slate-950/90 via-slate-900/80 to-slate-800/60" />
-                  </>
-                )}
-                
-                {/* Interactive purple overlay */}
-                <div className="absolute inset-0 bg-gradient-to-r from-violet-600/20 via-violet-500/10 to-violet-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                
-                <div className="relative z-10 flex items-center tracking-wide">
-                  <Plus className="w-4 h-4 inline mr-2" />
-                  Customization
-                </div>
-                
-                {/* Expanding underline */}
-                <div className={`absolute bottom-0 left-0 h-0.5 bg-gradient-to-r from-transparent via-amber-400 to-transparent transition-all duration-700 ${
-                  activeTab === 'customization' ? 'w-full' : 'w-0 group-hover:w-full'
-                }`} />
-              </button>
+
               
               <button
                 onClick={() => onActiveTabChange('layers')}
@@ -564,169 +527,7 @@ const MapControlPanel: React.FC<MapControlPanelProps> = ({
                 </div>
               )}
 
-              {/* Customization Tab */}
-              {activeTab === 'customization' && (
-                <div className="space-y-6">
-                  {/* Custom POI Types Section */}
-                  <div>
-                    <div className="flex justify-between items-center mb-4">
-                      <h4 className="text-sm font-light text-amber-200 tracking-wide" style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>Custom POI Types</h4>
-                      <button 
-                        onClick={onShowCustomPoiTypeModal}
-                        disabled={userCreatedPoiTypes.length >= 5}
-                        className={`px-4 py-2 text-sm rounded-lg font-light flex items-center gap-2 transition-all duration-300 relative overflow-hidden ${
-                          userCreatedPoiTypes.length >= 5
-                            ? 'bg-slate-700/60 text-amber-200/50 border border-slate-600/50 cursor-not-allowed'
-                            : 'bg-gradient-to-r from-amber-600 to-amber-500 text-slate-900 hover:from-amber-500 hover:to-amber-400 border border-amber-500 hover:border-amber-400 shadow-lg hover:shadow-xl'
-                        }`}
-                        title={userCreatedPoiTypes.length >= 5 ? 'Maximum 5 custom POI types allowed' : 'Create custom POI type'}
-                        style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
-                      >
-                        {/* Interactive overlay for enabled button */}
-                        {userCreatedPoiTypes.length < 5 && (
-                          <div className="absolute inset-0 bg-gradient-to-r from-violet-600/20 to-violet-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                        )}
-                        <div className="relative z-10 flex items-center gap-2">
-                          <Plus className="w-4 h-4" />
-                          Create
-                        </div>
-                      </button>
-                    </div>
-                    
-                    {/* Enhanced Limit indicator */}
-                    <div className="mb-4">
-                      <div className="relative overflow-hidden rounded-lg">
-                        <div className="absolute inset-0 bg-gradient-to-r from-amber-600/10 via-amber-500/5 to-amber-600/10" />
-                        <div className="relative z-10 border border-amber-400/20 p-3 backdrop-blur-sm">
-                          <div className="text-xs font-light text-amber-300/80 tracking-wide" style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-                            {userCreatedPoiTypes.length}/5 custom types created
-                            {userCreatedPoiTypes.length >= 5 && (
-                              <span className="ml-3 text-amber-400/90 font-medium px-2 py-1 bg-amber-400/10 rounded border border-amber-400/30">Limit reached</span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {userCreatedPoiTypes.length === 0 ? (
-                      <div className="text-center py-12 relative">
-                        {/* Background */}
-                        <div className="absolute inset-0 bg-gradient-to-b from-slate-800/20 via-slate-700/10 to-slate-800/20 rounded-lg border border-amber-400/10" />
-                        
-                        <div className="relative z-10">
-                          <Plus className="w-16 h-16 text-amber-400/50 mx-auto mb-4" />
-                          <p className="text-amber-200 mb-2 font-light tracking-wide" style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>No custom POI types yet</p>
-                          <p className="text-amber-300/70 text-sm font-light">Create custom POI types with your own icons and categories</p>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {userCreatedPoiTypes.map(poiType => (
-                          <div 
-                            key={poiType.id} 
-                            className="relative overflow-hidden rounded-lg transition-all duration-300 hover:shadow-lg group"
-                          >
-                            {/* Background layers */}
-                            <div className="absolute inset-0 bg-gradient-to-r from-slate-800/60 via-slate-700/40 to-slate-800/60" />
-                            <div className="absolute inset-0 bg-gradient-to-b from-slate-700/30 via-transparent to-slate-800/50" />
-                            
-                            {/* Interactive overlay */}
-                            <div className="absolute inset-0 bg-gradient-to-r from-violet-600/10 via-violet-500/5 to-violet-600/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                            
-                            <div className="relative z-10 border border-amber-400/30 p-4 backdrop-blur-sm">
-                              <div className="flex items-center">
-                                <div 
-                                  className="w-12 h-12 rounded-lg flex items-center justify-center mr-3 flex-shrink-0 border border-amber-400/20 shadow-sm"
-                                  style={{
-                                    backgroundColor: poiType.icon_has_transparent_background && isIconUrl(poiType.icon) 
-                                      ? 'transparent' 
-                                      : poiType.color
-                                  }}
-                                >
-                                  {isIconUrl(poiType.icon) ? (
-                                    <img
-                                      src={getDisplayImageUrl(poiType.icon)}
-                                      alt={poiType.name}
-                                      className="w-7 h-7 object-contain"
-                                    />
-                                  ) : (
-                                    <span className="text-lg font-medium" style={{ 
-                                      color: poiType.icon_has_transparent_background ? poiType.color : 'white'
-                                    }}>
-                                      {poiType.icon}
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center flex-wrap gap-2">
-                                    <h4 className="font-light text-amber-200 tracking-wide" style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>{poiType.name}</h4>
-                                    <span className="px-3 py-1 bg-amber-600/20 text-amber-300 text-xs rounded-lg capitalize border border-amber-500/30 font-light">
-                                      {poiType.category}
-                                    </span>
-                                  </div>
-                                  {poiType.default_description && (
-                                    <p className="text-sm text-amber-200/70 mt-2 font-light">{poiType.default_description}</p>
-                                  )}
-                                </div>
-                                <button
-                                  onClick={() => onCustomPoiTypeEdit(poiType)}
-                                  className="text-amber-400 hover:text-amber-200 transition-all duration-300 ml-3 p-2 rounded-lg hover:bg-amber-400/10 border border-transparent hover:border-amber-400/30"
-                                  title="Edit POI type"
-                                >
-                                  <Edit className="w-5 h-5" />
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
 
-                  {/* Collections Section */}
-                  <div className="pt-6 border-t border-amber-400/20">
-                    <div className="flex justify-between items-center mb-4">
-                      <h4 className="text-sm font-light text-amber-200 tracking-wide" style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>POI Collections</h4>
-                      <button 
-                        onClick={onShowCollectionModal}
-                        className="px-4 py-2 text-sm rounded-lg bg-gradient-to-r from-slate-700 to-slate-600 text-amber-200 hover:from-slate-600 hover:to-slate-500 border border-slate-600 hover:border-slate-500 transition-all duration-300 font-light flex items-center gap-2 shadow-lg hover:shadow-xl"
-                        style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
-                      >
-                        <FolderOpen className="w-4 h-4" />
-                        Manage
-                      </button>
-                    </div>
-                    
-                    <div className="relative overflow-hidden rounded-lg mb-4">
-                      <div className="absolute inset-0 bg-gradient-to-r from-amber-600/10 via-amber-500/5 to-amber-600/10" />
-                      <div className="relative z-10 border border-amber-400/20 p-3 backdrop-blur-sm">
-                        <p className="text-xs font-light text-amber-300/80 tracking-wide" style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-                          {collections.length} collections • Organize and share groups of POIs
-                        </p>
-                      </div>
-                    </div>
-                    
-                    {collections.length > 0 && (
-                      <div className="space-y-2 max-h-40 overflow-y-auto">
-                        {collections.slice(0, 3).map(collection => (
-                          <div key={collection.id} className="flex items-center text-sm p-2 rounded-lg bg-slate-800/30 border border-amber-400/10">
-                            <FolderOpen className="w-4 h-4 text-amber-400 mr-3 flex-shrink-0" />
-                            <span className="text-amber-200 flex-1 font-light tracking-wide" style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>{collection.name}</span>
-                            {collection.is_public && (
-                              <span className="text-xs text-blue-400 px-2 py-1 bg-blue-400/10 rounded border border-blue-400/30">Public</span>
-                            )}
-                          </div>
-                        ))}
-                        {collections.length > 3 && (
-                          <div className="text-xs text-amber-300/70 italic text-center py-2 font-light">
-                            +{collections.length - 3} more collections
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
 
               {/* Layers Tab */}
               {activeTab === 'layers' && (

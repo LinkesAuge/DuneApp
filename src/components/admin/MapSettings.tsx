@@ -3,35 +3,37 @@ import { Settings, Save, RefreshCw, Map, Upload, Check, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { HaggaBasinBaseMap } from '../../types';
 import { v4 as uuidv4 } from 'uuid';
+import { MapSettings as MapSettingsInterface, defaultMapSettings } from '../../lib/useMapSettings';
+import { uploadImageWithConversion } from '../../lib/imageUpload';
+import { formatConversionStats } from '../../lib/imageUtils';
 
 interface MapSettingsProps {
   onError: (error: string) => void;
   onSuccess: (message: string) => void;
 }
 
-interface MapSettings {
-  showMapGrid: boolean;
-  enableMapInteractions: boolean;
-  iconScaling: number;
-}
-
 const MapSettings: React.FC<MapSettingsProps> = ({ onError, onSuccess }) => {
-  const [mapSettings, setMapSettings] = useState<MapSettings>({
-    showMapGrid: true,
-    enableMapInteractions: true,
-    iconScaling: 1.0,
-  });
+  const [mapSettings, setMapSettings] = useState<MapSettingsInterface>(defaultMapSettings);
   
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [baseMaps, setBaseMaps] = useState<HaggaBasinBaseMap[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [conversionStats, setConversionStats] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadMapSettings();
     loadBaseMaps();
   }, []);
+
+  // Clear conversion stats after 5 seconds
+  useEffect(() => {
+    if (conversionStats) {
+      const timer = setTimeout(() => setConversionStats(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [conversionStats]);
 
   const loadMapSettings = async () => {
     try {
@@ -44,7 +46,13 @@ const MapSettings: React.FC<MapSettingsProps> = ({ onError, onSuccess }) => {
       if (error && error.code !== 'PGRST116') throw error;
 
       if (data?.setting_value) {
-        setMapSettings(data.setting_value);
+        const newSettings = {
+          ...defaultMapSettings,
+          ...data.setting_value
+        };
+        setMapSettings(newSettings);
+      } else {
+        setMapSettings(defaultMapSettings);
       }
     } catch (error: any) {
       console.error('Error loading map settings:', error);
@@ -77,9 +85,15 @@ const MapSettings: React.FC<MapSettingsProps> = ({ onError, onSuccess }) => {
         .upsert({
           setting_key: 'map_settings',
           setting_value: mapSettings
+        }, {
+          onConflict: 'setting_key'
         });
 
       if (error) throw error;
+      
+      // Broadcast event to refresh map settings across the app
+      window.dispatchEvent(new CustomEvent('mapSettingsUpdated'));
+      
       onSuccess('Map settings saved successfully');
     } catch (error: any) {
       console.error('Error saving map settings:', error);
@@ -90,11 +104,7 @@ const MapSettings: React.FC<MapSettingsProps> = ({ onError, onSuccess }) => {
   };
 
   const resetToDefaults = () => {
-    setMapSettings({
-      showMapGrid: true,
-      enableMapInteractions: true,
-      iconScaling: 1.0,
-    });
+    setMapSettings(defaultMapSettings);
   };
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -116,20 +126,22 @@ const MapSettings: React.FC<MapSettingsProps> = ({ onError, onSuccess }) => {
     setIsUploading(true);
 
     try {
-      // Upload to storage
+      // Upload with WebP conversion
       const fileName = `base-map-${uuidv4()}-${file.name}`;
-      const filePath = `hagga-basin/${fileName}`;
+      
+      const uploadResult = await uploadImageWithConversion(file, fileName, {
+        quality: 'high', // Use high quality for base maps
+        bucket: 'screenshots',
+        folder: 'hagga-basin',
+        maxWidth: 4000,
+        maxHeight: 4000
+      });
 
-      const { error: uploadError } = await supabase.storage
-        .from('screenshots')
-        .upload(filePath, file);
-
-      if (uploadError) throw uploadError;
-
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('screenshots')
-        .getPublicUrl(filePath);
+      // Show conversion feedback
+      if (uploadResult.compressionRatio) {
+        const stats = formatConversionStats(uploadResult);
+        setConversionStats(stats);
+      }
 
       // Deactivate existing maps
       await supabase
@@ -142,7 +154,7 @@ const MapSettings: React.FC<MapSettingsProps> = ({ onError, onSuccess }) => {
         .from('hagga_basin_base_maps')
         .insert({
           name: file.name.replace(/\.[^/.]+$/, ''),
-          image_url: publicUrl,
+          image_url: uploadResult.url,
           is_active: true,
           created_by: (await supabase.auth.getUser()).data.user?.id || ''
         });
@@ -282,70 +294,122 @@ const MapSettings: React.FC<MapSettingsProps> = ({ onError, onSuccess }) => {
         </div>
 
         <div className="p-6 space-y-6">
-          {/* Map Grid Toggle */}
+          {/* Show Tooltips Toggle */}
           <div className="flex items-center justify-between">
             <div>
               <label className="text-amber-200 font-medium tracking-wide" style={{ fontFamily: "'Trebuchet MS', sans-serif" }}>
-                Show Map Grid
+                Show POI Tooltips
               </label>
               <p className="text-amber-200/60 text-sm font-light mt-1">
-                Display coordinate grid lines on the map
+                Display rich tooltips when hovering over POI icons
               </p>
             </div>
             <label className="relative inline-flex items-center cursor-pointer">
               <input
                 type="checkbox"
-                checked={mapSettings.showMapGrid}
-                onChange={(e) => setMapSettings(prev => ({ ...prev, showMapGrid: e.target.checked }))}
+                checked={mapSettings.showTooltips}
+                onChange={(e) => setMapSettings(prev => ({ ...prev, showTooltips: e.target.checked }))}
                 className="sr-only peer"
               />
               <div className="w-11 h-6 bg-void-950/60 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-gold-300/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gold-300"></div>
             </label>
           </div>
 
-          {/* Map Interactions Toggle */}
+          {/* Show Shared Indicators Toggle */}
           <div className="flex items-center justify-between">
             <div>
               <label className="text-amber-200 font-medium tracking-wide" style={{ fontFamily: "'Trebuchet MS', sans-serif" }}>
-                Enable Map Interactions
+                Show Shared POI Indicators
               </label>
               <p className="text-amber-200/60 text-sm font-light mt-1">
-                Allow zooming, panning, and other map interactions
+                Display privacy indicators on POI icons
               </p>
             </div>
             <label className="relative inline-flex items-center cursor-pointer">
               <input
                 type="checkbox"
-                checked={mapSettings.enableMapInteractions}
-                onChange={(e) => setMapSettings(prev => ({ ...prev, enableMapInteractions: e.target.checked }))}
+                checked={mapSettings.showSharedIndicators}
+                onChange={(e) => setMapSettings(prev => ({ ...prev, showSharedIndicators: e.target.checked }))}
                 className="sr-only peer"
               />
               <div className="w-11 h-6 bg-void-950/60 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-gold-300/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gold-300"></div>
             </label>
           </div>
 
-          {/* Icon Scaling */}
+          {/* Icon Base Size */}
           <div className="space-y-3">
             <div>
               <label className="text-amber-200 font-medium tracking-wide" style={{ fontFamily: "'Trebuchet MS', sans-serif" }}>
-                Icon Scaling: {mapSettings.iconScaling}x
+                Icon Base Size: {mapSettings.iconBaseSize}px
               </label>
               <p className="text-amber-200/60 text-sm font-light mt-1">
-                Adjust the size of POI icons on the map
+                Base size of POI icons on the map
               </p>
             </div>
             <div className="flex items-center space-x-4">
-              <span className="text-amber-200/60 text-sm">0.5x</span>
+              <span className="text-amber-200/60 text-sm">48px</span>
               <input
                 type="range"
-                min="0.5"
-                max="2.0"
-                step="0.1"
-                value={mapSettings.iconScaling}
-                onChange={(e) => setMapSettings(prev => ({ ...prev, iconScaling: parseFloat(e.target.value) }))}
+                min="48"
+                max="96"
+                step="4"
+                value={mapSettings.iconBaseSize}
+                onChange={(e) => setMapSettings(prev => ({ ...prev, iconBaseSize: parseInt(e.target.value) }))}
                 className="flex-1 h-2 bg-void-950/60 rounded-lg appearance-none cursor-pointer slider"
               />
-              <span className="text-amber-200/60 text-sm">2.0x</span>
+              <span className="text-amber-200/60 text-sm">96px</span>
+            </div>
+          </div>
+
+          {/* Icon Size Range */}
+          <div className="space-y-4">
+            <div>
+              <label className="text-amber-200 font-medium tracking-wide" style={{ fontFamily: "'Trebuchet MS', sans-serif" }}>
+                Icon Size Range
+              </label>
+              <p className="text-amber-200/60 text-sm font-light mt-1">
+                Minimum and maximum sizes for zoom-based scaling
+              </p>
+            </div>
+            
+            {/* Min Size */}
+            <div className="flex items-center justify-between">
+              <label className="text-amber-200/80 text-sm font-light">
+                Minimum Size: {mapSettings.iconMinSize}px
+              </label>
+              <div className="flex items-center space-x-4 w-48">
+                <span className="text-amber-200/60 text-xs">32px</span>
+                <input
+                  type="range"
+                  min="32"
+                  max="72"
+                  step="4"
+                  value={mapSettings.iconMinSize}
+                  onChange={(e) => setMapSettings(prev => ({ ...prev, iconMinSize: parseInt(e.target.value) }))}
+                  className="flex-1 h-1 bg-void-950/60 rounded-lg appearance-none cursor-pointer slider"
+                />
+                <span className="text-amber-200/60 text-xs">72px</span>
+              </div>
+            </div>
+            
+            {/* Max Size */}
+            <div className="flex items-center justify-between">
+              <label className="text-amber-200/80 text-sm font-light">
+                Maximum Size: {mapSettings.iconMaxSize}px
+              </label>
+              <div className="flex items-center space-x-4 w-48">
+                <span className="text-amber-200/60 text-xs">96px</span>
+                <input
+                  type="range"
+                  min="96"
+                  max="192"
+                  step="8"
+                  value={mapSettings.iconMaxSize}
+                  onChange={(e) => setMapSettings(prev => ({ ...prev, iconMaxSize: parseInt(e.target.value) }))}
+                  className="flex-1 h-1 bg-void-950/60 rounded-lg appearance-none cursor-pointer slider"
+                />
+                <span className="text-amber-200/60 text-xs">192px</span>
+              </div>
             </div>
           </div>
         </div>
@@ -388,6 +452,15 @@ const MapSettings: React.FC<MapSettingsProps> = ({ onError, onSuccess }) => {
                   Upload New Base Map
                 </span>
               </button>
+
+              {/* Conversion Stats Display */}
+              {conversionStats && (
+                <div className="rounded-lg border border-green-500/30 bg-green-500/10 p-3">
+                  <p className="text-green-300 text-sm font-light" style={{ fontFamily: "'Trebuchet MS', sans-serif" }}>
+                    {conversionStats}
+                  </p>
+                </div>
+              )}
 
               {/* Current Base Maps */}
               {baseMaps.length > 0 && (

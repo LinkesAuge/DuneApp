@@ -24,13 +24,13 @@ const Navbar: React.FC = () => {
     <Link
       to={to}
       onClick={onClick}
-      className="group relative flex items-center h-16 px-4 min-w-[140px] justify-center transition-all duration-300"
+      className="group relative flex items-center h-16 px-3 min-w-[130px] justify-center transition-all duration-300"
     >
       {/* Button background image - Consistent with ui_aesthetics.md */}
       <div 
         className="absolute inset-0 bg-center bg-cover bg-no-repeat"
         style={{
-          backgroundImage: 'url(/images/bg-button.png)',
+          backgroundImage: 'url(/images/bg-button.webp)',
           backgroundSize: 'cover'
         }}
       />
@@ -132,7 +132,7 @@ const Navbar: React.FC = () => {
       <div 
         className="absolute inset-0 bg-center bg-cover bg-no-repeat opacity-70"
         style={{
-          backgroundImage: 'url(/images/bg-button.png)',
+          backgroundImage: 'url(/images/bg-button.webp)',
           backgroundSize: 'cover'
         }}
       />
@@ -206,20 +206,20 @@ const Navbar: React.FC = () => {
   return (
     <nav className="relative z-50 border-b border-slate-700/30">
       {/* Navbar background image - Ensure this aligns with the three-layer gradient system if possible, or is a deliberate choice */}
-      {/* Consider if navbar-color.png is the "Base Layer" or "Depth Layer" from ui_aesthetics.md */}
+                  {/* Consider if navbar-color.webp is the "Base Layer" or "Depth Layer" from ui_aesthetics.md */}
       <div 
         className="absolute inset-0 bg-center bg-cover bg-no-repeat"
         style={{
-          // backgroundImage: 'url(/images/navbar-color.png?v=' + Date.now() + ')', // Retaining for now, but verify its role
-          // Applying slate gradient as a base, potentially overlaid by navbar-color.png if it acts as a texture/detail layer
+                      // backgroundImage: 'url(/images/navbar-color.webp?v=' + Date.now() + ')', // Retaining for now, but verify its role
+                      // Applying slate gradient as a base, potentially overlaid by navbar-color.webp if it acts as a texture/detail layer
           background: 'linear-gradient(to right, var(--slate-900), var(--slate-800), var(--slate-900))', // Base Layer from guide
         }}
       />
-      {/* Secondary overlay, potentially the navbar-color.png or a deeper slate gradient */}
+                {/* Secondary overlay, potentially the navbar-color.webp or a deeper slate gradient */}
       <div 
-        className="absolute inset-0 bg-center bg-cover bg-no-repeat opacity-80" // Adjusted opacity if navbar-color.png is used as a detail layer
+                  className="absolute inset-0 bg-center bg-cover bg-no-repeat opacity-80" // Adjusted opacity if navbar-color.webp is used as a detail layer
         style={{
-          backgroundImage: 'url(/images/navbar-color.png?v=' + Date.now() + ')', // Depth Layer or detail
+          backgroundImage: 'url(/images/navbar-color.webp?v=' + Date.now() + ')', // Depth Layer or detail
           // background: 'linear-gradient(to bottom, var(--slate-950-90), var(--slate-900-80), var(--slate-800-60))', // Alternative Depth Layer
         }}
       />
@@ -241,13 +241,13 @@ const Navbar: React.FC = () => {
           <div className="flex items-center h-16">
             
             {/* Expanded Logo Section - Use Trebuchet MS as per guide */}
-            <div className="flex-1 max-w-lg mr-28">
-              <Link to="/" className="group relative flex items-center h-16 px-8 transition-all duration-300" style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+            <div className="flex-1 max-w-md mr-16">
+              <Link to="/" className="group relative flex items-center h-16 px-6 transition-all duration-300" style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
                 {/* Logo button background image - Should align with NavButton styling */}
                 <div 
                   className="absolute inset-0 bg-center bg-cover bg-no-repeat"
                   style={{
-                    backgroundImage: 'url(/images/bg-button.png)', // Consistent with NavButton
+                    backgroundImage: 'url(/images/bg-button.webp)', // Consistent with NavButton
                     backgroundSize: 'cover'
                   }}
                 />
@@ -257,14 +257,14 @@ const Navbar: React.FC = () => {
                 
                 <div className="relative z-10 flex items-center justify-center">
                   {/* Apply typography for "DUNE" part of the logo if it's text, or ensure image matches */}
-                  {/* Assuming dune-log.png is the full visual logo */}
+                  {/* Assuming dune-log.webp is the full visual logo */}
                   <img 
-                    src={`/images/dune-log.png?v=${Date.now()}`}
+                    src={`/images/dune-log.webp?v=${Date.now()}`}
                     alt="DUNE AWAKENING TRACKER" 
                     className="h-14 w-auto object-contain transition-all duration-300 group-hover:scale-105 drop-shadow-sm"
                     style={{ 
                       filter: 'brightness(1.1) contrast(1.05)',
-                      maxWidth: '300px'
+                      maxWidth: '280px'
                     }}
                   />
                   {/* If "DUNE AWAKENING TRACKER" text is separate and needs styling: */}
@@ -281,8 +281,8 @@ const Navbar: React.FC = () => {
             </div>
 
             {/* Desktop Navigation - centered with separation */}
-            <div className="hidden md:flex flex-1 justify-center max-w-2xl">
-              <div className="flex items-center space-x-1">
+            <div className="hidden md:flex flex-1 justify-center max-w-4xl">
+              <div className="flex items-center space-x-0.5">
                 {user && (
                   <>
                     <NavButton
@@ -313,6 +313,8 @@ const Navbar: React.FC = () => {
                     >
                       Points of Interest
                     </NavButton>
+                    {user.role === 'admin' && (
+                      <>
                     <NavButton
                       to="/database"
                       icon={<Database size={14} strokeWidth={1.5} />}
@@ -320,7 +322,6 @@ const Navbar: React.FC = () => {
                     >
                       Database
                     </NavButton>
-                    {user.role === 'admin' && (
                       <NavButton
                         to="/admin"
                         icon={<Shield size={14} strokeWidth={1.5} />}
@@ -328,6 +329,7 @@ const Navbar: React.FC = () => {
                       >
                         Admin
                       </NavButton>
+                      </>
                     )}
                   </>
                 )}
@@ -335,7 +337,7 @@ const Navbar: React.FC = () => {
             </div>
 
             {/* Profile Section - right aligned with separation */}
-            <div className="hidden md:flex flex-1 justify-end max-w-xs ml-12">
+            <div className="hidden md:flex flex-1 justify-end max-w-sm ml-6">
               <div className="flex items-center">
                 {user ? (
                   <div className="relative">
@@ -347,7 +349,7 @@ const Navbar: React.FC = () => {
                       <div 
                         className="absolute inset-0 bg-center bg-cover bg-no-repeat"
                         style={{
-                          backgroundImage: 'url(/images/bg-button.png)',
+                          backgroundImage: 'url(/images/bg-button.webp)',
                           backgroundSize: 'cover'
                         }}
                       />
@@ -486,7 +488,7 @@ const Navbar: React.FC = () => {
                 <div 
                   className="absolute inset-0 bg-center bg-cover bg-no-repeat"
                   style={{
-                    backgroundImage: 'url(/images/bg-button.png)',
+                    backgroundImage: 'url(/images/bg-button.webp)',
                     backgroundSize: 'cover'
                   }}
                 />
@@ -565,14 +567,6 @@ const Navbar: React.FC = () => {
                   Points of Interest
                 </MobileNavButton>
                 <MobileNavButton
-                  to="/database"
-                  icon={<Database size={15} strokeWidth={1.5} />}
-                  isActive={location.pathname === '/database'}
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  Database
-                </MobileNavButton>
-                <MobileNavButton
                   to="/profile"
                   icon={<User size={15} strokeWidth={1.5} />}
                   isActive={location.pathname === '/profile'}
@@ -581,6 +575,15 @@ const Navbar: React.FC = () => {
                   Profile Settings
                 </MobileNavButton>
                 {user.role === 'admin' && (
+                  <>
+                    <MobileNavButton
+                      to="/database"
+                      icon={<Database size={15} strokeWidth={1.5} />}
+                      isActive={location.pathname === '/database'}
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      Database
+                    </MobileNavButton>
                   <MobileNavButton
                     to="/admin"
                     icon={<Shield size={15} strokeWidth={1.5} />}
@@ -589,6 +592,7 @@ const Navbar: React.FC = () => {
                   >
                     Admin Panel
                   </MobileNavButton>
+                  </>
                 )}
                 
                 {/* Mobile Profile */}

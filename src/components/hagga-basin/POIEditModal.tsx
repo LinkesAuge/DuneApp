@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
-import { X, MapPin, Lock, Users, Eye, Save, Upload, Trash2, Target, Edit, Plus, FileText, Tag, EyeOff, Share2, Globe, AlertTriangle, Settings, Image as ImageIcon } from 'lucide-react';
+import { X, MapPin, Lock, Users, Eye, Save, Upload, Trash2, Target, Edit, Plus, FileText, Tag, EyeOff, Share2, Globe, AlertTriangle, Settings, Image as ImageIcon, Search, UserPlus } from 'lucide-react';
 import type { 
   Poi, 
   PoiType, 
-  CustomIcon, 
+ 
   PrivacyLevel, 
   PoiScreenshot
 } from '../../types';
@@ -14,11 +14,14 @@ import ImageCropModal from '../grid/ImageCropModal';
 import { PixelCrop, Crop } from 'react-image-crop';
 import CommentsList from '../comments/CommentsList';
 import { getScreenshotLabel } from '../../lib/cropUtils';
+import UserAvatar from '../common/UserAvatar';
+import { uploadPoiScreenshot } from '../../lib/imageUpload';
+import { formatConversionStats } from '../../lib/imageUtils';
 
 interface POIEditModalProps {
   poi: Poi;
   poiTypes: PoiType[];
-  customIcons: CustomIcon[];
+
   onPoiUpdated: (poi: Poi) => void;
   onClose: () => void;
   onPositionChange?: (poi: Poi) => void;
@@ -44,7 +47,7 @@ const privacyOptions = [
     value: 'shared' as PrivacyLevel,
     label: 'Shared',
     icon: Users,
-    description: 'Share with specific users',
+    description: 'Shared with specific users (select below)',
     color: 'text-blue-600'
   }
 ];
@@ -55,13 +58,7 @@ const isIconUrl = (icon: string): boolean => {
 };
 
 // Helper function to get display image URL for POI icons
-const getDisplayImageUrl = (icon: string, customIcons: CustomIcon[]): string | null => {
-  // Check if it's a custom icon reference
-  const customIcon = customIcons.find(ci => ci.id === icon || ci.name === icon);
-  if (customIcon) {
-    return customIcon.image_url;
-  }
-  
+const getDisplayImageUrl = (icon: string): string | null => {
   // Check if it's already a URL
   if (isIconUrl(icon)) {
     return icon;
@@ -73,7 +70,7 @@ const getDisplayImageUrl = (icon: string, customIcons: CustomIcon[]): string | n
 const POIEditModal: React.FC<POIEditModalProps> = ({
   poi,
   poiTypes,
-  customIcons,
+
   onPoiUpdated,
   onClose,
   onPositionChange
@@ -117,6 +114,14 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
   const [showDetailedPoiSelection, setShowDetailedPoiSelection] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [conversionStats, setConversionStats] = useState<string | null>(null);
+  
+  // Sharing state
+  const [availableUsers, setAvailableUsers] = useState<any[]>([]);
+  const [selectedUsers, setSelectedUsers] = useState<any[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [showSharingSection, setShowSharingSection] = useState(false);
 
   // Check permissions
   const canEdit = user && (user.id === poi.created_by || user.role === 'admin' || user.role === 'editor');
@@ -129,6 +134,73 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
     setExistingScreenshots(poi.screenshots || []);
   }, [poi.screenshots]);
 
+  // Load available users and current shares
+  useEffect(() => {
+    loadAvailableUsers();
+    loadCurrentShares();
+  }, []);
+
+  // Show sharing section when privacy level is shared
+  useEffect(() => {
+    setShowSharingSection(privacyLevel === 'shared');
+  }, [privacyLevel]);
+
+  // Clear conversion stats after 5 seconds
+  useEffect(() => {
+    if (conversionStats) {
+      const timer = setTimeout(() => setConversionStats(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [conversionStats]);
+
+  const loadAvailableUsers = async () => {
+    setLoadingUsers(true);
+    try {
+      const { data: users, error } = await supabase
+        .from('profiles')
+        .select('id, username, email, display_name, discord_username, custom_avatar_url, discord_avatar_url, use_discord_avatar')
+        .neq('id', user?.id || '') // Exclude current user
+        .order('username');
+
+      if (error) throw error;
+      setAvailableUsers(users || []);
+    } catch (err) {
+      console.error('Error loading users:', err);
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
+  const loadCurrentShares = async () => {
+    if (poi.privacy_level !== 'shared') {
+      console.log('[POIEditModal] POI privacy is not shared, skipping share loading');
+      return;
+    }
+    
+    console.log('[POIEditModal] Loading current shares for POI:', poi.id);
+    
+    try {
+      const { data: shares, error } = await supabase
+        .from('poi_shares')
+        .select(`
+          *,
+          profiles (id, username, email, display_name, discord_username, custom_avatar_url, discord_avatar_url, use_discord_avatar)
+        `)
+        .eq('poi_id', poi.id);
+
+      if (error) throw error;
+      
+      console.log('[POIEditModal] Raw shares data:', shares);
+      
+      const currentSharedUsers = shares?.map(share => share.profiles).filter(Boolean) || [];
+      console.log('[POIEditModal] Processed shared users:', currentSharedUsers);
+      
+      setSelectedUsers(currentSharedUsers);
+    } catch (err) {
+      console.error('Error loading current shares:', err);
+    }
+  };
+
   // Handle position change
   const handlePositionChange = () => {
     if (onPositionChange) {
@@ -136,6 +208,40 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
       onClose();
     }
   };
+
+  // Handle adding a user to share with
+  const handleAddUser = (userToAdd: any) => {
+    if (!selectedUsers.find(u => u.id === userToAdd.id)) {
+      setSelectedUsers(prev => [...prev, userToAdd]);
+      // Automatically set privacy to shared when users are selected
+      if (privacyLevel !== 'shared') {
+        setPrivacyLevel('shared');
+      }
+    }
+  };
+
+  // Handle removing a user from sharing
+  const handleRemoveUser = (userId: string) => {
+    setSelectedUsers(prev => prev.filter(u => u.id !== userId));
+    // If no users selected, change back to private
+    const remainingUsers = selectedUsers.filter(u => u.id !== userId);
+    if (remainingUsers.length === 0 && privacyLevel === 'shared') {
+      setPrivacyLevel('private');
+    }
+  };
+
+  // Filter available users based on search and already selected
+  const filteredAvailableUsers = availableUsers.filter(user => {
+    const matchesSearch = !searchTerm || 
+      user.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.display_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.discord_username?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const notAlreadySelected = !selectedUsers.find(su => su.id === user.id);
+    
+    return matchesSearch && notAlreadySelected;
+  });
 
   // Handle existing screenshot deletion
   const handleDeleteExistingScreenshot = (screenshotId: string) => {
@@ -389,6 +495,13 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
       setError('You do not have permission to edit this POI.');
       return;
     }
+
+    // Validate shared privacy level workflow
+    if (privacyLevel === 'shared' && selectedUsers.length === 0) {
+      setError('Please select users to share with or change privacy level to Private.');
+      return;
+    }
+
     setIsSubmitting(true);
     setError(null);
 
@@ -411,26 +524,24 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
         const newScreenshotId = crypto.randomUUID();
         const fileExt = pendingFile.displayFile.name.split('.').pop() || 'jpg';
         
-        // Upload original file
-        const originalFileName = `poi_originals/${poi.id}/${newScreenshotId}_original.${fileExt}`;
-        const { data: originalUploadData, error: originalUploadError } = await supabase.storage
-          .from('screenshots')
-          .upload(originalFileName, pendingFile.originalFile);
-        if (originalUploadError) throw originalUploadError;
-        const { data: originalUrlData } = supabase.storage.from('screenshots').getPublicUrl(originalFileName);
+        // Upload original file with WebP conversion
+        const originalFileName = `poi_originals/${poi.id}/${newScreenshotId}_original`;
+        const originalUploadResult = await uploadPoiScreenshot(pendingFile.originalFile, originalFileName);
 
-        // Upload display file (cropped or same as original)
-        const displayFileName = `poi_screenshots/${poi.id}/${newScreenshotId}_display.${fileExt}`;
-        const { data: displayUploadData, error: displayUploadError } = await supabase.storage
-          .from('screenshots')
-          .upload(displayFileName, pendingFile.displayFile);
-        if (displayUploadError) throw displayUploadError;
-        const { data: displayUrlData } = supabase.storage.from('screenshots').getPublicUrl(displayFileName);
+        // Upload display file (cropped or same as original) with WebP conversion
+        const displayFileName = `poi_screenshots/${poi.id}/${newScreenshotId}_display`;
+        const displayUploadResult = await uploadPoiScreenshot(pendingFile.displayFile, displayFileName);
+        
+        // Show conversion feedback for the first upload
+        if (filesToUploadActuallyNew[0] === pendingFile && displayUploadResult.compressionRatio) {
+          const stats = formatConversionStats(displayUploadResult);
+          setConversionStats(stats);
+        }
 
         newUploadedScreenshotObjects.push({
           id: newScreenshotId, 
-          url: displayUrlData.publicUrl, // Display URL (cropped or original)
-          original_url: originalUrlData.publicUrl, // Original URL
+          url: displayUploadResult.url, // Display URL (cropped or original)
+          original_url: originalUploadResult.url, // Original URL
           crop_details: pendingFile.cropDetails, // Store the crop data
           uploaded_by: user!.id,
           upload_date: new Date().toISOString(),
@@ -443,18 +554,14 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
 
       const filesToUploadAsEdits = pendingCroppedFiles.filter(pf => pf.originalScreenshotId && pf.originalScreenshotUrl);
       for (const pendingVersion of filesToUploadAsEdits) {
-        const fileExt = pendingVersion.displayFile.name.split('.').pop() || 'jpg';
-        const displayFileName = `poi_screenshots/${poi.id}/edited_${pendingVersion.originalScreenshotId}_${Date.now()}.${fileExt}`;
+        const displayFileName = `poi_screenshots/${poi.id}/edited_${pendingVersion.originalScreenshotId}_${Date.now()}`;
         
-        const { data: displayUploadData, error: displayUploadError } = await supabase.storage
-          .from('screenshots')
-          .upload(displayFileName, pendingVersion.displayFile);
-        if (displayUploadError) throw displayUploadError;
-        const { data: displayUrlData } = supabase.storage.from('screenshots').getPublicUrl(displayFileName);
+        // Upload display file with WebP conversion
+        const displayUploadResult = await uploadPoiScreenshot(pendingVersion.displayFile, displayFileName);
         
         editedScreenshotObjects.push({
           id: pendingVersion.originalScreenshotId!, 
-          url: displayUrlData.publicUrl, 
+          url: displayUploadResult.url, 
           original_url: pendingVersion.originalScreenshotUrl, // Preserve the original source URL
           crop_details: pendingVersion.cropDetails, // The new crop details
           uploaded_by: user!.id, // Should be updated_by for edits
@@ -494,7 +601,64 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
 
       if (updateError) throw updateError;
 
-      // 5. Delete files from storage
+      // 5. Handle sharing updates
+      if (privacyLevel === 'shared') {
+        // Get current shares
+        const { data: currentShares } = await supabase
+          .from('poi_shares')
+          .select('shared_with_user_id')
+          .eq('poi_id', poi.id);
+
+        const currentUserIds = new Set(currentShares?.map(s => s.shared_with_user_id) || []);
+        const newUserIds = new Set(selectedUsers.map(u => u.id));
+
+        // Remove shares that are no longer selected
+        const toRemove = [...currentUserIds].filter(id => !newUserIds.has(id));
+        if (toRemove.length > 0) {
+          const { error: shareDeleteError } = await supabase
+            .from('poi_shares')
+            .delete()
+            .eq('poi_id', poi.id)
+            .in('shared_with_user_id', toRemove);
+            
+          if (shareDeleteError) {
+            console.error('Error removing shares:', shareDeleteError);
+            throw new Error('Failed to update POI sharing settings');
+          }
+        }
+
+        // Add new shares
+        const toAdd = [...newUserIds].filter(id => !currentUserIds.has(id));
+        if (toAdd.length > 0) {
+          const newShares = toAdd.map(userId => ({
+            poi_id: poi.id,
+            shared_with_user_id: userId,
+            shared_by_user_id: user!.id
+          }));
+          
+          const { error: shareInsertError } = await supabase
+            .from('poi_shares')
+            .insert(newShares);
+            
+          if (shareInsertError) {
+            console.error('Error inserting new shares:', shareInsertError);
+            throw new Error('Failed to save POI sharing settings');
+          }
+        }
+      } else {
+        // If privacy level changed away from shared, remove all shares
+        const { error: shareDeleteAllError } = await supabase
+          .from('poi_shares')
+          .delete()
+          .eq('poi_id', poi.id);
+          
+        if (shareDeleteAllError) {
+          console.error('Error removing all shares:', shareDeleteAllError);
+          throw new Error('Failed to update POI privacy settings');
+        }
+      }
+
+      // 6. Delete files from storage
       // These are: 
       //    - original URLs of screenshots explicitly marked for deletion (screenshotsToDelete translates to URLs)
       //    - old CROPPED URLs of screenshots that were re-cropped (urlsOfOldCroppedFilesToDelete)
@@ -597,6 +761,13 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
               </div>
             )}
 
+            {/* Conversion Stats Display */}
+            {conversionStats && (
+              <div className="bg-green-900/20 border border-green-800 rounded-lg p-4">
+                <p className="text-green-300 text-sm">{conversionStats}</p>
+              </div>
+            )}
+
             {/* Title */}
             <div>
               <label htmlFor="title" className="block text-sm font-medium text-amber-200 mb-2">
@@ -680,15 +851,7 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
                       ))}
                   </optgroup>
                 ))}
-                {customIcons.length > 0 && (
-                  <optgroup label="Custom Icons">
-                    {customIcons.map(icon => (
-                      <option key={`custom_${icon.id}`} value={`custom_${icon.id}`}>
-                        {icon.name} (Custom)
-                      </option>
-                    ))}
-                  </optgroup>
-                )}
+
               </select>
 
               {/* Show More Details Toggle */}
@@ -713,7 +876,7 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
                         </h4>
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                           {categoryTypes.map(poiType => {
-                            const imageUrl = getDisplayImageUrl(poiType.icon, customIcons);
+                            const imageUrl = getDisplayImageUrl(poiType.icon);
                             
                             return (
                               <label
@@ -775,48 +938,7 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
                     );
                   })}
 
-                  {/* Custom Icons Section */}
-                  {customIcons.length > 0 && (
-                    <div>
-                      <h4 className="text-sm font-medium text-amber-300 mb-2">
-                        Custom Icons
-                      </h4>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                        {customIcons.map(customIcon => (
-                          <label
-                            key={`custom_${customIcon.id}`}
-                            className={`flex items-center space-x-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                              selectedPoiTypeId === `custom_${customIcon.id}`
-                                ? 'border-amber-500 bg-amber-900/20'
-                                : 'border-slate-600 hover:border-slate-500 bg-slate-800'
-                            }`}
-                          >
-                            <input
-                              type="radio"
-                              name="poiType"
-                              value={`custom_${customIcon.id}`}
-                              checked={selectedPoiTypeId === `custom_${customIcon.id}`}
-                              onChange={(e) => setSelectedPoiTypeId(e.target.value)}
-                              className="sr-only"
-                            />
-                            
-                            {/* Custom Icon */}
-                            <div className="w-8 h-8 rounded-full border border-slate-500 shadow-sm flex items-center justify-center flex-shrink-0 bg-slate-700">
-                              <img
-                                src={customIcon.image_url}
-                                alt={customIcon.name}
-                                className="w-5 h-5 object-contain"
-                              />
-                            </div>
-                            
-                            <span className="text-sm font-medium text-amber-200 truncate">
-                              {customIcon.name}
-                            </span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+
                 </div>
               )}
             </div>
@@ -856,6 +978,127 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
                 })}
               </div>
             </div>
+
+            {/* Sharing Section */}
+            {showSharingSection && (
+              <div>
+                <label className="block text-sm font-medium text-amber-200 mb-3">
+                  Share with Users
+                </label>
+                
+                {/* Currently Selected Users */}
+                {selectedUsers.length > 0 && (
+                  <div className="mb-4">
+                    <h4 className="text-sm font-medium text-amber-200 mb-2 flex items-center gap-2">
+                      <Users className="w-4 h-4" />
+                      Selected Users ({selectedUsers.length})
+                    </h4>
+                    <div className="space-y-2">
+                      {selectedUsers.map(selectedUser => (
+                        <div key={selectedUser.id} className="bg-slate-800 border border-slate-600 rounded-lg p-3">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <UserAvatar
+                                user={selectedUser}
+                                size="sm"
+                                className="w-8 h-8"
+                              />
+                              <div>
+                                <p className="text-amber-200 font-medium"
+                                   style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                                  {selectedUser.display_name || selectedUser.username}
+                                </p>
+                                <p className="text-slate-400 text-xs">{selectedUser.email}</p>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveUser(selectedUser.id)}
+                              className="p-1.5 text-red-300 hover:text-red-100 hover:bg-slate-700/50 rounded transition-colors"
+                              title="Remove access"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Add Users Section */}
+                <div>
+                  <h4 className="text-sm font-medium text-amber-200 mb-3 flex items-center gap-2">
+                    <UserPlus className="w-4 h-4" />
+                    Add Users
+                  </h4>
+                  
+                  {/* Search Input */}
+                  <div className="relative mb-4">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Search users by name or email..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2 bg-slate-800 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-400 focus:outline-none focus:border-amber-400 transition-colors"
+                      style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
+                    />
+                  </div>
+
+                  {/* Available Users */}
+                  <div className="max-h-60 overflow-y-auto space-y-2">
+                    {loadingUsers ? (
+                      <div className="text-center py-8">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-400 mx-auto mb-4"></div>
+                        <p className="text-slate-400">Loading users...</p>
+                      </div>
+                    ) : filteredAvailableUsers.length === 0 ? (
+                      <div className="text-center py-8">
+                        <Users className="w-12 h-12 text-slate-500 mx-auto mb-4" />
+                        <p className="text-slate-300 mb-2"
+                           style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                          {searchTerm ? 'No users found matching your search' : 'No more users to share with'}
+                        </p>
+                        <p className="text-slate-400 text-sm">
+                          {searchTerm ? 'Try adjusting your search terms' : 'All available users have already been selected'}
+                        </p>
+                      </div>
+                    ) : (
+                      filteredAvailableUsers.map(availableUser => (
+                        <div key={availableUser.id} className="bg-slate-800 border border-slate-600 rounded-lg p-3 hover:border-slate-500 transition-colors">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <UserAvatar
+                                user={availableUser}
+                                size="sm"
+                                className="w-8 h-8"
+                              />
+                              <div>
+                                <p className="text-amber-200 font-medium"
+                                   style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                                  {availableUser.display_name || availableUser.username}
+                                </p>
+                                <p className="text-slate-400 text-xs">{availableUser.email}</p>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleAddUser(availableUser)}
+                              className="bg-green-600 hover:bg-green-500 text-white px-3 py-1.5 rounded text-sm transition-colors flex items-center gap-2"
+                              style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
+                            >
+                              <UserPlus className="w-3 h-3" />
+                              <span>Add</span>
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Screenshots Management */}
             <div>

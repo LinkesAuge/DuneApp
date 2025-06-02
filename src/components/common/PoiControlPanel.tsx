@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { Poi, PoiType, CustomIcon } from '../../types';
+import { Poi, PoiType } from '../../types';
 import { ChevronDown, ChevronUp, Plus, Settings, Eye, EyeOff, Filter } from 'lucide-react';
-import CustomPoiTypeModal from '../hagga-basin/CustomPoiTypeModal';
+
 
 interface PoiControlPanelProps {
   pois: Poi[];
   poiTypes: PoiType[];
-  customIcons: CustomIcon[];
+
   selectedPoiTypes: string[];
   onTypeToggle: (typeId: string) => void;
   onCategoryToggle: (category: string, checked: boolean) => void;
@@ -23,7 +23,7 @@ interface PoiControlPanelProps {
 const PoiControlPanel: React.FC<PoiControlPanelProps> = ({
   pois,
   poiTypes,
-  customIcons,
+
   selectedPoiTypes,
   onTypeToggle,
   onCategoryToggle,
@@ -37,7 +37,7 @@ const PoiControlPanel: React.FC<PoiControlPanelProps> = ({
   userCreatedPoiTypes = []
 }) => {
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
-  const [showCustomPoiTypeModal, setShowCustomPoiTypeModal] = useState(false);
+
   const [editingPoiType, setEditingPoiType] = useState<PoiType | null>(null);
 
   // Helper functions
@@ -234,7 +234,7 @@ const PoiControlPanel: React.FC<PoiControlPanelProps> = ({
                 {onCustomPoiTypeCreated && (
                   <div className="relative group">
                     <button
-                      onClick={() => setShowCustomPoiTypeModal(true)}
+                      onClick={() => {/* Custom POI creation removed */}}
                       disabled={userCreatedPoiTypes.length >= 5}
                       className={`p-2 rounded-lg transition-all duration-300 ${
                         userCreatedPoiTypes.length >= 5
@@ -293,20 +293,7 @@ const PoiControlPanel: React.FC<PoiControlPanelProps> = ({
         </div>
       </div>
 
-      {/* Custom POI Type Modal */}
-      {showCustomPoiTypeModal && onCustomPoiTypeCreated && (
-        <CustomPoiTypeModal
-          poiType={editingPoiType}
-          customIcons={customIcons}
-          onClose={() => {
-            setShowCustomPoiTypeModal(false);
-            setEditingPoiType(null);
-          }}
-          onPoiTypeCreated={onCustomPoiTypeCreated}
-          onPoiTypeUpdated={onCustomPoiTypeUpdated}
-          onPoiTypeDeleted={onCustomPoiTypeDeleted}
-        />
-      )}
+
     </div>
   );
 };

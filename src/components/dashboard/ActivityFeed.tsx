@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { ActivityItem } from '../../types';
+import { Rank } from '../../types/profile';
 import DiamondIcon from '../common/DiamondIcon';
 import UserAvatar from '../common/UserAvatar';
+import RankBadge from '../common/RankBadge';
 import { 
   MapPin, 
   MessageSquare, 
@@ -12,7 +14,8 @@ import {
   Clock,
   Edit,
   Trash2,
-  AlertTriangle
+  AlertTriangle,
+  Award
 } from 'lucide-react';
 
 interface ActivityFeedProps {
@@ -29,6 +32,7 @@ interface EnhancedActivityItem extends ActivityItem {
     custom_avatar_url?: string | null;
     discord_avatar_url?: string | null;
     use_discord_avatar?: boolean;
+    rank?: Rank | null;
   };
 }
 
@@ -38,11 +42,10 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ limit = 20 }) => {
   const [error, setError] = useState<string | null>(null);
 
   const fetchUserProfile = async (userId: string) => {
-    if (!userId) return null;
-    
+    try {
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, username, display_name, discord_username, custom_avatar_url, discord_avatar_url, use_discord_avatar')
+        .select('id, username, display_name, discord_username, custom_avatar_url, discord_avatar_url, use_discord_avatar, rank:ranks(*)')
       .eq('id', userId)
       .single();
     
@@ -52,6 +55,10 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ limit = 20 }) => {
     }
     
     return data;
+    } catch (err) {
+      console.error('Error fetching user profile:', err);
+      return null;
+    }
   };
 
   const fetchActivities = async () => {
@@ -291,6 +298,7 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ limit = 20 }) => {
       Edit: <Edit size={14} strokeWidth={1.5} />,
       Trash2: <Trash2 size={14} strokeWidth={1.5} />,
       AlertTriangle: <AlertTriangle size={14} strokeWidth={1.5} />,
+      Award: <Award size={14} strokeWidth={1.5} />,
     };
     return iconMap[iconName as keyof typeof iconMap] || <Clock size={14} strokeWidth={1.5} />;
   };
@@ -352,6 +360,12 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ limit = 20 }) => {
                             style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
                         {activity.user.display_name || activity.user.discord_username || activity.user.username}
                       </span>
+                      {activity.user.rank && (
+                        <>
+                          <span className="text-amber-300/50">•</span>
+                          <RankBadge rank={activity.user.rank} size="xxs" />
+                        </>
+                      )}
                       {activity.description && (
                         <>
                           <span className="text-amber-300/50">•</span>

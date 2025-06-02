@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { TransformWrapper, TransformComponent, ReactZoomPanPinchRef } from 'react-zoom-pan-pinch';
-import { Poi, PoiType, CustomIcon } from '../../types';
+import { Poi, PoiType } from '../../types';
 import { ZoomIn, ZoomOut, RotateCcw, Plus } from 'lucide-react';
 import POIPlacementModal from '../hagga-basin/POIPlacementModal';
 import MapPOIMarker from '../hagga-basin/MapPOIMarker';
@@ -10,7 +10,7 @@ interface InteractivePoiImageProps {
   imageAlt: string;
   pois: Poi[];
   poiTypes: PoiType[];
-  customIcons: CustomIcon[];
+
   selectedPoiTypes: string[];
   onPoiCreated: (poi: Poi) => void;
   onPoiUpdated?: (poi: Poi) => void;
@@ -56,7 +56,7 @@ const InteractivePoiImage: React.FC<InteractivePoiImageProps> = ({
   imageAlt,
   pois,
   poiTypes,
-  customIcons,
+
   selectedPoiTypes,
   onPoiCreated,
   onPoiUpdated,
@@ -320,7 +320,6 @@ const InteractivePoiImage: React.FC<InteractivePoiImageProps> = ({
                   <MapPOIMarker
                     poi={poi}
                     poiType={poiType}
-                    customIcons={customIcons}
                     zoom={currentZoom}
                     mapSettings={mapSettings}
                     onEdit={setEditingPoi}
@@ -360,7 +359,6 @@ const InteractivePoiImage: React.FC<InteractivePoiImageProps> = ({
             y: placementCoordinates.y
           }}
           poiTypes={poiTypes}
-          customIcons={customIcons}
           onClose={() => {
             setShowPlacementModal(false);
             setPlacementCoordinates(null);

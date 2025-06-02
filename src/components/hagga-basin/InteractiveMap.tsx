@@ -6,7 +6,7 @@ import type {
   HaggaBasinOverlay, 
   Poi, 
   PoiType, 
-  CustomIcon, 
+ 
   PixelCoordinates 
 } from '../../types';
 import { getMarkerPosition, getRelativeCoordinates, validateCoordinates } from '../../lib/coordinates';
@@ -26,7 +26,7 @@ interface InteractiveMapProps {
   onPoiDeleted?: (poiId: string) => void;
   onPoiShare?: (poi: Poi) => void;
   onPoiGalleryOpen?: (poi: Poi) => void;
-  customIcons?: CustomIcon[];
+
   placementMode?: boolean;
   onPlacementModeChange?: (mode: boolean) => void;
   // Help tooltip props
@@ -76,7 +76,7 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
   onPoiDeleted,
   onPoiShare,
   onPoiGalleryOpen,
-  customIcons = [],
+
   placementMode = false,
   onPlacementModeChange,
   // Help tooltip props
@@ -305,7 +305,7 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
       <div 
         className="absolute inset-0 bg-cover bg-center bg-no-repeat"
         style={{
-          backgroundImage: `url(/images/main-bg.jpg)`
+                      backgroundImage: `url(/images/main-bg.webp)`
         }}
       />
       
@@ -380,7 +380,6 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
                   <MapPOIMarker
                     poi={poi}
                     poiType={poiType}
-                    customIcons={customIcons}
                     zoom={currentZoom}
                     mapSettings={mapSettings}
                     onEdit={setEditingPoi}
@@ -522,7 +521,6 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
         <POIPlacementModal
           coordinates={placementCoordinates}
           poiTypes={poiTypes}
-          customIcons={customIcons}
           onPoiCreated={handlePoiCreated}
           onClose={() => {
             setShowPlacementModal(false);
@@ -540,25 +538,17 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
           <POICard
             poi={selectedPoi}
             poiType={poiType}
-            customIcons={customIcons}
             isOpen={true}
             onClose={() => setSelectedPoi(null)}
             onEdit={() => {
               setEditingPoi(selectedPoi);
               setSelectedPoi(null);
             }}
-            onDelete={async () => {
-              if (window.confirm(`Are you sure you want to delete "${selectedPoi.title}"?`)) {
-                try {
+            onDelete={() => {
                   if (onPoiDeleted) {
-                    await onPoiDeleted(selectedPoi.id);
+                onPoiDeleted(selectedPoi.id);
                   }
                   setSelectedPoi(null);
-                } catch (error) {
-                  console.error('Error deleting POI:', error);
-                  alert('Failed to delete POI. Please try again.');
-                }
-              }
             }}
             onShare={() => {
               if (onPoiShare) {
@@ -580,7 +570,6 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
         <POIEditModal
           poi={editingPoi}
           poiTypes={poiTypes}
-          customIcons={customIcons}
           onPoiUpdated={(updatedPoi) => {
             if (onPoiUpdated) {
               onPoiUpdated(updatedPoi);

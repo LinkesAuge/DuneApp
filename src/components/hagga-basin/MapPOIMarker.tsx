@@ -1,14 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Lock, Users, Eye } from 'lucide-react';
-import type { Poi, PoiType, CustomIcon } from '../../types';
+import { Lock, Users, Eye, Share, Award } from 'lucide-react';
+import type { Poi, PoiType } from '../../types';
 import type { MapSettings } from '../../lib/useMapSettings';
+import { Rank } from '../../types/profile';
+import { useAuth } from '../auth/AuthProvider';
 import { supabase } from '../../lib/supabase';
 
 interface MapPOIMarkerProps {
   poi: Poi;
   poiType: PoiType;
-  customIcons: CustomIcon[];
+
   zoom?: number;
   mapSettings?: MapSettings | null;
   onEdit?: (poi: Poi) => void;
@@ -19,6 +21,7 @@ interface MapPOIMarkerProps {
   // Selection mode props
   selectionMode?: boolean;
   isSelected?: boolean;
+  user?: { id: string };
 }
 
 // Helper function to determine if an icon is a URL or emoji
@@ -27,22 +30,8 @@ const isIconUrl = (icon: string): boolean => {
 };
 
 // Helper function to get display image URL for POI icons
-const getDisplayImageUrl = (poi: Poi, poiType: PoiType, customIcons: CustomIcon[]): string | null => {
-  // First priority: Check if POI has a custom icon reference
-  if (poi.custom_icon_id) {
-    const customIcon = customIcons.find(ci => ci.id === poi.custom_icon_id);
-    if (customIcon) {
-      return customIcon.image_url;
-    }
-  }
-  
-  // Second priority: Check if POI type icon is a custom icon reference
-  const customIconByPoiType = customIcons.find(ci => ci.id === poiType.icon || ci.name === poiType.icon);
-  if (customIconByPoiType) {
-    return customIconByPoiType.image_url;
-  }
-  
-  // Third priority: Check if POI type icon is already a URL
+const getDisplayImageUrl = (poi: Poi, poiType: PoiType): string | null => {
+  // Check if POI type icon is already a URL
   if (isIconUrl(poiType.icon)) {
     return poiType.icon;
   }
@@ -67,7 +56,7 @@ const privacyColors = {
 const MapPOIMarker: React.FC<MapPOIMarkerProps> = ({ 
   poi, 
   poiType, 
-  customIcons, 
+ 
   zoom = 1, 
   mapSettings,
   onEdit,
@@ -76,35 +65,48 @@ const MapPOIMarker: React.FC<MapPOIMarkerProps> = ({
   onImageClick,
   isHighlighted,
   selectionMode = false,
-  isSelected = false
+  isSelected = false,
+  user
 }) => {
+  const { user: authUser } = useAuth();
   const [showCard, setShowCard] = useState(false);
   const [hoverTimeout, setHoverTimeout] = useState<NodeJS.Timeout | null>(null);
-  const [userInfo, setUserInfo] = useState<{ username: string; display_name?: string | null; discord_username?: string | null; custom_avatar_url?: string | null; discord_avatar_url?: string | null; use_discord_avatar?: boolean; } | null>(null);
+  const [userInfo, setUserInfo] = useState<{ 
+    username: string; 
+    display_name?: string | null; 
+    discord_username?: string | null; 
+    custom_avatar_url?: string | null; 
+    discord_avatar_url?: string | null; 
+    use_discord_avatar?: boolean;
+    rank?: Rank | null;
+  } | null>(null);
   const [tooltipPosition, setTooltipPosition] = useState<{ x: number; y: number } | null>(null);
   const markerRef = useRef<HTMLDivElement>(null);
   
-  const imageUrl = getDisplayImageUrl(poi, poiType, customIcons);
+  const imageUrl = getDisplayImageUrl(poi, poiType);
   const PrivacyIcon = privacyIcons[poi.privacy_level];
   const privacyColor = privacyColors[poi.privacy_level];
 
   // Fetch user information for POI creator
   useEffect(() => {
     const fetchUserInfo = async () => {
-      if (poi.created_by) {
+      if (!poi.created_by) return;
+      
         try {
-          const { data, error } = await supabase
+        const { data: userData, error } = await supabase
             .from('profiles')
-            .select('username, display_name, discord_username, custom_avatar_url, discord_avatar_url, use_discord_avatar')
+          .select('username, display_name, discord_username, custom_avatar_url, discord_avatar_url, use_discord_avatar, rank:ranks(*)')
             .eq('id', poi.created_by)
             .single();
           
-          if (data && !error) {
-            setUserInfo(data);
-          }
-        } catch (error) {
+        if (error) {
           console.error('Error fetching user info:', error);
+          return;
         }
+
+        setUserInfo(userData);
+      } catch (error) {
+        console.error('Error fetching user info:', error);
       }
     };
 
@@ -176,21 +178,19 @@ const MapPOIMarker: React.FC<MapPOIMarkerProps> = ({
       <div className="relative">
         {/* POI Icon */}
         <div 
-          className={`rounded-full border-2 shadow-lg flex items-center justify-center transition-all duration-200 cursor-pointer hover:scale-110 ${
+          className={`flex items-center justify-center transition-all duration-200 cursor-pointer hover:scale-110 ${
             selectionMode 
               ? isSelected 
-                ? 'border-amber-400 ring-2 ring-amber-400/50' 
-                : 'border-white hover:border-amber-300'
+                ? 'ring-2 ring-amber-400/50' 
+                : 'hover:ring-1 hover:ring-amber-300/50'
               : isHighlighted 
-                ? 'border-amber-400 ring-2 ring-amber-400/50' 
-                : 'border-white'
+                ? 'ring-2 ring-amber-400/50' 
+                : ''
           }`}
           style={{
             width: `${iconSize}px`,
             height: `${iconSize}px`,
-            backgroundColor: poiType.icon_has_transparent_background && imageUrl 
-              ? 'transparent' 
-              : poiType.color
+            backgroundColor: 'transparent'
           }}
         >
           {imageUrl ? (
@@ -201,16 +201,16 @@ const MapPOIMarker: React.FC<MapPOIMarkerProps> = ({
               style={{
                 width: `${innerIconSize}px`,
                 height: `${innerIconSize}px`,
-                filter: poiType.icon_has_transparent_background ? 'none' : 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))'
+                filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.8)) drop-shadow(0 0 8px rgba(0,0,0,0.5)) drop-shadow(0 0 12px rgba(0,0,0,0.3)) drop-shadow(0 0 18px rgba(0,0,0,0.2))'
               }}
             />
           ) : (
             <span 
               className="leading-none font-medium"
               style={{ 
-                fontSize: `${innerIconSize * 0.5}px`,
-                color: poiType.icon_has_transparent_background ? poiType.color : 'white',
-                textShadow: poiType.icon_has_transparent_background ? '0 1px 2px rgba(0,0,0,0.3)' : 'none'
+                fontSize: `${innerIconSize * 0.6}px`,
+                color: poiType.color,
+                textShadow: '0 2px 6px rgba(0,0,0,0.8), 0 0 8px rgba(0,0,0,0.5), 0 0 12px rgba(0,0,0,0.3), 0 0 18px rgba(0,0,0,0.2)'
               }}
             >
               {poiType.icon}
@@ -246,7 +246,7 @@ const MapPOIMarker: React.FC<MapPOIMarkerProps> = ({
             
             {/* Outer ring - ping animation */}
             <div 
-              className="absolute animate-ping rounded-full border-4 border-green-500 opacity-75"
+              className="absolute animate-ping border-4 border-green-500 opacity-75"
               style={{
                 width: `${iconSize * 1.8}px`,
                 height: `${iconSize * 1.8}px`,
@@ -256,7 +256,7 @@ const MapPOIMarker: React.FC<MapPOIMarkerProps> = ({
             />
             {/* Middle ring - pulse animation */}
             <div 
-              className="absolute animate-pulse rounded-full border-3 border-green-400 opacity-60"
+              className="absolute animate-pulse border-3 border-green-400 opacity-60"
               style={{
                 width: `${iconSize * 1.4}px`,
                 height: `${iconSize * 1.4}px`,
@@ -267,7 +267,7 @@ const MapPOIMarker: React.FC<MapPOIMarkerProps> = ({
             />
             {/* Inner glow */}
             <div 
-              className="absolute rounded-full bg-green-500/20"
+              className="absolute bg-green-500/20"
               style={{
                 width: `${iconSize}px`,
                 height: `${iconSize}px`,
@@ -296,31 +296,9 @@ const MapPOIMarker: React.FC<MapPOIMarkerProps> = ({
           </div>
         )}
 
-        {/* Shared POI Indicator - Special highlighting for shared POIs */}
-        {poi.privacy_level === 'shared' && mapSettings?.showSharedIndicators && (
-          <div className="absolute inset-0 rounded-full animate-pulse">
-            <div className="absolute inset-0 rounded-full border-2 border-blue-400 opacity-60"></div>
-            <div className="absolute inset-0 rounded-full border border-blue-300 opacity-40 scale-110"></div>
-          </div>
-        )}
 
-      {/* Screenshot indicator */}
-      {poi.screenshots && poi.screenshots.length > 0 && (
-        <div 
-          className="absolute bg-spice-500 rounded-full border border-white flex items-center justify-center"
-          style={{
-            width: `12px`,
-            height: `12px`,
-            bottom: `-4px`,
-            right: `-4px`,
-            fontSize: `10px`
-          }}
-        >
-          <span className="text-white font-bold leading-none">
-            {poi.screenshots.length}
-          </span>
-        </div>
-      )}
+
+
       </div>
       </div>
 
@@ -436,11 +414,11 @@ const MapPOIMarker: React.FC<MapPOIMarkerProps> = ({
                 </div>
               )}
 
-              {/* Creator info - Fixed duplicate text */}
+              {/* Creator info - Enhanced with rank */}
               {userInfo && (
                 <div>
                   <h4 className="text-xs font-light text-amber-200/90 mb-1 tracking-wide">Creator</h4>
-                  <div className="flex items-center gap-2 text-xs text-amber-300/90">
+                  <div className="flex items-center gap-2 text-xs text-amber-300/90 flex-wrap">
                     <div className="flex items-center gap-1">
                       {userInfo && (userInfo.custom_avatar_url || userInfo.discord_avatar_url) ? (
                         <img
@@ -463,8 +441,36 @@ const MapPOIMarker: React.FC<MapPOIMarkerProps> = ({
                         {userInfo?.display_name || userInfo?.username || 'Unknown User'}
                       </span>
                     </div>
+                    {userInfo?.rank && (
+                      <span 
+                        className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium border"
+                        style={{ 
+                          backgroundColor: `${userInfo.rank.color}20`,
+                          borderColor: `${userInfo.rank.color}40`, 
+                          color: userInfo.rank.text_color,
+                          fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif"
+                        }}
+                      >
+                        <Award className="w-2.5 h-2.5 mr-1" style={{ color: userInfo.rank.text_color }} />
+                        {userInfo.rank.name}
+                      </span>
+                    )}
                   </div>
                 </div>
+              )}
+
+              {/* Only show share button for private/shared POIs that the user owns */}
+              {onShare && user && poi.created_by === user.id && poi.privacy_level !== 'global' && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onShare(poi);
+                  }}
+                  className="p-1 text-green-300 hover:text-green-100 hover:bg-slate-700/50 rounded transition-colors"
+                  title="Share POI"
+                >
+                  <Share className="w-3 h-3" />
+                </button>
               )}
 
               {/* Action hint */}

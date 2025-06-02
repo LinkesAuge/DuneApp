@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, UserPlus, Users, Search, Trash2, Check, AlertCircle, Share2 } from 'lucide-react';
+import { X, UserPlus, Users, Search, Trash2, Check, AlertCircle, Share2, Eye, Lock } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-import type { Poi, User, PoiShare } from '../../types';
+import type { Poi, User, PoiShare, PrivacyLevel } from '../../types';
 import { useAuth } from '../auth/AuthProvider';
 import UserAvatar from '../common/UserAvatar';
 
@@ -23,6 +23,7 @@ interface SharePoiModalProps {
   poi: Poi | null;
   onShareAdded?: (share: PoiShare) => void;
   onShareRemoved?: (shareUserId: string) => void;
+  onPrivacyLevelChanged?: (poiId: string, newPrivacyLevel: PrivacyLevel) => void;
 }
 
 const SharePoiModal: React.FC<SharePoiModalProps> = ({
@@ -30,7 +31,8 @@ const SharePoiModal: React.FC<SharePoiModalProps> = ({
   onClose,
   poi,
   onShareAdded,
-  onShareRemoved
+  onShareRemoved,
+  onPrivacyLevelChanged
 }) => {
   const { user } = useAuth();
   
@@ -42,6 +44,7 @@ const SharePoiModal: React.FC<SharePoiModalProps> = ({
   const [existingShares, setExistingShares] = useState<PoiShare[]>([]);
   const [sharing, setSharing] = useState<string | null>(null);
   const [removing, setRemoving] = useState<string | null>(null);
+  const [updatingPrivacy, setUpdatingPrivacy] = useState(false);
 
   // Load data when modal opens
   useEffect(() => {
@@ -84,6 +87,32 @@ const SharePoiModal: React.FC<SharePoiModalProps> = ({
     }
   };
 
+  // Helper function to update POI privacy level
+  const updatePoiPrivacyLevel = async (newPrivacyLevel: PrivacyLevel) => {
+    if (!poi || !user) return;
+
+    setUpdatingPrivacy(true);
+    try {
+      const { error } = await supabase
+        .from('pois')
+        .update({ privacy_level: newPrivacyLevel })
+        .eq('id', poi.id);
+
+      if (error) throw error;
+
+      // Call callback to update parent state
+      if (onPrivacyLevelChanged) {
+        onPrivacyLevelChanged(poi.id, newPrivacyLevel);
+      }
+
+    } catch (err) {
+      console.error('Error updating privacy level:', err);
+      throw err;
+    } finally {
+      setUpdatingPrivacy(false);
+    }
+  };
+
   const handleShareWithUser = async (targetUser: AppUser) => {
     if (!poi || !user) return;
 
@@ -98,6 +127,7 @@ const SharePoiModal: React.FC<SharePoiModalProps> = ({
     setError(null);
 
     try {
+      // Add the share
       const { data, error } = await supabase
         .from('poi_shares')
         .insert({
@@ -112,6 +142,11 @@ const SharePoiModal: React.FC<SharePoiModalProps> = ({
 
       // Update local state
       setExistingShares(prev => [...prev, data]);
+
+      // Auto-convert privacy level from 'private' to 'shared' when first user is added
+      if (poi.privacy_level === 'private' && existingShares.length === 0) {
+        await updatePoiPrivacyLevel('shared');
+      }
 
       // Call callback
       if (onShareAdded) {
@@ -142,7 +177,13 @@ const SharePoiModal: React.FC<SharePoiModalProps> = ({
       if (error) throw error;
 
       // Update local state
-      setExistingShares(prev => prev.filter(share => share.shared_with_user_id !== shareUserId));
+      const updatedShares = existingShares.filter(share => share.shared_with_user_id !== shareUserId);
+      setExistingShares(updatedShares);
+
+      // Auto-convert privacy level from 'shared' to 'private' when last user is removed
+      if (poi.privacy_level === 'shared' && updatedShares.length === 0) {
+        await updatePoiPrivacyLevel('private');
+      }
 
       // Call callback
       if (onShareRemoved) {
@@ -178,6 +219,71 @@ const SharePoiModal: React.FC<SharePoiModalProps> = ({
 
   // Check if user is the owner
   const isOwner = poi.created_by === user?.id;
+
+  // Don't show sharing for global POIs
+  if (poi.privacy_level === 'global') {
+    return (
+      <div className="fixed inset-0 bg-black/60 z-[55] flex items-center justify-center p-4">
+        <div 
+          className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl max-w-md w-full"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="bg-slate-800/50 px-4 py-3 border-b border-slate-700 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-slate-700 border border-slate-600 flex items-center justify-center">
+                <Eye className="w-5 h-5 text-green-400" />
+              </div>
+              <h3 className="text-lg font-bold text-amber-200" 
+                  style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                Public POI
+              </h3>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-1.5 text-slate-400 hover:text-amber-300 hover:bg-slate-700/50 rounded transition-colors"
+              title="Close"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Content */}
+          <div className="p-6 text-center">
+            <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4 mb-4">
+              <div className="flex items-start gap-3">
+                <Eye className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" />
+                <div className="text-left">
+                  <p className="text-green-300 font-medium mb-1">This POI is Public</p>
+                  <p className="text-green-200/80 text-sm">
+                    Public POIs are visible to all users automatically. No individual sharing is needed.
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="bg-slate-800 border border-slate-600 rounded-lg p-3 mb-4">
+              <h4 className="text-amber-200 font-medium mb-1"
+                  style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                {poi.title}
+              </h4>
+              <p className="text-sm text-slate-400">
+                Map: {poi.map_type === 'hagga_basin' ? 'Hagga Basin' : 'Deep Desert'}
+              </p>
+            </div>
+
+            <button
+              onClick={onClose}
+              className="bg-amber-600 hover:bg-amber-500 text-white px-4 py-2 rounded-lg transition-colors"
+              style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
+            >
+              Got it
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-black/60 z-[55] flex items-center justify-center p-4">
@@ -219,15 +325,22 @@ const SharePoiModal: React.FC<SharePoiModalProps> = ({
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <div className={`px-2 py-1 rounded text-xs ${
-                  poi.privacy_level === 'global' 
-                    ? 'bg-green-500/20 text-green-400 border border-green-500/30' 
-                    : poi.privacy_level === 'private' 
+                <div className={`px-2 py-1 rounded text-xs flex items-center gap-1 ${
+                  poi.privacy_level === 'private' 
                     ? 'bg-red-500/20 text-red-400 border border-red-500/30'
                     : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
                 }`}>
-                  {poi.privacy_level === 'global' ? 'Public' : 
-                   poi.privacy_level === 'private' ? 'Private' : 'Shared'}
+                  {poi.privacy_level === 'private' ? (
+                    <>
+                      <Lock className="w-3 h-3" />
+                      <span>Private</span>
+                    </>
+                  ) : (
+                    <>
+                      <Users className="w-3 h-3" />
+                      <span>Shared</span>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -297,7 +410,7 @@ const SharePoiModal: React.FC<SharePoiModalProps> = ({
                           </div>
                           <button
                             onClick={() => handleRemoveShare(sharedUser.id)}
-                            disabled={removing === sharedUser.id}
+                            disabled={removing === sharedUser.id || updatingPrivacy}
                             className="p-1.5 text-red-300 hover:text-red-100 hover:bg-slate-700/50 rounded transition-colors disabled:opacity-50"
                             title="Remove access"
                           >
@@ -369,7 +482,7 @@ const SharePoiModal: React.FC<SharePoiModalProps> = ({
                             </div>
                             <button
                               onClick={() => handleShareWithUser(availableUser)}
-                              disabled={sharing === availableUser.id}
+                              disabled={sharing === availableUser.id || updatingPrivacy}
                               className="bg-green-600 hover:bg-green-500 text-white px-3 py-1.5 rounded text-sm transition-colors disabled:opacity-50 flex items-center gap-2"
                               style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
                             >
@@ -401,7 +514,7 @@ const SharePoiModal: React.FC<SharePoiModalProps> = ({
           <div className="bg-slate-800 border border-slate-600 rounded-lg p-3">
             <div className="text-xs text-slate-400"
                  style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-              💡 Tip: Users can only see shared POIs when they have access to your map data.
+              💡 Tip: Privacy level automatically changes between Private and Shared based on share list.
             </div>
           </div>
         </div>

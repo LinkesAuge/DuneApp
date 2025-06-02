@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { TransformWrapper, TransformComponent, ReactZoomPanPinchRef } from 'react-zoom-pan-pinch';
 import { supabase } from '../../lib/supabase';
-import { GridSquare, Poi, PoiType, CustomIcon } from '../../types';
+import { GridSquare, Poi, PoiType } from '../../types';
 import { ChevronUp, ChevronDown, ZoomIn, ZoomOut, RotateCcw, MapPin, Check } from 'lucide-react';
 import MapPOIMarker from '../hagga-basin/MapPOIMarker';
 
@@ -10,7 +10,7 @@ interface DeepDesertSelectionModeProps {
   allGridSquares: GridSquare[];
   pois: Poi[];
   poiTypes: PoiType[];
-  customIcons: CustomIcon[];
+
   selectedPoiIds: Set<string>;
   onPoiSelect: (poiId: string) => void;
   onPoiDeselect: (poiId: string) => void;
@@ -27,7 +27,7 @@ const DeepDesertSelectionMode: React.FC<DeepDesertSelectionModeProps> = ({
   allGridSquares,
   pois,
   poiTypes,
-  customIcons,
+
   selectedPoiIds,
   onPoiSelect,
   onPoiDeselect,
@@ -279,7 +279,7 @@ const DeepDesertSelectionMode: React.FC<DeepDesertSelectionModeProps> = ({
                           <MapPOIMarker
                             poi={poi}
                             poiType={poiType}
-                            customIcons={customIcons}
+        
                             onClick={(event) => handlePoiClick(poi, event)}
                             isSelectionMode={true}
                             isSelected={isSelected}

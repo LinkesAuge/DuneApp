@@ -38,16 +38,15 @@ const Landing: React.FC = () => {
   
   return (
     <div className="min-h-screen">
-      {/* Hero Section - Dune-Inspired with main-bg.jpg */}
+              {/* Hero Section - Dune-Inspired with main-bg.webp */}
       <div className="relative overflow-hidden">
         {/* Main background image */}
         <div 
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          className="relative bg-cover bg-center text-white overflow-hidden"
           style={{
-            backgroundImage: `url(/images/main-bg.jpg?v=${Date.now()})`
+            backgroundImage: `url(/images/main-bg.webp?v=${Date.now()})`
           }}
-        />
-        
+        >
         {/* Minimal overlay only for text readability if needed */}
         {/* <div className="absolute inset-0 bg-slate-950/20" /> */}
 
@@ -58,20 +57,18 @@ const Landing: React.FC = () => {
               {/* Landing top image - positioned behind logo area, offset to bottom */}
               <div className="absolute top-16 left-1/2 transform -translate-x-1/2">
                 <img 
-                  src={`/images/landing_top.png?v=${Date.now()}`}
-                  alt="Dune Desert Scene"
-                  className="w-full max-w-3xl h-auto opacity-60"
+                    src={`/images/landing_top.webp?v=${Date.now()}`}
+                    alt="Dune Awakening Desert" 
+                    className="w-full max-w-4xl h-auto object-contain drop-shadow-2xl"
                 />
               </div>
               
-              {/* Dune Logo Image */}
-              <div className="relative z-10 flex justify-center mb-8">
+                {/* Logo and title overlay */}
                 <img 
-                  src={`/images/dune-log.png?v=${Date.now()}`}
-                  alt="Dune Awakening"
-                  className="h-24 md:h-32 lg:h-40 w-auto drop-shadow-lg"
+                  src={`/images/dune-log.webp?v=${Date.now()}`}
+                  alt="Dune Awakening Tracker Logo" 
+                  className="absolute inset-0 mx-auto mt-12 w-full max-w-lg h-auto object-contain z-10 drop-shadow-lg"
                 />
-              </div>
             </div>
             
             {/* Buttons section */}
@@ -152,6 +149,7 @@ const Landing: React.FC = () => {
                   subtitle={feature.subtitle}
                 />
               ))}
+              </div>
             </div>
           </div>
         </div>
@@ -192,7 +190,7 @@ const Landing: React.FC = () => {
                 {
                   icon: <Database size={24} strokeWidth={1.5} />,
                   title: "Advanced POI Management",
-                  description: "Comprehensive point-of-interest system with custom types, collections, sharing, privacy controls, and unified panel interface across both map systems."
+                  description: "Comprehensive point-of-interest system with sharing, privacy controls, and unified panel interface across both map systems."
                 },
                 {
                   icon: <Activity size={24} strokeWidth={1.5} />,
@@ -317,7 +315,7 @@ const Landing: React.FC = () => {
               {
                 icon: <Share size={28} strokeWidth={1.5} />,
                 title: "Data Intelligence",
-                description: "Advanced filtering, search, sorting, custom collections, privacy controls, and sharing mechanisms for efficient information organization."
+                description: "Advanced filtering, search, sorting, privacy controls, and sharing mechanisms for efficient information organization."
               }
             ].map((capability, index) => (
               <HexCard 

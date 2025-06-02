@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
-import { Poi, PoiType, GridSquare, PoiWithGridSquare, MapType, CustomIcon } from '../types';
+import { Poi, PoiType, GridSquare, PoiWithGridSquare, MapType } from '../types';
 import { Search, Compass, LayoutGrid, List, Edit2, Trash2, ArrowDownUp, SortAsc, SortDesc, Image as ImageIconLucide, Share2, Bookmark, MessageSquare, MapPin, Tag } from 'lucide-react';
 import GridGallery from '../components/grid/GridGallery';
 import POIEditModal from '../components/hagga-basin/POIEditModal';
@@ -10,6 +10,7 @@ import DiamondIcon from '../components/common/DiamondIcon';
 import { useAuth } from '../components/auth/AuthProvider';
 import { useNavigate } from 'react-router-dom';
 import POIFilters from '../components/filters/POIFilters';
+import { ConfirmationModal } from '../components/shared/ConfirmationModal';
 
 const isPoiTypeIconUrl = (iconValue: string | null | undefined): iconValue is string => 
   typeof iconValue === 'string' && (iconValue.startsWith('http://') || iconValue.startsWith('https://'));
@@ -18,7 +19,7 @@ const PoisPage: React.FC = () => {
   const { user } = useAuth();
   const [pois, setPois] = useState<PoiWithGridSquare[]>([]);
   const [poiTypes, setPoiTypes] = useState<PoiType[]>([]);
-  const [customIcons, setCustomIcons] = useState<CustomIcon[]>([]);
+
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -67,14 +68,23 @@ const PoisPage: React.FC = () => {
 
   const navigate = useNavigate();
 
+  // Confirmation modal state for POI deletion
+  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  const [poiToDelete, setPoiToDelete] = useState<PoiWithGridSquare | null>(null);
+
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        // Fetch all POIs
+        // Fetch all POIs with proper privacy filtering via RLS
         const { data: poisData, error: poisError } = await supabase
           .from('pois')
-          .select('*');
+          .select(`
+            *,
+            poi_types (*),
+            profiles (username)
+          `)
+          .order('created_at', { ascending: false });
 
         if (poisError) throw poisError;
 
@@ -113,30 +123,24 @@ const PoisPage: React.FC = () => {
         setPoiTypes(typesData || []);
 
         // Fetch custom icons
-        await fetchCustomIcons();
+    
 
-        // Fetch user info
+        // Extract user info from POI data (profiles are now included in the query)
         if (poisData) {
-          // Filter out null/undefined values to avoid UUID errors
-          const userIds = [...new Set(poisData.map(poi => poi.created_by).filter(id => id !== null && id !== undefined))];
-          
-          if (userIds.length > 0) {
-            const { data: userData, error: userError } = await supabase
-              .from('profiles')
-              .select('id, username, display_name, custom_avatar_url, discord_avatar_url')
-              .in('id', userIds);
-
-            if (userError) throw userError;
-
-            const userInfoMap = userData.reduce((acc, user) => {
-              acc[user.id] = { username: user.username, display_name: user.display_name, custom_avatar_url: user.custom_avatar_url, discord_avatar_url: user.discord_avatar_url };
+          const userInfoMap = poisData.reduce((acc, poi) => {
+            if (poi.created_by && poi.profiles) {
+              acc[poi.created_by] = {
+                username: poi.profiles.username,
+                display_name: poi.profiles.display_name,
+                custom_avatar_url: poi.profiles.custom_avatar_url,
+                discord_avatar_url: poi.profiles.discord_avatar_url,
+                use_discord_avatar: poi.profiles.use_discord_avatar
+              };
+            }
               return acc;
-            }, {} as { [key: string]: { username: string; display_name?: string | null; custom_avatar_url?: string | null; discord_avatar_url?: string | null } });
+          }, {} as { [key: string]: { username: string; display_name?: string | null; custom_avatar_url?: string | null; discord_avatar_url?: string | null; use_discord_avatar?: boolean } });
 
             setUserInfo(userInfoMap);
-          } else {
-            setUserInfo({});
-          }
         }
       } catch (err: any) {
         console.error('Error fetching data:', err);
@@ -149,22 +153,7 @@ const PoisPage: React.FC = () => {
     fetchData();
   }, [user]);
 
-  const fetchCustomIcons = async () => {
-    if (!user) return;
 
-    const { data, error } = await supabase
-      .from('custom_icons')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('Error fetching custom icons:', error);
-      throw error;
-    }
-
-    setCustomIcons(data || []);
-  };
 
   // Group POI types by category
   const typesByCategory = poiTypes.reduce((acc: Record<string, PoiType[]>, type) => {
@@ -355,17 +344,34 @@ const PoisPage: React.FC = () => {
     setSelectedType('');
   };
 
+  // Handle POI deletion request - shows confirmation first
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this POI?')) return;
+    const poi = pois.find(p => p.id === id);
+    if (!poi) {
+      setError('POI not found');
+      return;
+    }
+    
+    setPoiToDelete(poi);
+    setShowDeleteConfirmation(true);
+  };
+
+  // Perform actual POI deletion after confirmation
+  const performPoiDeletion = async () => {
+    if (!poiToDelete) return;
     
     try {
       const { error } = await supabase
         .from('pois')
         .delete()
-        .eq('id', id);
+        .eq('id', poiToDelete.id);
 
       if (error) throw error;
-      setPois(prev => prev.filter(poi => poi.id !== id));
+      setPois(prev => prev.filter(poi => poi.id !== poiToDelete.id));
+
+      // Close confirmation modal
+      setShowDeleteConfirmation(false);
+      setPoiToDelete(null);
     } catch (err: any) {
       console.error('Error deleting POI:', err);
       setError(err.message);
@@ -732,7 +738,7 @@ const PoisPage: React.FC = () => {
                         key={poi.id}
                         poi={poi}
                         poiTypes={poiTypes}
-                        customIcons={customIcons}
+        
                         userInfo={userInfo}
                         layout={displayMode}
                         onClick={() => setSelectedPoiId(poi.id)}
@@ -792,7 +798,6 @@ const PoisPage: React.FC = () => {
           <POICard
             poi={selectedPoi}
             poiType={selectedPoiType}
-            customIcons={customIcons}
             isOpen={true}
             onClose={() => setSelectedPoiId(null)}
             onEdit={() => {
@@ -816,9 +821,25 @@ const PoisPage: React.FC = () => {
         <POIEditModal
           poi={filteredPois.find(poi => poi.id === editingPoiId)!}
           poiTypes={poiTypes}
-          customIcons={customIcons}
           onClose={() => setEditingPoiId(null)}
           onPoiUpdated={handleUpdate}
+        />
+      )}
+
+      {/* POI Deletion Confirmation Modal */}
+      {showDeleteConfirmation && poiToDelete && (
+        <ConfirmationModal
+          isOpen={showDeleteConfirmation}
+          onClose={() => {
+            setShowDeleteConfirmation(false);
+            setPoiToDelete(null);
+          }}
+          onConfirm={performPoiDeletion}
+          title="Delete POI"
+          message={`Are you sure you want to delete "${poiToDelete.title}"? This action cannot be undone and will also delete all associated screenshots.`}
+          confirmButtonText="Delete POI"
+          cancelButtonText="Cancel"
+          variant="danger"
         />
       )}
     </div>

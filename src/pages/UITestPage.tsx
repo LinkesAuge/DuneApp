@@ -22,7 +22,7 @@ const UITestPage: React.FC = () => {
     <div 
       className="min-h-screen p-8 bg-center bg-cover bg-no-repeat"
       style={{
-        backgroundImage: 'url(/images/main-bg.jpg)',
+        backgroundImage: 'url(/images/main-bg.webp)',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundAttachment: 'fixed'

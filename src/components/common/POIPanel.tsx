@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { MapPin, ChevronRight, LayoutGrid, List, SortAsc, SortDesc, ChevronDown } from 'lucide-react';
-import { Poi, PoiType, CustomIcon } from '../../types';
+import { Poi, PoiType } from '../../types';
 import POIPreviewCard from './POIPreviewCard';
 
 interface POIPanelProps {
@@ -12,7 +12,7 @@ interface POIPanelProps {
   title: string;
   pois: Poi[];
   poiTypes: PoiType[];
-  customIcons: CustomIcon[];
+
   userInfo: { [key: string]: { username: string; display_name?: string | null; custom_avatar_url?: string | null; discord_avatar_url?: string | null; use_discord_avatar?: boolean } };
   
   // Event handlers
@@ -22,7 +22,7 @@ interface POIPanelProps {
   onPoiShare?: (poi: Poi) => void;
   onPoiImageClick?: (poi: Poi) => void;
   
-  // Customization
+  // POI Controls
   emptyStateMessage?: string;
   emptyStateSubtitle?: string;
   className?: string;
@@ -38,7 +38,7 @@ const POIPanel: React.FC<POIPanelProps> = ({
   title,
   pois,
   poiTypes,
-  customIcons,
+
   userInfo,
   onPoiClick,
   onPoiEdit,
@@ -207,7 +207,7 @@ const POIPanel: React.FC<POIPanelProps> = ({
                         key={poi.id}
                         poi={poi}
                         poiTypes={poiTypes}
-                        customIcons={customIcons}
+
                         userInfo={userInfo}
                         layout={viewMode}
                         onClick={() => onPoiClick(poi)}

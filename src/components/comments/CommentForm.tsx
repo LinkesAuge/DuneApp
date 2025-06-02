@@ -6,6 +6,8 @@ import EmojiTextArea from '../common/EmojiTextArea';
 import ImageCropModal from '../grid/ImageCropModal';
 import { PixelCrop } from 'react-image-crop';
 import { v4 as uuidv4 } from 'uuid';
+import { uploadCommentScreenshot } from '../../lib/imageUpload';
+import { formatConversionStats } from '../../lib/imageUtils';
 
 interface CommentFormProps {
   poiId?: string;
@@ -34,6 +36,7 @@ const CommentForm: React.FC<CommentFormProps> = ({
   const [content, setContent] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [conversionStats, setConversionStats] = useState<string | null>(null);
   const [screenshots, setScreenshots] = useState<ScreenshotFile[]>([]);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -191,28 +194,27 @@ const CommentForm: React.FC<CommentFormProps> = ({
       if (insertError) throw insertError;
 
       // 2. Then upload screenshots and create screenshot records
-      for (const screenshot of screenshots) {
-        const fileName = `${user.id}/${uuidv4()}-${screenshot.file.name}`;
-        const filePath = `comment-screenshots/${fileName}`;
+      for (let i = 0; i < screenshots.length; i++) {
+        const screenshot = screenshots[i];
+        const fileName = `${user.id}/${uuidv4()}-${screenshot.file.name.replace(/\.[^/.]+$/, '.webp')}`;
         
-        // Upload to Supabase Storage
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('screenshots')
-          .upload(filePath, screenshot.file);
+        const uploadResult = await uploadCommentScreenshot(screenshot.file, fileName);
 
-        if (uploadError) throw uploadError;
-
-        // Get public URL
-        const { data: urlData } = supabase.storage
-          .from('screenshots')
-          .getPublicUrl(filePath);
+        // Show conversion feedback for first upload
+        if (i === 0 && uploadResult.compressionRatio) {
+          const stats = formatConversionStats(uploadResult);
+          setConversionStats(stats);
+          
+          // Clear stats after 5 seconds
+          setTimeout(() => setConversionStats(null), 5000);
+        }
 
         // Create screenshot record in comment_screenshots table
         const { error: screenshotError } = await supabase
           .from('comment_screenshots')
           .insert({
             comment_id: commentData.id,
-            url: urlData.publicUrl,
+            url: uploadResult.url,
             uploaded_by: user.id,
             file_size: screenshot.file.size,
             file_name: screenshot.file.name
@@ -313,6 +315,13 @@ const CommentForm: React.FC<CommentFormProps> = ({
         <div className="flex items-start gap-2 p-2.5 text-sm text-red-300 bg-red-900/30 border border-red-700/50 rounded">
           <AlertTriangle size={18} className="flex-shrink-0 mt-0.5"/> 
           <span>{error}</span>
+        </div>
+      )}
+
+      {/* Conversion Stats Display */}
+      {conversionStats && (
+        <div className="p-2.5 text-sm text-green-300 bg-green-900/30 border border-green-700/50 rounded">
+          ✓ {conversionStats}
         </div>
       )}
 

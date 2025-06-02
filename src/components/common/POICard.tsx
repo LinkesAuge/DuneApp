@@ -1,18 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { X, Edit, Trash2, Share, MapPin, Clock, Users, Lock, Eye, User, Image as ImageIcon, Heart, Mountain, Pyramid } from 'lucide-react';
-import { Poi, PoiType, CustomIcon } from '../../types';
+import { Poi, PoiType } from '../../types';
+import { Rank } from '../../types/profile';
 import { useAuth } from '../auth/AuthProvider';
 import { supabase } from '../../lib/supabase';
 import { formatCompactDateTime, wasUpdated, formatDateWithPreposition } from '../../lib/dateUtils';
 import { getDisplayNameFromProfile } from '../../lib/utils';
 import UserAvatar from './UserAvatar';
+import RankBadge from './RankBadge';
 import CommentsList from '../comments/CommentsList';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 interface POICardProps {
   poi: Poi;
   poiType: PoiType;
-  customIcons: CustomIcon[];
+
   isOpen: boolean;
   onClose: () => void;
   onEdit?: () => void;
@@ -27,22 +29,8 @@ const isIconUrl = (icon: string): boolean => {
 };
 
 // Helper function to get display image URL for POI icons
-const getDisplayImageUrl = (poi: Poi, poiType: PoiType, customIcons: CustomIcon[]): string | null => {
-  // First priority: Check if POI has a custom icon reference
-  if (poi.custom_icon_id) {
-    const customIcon = customIcons.find(ci => ci.id === poi.custom_icon_id);
-    if (customIcon) {
-      return customIcon.image_url;
-    }
-  }
-  
-  // Second priority: Check if POI type icon is a custom icon reference
-  const customIconByPoiType = customIcons.find(ci => ci.id === poiType.icon || ci.name === poiType.icon);
-  if (customIconByPoiType) {
-    return customIconByPoiType.image_url;
-  }
-  
-  // Third priority: Check if POI type icon is already a URL
+const getDisplayImageUrl = (poi: Poi, poiType: PoiType): string | null => {
+  // Check if POI type icon is already a URL
   if (isIconUrl(poiType.icon)) {
     return poiType.icon;
   }
@@ -74,7 +62,7 @@ const privacyLabels = {
 const POICard: React.FC<POICardProps> = ({
   poi,
   poiType,
-  customIcons,
+
   isOpen,
   onClose,
   onEdit,
@@ -87,13 +75,13 @@ const POICard: React.FC<POICardProps> = ({
   const location = useLocation();
   const canModify = user && (user.id === poi.created_by || user.role === 'admin' || user.role === 'editor');
   
-  // State for user information
-  const [creatorInfo, setCreatorInfo] = useState<{ username: string; display_name?: string | null; custom_avatar_url?: string | null; discord_avatar_url?: string | null; use_discord_avatar?: boolean } | null>(null);
-  const [editorInfo, setEditorInfo] = useState<{ username: string; display_name?: string | null; custom_avatar_url?: string | null; discord_avatar_url?: string | null; use_discord_avatar?: boolean } | null>(null);
+  // State for user information with rank
+  const [creatorInfo, setCreatorInfo] = useState<{ username: string; display_name?: string | null; custom_avatar_url?: string | null; discord_avatar_url?: string | null; use_discord_avatar?: boolean; rank?: Rank | null } | null>(null);
+  const [editorInfo, setEditorInfo] = useState<{ username: string; display_name?: string | null; custom_avatar_url?: string | null; discord_avatar_url?: string | null; use_discord_avatar?: boolean; rank?: Rank | null } | null>(null);
   const [loadingUserInfo, setLoadingUserInfo] = useState(true);
   const [commentCount, setCommentCount] = useState(0);
   
-  const imageUrl = getDisplayImageUrl(poi, poiType, customIcons);
+  const imageUrl = getDisplayImageUrl(poi, poiType);
   const PrivacyIcon = privacyIcons[poi.privacy_level];
   const privacyColor = privacyColors[poi.privacy_level];
   const privacyLabel = privacyLabels[poi.privacy_level];
@@ -107,13 +95,13 @@ const POICard: React.FC<POICardProps> = ({
       try {
         setLoadingUserInfo(true);
         
-        // Fetch user information - Filter out null values to avoid UUID errors
+        // Fetch user information with rank data - Filter out null values to avoid UUID errors
         const userIds = [poi.created_by, poi.updated_by].filter(id => id !== null && id !== undefined);
         
         if (userIds.length > 0) {
           const { data: userData, error: userError } = await supabase
             .from('profiles')
-            .select('id, username, display_name, custom_avatar_url, discord_avatar_url')
+            .select('id, username, display_name, custom_avatar_url, discord_avatar_url, rank:ranks(*)')
             .in('id', userIds);
           
           if (userError) throw userError;
@@ -121,8 +109,20 @@ const POICard: React.FC<POICardProps> = ({
           const creatorData = userData?.find(u => u.id === poi.created_by);
           const editorData = userData?.find(u => u.id === poi.updated_by);
           
-          setCreatorInfo(creatorData ? { username: creatorData.username, display_name: creatorData.display_name, custom_avatar_url: creatorData.custom_avatar_url, discord_avatar_url: creatorData.discord_avatar_url } : null);
-          setEditorInfo(editorData ? { username: editorData.username, display_name: editorData.display_name, custom_avatar_url: editorData.custom_avatar_url, discord_avatar_url: editorData.discord_avatar_url } : null);
+          setCreatorInfo(creatorData ? { 
+            username: creatorData.username, 
+            display_name: creatorData.display_name, 
+            custom_avatar_url: creatorData.custom_avatar_url, 
+            discord_avatar_url: creatorData.discord_avatar_url,
+            rank: creatorData.rank 
+          } : null);
+          setEditorInfo(editorData ? { 
+            username: editorData.username, 
+            display_name: editorData.display_name, 
+            custom_avatar_url: editorData.custom_avatar_url, 
+            discord_avatar_url: editorData.discord_avatar_url,
+            rank: editorData.rank 
+          } : null);
         } else {
           // No valid user IDs, set to null
           setCreatorInfo(null);
@@ -283,7 +283,8 @@ const POICard: React.FC<POICardProps> = ({
               </button>
             )}
 
-            {onShare && (
+            {/* Only show share button for private/shared POIs that the user owns */}
+            {onShare && user && poi.created_by === user.id && poi.privacy_level !== 'global' && (
               <button
                 onClick={onShare}
                 className="p-1.5 text-green-300 hover:text-green-100 hover:bg-slate-700/50 rounded transition-colors"
@@ -414,7 +415,7 @@ const POICard: React.FC<POICardProps> = ({
             </div>
           </div>
 
-          {/* Metadata - Enhanced with Avatars */}
+          {/* Metadata - Enhanced with Avatars and Ranks */}
           <div className="p-3 border-b border-slate-700">
             <div className="space-y-2">
               {/* Creator Information */}
@@ -431,6 +432,9 @@ const POICard: React.FC<POICardProps> = ({
                 <span className="text-amber-300 font-medium">
                   {getDisplayNameFromProfile(creatorInfo) || (poi.created_by ? 'Loading...' : 'Deleted User')}
                 </span>
+                {creatorInfo?.rank && (
+                  <RankBadge rank={creatorInfo.rank} size="xxs" />
+                )}
                 <span className="text-slate-400">
                   {(() => {
                     const { date, useOn } = formatDateWithPreposition(poi.created_at);
@@ -454,6 +458,9 @@ const POICard: React.FC<POICardProps> = ({
                   <span className="text-amber-300 font-medium">
                     {editorInfo ? getDisplayNameFromProfile(editorInfo) : 'Deleted User'}
                   </span>
+                  {editorInfo?.rank && (
+                    <RankBadge rank={editorInfo.rank} size="xxs" />
+                  )}
                   <span className="text-slate-400">
                     {(() => {
                       const { date: editDate, useOn: editUseOn } = formatDateWithPreposition(poi.updated_at);

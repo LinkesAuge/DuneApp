@@ -7,19 +7,18 @@ import type {
   PoiType, 
   HaggaBasinBaseMap, 
   HaggaBasinOverlay,
-  PoiCollection,
-  CustomIcon,
   User
 } from '../types';
 import InteractiveMap from '../components/hagga-basin/InteractiveMap';
-import CollectionModal from '../components/hagga-basin/CollectionModal';
-import CustomPoiTypeModal from '../components/hagga-basin/CustomPoiTypeModal';
+
+
 import SharePoiModal from '../components/hagga-basin/SharePoiModal';
 import POIEditModal from '../components/hagga-basin/POIEditModal';
 import GridGallery from '../components/grid/GridGallery';
 import POICard from '../components/common/POICard';
 import MapControlPanel from '../components/common/MapControlPanel';
 import POIPanel from '../components/common/POIPanel';
+import { ConfirmationModal } from '../components/shared/ConfirmationModal';
 import { useAuth } from '../components/auth/AuthProvider';
 
 const HaggaBasinPage: React.FC = () => {
@@ -32,8 +31,8 @@ const HaggaBasinPage: React.FC = () => {
   const [poiTypes, setPoiTypes] = useState<PoiType[]>([]);
   const [baseMaps, setBaseMaps] = useState<HaggaBasinBaseMap[]>([]);
   const [overlays, setOverlays] = useState<HaggaBasinOverlay[]>([]);
-  const [collections, setCollections] = useState<PoiCollection[]>([]);
-  const [customIcons, setCustomIcons] = useState<CustomIcon[]>([]);
+
+
   const [userInfo, setUserInfo] = useState<{ [key: string]: { username: string; display_name?: string | null; custom_avatar_url?: string | null; discord_avatar_url?: string | null; use_discord_avatar?: boolean } }>({});
 
   // UI state
@@ -41,7 +40,7 @@ const HaggaBasinPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [showRightPanel, setShowRightPanel] = useState(true);
-  const [activeTab, setActiveTab] = useState<'filters' | 'customization' | 'overlays'>('filters');
+  const [activeTab, setActiveTab] = useState<'filters' | 'overlays'>('filters');
 
   // Filter state - Updated for proper default selection
   const [selectedPoiTypes, setSelectedPoiTypes] = useState<string[]>([]);
@@ -55,11 +54,10 @@ const HaggaBasinPage: React.FC = () => {
   const [placementMode, setPlacementMode] = useState(false);
   
   // Modal state
-  const [showCollectionModal, setShowCollectionModal] = useState(false);
-  const [showCustomPoiTypeModal, setShowCustomPoiTypeModal] = useState(false);
+
   const [showSharePoiModal, setShowSharePoiModal] = useState(false);
   const [selectedPoiForShare, setSelectedPoiForShare] = useState<Poi | null>(null);
-  const [editingPoiType, setEditingPoiType] = useState<PoiType | null>(null);
+
   const [editingPoi, setEditingPoi] = useState<Poi | null>(null);
 
   // Gallery state
@@ -73,6 +71,10 @@ const HaggaBasinPage: React.FC = () => {
   // Highlighted POI state for navigation focus
   const [highlightedPoiId, setHighlightedPoiId] = useState<string | null>(null);
   const [selectedPoiId, setSelectedPoiId] = useState<string | null>(null);
+  
+  // Confirmation modal state for POI deletion
+  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  const [poiToDelete, setPoiToDelete] = useState<Poi | null>(null);
   
   // Get highlight parameter for POI highlighting
   const highlightPoiId = searchParams.get('highlight');
@@ -128,8 +130,7 @@ const HaggaBasinPage: React.FC = () => {
         fetchPoiTypes(),
         fetchBaseMaps(),
         fetchOverlays(),
-        fetchCollections(),
-        fetchCustomIcons()
+    
       ]);
     } catch (err) {
       console.error('Error initializing Hagga Basin data:', err);
@@ -235,39 +236,9 @@ const HaggaBasinPage: React.FC = () => {
     setSelectedOverlays((data || []).map(overlay => overlay.id));
   };
 
-  const fetchCollections = async () => {
-    if (!user) return;
 
-    const { data, error } = await supabase
-      .from('poi_collections')
-      .select('*')
-      .or(`created_by.eq.${user.id},is_public.eq.true`)
-      .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error('Error fetching collections:', error);
-      throw error;
-    }
 
-    setCollections(data || []);
-  };
-
-  const fetchCustomIcons = async () => {
-    if (!user) return;
-
-    const { data, error } = await supabase
-      .from('custom_icons')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('Error fetching custom icons:', error);
-      throw error;
-    }
-
-    setCustomIcons(data || []);
-  };
 
   const fetchUserInfo = async (pois: Poi[]) => {
     if (pois.length === 0) return;
@@ -343,8 +314,7 @@ const HaggaBasinPage: React.FC = () => {
     });
   };
 
-  // Get user-created POI types for display in customization tab
-  const userCreatedPoiTypes = poiTypes.filter(type => type.created_by === user?.id);
+
 
   // Handle category toggle - now syncs with selectedPoiTypes
   const handleCategoryToggle = (category: string, checked: boolean) => {
@@ -435,8 +405,13 @@ const HaggaBasinPage: React.FC = () => {
   // Handle POI creation
   const handlePoiCreated = async (newPoi: Poi) => {
     try {
+      console.log('[HaggaBasinPage] Adding new POI to local state:', newPoi);
       // Add to local state
-      setPois(prev => [newPoi, ...prev]);
+      setPois(prev => {
+        const updated = [newPoi, ...prev];
+        console.log('[HaggaBasinPage] Updated POI list length:', updated.length);
+        return updated;
+      });
       // Exit placement mode
       setPlacementMode(false);
     } catch (error) {
@@ -450,67 +425,94 @@ const HaggaBasinPage: React.FC = () => {
     setShowSharePoiModal(true);
   };
 
-  // Handle POI editing
-  const handlePoiUpdated = async (updatedPoi: Poi) => {
+  // Handle POI privacy level changes from sharing modal
+  const handlePoiPrivacyLevelChanged = async (poiId: string, newPrivacyLevel: 'private' | 'shared') => {
     try {
-      const { error } = await supabase
-        .from('pois')
-        .update({
-          title: updatedPoi.title,
-          description: updatedPoi.description,
-          coordinates_x: updatedPoi.coordinates_x,
-          coordinates_y: updatedPoi.coordinates_y,
-          poi_type_id: updatedPoi.poi_type_id,
-          privacy_level: updatedPoi.privacy_level
-        })
-        .eq('id', updatedPoi.id);
+      // Update local state immediately for responsive UI
+      setPois(prevPois => 
+        prevPois.map(poi => 
+          poi.id === poiId 
+            ? { ...poi, privacy_level: newPrivacyLevel }
+            : poi
+        )
+      );
 
-      if (error) throw error;
-
-      // Update local state
-      setPois(prev => prev.map(p => p.id === updatedPoi.id ? updatedPoi : p));
+      // Fetch fresh POI data to ensure consistency
+      await fetchHaggaBasinPOIs();
     } catch (error) {
-      console.error('Error updating POI:', error);
-      throw error;
+      console.error('Error handling POI privacy level change:', error);
+      // Revert optimistic update on error
+      await fetchHaggaBasinPOIs();
     }
   };
 
-  // Handle POI deletion
+  // Handle share modal close with refresh
+  const handleShareModalClose = async () => {
+    setShowSharePoiModal(false);
+    setSelectedPoiForShare(null);
+    // Refresh POIs after sharing changes to ensure all users see updates
+    await fetchHaggaBasinPOIs();
+  };
+
+  // Handle POI editing
+  const handlePoiUpdated = (updatedPoi: Poi) => {
+    console.log('[HaggaBasinPage] Updating local POI state with:', updatedPoi);
+    // POI has already been updated in the database by the modal
+    // Just update local state with the returned data
+    setPois(prev => prev.map(p => p.id === updatedPoi.id ? updatedPoi : p));
+  };
+
+  // Handle POI deletion request - shows confirmation first
   const handlePoiDeleted = async (poiId: string) => {
+    const poi = pois.find(p => p.id === poiId);
+    if (!poi) {
+      setError('POI not found');
+      return;
+    }
+    
+    setPoiToDelete(poi);
+    setShowDeleteConfirmation(true);
+  };
+
+  // Perform actual POI deletion after confirmation
+  const performPoiDeletion = async () => {
+    if (!poiToDelete) return;
+    
     try {
+      console.log('[HaggaBasinPage] Deleting POI from database:', poiToDelete.id);
       const { error } = await supabase
         .from('pois')
         .delete()
-        .eq('id', poiId);
+        .eq('id', poiToDelete.id);
 
       if (error) throw error;
 
+      console.log('[HaggaBasinPage] POI deleted successfully, updating local state');
       // Update local state
-      setPois(prev => prev.filter(p => p.id !== poiId));
+      setPois(prev => {
+        const updated = prev.filter(p => p.id !== poiToDelete.id);
+        console.log('[HaggaBasinPage] Updated POI list length after deletion:', updated.length);
+        return updated;
+      });
+
+      // Clear any highlighted POI if it was the deleted one
+      if (highlightedPoiId === poiToDelete.id) {
+        setHighlightedPoiId(null);
+      }
+      if (selectedPoiId === poiToDelete.id) {
+        setSelectedPoiId(null);
+      }
+
+      // Close confirmation modal
+      setShowDeleteConfirmation(false);
+      setPoiToDelete(null);
     } catch (error) {
       console.error('Error deleting POI:', error);
-      throw error;
+      setError('Failed to delete POI');
     }
   };
 
-  // Handle custom POI type updates
-  const handleCustomPoiTypeCreated = (newPoiType: PoiType) => {
-    setPoiTypes(prev => [newPoiType, ...prev]);
-  };
 
-  const handleCustomPoiTypeDeleted = (poiTypeId: string) => {
-    setPoiTypes(prev => prev.filter(type => type.id !== poiTypeId));
-  };
-
-  const handleCustomPoiTypeUpdated = (updatedPoiType: PoiType) => {
-    setPoiTypes(prev => prev.map(type => type.id === updatedPoiType.id ? updatedPoiType : type));
-    setEditingPoiType(null);
-  };
-
-  const handleCustomPoiTypeEdit = (poiType: PoiType) => {
-    setEditingPoiType(poiType);
-    setShowCustomPoiTypeModal(true);
-  };
 
   // Handle POI gallery opening
   const handlePoiGalleryOpen = useCallback((poi: Poi) => {
@@ -561,6 +563,231 @@ const HaggaBasinPage: React.FC = () => {
     initializeData();
   }, []);
 
+  // Set up real-time subscriptions for POI changes
+  useEffect(() => {
+    console.log('[HaggaBasinPage] Setting up real-time subscriptions...');
+    
+    // Subscribe to POI table changes
+    const poiSubscription = supabase
+      .channel('hagga-basin-pois')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
+          schema: 'public',
+          table: 'pois',
+          filter: 'map_type=eq.hagga_basin' // Only listen to Hagga Basin POIs
+        },
+        async (payload) => {
+          console.log('[HaggaBasinPage] Real-time POI change detected:', payload);
+          
+          if (payload.eventType === 'INSERT') {
+            const newPoi = payload.new as Poi;
+            console.log('[HaggaBasinPage] Real-time INSERT - adding POI:', newPoi.id);
+            
+            // Fetch complete POI data with relations
+            const { data: completePoiData, error } = await supabase
+              .from('pois')
+              .select(`
+                *,
+                poi_types (*),
+                profiles (username)
+              `)
+              .eq('id', newPoi.id)
+              .single();
+            
+            if (!error && completePoiData) {
+              // Transform screenshots for compatibility
+              const transformedPoi = {
+                ...completePoiData,
+                screenshots: Array.isArray(completePoiData.screenshots) 
+                  ? completePoiData.screenshots.map((screenshot: any, index: number) => ({
+                      id: screenshot.id || `${completePoiData.id}_${index}`,
+                      url: screenshot.url || screenshot,
+                      uploaded_by: screenshot.uploaded_by || completePoiData.created_by,
+                      upload_date: screenshot.upload_date || completePoiData.created_at
+                    }))
+                  : []
+              };
+              
+              setPois(prev => {
+                // Check if POI already exists (to avoid duplicates)
+                const exists = prev.some(p => p.id === transformedPoi.id);
+                if (exists) {
+                  console.log('[HaggaBasinPage] POI already exists, skipping insert');
+                  return prev;
+                }
+                console.log('[HaggaBasinPage] Adding new POI to state');
+                return [transformedPoi, ...prev];
+              });
+            }
+          } 
+          else if (payload.eventType === 'UPDATE') {
+            const updatedPoi = payload.new as Poi;
+            console.log('[HaggaBasinPage] Real-time UPDATE - updating POI:', updatedPoi.id);
+            
+            // Check if POI still exists in our local state (it might have been deleted)
+            setPois(prev => {
+              const existsInState = prev.some(p => p.id === updatedPoi.id);
+              if (!existsInState) {
+                console.log('[HaggaBasinPage] POI not in local state, skipping update');
+                return prev;
+              }
+              
+              // Fetch complete updated POI data with relations, but only if it still exists
+              supabase
+                .from('pois')
+                .select(`
+                  *,
+                  poi_types (*),
+                  profiles (username)
+                `)
+                .eq('id', updatedPoi.id)
+                .eq('map_type', 'hagga_basin') // Ensure we only get Hagga Basin POIs
+                .maybeSingle() // Use maybeSingle() instead of single() to handle missing records gracefully
+                .then(({ data: completePoiData, error }) => {
+                  if (!error && completePoiData) {
+                    // Transform screenshots for compatibility
+                    const transformedPoi = {
+                      ...completePoiData,
+                      screenshots: Array.isArray(completePoiData.screenshots) 
+                        ? completePoiData.screenshots.map((screenshot: any, index: number) => ({
+                            id: screenshot.id || `${completePoiData.id}_${index}`,
+                            url: screenshot.url || screenshot,
+                            uploaded_by: screenshot.uploaded_by || completePoiData.created_by,
+                            upload_date: screenshot.upload_date || completePoiData.created_at
+                          }))
+                        : []
+                    };
+                    
+                    setPois(prev => {
+                      // Double-check POI still exists in state before updating
+                      const stillExists = prev.some(p => p.id === transformedPoi.id);
+                      if (stillExists) {
+                        console.log('[HaggaBasinPage] Updating POI in state');
+                        return prev.map(p => p.id === transformedPoi.id ? transformedPoi : p);
+                      }
+                      console.log('[HaggaBasinPage] POI no longer in state, skipping update');
+                      return prev;
+                    });
+                  } else if (error) {
+                    console.log('[HaggaBasinPage] POI no longer exists or error fetching update:', error);
+                    // If the POI was deleted during the update, remove it from state
+                    if (error.code === 'PGRST116') { // PostgREST "no rows found" error
+                      setPois(prev => {
+                        console.log('[HaggaBasinPage] Removing POI from state due to 404');
+                        return prev.filter(p => p.id !== updatedPoi.id);
+                      });
+                    }
+                  } else {
+                    // completePoiData is null (no results from maybeSingle)
+                    console.log('[HaggaBasinPage] POI not found during update, removing from state');
+                    setPois(prev => {
+                      console.log('[HaggaBasinPage] Removing POI from state due to missing data');
+                      return prev.filter(p => p.id !== updatedPoi.id);
+                    });
+                  }
+                });
+              
+              return prev; // Return current state, update will happen in the async call above
+            });
+          } 
+          else if (payload.eventType === 'DELETE') {
+            const deletedPoiId = payload.old.id;
+            console.log('[HaggaBasinPage] Real-time DELETE - removing POI:', deletedPoiId);
+            
+            setPois(prev => {
+              console.log('[HaggaBasinPage] Removing POI from state');
+              return prev.filter(p => p.id !== deletedPoiId);
+            });
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log('[HaggaBasinPage] Real-time subscription status:', status);
+      });
+
+    // Subscribe to POI shares table changes for privacy updates
+    const sharesSubscription = supabase
+      .channel('hagga-basin-poi-shares')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'poi_shares'
+        },
+        async (payload) => {
+          console.log('[HaggaBasinPage] Real-time POI share change detected:', payload);
+          
+          // When shares change, refresh the affected POI to get updated privacy status
+          let poiId: string | null = null;
+          
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            poiId = payload.new?.poi_id;
+          } else if (payload.eventType === 'DELETE') {
+            poiId = payload.old?.poi_id;
+          }
+          
+          if (poiId) {
+            console.log('[HaggaBasinPage] Refreshing POI data for share change:', poiId);
+            
+            // Fetch updated POI data
+            const { data: updatedPoiData, error } = await supabase
+              .from('pois')
+              .select(`
+                *,
+                poi_types (*),
+                profiles (username)
+              `)
+              .eq('id', poiId)
+              .eq('map_type', 'hagga_basin')
+              .maybeSingle(); // Use maybeSingle() to handle missing records gracefully
+            
+                          if (!error && updatedPoiData) {
+                // Transform screenshots for compatibility
+                const transformedPoi = {
+                  ...updatedPoiData,
+                  screenshots: Array.isArray(updatedPoiData.screenshots) 
+                    ? updatedPoiData.screenshots.map((screenshot: any, index: number) => ({
+                        id: screenshot.id || `${updatedPoiData.id}_${index}`,
+                        url: screenshot.url || screenshot,
+                        uploaded_by: screenshot.uploaded_by || updatedPoiData.created_by,
+                        upload_date: screenshot.upload_date || updatedPoiData.created_at
+                      }))
+                    : []
+                };
+                
+                setPois(prev => {
+                  // Check if POI still exists in state before updating
+                  const stillExists = prev.some(p => p.id === transformedPoi.id);
+                  if (stillExists) {
+                    console.log('[HaggaBasinPage] Updating POI in state after share change');
+                    return prev.map(p => p.id === transformedPoi.id ? transformedPoi : p);
+                  }
+                  console.log('[HaggaBasinPage] POI no longer in state, skipping share update');
+                  return prev;
+                });
+              } else if (error) {
+                console.log('[HaggaBasinPage] Error or POI not found during share update:', error);
+              } else {
+                console.log('[HaggaBasinPage] POI not found during share update, may have been deleted');
+              }
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log('[HaggaBasinPage] Real-time shares subscription status:', status);
+      });
+
+    // Cleanup subscriptions on component unmount
+    return () => {
+      console.log('[HaggaBasinPage] Cleaning up real-time subscriptions...');
+      supabase.removeChannel(poiSubscription);
+      supabase.removeChannel(sharesSubscription);
+    };
+  }, []);
+
   // Handle POI editing
   const handlePoiEdit = (poi: Poi) => {
     setEditingPoi(poi);
@@ -573,7 +800,7 @@ const HaggaBasinPage: React.FC = () => {
         <div 
           className="absolute inset-0 bg-cover bg-center bg-no-repeat"
           style={{
-            backgroundImage: `url(/images/main-bg.jpg)`
+            backgroundImage: `url(/images/main-bg.webp)`
           }}
         />
         
@@ -594,7 +821,7 @@ const HaggaBasinPage: React.FC = () => {
         <div 
           className="absolute inset-0 bg-cover bg-center bg-no-repeat"
           style={{
-            backgroundImage: `url(/images/main-bg.jpg)`
+            backgroundImage: `url(/images/main-bg.webp)`
           }}
         />
         
@@ -620,7 +847,7 @@ const HaggaBasinPage: React.FC = () => {
       <div 
         className="absolute inset-0 bg-cover bg-center bg-no-repeat"
         style={{
-          backgroundImage: `url(/images/main-bg.jpg)`
+          backgroundImage: `url(/images/main-bg.webp)`
         }}
       />
 
@@ -633,9 +860,7 @@ const HaggaBasinPage: React.FC = () => {
         pois={pois}
         filteredPois={filteredPois}
         poiTypes={poiTypes}
-        customIcons={customIcons}
-        collections={collections}
-        userCreatedPoiTypes={userCreatedPoiTypes}
+
         activeTab={activeTab === 'overlays' ? 'layers' : activeTab}
         onActiveTabChange={(tab) => setActiveTab(tab === 'layers' ? 'overlays' : tab)}
         searchTerm={searchTerm}
@@ -649,12 +874,7 @@ const HaggaBasinPage: React.FC = () => {
         onCategoryToggle={handleCategoryToggle}
         onToggleAllPois={handleToggleAllPois}
         onOtherTypesToggle={handleOtherTypesToggle}
-        onCustomPoiTypeEdit={handleCustomPoiTypeEdit}
-        onShowCollectionModal={() => setShowCollectionModal(true)}
-        onShowCustomPoiTypeModal={() => {
-          setEditingPoiType(null);
-          setShowCustomPoiTypeModal(true);
-        }}
+
         isIconUrl={isIconUrl}
         getDisplayImageUrl={getDisplayImageUrl}
         additionalLayerContent={
@@ -726,7 +946,6 @@ const HaggaBasinPage: React.FC = () => {
             onPoiDeleted={handlePoiDeleted}
             onPoiShare={handleSharePoi}
             onPoiGalleryOpen={handlePoiGalleryOpen}
-            customIcons={customIcons}
             placementMode={placementMode}
             onPlacementModeChange={setPlacementMode}
             showHelpTooltip={showHelpTooltip}
@@ -755,7 +974,6 @@ const HaggaBasinPage: React.FC = () => {
         title={`POIs on Map`}
         pois={filteredPois}
         poiTypes={poiTypes}
-        customIcons={customIcons}
         userInfo={userInfo}
         onPoiClick={handlePoiClick}
         onPoiEdit={handlePoiEdit}
@@ -766,40 +984,14 @@ const HaggaBasinPage: React.FC = () => {
         emptyStateSubtitle="Add POIs to the map to see them here"
       />
 
-      {/* Collection Modal */}
-      <CollectionModal
-        isOpen={showCollectionModal}
-        onClose={() => setShowCollectionModal(false)}
-        onCollectionCreated={(newCollection) => {
-          setCollections(prev => [newCollection, ...prev]);
-          setShowCollectionModal(false);
-        }}
-        existingCollections={collections}
-      />
 
-      {/* Custom POI Type Modal */}
-      <CustomPoiTypeModal
-        isOpen={showCustomPoiTypeModal}
-        onClose={() => {
-          setShowCustomPoiTypeModal(false);
-          setEditingPoiType(null);
-        }}
-        customPoiTypes={userCreatedPoiTypes}
-        onPoiTypeCreated={handleCustomPoiTypeCreated}
-        onPoiTypeDeleted={handleCustomPoiTypeDeleted}
-        onPoiTypeUpdated={handleCustomPoiTypeUpdated}
-        onPoiTypeEdit={handleCustomPoiTypeEdit}
-        editingPoiType={editingPoiType}
-      />
 
       {/* Share POI Modal */}
       <SharePoiModal
         isOpen={showSharePoiModal}
-        onClose={() => {
-          setShowSharePoiModal(false);
-          setSelectedPoiForShare(null);
-        }}
+        onClose={handleShareModalClose}
         poi={selectedPoiForShare}
+        onPrivacyLevelChanged={handlePoiPrivacyLevelChanged}
       />
 
       {/* POI Edit Modal */}
@@ -807,7 +999,6 @@ const HaggaBasinPage: React.FC = () => {
         <POIEditModal
           poi={editingPoi}
           poiTypes={poiTypes}
-          customIcons={customIcons}
           onPoiUpdated={(updatedPoi) => {
             handlePoiUpdated(updatedPoi);
             setEditingPoi(null);
@@ -826,15 +1017,14 @@ const HaggaBasinPage: React.FC = () => {
           <POICard
             poi={selectedPoi}
             poiType={selectedPoiType}
-            customIcons={customIcons}
             isOpen={true}
             onClose={() => setSelectedPoiId(null)}
             onEdit={() => {
               setEditingPoi(selectedPoi);
               setSelectedPoiId(null);
             }}
-            onDelete={async () => {
-              await handlePoiDeleted(selectedPoi.id);
+            onDelete={() => {
+              handlePoiDeleted(selectedPoi.id);
               setSelectedPoiId(null);
             }}
             onShare={() => {
@@ -878,6 +1068,23 @@ const HaggaBasinPage: React.FC = () => {
             created_at: galleryPoi.created_at,
             created_by: galleryPoi.created_by,
           }}
+        />
+      )}
+
+      {/* POI Deletion Confirmation Modal */}
+      {showDeleteConfirmation && poiToDelete && (
+        <ConfirmationModal
+          isOpen={showDeleteConfirmation}
+          onClose={() => {
+            setShowDeleteConfirmation(false);
+            setPoiToDelete(null);
+          }}
+          onConfirm={performPoiDeletion}
+          title="Delete POI"
+          message={`Are you sure you want to delete "${poiToDelete.title}"? This action cannot be undone and will also delete all associated screenshots.`}
+          confirmButtonText="Delete POI"
+          cancelButtonText="Cancel"
+          variant="danger"
         />
       )}
     </div>

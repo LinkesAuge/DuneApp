@@ -32,7 +32,7 @@ const StatisticsCards: React.FC = () => {
         exploredGridSquaresResult,
         screenshotsResult,
         usersResult,
-        collectionsResult,
+  
         privatePoisResult,
         sharedPoisResult
       ] = await Promise.all([
@@ -43,7 +43,7 @@ const StatisticsCards: React.FC = () => {
         supabase.from('grid_squares').select('id', { count: 'exact', head: true }).eq('is_explored', true),
         supabase.from('comment_screenshots').select('id', { count: 'exact', head: true }),
         supabase.from('profiles').select('id', { count: 'exact', head: true }),
-        supabase.from('poi_collections').select('id', { count: 'exact', head: true }),
+
         supabase.from('pois').select('id', { count: 'exact', head: true }).eq('privacy_level', 'private'),
         supabase.from('pois').select('id', { count: 'exact', head: true }).eq('privacy_level', 'shared')
       ]);
@@ -56,7 +56,7 @@ const StatisticsCards: React.FC = () => {
       if (exploredGridSquaresResult.error) throw exploredGridSquaresResult.error;
       if (screenshotsResult.error) throw screenshotsResult.error;
       if (usersResult.error) throw usersResult.error;
-      if (collectionsResult.error) throw collectionsResult.error;
+
       if (privatePoisResult.error) throw privatePoisResult.error;
       if (sharedPoisResult.error) throw sharedPoisResult.error;
 
@@ -76,7 +76,7 @@ const StatisticsCards: React.FC = () => {
         totalUsers: usersResult.count || 0,
         deepDesertPois: deepDesertPoisResult.count || 0,
         haggaBasinPois: haggaBasinPoisResult.count || 0,
-        poiCollections: collectionsResult.count || 0,
+
         sharedPois: sharedPoisResult.count || 0,
         privatePois: privatePoisResult.count || 0
       });
@@ -183,13 +183,7 @@ const StatisticsCards: React.FC = () => {
         color="green"
       />
 
-      <StatCard
-        title="Collections"
-        value={stats.poiCollections}
-        icon={MapPin}
-        subtitle="POI collections"
-        color="indigo"
-      />
+
     </div>
   );
 };

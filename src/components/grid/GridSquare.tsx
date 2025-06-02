@@ -119,12 +119,9 @@ const GridSquare: React.FC<GridSquareProps> = ({ square, poisToDisplay = [], poi
           {poiTypeDetails.map((type) => (
             <div
               key={type.id}
-              className="text-white w-6 h-6 rounded-lg flex items-center justify-center backdrop-blur-sm transition-all duration-300 relative shadow-lg border border-amber-400/20"
+              className="text-white w-6 h-6 flex items-center justify-center transition-all duration-300 relative"
               style={{
-                backgroundColor: 
-                  (isIconUrl(type.icon) && type.icon_has_transparent_background) 
-                  ? 'rgba(30, 41, 59, 0.8)' 
-                  : (type.color || 'rgba(30, 41, 59, 0.8)') // Enhanced fallback with slate tone
+                backgroundColor: 'transparent'
               }}
               onMouseEnter={() => setHoveredPoiType(type)}
               onMouseLeave={() => setHoveredPoiType(null)}
@@ -134,9 +131,20 @@ const GridSquare: React.FC<GridSquareProps> = ({ square, poisToDisplay = [], poi
                   src={getDisplayImageUrl(type.icon)} 
                   alt={type.name} 
                   className="w-5 h-5 object-contain"
+                  style={{
+                    filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.9)) drop-shadow(0 0 10px rgba(0,0,0,0.7)) drop-shadow(0 0 16px rgba(0,0,0,0.5)) drop-shadow(0 0 24px rgba(0,0,0,0.3))'
+                  }}
                 />
               ) : (
-                <span className="text-base">{type.icon}</span>
+                <span 
+                  className="text-base leading-none font-medium"
+                  style={{ 
+                    color: type.color,
+                    textShadow: '0 2px 6px rgba(0,0,0,0.9), 0 0 10px rgba(0,0,0,0.7), 0 0 16px rgba(0,0,0,0.5), 0 0 24px rgba(0,0,0,0.3)'
+                  }}
+                >
+                  {type.icon}
+                </span>
               )}
 
               {/* Enhanced Tooltip */}

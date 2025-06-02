@@ -8,6 +8,8 @@ import ImageCropModal from '../grid/ImageCropModal';
 import { PixelCrop } from 'react-image-crop';
 import { toast } from 'react-hot-toast';
 import { getScreenshotLabel } from '../../lib/cropUtils';
+import { uploadPoiScreenshot } from '../../lib/imageUpload';
+import { formatConversionStats } from '../../lib/imageUtils';
 
 interface AddPoiFormProps {
   gridSquareId: string;
@@ -33,6 +35,7 @@ const AddPoiForm: React.FC<AddPoiFormProps> = ({ gridSquareId, poiTypes, onCance
   const [screenshots, setScreenshots] = useState<ScreenshotFile[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [conversionStats, setConversionStats] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Screenshot cropping state
@@ -52,6 +55,14 @@ const AddPoiForm: React.FC<AddPoiFormProps> = ({ gridSquareId, poiTypes, onCance
       setTitle('');
     }
   }, [poiTypeId, poiTypes]);
+
+  // Clear conversion stats after 5 seconds
+  useEffect(() => {
+    if (conversionStats) {
+      const timer = setTimeout(() => setConversionStats(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [conversionStats]);
 
   const handleScreenshotUpload = () => {
     fileInputRef.current?.click();
@@ -175,21 +186,18 @@ const AddPoiForm: React.FC<AddPoiFormProps> = ({ gridSquareId, poiTypes, onCance
 
       for (const screenshot of screenshots) {
         if (screenshot.isNew) {
-          const fileName = `${user.id}/${uuidv4()}-${screenshot.file.name}`;
-          const filePath = `poi-screenshots/${fileName}`;
+          const fileName = `${user.id}/${uuidv4()}-${screenshot.file.name.replace(/\.[^/.]+$/, '.webp')}`;
           
-          const { data: uploadData, error: uploadError } = await supabase.storage
-            .from('screenshots')
-            .upload(filePath, screenshot.file, { upsert: false });
+          const uploadResult = await uploadPoiScreenshot(screenshot.file, fileName);
 
-          if (uploadError) {
-            console.error('Error uploading screenshot:', uploadError);
-            throw new Error('Error uploading screenshot');
+          // Show conversion feedback for first upload
+          if (uploadedScreenshotPaths.length === 0 && uploadResult.compressionRatio) {
+            const stats = formatConversionStats(uploadResult);
+            setConversionStats(stats);
           }
-          
-          const publicURL = supabase.storage.from('screenshots').getPublicUrl(filePath).data.publicUrl;
+
           uploadedScreenshotPaths.push({ 
-            url: publicURL, 
+            url: uploadResult.url, 
             crop_details: screenshot.cropDetails,
             original_name: screenshot.file.name 
           });
@@ -235,6 +243,15 @@ const AddPoiForm: React.FC<AddPoiFormProps> = ({ gridSquareId, poiTypes, onCance
       {error && (
         <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md text-sm">
           {error}
+        </div>
+      )}
+
+      {/* Conversion Stats Display */}
+      {conversionStats && (
+        <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+          <p className="text-green-700 text-sm">
+            ✓ {conversionStats}
+          </p>
         </div>
       )}
       
