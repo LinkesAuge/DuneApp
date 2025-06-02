@@ -3,16 +3,21 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
 import { getDisplayName } from '../../lib/utils';
 import UserAvatar from './UserAvatar';
-import { Menu, X, User, LogOut, Shield, LayoutDashboard, Mountain, MapPin, Pyramid, Database } from 'lucide-react';
+import { Menu, X, User, LogOut, Shield, LayoutDashboard, Mountain, MapPin, Pyramid, Database, ChevronDown, Link as LinkIcon } from 'lucide-react';
 
 const Navbar: React.FC = () => {
   const { user, signOut } = useAuth();
   const location = useLocation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isDatabaseDropdownOpen, setIsDatabaseDropdownOpen] = useState(false);
 
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
   const toggleProfile = () => setIsProfileOpen(!isProfileOpen);
+  const toggleDatabaseDropdown = () => setIsDatabaseDropdownOpen(!isDatabaseDropdownOpen);
+
+  // Check if any database route is active
+  const isDatabaseActive = location.pathname === '/database' || location.pathname === '/poi-linking';
 
   const NavButton: React.FC<{
     to: string;
@@ -114,6 +119,110 @@ const Navbar: React.FC = () => {
         }
       `} />
     </Link>
+  );
+
+  // Database dropdown button component
+  const DatabaseDropdownButton: React.FC = () => (
+    <div className="relative">
+      <button
+        onClick={toggleDatabaseDropdown}
+        className="group relative flex items-center h-16 px-3 min-w-[130px] justify-center transition-all duration-300"
+      >
+        {/* Button background image */}
+        <div 
+          className="absolute inset-0 bg-center bg-cover bg-no-repeat"
+          style={{
+            backgroundImage: 'url(/images/bg-button.webp)',
+            backgroundSize: 'cover'
+          }}
+        />
+        
+        {/* Advanced purple overlay */}
+        <div className={`
+          absolute inset-0 transition-all duration-300
+          ${isDatabaseActive 
+            ? 'bg-gradient-to-b from-violet-600/50 via-violet-700/30 to-transparent' // Active state
+            : 'bg-gradient-to-b from-violet-600/0 via-violet-700/0 to-transparent group-hover:from-violet-600/40 group-hover:via-violet-700/20' // Hover state
+          }
+        `} />
+        
+        {/* Content */}
+        <div className="relative z-10 flex items-center space-x-2">
+          <span className={`
+            transition-all duration-300
+            ${isDatabaseActive ? 'text-amber-200 drop-shadow-lg' : 'text-amber-300 group-hover:text-amber-100 group-hover:drop-shadow-lg'}
+          `}
+          style={{
+            textShadow: isDatabaseActive ? '0 0 8px rgba(251, 191, 36, 0.6)' : undefined,
+            fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif"
+          }}
+          >
+            <Database size={14} strokeWidth={1.5} />
+          </span>
+          <span className={`
+            font-light text-xs uppercase tracking-widest transition-all duration-300 whitespace-nowrap
+            ${isDatabaseActive ? 'text-amber-100 drop-shadow-lg' : 'text-amber-200 group-hover:text-amber-50 group-hover:drop-shadow-lg'}
+          `}
+          style={{
+            textShadow: isDatabaseActive ? '0 0 8px rgba(251, 191, 36, 0.6)' : undefined,
+            fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif"
+          }}
+          >
+            Database
+          </span>
+          <ChevronDown 
+            size={12} 
+            strokeWidth={1.5} 
+            className={`
+              transition-all duration-300
+              ${isDatabaseActive ? 'text-amber-200 drop-shadow-lg' : 'text-amber-300 group-hover:text-amber-100 group-hover:drop-shadow-lg'}
+              ${isDatabaseDropdownOpen ? 'rotate-180' : 'rotate-0'}
+            `}
+          />
+        </div>
+        
+        {/* Sleek expanding underline */}
+        <div className={`
+          absolute bottom-1 left-0 transition-all duration-700 ease-out h-0.5 bg-gradient-to-r from-transparent to-transparent
+          ${isDatabaseActive 
+            ? 'w-full via-yellow-300 shadow-md shadow-yellow-300/60'
+            : 'w-0 via-violet-400 group-hover:w-full group-hover:shadow-md group-hover:shadow-violet-400/50'
+          }
+        `} />
+      </button>
+
+      {/* Dropdown menu */}
+      {isDatabaseDropdownOpen && (
+        <>
+          {/* Backdrop to close dropdown */}
+          <div 
+            className="fixed inset-0 z-40"
+            onClick={() => setIsDatabaseDropdownOpen(false)}
+          />
+          
+          {/* Dropdown content */}
+          <div className="absolute top-full left-0 mt-1 w-56 bg-gradient-to-b from-slate-950 to-slate-900 border border-slate-600/30 shadow-2xl z-50 backdrop-blur-sm">
+            <Link
+              to="/database"
+              onClick={() => setIsDatabaseDropdownOpen(false)}
+              className="group relative flex items-center px-4 py-3 hover:bg-violet-600/20 transition-all duration-200"
+            >
+              <Database size={14} strokeWidth={1.5} className="mr-3 text-amber-300 group-hover:text-amber-100" />
+              <span className="text-amber-200 group-hover:text-amber-50 font-light text-sm">Database Management</span>
+            </Link>
+            
+            <Link
+              to="/poi-linking"
+              onClick={() => setIsDatabaseDropdownOpen(false)}
+              className="group relative flex items-center px-4 py-3 hover:bg-violet-600/20 transition-all duration-200"
+            >
+              <LinkIcon size={14} strokeWidth={1.5} className="mr-3 text-amber-300 group-hover:text-amber-100" />
+              <span className="text-amber-200 group-hover:text-amber-50 font-light text-sm">POI Linking</span>
+            </Link>
+          </div>
+        </>
+      )}
+    </div>
   );
 
   const MobileNavButton: React.FC<{
@@ -315,13 +424,7 @@ const Navbar: React.FC = () => {
                     </NavButton>
                     {user.role === 'admin' && (
                       <>
-                    <NavButton
-                      to="/database"
-                      icon={<Database size={14} strokeWidth={1.5} />}
-                      isActive={location.pathname === '/database'}
-                    >
-                      Database
-                    </NavButton>
+                      <DatabaseDropdownButton />
                       <NavButton
                         to="/admin"
                         icon={<Shield size={14} strokeWidth={1.5} />}
@@ -582,7 +685,15 @@ const Navbar: React.FC = () => {
                       isActive={location.pathname === '/database'}
                       onClick={() => setIsMenuOpen(false)}
                     >
-                      Database
+                      Database Management
+                    </MobileNavButton>
+                    <MobileNavButton
+                      to="/poi-linking"
+                      icon={<LinkIcon size={15} strokeWidth={1.5} />}
+                      isActive={location.pathname === '/poi-linking'}
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      POI Linking
                     </MobileNavButton>
                   <MobileNavButton
                     to="/admin"

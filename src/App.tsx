@@ -14,6 +14,7 @@ import UITestPage from './pages/UITestPage';
 import ProfilePage from './pages/ProfilePage';
 import ItemsSchematicsPage from './pages/ItemsSchematicsPage';
 import PoiLinkingPage from './pages/PoiLinkingPage';
+import UnifiedPoiLinkingPage from './pages/UnifiedPoiLinkingPage';
 import { SharedImagesTest } from './pages/SharedImagesTest';
 import { useAuth } from './components/auth/AuthProvider';
 import { AlertTriangle } from 'lucide-react';
@@ -139,6 +140,14 @@ const AppRoutes: React.FC = () => {
         element={
           <AdminRoute>
             <ItemsSchematicsPage />
+          </AdminRoute>
+        } 
+      />
+      <Route 
+        path="/poi-linking" 
+        element={
+          <AdminRoute>
+            <UnifiedPoiLinkingPage />
           </AdminRoute>
         } 
       />
