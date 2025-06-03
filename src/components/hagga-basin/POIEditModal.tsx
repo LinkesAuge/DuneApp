@@ -17,6 +17,7 @@ import { getScreenshotLabel } from '../../lib/cropUtils';
 import UserAvatar from '../common/UserAvatar';
 import { uploadPoiScreenshot } from '../../lib/imageUpload';
 import { formatConversionStats } from '../../lib/imageUtils';
+import LinkedEntitiesSection from '../poi-linking/LinkedEntitiesSection';
 
 interface POIEditModalProps {
   poi: Poi;
@@ -1220,6 +1221,19 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
                 </p>
               </div>
             </div>
+
+            {/* Linked Entities Section */}
+            <LinkedEntitiesSection
+              poiId={poi.id}
+              poiTitle={poi.title}
+              className="mt-6"
+              showLinkButton={canEdit}
+              canEdit={canEdit}
+              onLinksChanged={() => {
+                // Could trigger a refresh of POI data if needed
+                // For now, the section handles its own data refresh
+              }}
+            />
           </div>
         </form>
 

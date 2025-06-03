@@ -1,34 +1,12 @@
 import React from 'react';
 import { Package, FileText, Calendar, User, Tag, Edit, Trash, Star, Share, X } from 'lucide-react';
+import EntityPOILinksSection from '../poi-linking/EntityPOILinksSection';
 
 // Import types
 type ActiveView = 'items' | 'schematics';
 
-interface Entity {
-  id: string;
-  name: string;
-  description?: string;
-  category?: {
-    id: string;
-    name: string;
-    icon?: string;
-  };
-  type?: {
-    id: string;
-    name: string;
-  };
-  tier?: {
-    id: string;
-    name: string;
-    level: number;
-    color?: string;
-  };
-  icon_url?: string;
-  created_at: string;
-  updated_at?: string;
-  created_by?: string;
-  field_values?: Record<string, any>;
-}
+// Use the unified Entity interface from types
+import { Entity } from '../../types/unified-entities';
 
 interface DetailsPanelProps {
   activeView: ActiveView;
@@ -340,6 +318,18 @@ const DetailsPanel: React.FC<DetailsPanelProps> = ({
               </div>
             </div>
           </DetailSection>
+
+          {/* POI Locations Section */}
+          <EntityPOILinksSection
+            entity={selectedItem}
+            className="mt-6"
+            showLinkButton={true}
+            canEdit={true}
+            onLinksChanged={() => {
+              // Could trigger entity data refresh if needed
+              // For now, the section handles its own data refresh
+            }}
+          />
         </div>
       </div>
     </div>

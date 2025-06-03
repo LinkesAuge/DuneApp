@@ -12,7 +12,7 @@ import AdminPanel from './components/admin/AdminPanel';
 import GridPage from './pages/GridPage';
 import UITestPage from './pages/UITestPage';
 import ProfilePage from './pages/ProfilePage';
-import ItemsSchematicsPage from './pages/ItemsSchematicsPage';
+import UnifiedEntitiesPage from './pages/UnifiedEntitiesPage';
 import PoiLinkingPage from './pages/PoiLinkingPage';
 import UnifiedPoiLinkingPage from './pages/UnifiedPoiLinkingPage';
 import { SharedImagesTest } from './pages/SharedImagesTest';
@@ -139,7 +139,7 @@ const AppRoutes: React.FC = () => {
         path="/database" 
         element={
           <AdminRoute>
-            <ItemsSchematicsPage />
+                          <UnifiedEntitiesPage />
           </AdminRoute>
         } 
       />
