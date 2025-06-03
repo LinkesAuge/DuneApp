@@ -378,7 +378,9 @@ export function useItemsSchematics(): UseItemsSchematicsReturn {
   }, []);
 
   const getTierById = useCallback((id: string): Tier | undefined => {
-    return state.tiers.find(tier => tier.id === id);
+    // Convert id to number since tier_number is the primary key
+    const tierNumber = parseInt(id, 10);
+    return state.tiers.find(tier => tier.tier_number === tierNumber);
   }, [state.tiers]);
 
   // Legacy compatibility functions

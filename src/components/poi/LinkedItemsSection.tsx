@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronDown, ChevronRight, Package, FileText, ExternalLink, Link2 } from 'lucide-react';
-import { getPoiWithItems } from '../../lib/api/poiItemLinks';
+import { getPoiWithEntities } from '../../lib/api/poi-entity-links';
 import { PoiWithItems, ItemWithRelations, SchematicWithRelations } from '../../types';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
@@ -29,7 +29,7 @@ const LinkedItemsSection: React.FC<LinkedItemsSectionProps> = ({
     const fetchPoiItems = async () => {
       try {
         setLoading(true);
-        const data = await getPoiWithItems(poiId);
+        const data = await getPoiWithEntities(poiId);
         setPoiWithItems(data);
       } catch (error) {
         console.error('Error fetching POI items:', error);

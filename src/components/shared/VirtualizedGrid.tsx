@@ -117,12 +117,26 @@ export function VirtualizedGrid<T>({
     onScroll?.(scrollTop, scrollLeft);
   }, [onScroll]);
 
+  // Convert width and height to numbers for react-window (it doesn't accept strings or undefined)
+  const gridWidth = useMemo(() => {
+    if (typeof width === 'number') return width;
+    // For string widths like "100%", we'll use the parent container width
+    // This is a fallback - ideally the parent should provide a numeric width
+    return 800; // Default fallback width
+  }, [width]);
+
+  const gridHeight = useMemo(() => {
+    if (typeof height === 'number') return height;
+    // If height is undefined or not a number, provide a default
+    return 600; // Default fallback height
+  }, [height]);
+
   // Memoize grid props to prevent unnecessary re-renders
   const gridProps = useMemo(() => ({
     rowCount,
     columnCount: columnsCount,
-    height,
-    width,
+    height: gridHeight,
+    width: gridWidth,
     overscanRowCount: overscanCount,
     overscanColumnCount: overscanCount,
     onScroll: handleScroll,
@@ -134,7 +148,7 @@ export function VirtualizedGrid<T>({
       scrollToColumn,
       scrollToAlignment
     })
-  }), [rowCount, columnsCount, height, width, overscanCount, handleScroll, scrollToRow, scrollToColumn, scrollToAlignment]);
+  }), [rowCount, columnsCount, gridHeight, gridWidth, overscanCount, handleScroll, scrollToRow, scrollToColumn, scrollToAlignment]);
 
   // Calculate grid item dimensions
   const getColumnWidth = useCallback((columnIndex: number) => {
@@ -156,7 +170,7 @@ export function VirtualizedGrid<T>({
     return (
       <div 
         className={cn("overflow-auto", className)}
-        style={{ height, width }}
+        style={{ height: gridHeight, width: gridWidth }}
       >
         <div 
           className="grid"

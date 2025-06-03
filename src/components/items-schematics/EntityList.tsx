@@ -120,7 +120,7 @@ const EntityList: React.FC<EntityListProps> = ({
         limit: pagination.limit,
         offset
       };
-
+      
       const response: EntityResponse = await entitiesAPI.getAll(apiFilters);
       
       if (offset === 0) {

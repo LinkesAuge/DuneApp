@@ -1,5 +1,30 @@
 import { createClient } from '@supabase/supabase-js';
 
+// Suppress development warnings in development
+if (process.env.NODE_ENV === 'development') {
+  const originalConsoleWarn = console.warn;
+  const originalConsoleError = console.error;
+  
+  console.warn = (...args) => {
+    const message = args.join(' ');
+    if (message.includes('__cf_bm') && message.includes('ungültiger Domain')) {
+      // Suppress Cloudflare bot management cookie warnings in development
+      return;
+    }
+    originalConsoleWarn.apply(console, args);
+  };
+
+  console.error = (...args) => {
+    const message = args.join(' ');
+    if (message.includes('OpaqueResponseBlocking') || 
+        (message.includes('blocked') && message.includes('.webp'))) {
+      // Suppress Supabase storage CORS warnings in development
+      return;
+    }
+    originalConsoleError.apply(console, args);
+  };
+}
+
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 

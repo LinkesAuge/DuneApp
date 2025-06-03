@@ -6,7 +6,10 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { usePagination } from '../../hooks/usePagination';
 import { VirtualizedList, VirtualizedGrid, PaginationControls } from '../shared';
-import type { Item, Schematic, Category, Type, Tier } from '../../types';
+import type { Entity, Tier } from '../../types/unified-entities';
+// Legacy type aliases for compatibility
+type Item = Entity;
+type Schematic = Entity;
 
 interface ItemSchematicSelectionPanelProps {
   selectedItemIds: Set<string>;
@@ -243,9 +246,9 @@ const ItemSchematicSelectionPanel: React.FC<ItemSchematicSelectionPanelProps> = 
         const searchFields = [
           item.name,
           item.description || '',
-          item.category?.name || '',
-          item.type?.name || '',
-          item.tier?.name || ''
+          item.category || '',
+          item.type || '',
+          item.tier_number?.toString() || ''
         ];
         
         if (!searchFields.some(field => field.toLowerCase().includes(searchLower))) {
@@ -334,6 +337,8 @@ const ItemSchematicSelectionPanel: React.FC<ItemSchematicSelectionPanelProps> = 
   const error = activeTab === 'items'
     ? itemsData.error || itemCategories.error || tiers.error
     : schematicsData.error || schematicCategories.error || tiers.error;
+
+  // Handle filtered data based on active tab
 
   // Handle filter changes
   const updateFilter = <K extends keyof FilterState>(key: K, value: FilterState[K]) => {
@@ -484,7 +489,7 @@ const ItemSchematicSelectionPanel: React.FC<ItemSchematicSelectionPanelProps> = 
                       <div className="text-xs text-slate-400 font-medium mb-2 px-2">Quick Filters</div>
                       {DEFAULT_PRESETS.map(preset => (
                         <button
-                          key={preset.id}
+                          key={`preset-${preset.id}`}
                           onClick={() => applyPreset(preset)}
                           className="w-full text-left px-2 py-2 text-sm text-slate-300 hover:text-slate-100 hover:bg-slate-700/50 rounded transition-colors"
                         >
@@ -653,9 +658,9 @@ const ItemSchematicSelectionPanel: React.FC<ItemSchematicSelectionPanelProps> = 
                     className="w-full px-2 py-1.5 bg-slate-700 border border-slate-600 rounded text-slate-100 text-sm"
                   >
                     <option value="all">All Creators</option>
-                    {user && <option value="mine">My {activeTab}</option>}
+                    {user && <option key="mine" value="mine">My {activeTab}</option>}
                     {creators.map(creator => (
-                      <option key={creator.id} value={creator.id}>
+                      <option key={`creator-${creator.id}`} value={creator.id}>
                         {creator.display_name || creator.username}
                       </option>
                     ))}
@@ -718,7 +723,7 @@ const ItemSchematicSelectionPanel: React.FC<ItemSchematicSelectionPanelProps> = 
                   
                   return (
                     <button
-                      key={category.id}
+                      key={`category-${category.id}`}
                       onClick={() => toggleCategory(category.id)}
                       className={`flex items-center space-x-2 px-2 py-1 rounded text-xs transition-colors ${
                         isSelected
@@ -748,7 +753,7 @@ const ItemSchematicSelectionPanel: React.FC<ItemSchematicSelectionPanelProps> = 
                     
                     return (
                       <button
-                        key={type.id}
+                        key={`type-${type.id}`}
                         onClick={() => toggleType(type.id)}
                         className={`flex items-center space-x-2 px-2 py-1 rounded text-xs transition-colors ${
                           isSelected
@@ -773,13 +778,15 @@ const ItemSchematicSelectionPanel: React.FC<ItemSchematicSelectionPanelProps> = 
             <div className="space-y-2">
               <div className="text-xs text-blue-300 font-medium">Tiers:</div>
               <div className="flex flex-wrap gap-1">
-                {tiers.tiers.map(tier => {
-                  const isSelected = filters.selectedTiers.has(tier.id);
+                {tiers.tiers.map((tier, index) => {
+                  // Use tier_number as the unique identifier (it's the primary key)
+                  const tierId = tier.tier_number.toString();
+                  const isSelected = filters.selectedTiers.has(tierId);
                   
                   return (
                     <button
-                      key={tier.id}
-                      onClick={() => toggleTier(tier.id)}
+                      key={`tier-${tier.tier_number}`}
+                      onClick={() => toggleTier(tierId)}
                       className={`flex items-center space-x-1 px-2 py-1 rounded text-xs transition-colors ${
                         isSelected
                           ? 'bg-blue-600/20 text-blue-100'
@@ -791,7 +798,7 @@ const ItemSchematicSelectionPanel: React.FC<ItemSchematicSelectionPanelProps> = 
                       ) : (
                         <Square className="w-2 h-2 text-slate-500 flex-shrink-0" />
                       )}
-                      <span className="truncate">T{tier.level}</span>
+                      <span className="truncate">T{tier.tier_number}</span>
                     </button>
                   );
                 })}
@@ -886,14 +893,14 @@ const ItemSchematicGridView: React.FC<ItemSchematicGridViewProps> = ({
               <div className="flex items-center space-x-2 text-xs text-slate-400 mt-1">
                 {item.category && (
                   <span className="px-1.5 py-0.5 bg-slate-700 text-blue-300 rounded text-xs">
-                    {item.category.name}
+                    {item.category}
                   </span>
                 )}
                 {item.type && (
-                  <span className="text-slate-400">{item.type.name}</span>
+                  <span className="text-slate-400">{item.type}</span>
                 )}
-                {item.tier && (
-                  <span className="text-slate-400">T{item.tier.level}</span>
+                {item.tier_number !== undefined && (
+                  <span className="text-slate-400">T{item.tier_number}</span>
                 )}
               </div>
               {item.description && (
@@ -1011,14 +1018,14 @@ const ItemSchematicListView: React.FC<ItemSchematicListViewProps> = ({
           <div className="flex items-center space-x-2 text-xs text-slate-400 mt-1">
             {item.category && (
               <span className="px-2 py-0.5 bg-slate-700 text-blue-300 rounded">
-                {item.category.name}
+                {item.category}
               </span>
             )}
             {item.type && (
-              <span>{item.type.name}</span>
+              <span>{item.type}</span>
             )}
-            {item.tier && (
-              <span className="text-amber-400">Tier {item.tier.level}</span>
+            {item.tier_number !== undefined && (
+              <span className="text-amber-400">Tier {item.tier_number}</span>
             )}
           </div>
           {item.description && (

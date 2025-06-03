@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Shield, AlertCircle, CheckCircle, Shapes } from 'lucide-react';
+import { Shield, AlertCircle, CheckCircle, Shapes, Image } from 'lucide-react';
 import { useAdminData } from '../../hooks/useAdminData';
 import DatabaseManagement from './DatabaseManagement';
 import UserManagement from './UserManagement';
@@ -8,10 +8,11 @@ import PoiDefinitionManager from './PoiTypeManager';
 import MapSettings from './MapSettings';
 import RankManagement from './RankManagement';
 import SystemBuilder from './SystemBuilder';
+import SharedImagesManagement from './SharedImagesManagement';
 import DiamondIcon from '../common/DiamondIcon';
 
 const AdminPanel: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'database' | 'users' | 'poi-types' | 'settings' | 'tasks' | 'ranks' | 'system-builder'>('users');
+  const [activeTab, setActiveTab] = useState<'database' | 'users' | 'poi-types' | 'settings' | 'tasks' | 'ranks' | 'system-builder' | 'shared-images'>('users');
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -49,6 +50,7 @@ const AdminPanel: React.FC = () => {
     { id: 'ranks' as const, label: 'Ranks', icon: '🏆' },
     { id: 'poi-types' as const, label: 'POI Definitions', icon: '📍' },
     { id: 'system-builder' as const, label: 'System Builder', icon: '🔧' },
+    { id: 'shared-images' as const, label: 'Media', icon: '🖼️' },
     { id: 'settings' as const, label: 'Map Settings', icon: '⚙️' },
     { id: 'tasks' as const, label: 'Scheduled Tasks', icon: '⏰' },
     { id: 'database' as const, label: 'Database', icon: '💾' }
@@ -255,6 +257,13 @@ const AdminPanel: React.FC = () => {
 
             {activeTab === 'system-builder' && (
               <SystemBuilder
+                onError={handleError}
+                onSuccess={handleSuccess}
+              />
+            )}
+
+            {activeTab === 'shared-images' && (
+              <SharedImagesManagement
                 onError={handleError}
                 onSuccess={handleSuccess}
               />

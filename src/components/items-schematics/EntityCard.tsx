@@ -89,11 +89,10 @@ const EntityCard: React.FC<EntityCardProps> = ({
           {/* Entity Type Icon */}
           <div className={`${compact ? 'w-8 h-8' : 'w-10 h-10'} flex items-center justify-center rounded-lg bg-slate-700 border border-slate-600 flex-shrink-0`}>
             <ImagePreview
-              imageId={entity.icon_image_id}
-              fallbackText={entity.icon_fallback || (isSchematic ? '📋' : '📦')}
+              iconImageId={entity.icon_image_id}
+              iconFallback={entity.icon_fallback || (isSchematic ? '📋' : '📦')}
               size={compact ? 'sm' : 'md'}
               className="w-full h-full"
-              showFallback={true}
             />
           </div>
 

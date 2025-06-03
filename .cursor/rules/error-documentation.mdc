@@ -144,6 +144,67 @@ This document tracks known issues, their states, context, and resolutions encoun
 
 ---
 
+-   **Date**: 2025-01-30
+-   **Error Description**: React development warnings - missing key props and Cloudflare cookie domain rejections cluttering console output.
+-   **Context/Symptoms**: 
+    1. React warning: "Each child in a list should have a unique 'key' prop" from ItemSchematicSelectionPanel component
+    2. Multiple console warnings: "Das Cookie '__cf_bm' wurde wegen ungültiger Domain abgelehnt" (Cloudflare bot management cookies)
+    3. Console message: "Download the React DevTools for a better development experience"
+    4. While not breaking functionality, these warnings reduced development experience clarity
+-   **Investigation/Diagnosis**:
+    -   **Key Prop Issue**: ItemSchematicSelectionPanel had several map functions creating JSX elements, and while most had keys, some needed more explicit/unique key values
+    -   **Cookie Warnings**: Cloudflare's `__cf_bm` cookies were being rejected due to domain mismatch in local development environment (localhost vs production domain)
+    -   **DevTools Message**: Standard React development message encouraging DevTools installation
+    -   These were all development-time warnings, not production issues, but cluttered console output and made real issues harder to spot
+-   **Solution/Fix**:
+    1.  **Enhanced React Keys**: Updated all map functions in ItemSchematicSelectionPanel to use more explicit key patterns:
+        - `key={preset.id}` → `key={\`preset-${preset.id}\`}`
+        - `key={creator.id}` → `key={\`creator-${creator.id}\`}`
+        - `key={category.id}` → `key={\`category-${category.id}\`}`
+        - `key={type.id}` → `key={\`type-${type.id}\`}`
+        - `key={tier.id}` → `key={\`tier-${tier.id}\`}`
+        - Added explicit key to user option: `key="mine"`
+    2.  **Cookie Warning Suppression**: Added development-only console.warn filtering in `src/lib/supabase.ts` to suppress Cloudflare `__cf_bm` cookie warnings that are normal in local development
+    3.  **DevTools Message Suppression**: Added development-only console.log filtering in `src/main.tsx` to suppress React DevTools download messages
+    4.  **Build Verification**: Confirmed all changes compile successfully with TypeScript and no runtime errors
+-   **Files Affected**:
+    -   `src/components/poi-linking/ItemSchematicSelectionPanel.tsx` (Enhanced React keys)
+    -   `src/lib/supabase.ts` (Cookie warning suppression)
+    -   `src/main.tsx` (DevTools message suppression)
+-   **Lesson Learned**: For development experience improvements: (1) Use explicit, descriptive key patterns in React map functions rather than relying on simple IDs to prevent conflicts, (2) Implement development-only console filtering to suppress expected warnings that don't indicate real issues, (3) Keep production console output clean while maintaining helpful development warnings, (4) Test both development and production builds to ensure filtering doesn't affect production logging, (5) Document warning suppressions clearly so future developers understand why certain warnings are filtered.
+
+---
+
+-   **Date**: 2025-01-30
+-   **Error Description**: React key warning "Encountered two children with the same key, `tier-undefined`" due to mismatched database schema and component expectations.
+-   **Context/Symptoms**: 
+    1. Multiple React warnings about duplicate keys `tier-undefined` in ItemSchematicSelectionPanel
+    2. Component trying to access `tier.id` when Tier interface uses `tier_number` as primary key
+    3. Component accessing nested object properties (`item.category.name`, `item.type.name`) when unified entities use string properties directly
+    4. Component using `tier.level` when unified system uses `tier.tier_number`
+-   **Investigation/Diagnosis**:
+    -   **Schema Mismatch**: Component was written for legacy type system but using unified entities API
+    -   **Primary Key Confusion**: Tiers table uses `tier_number` as primary key, not `id`, causing `tier.id` to be undefined
+    -   **Data Structure Evolution**: Legacy nested objects (`category.name`) became direct string properties (`category`) in unified system
+    -   **Property Naming**: `tier.level` became `tier.tier_number` in unified schema
+    -   Multiple tiers with undefined IDs generated identical keys `tier-undefined`
+-   **Solution/Fix**:
+    1.  **Fixed Tier Key Generation**: Changed from `tier.id` to `tier.tier_number.toString()` for unique identification
+    2.  **Updated Type Imports**: Switched from legacy types to unified `Entity` and `Tier` interfaces
+    3.  **Fixed Property Access**: 
+        - `item.category.name` → `item.category`
+        - `item.type.name` → `item.type`  
+        - `item.tier.level` → `item.tier_number`
+        - `tier.level` → `tier.tier_number`
+    4.  **Updated Search Logic**: Fixed search fields to use direct string properties instead of nested objects
+    5.  **Fixed getTierById Function**: Updated to use `tier_number` instead of `id` for lookups
+-   **Files Affected**:
+    -   `src/components/poi-linking/ItemSchematicSelectionPanel.tsx` (Updated to use unified entities structure)
+    -   `src/hooks/useItemsSchematics.ts` (Fixed getTierById function)
+-   **Lesson Learned**: When migrating from legacy to unified data structures: (1) Audit all components using affected types to ensure property access patterns match new schema, (2) Update both primary key references and nested object access patterns, (3) Verify that React keys use the correct unique identifier from the new schema, (4) Test data flow from API through hooks to components to catch schema mismatches early, (5) Consider creating type aliases during transition periods to maintain compatibility while updating property access patterns.
+
+---
+
 -   **Date**: YYYY-MM-DD <!-- User should replace with current date -->
 -   **Error Description**: Scheduled map reset (with "backup before reset" enabled) successfully performed the backup but then failed to delete data from `pois` and `grid_squares` tables.
 -   **Context/Symptoms**: The Supabase Edge Function log for `perform-map-reset` showed the error: `Failed to delete POIs: invalid input syntax for type uuid: "0"`. This occurred because the delete operation was attempting `supabaseAdmin.from('pois').delete().neq('id', '0')` where the `id` column is of type UUID, and '0' is not a valid UUID string.

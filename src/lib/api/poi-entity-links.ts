@@ -500,4 +500,68 @@ export const poiEntityLinksAPI = {
 };
 
 // Export error class for external use
-export { POIEntityLinkAPIError }; 
+export { POIEntityLinkAPIError };
+
+/**
+ * Get POI with all linked entities (compatible with legacy PoiWithItems interface)
+ * This function bridges the old items/schematics system with the new unified entities system
+ */
+export async function getPoiWithEntities(poiId: string): Promise<any> {
+  try {
+    // Get the POI first
+    const { data: poi, error: poiError } = await supabase
+      .from('pois')
+      .select('*')
+      .eq('id', poiId)
+      .single();
+
+    if (poiError) throw poiError;
+    if (!poi) return null;
+
+    // Get all linked entities for this POI
+    const entityLinks = await poiEntityLinksAPI.getPOIEntityLinks(poiId);
+
+    // Separate items and schematics for legacy compatibility
+    const linked_items = entityLinks
+      ?.filter(link => link.entity && !link.entity.is_schematic)
+      .map(link => ({
+        ...link.entity,
+        // Map to legacy item structure
+        icon_url: null, // Will be handled by ImagePreview component
+        category: { name: link.entity.category },
+        type: { name: link.entity.type },
+        subtype: link.entity.subtype ? { name: link.entity.subtype } : null,
+        tier: link.entity.tier_number > 0 ? { 
+          name: `Tier ${link.entity.tier_number}`,
+          color: '#fbbf24' // Default amber color
+        } : null,
+        field_values: {} // No custom fields in unified system yet
+      })) || [];
+    
+    const linked_schematics = entityLinks
+      ?.filter(link => link.entity && link.entity.is_schematic)
+      .map(link => ({
+        ...link.entity,
+        // Map to legacy schematic structure
+        icon_url: null, // Will be handled by ImagePreview component
+        category: { name: link.entity.category },
+        type: { name: link.entity.type },
+        subtype: link.entity.subtype ? { name: link.entity.subtype } : null,
+        tier: link.entity.tier_number > 0 ? { 
+          name: `Tier ${link.entity.tier_number}`,
+          color: '#3b82f6' // Default blue color
+        } : null,
+        field_values: {} // No custom fields in unified system yet
+      })) || [];
+
+    return {
+      ...poi,
+      linked_items,
+      linked_schematics,
+      item_links: entityLinks || []
+    };
+  } catch (error) {
+    console.error('Error fetching POI with entities:', error);
+    throw error;
+  }
+} 

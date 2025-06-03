@@ -143,11 +143,10 @@ const LinkedEntitiesSection: React.FC<LinkedEntitiesSectionProps> = ({
             {/* Entity Icon */}
             <div className="w-10 h-10 flex items-center justify-center rounded-lg bg-slate-700 border border-slate-600 flex-shrink-0">
               <ImagePreview
-                imageId={entity.icon_image_id}
-                fallbackText={entity.icon_fallback || (entity.is_schematic ? '📋' : '📦')}
+                iconImageId={entity.icon_image_id}
+                iconFallback={entity.icon_fallback || (entity.is_schematic ? '📋' : '📦')}
                 size="sm"
                 className="w-full h-full"
-                showFallback={true}
               />
             </div>
             

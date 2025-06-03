@@ -1,6 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Route, Routes, Navigate, useLocation } from 'react-router-dom';
-import { AuthProvider } from './components/auth/AuthProvider';
+import { AuthProvider, useAuth } from './components/auth/AuthProvider';
 import Navbar from './components/common/Navbar';
 import Landing from './pages/Landing';
 import Auth from './pages/Auth';
@@ -16,10 +16,10 @@ import UnifiedEntitiesPage from './pages/UnifiedEntitiesPage';
 import PoiLinkingPage from './pages/PoiLinkingPage';
 import UnifiedPoiLinkingPage from './pages/UnifiedPoiLinkingPage';
 import { SharedImagesTest } from './pages/SharedImagesTest';
-import { useAuth } from './components/auth/AuthProvider';
 import { AlertTriangle } from 'lucide-react';
 import ItemDetailPage from './pages/ItemDetailPage';
 import SchematicDetailPage from './pages/SchematicDetailPage';
+
 
 const PendingApprovalMessage: React.FC = () => (
   <div className="min-h-[60vh] flex items-center justify-center">
@@ -138,9 +138,9 @@ const AppRoutes: React.FC = () => {
       <Route 
         path="/database" 
         element={
-          <AdminRoute>
-                          <UnifiedEntitiesPage />
-          </AdminRoute>
+          <ProtectedRoute>
+            <UnifiedEntitiesPage />
+          </ProtectedRoute>
         } 
       />
       <Route 
@@ -211,6 +211,7 @@ const AppRoutes: React.FC = () => {
           </ProtectedRoute>
         }
       />
+      
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

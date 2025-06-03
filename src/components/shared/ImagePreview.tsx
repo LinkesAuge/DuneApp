@@ -90,12 +90,14 @@ export const ImagePreview: React.FC<ImagePreviewProps> = ({
   return (
     <div className={`flex items-center gap-2 ${className}`}>
       {/* Image or Text Icon Display */}
-      {displayInfo.is_image && displayInfo.image_url ? (
+      {displayInfo.is_image && displayInfo.image_url && !error ? (
         <img
           src={displayInfo.image_url}
           alt={displayInfo.display_value || 'Icon'}
           className={`${sizeClasses[size]} object-cover rounded`}
+          crossOrigin="anonymous"
           onError={() => setError(true)}
+          onLoad={() => setError(false)}
         />
       ) : (
         <div className={`${sizeClasses[size]} flex items-center justify-center rounded`}>

@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useItemsSchematics } from './useItemsSchematics';
 import { useAuth } from '../components/auth/AuthProvider';
-import type { AppliesTo } from '../types';
 
 // =================================
 // Simplified Hooks for UI Components
@@ -12,28 +11,32 @@ import type { AppliesTo } from '../types';
  */
 export function useCategories(entityType: 'items' | 'schematics') {
   const { user } = useAuth();
-  const { categories, loading, errors, refetchCategories } = useItemsSchematics();
+  const { categories, loading, errors, refetchCategories, items, schematics } = useItemsSchematics();
   
-  const appliesTo: AppliesTo = entityType === 'items' ? 'item' : 'schematic';
-  
-  // Filter categories for the specific entity type
+  // In unified system, derive categories from actual entities
   const filteredCategories = useMemo(() => {
-    return categories.filter(category => 
-      category.applies_to === 'both' || category.applies_to === appliesTo
-    );
-  }, [categories, appliesTo]);
+    const entities = entityType === 'items' ? items : schematics;
+    const categoryNames = Array.from(new Set(entities.map(e => e.category))).sort();
+    
+    // Convert to legacy format for compatibility
+    return categoryNames.map(name => ({
+      id: name,
+      name: name,
+      applies_to: 'both' as const
+    }));
+  }, [items, schematics, entityType]);
 
   useEffect(() => {
     if (user) {
-      refetchCategories(appliesTo);
+      refetchCategories();
     }
-  }, [user, appliesTo, refetchCategories]);
+  }, [user, refetchCategories]);
 
   return {
     categories: filteredCategories,
     loading: loading.categories,
     error: errors.categories,
-    refetch: () => refetchCategories(appliesTo)
+    refetch: refetchCategories
   };
 }
 
@@ -42,17 +45,27 @@ export function useCategories(entityType: 'items' | 'schematics') {
  */
 export function useTypes(categoryId?: string) {
   const { user } = useAuth();
-  const { types, loading, errors, refetchTypes } = useItemsSchematics();
+  const { types, loading, errors, refetchTypes, items, schematics } = useItemsSchematics();
   
-  // Filter types by category if specified
+  // In unified system, derive types from actual entities for the specified category
   const filteredTypes = useMemo(() => {
     if (!categoryId) return [];
-    return types.filter(type => type.category_id === categoryId);
-  }, [types, categoryId]);
+    
+    const allEntities = [...items, ...schematics];
+    const categoryEntities = allEntities.filter(e => e.category === categoryId);
+    const typeNames = Array.from(new Set(categoryEntities.map(e => e.type))).sort();
+    
+    // Convert to legacy format for compatibility
+    return typeNames.map(name => ({
+      id: name,
+      name: name,
+      category_id: categoryId
+    }));
+  }, [items, schematics, categoryId]);
 
   useEffect(() => {
     if (user && categoryId) {
-      refetchTypes(categoryId);
+      refetchTypes();
     }
   }, [user, categoryId, refetchTypes]);
 
@@ -60,7 +73,7 @@ export function useTypes(categoryId?: string) {
     types: filteredTypes,
     loading: loading.types,
     error: errors.types,
-    refetch: categoryId ? () => refetchTypes(categoryId) : () => {}
+    refetch: refetchTypes
   };
 }
 
@@ -102,15 +115,17 @@ export function useItems(filters?: {
     let result = [...items];
 
     if (filters?.category_id) {
-      result = result.filter(item => item.category_id === filters.category_id);
+      result = result.filter(item => item.category === filters.category_id);
     }
 
     if (filters?.type_id) {
-      result = result.filter(item => item.type_id === filters.type_id);
+      result = result.filter(item => item.type === filters.type_id);
     }
 
     if (filters?.tier_id) {
-      result = result.filter(item => item.tier_id === filters.tier_id);
+      // tier_id comes as string but tier_number is a number
+      const tierNumber = parseInt(filters.tier_id, 10);
+      result = result.filter(item => item.tier_number === tierNumber);
     }
 
     if (filters?.searchTerm) {
@@ -118,8 +133,8 @@ export function useItems(filters?: {
       result = result.filter(item => 
         item.name.toLowerCase().includes(searchLower) ||
         item.description?.toLowerCase().includes(searchLower) ||
-        item.category?.name.toLowerCase().includes(searchLower) ||
-        item.type?.name.toLowerCase().includes(searchLower)
+        item.category?.toLowerCase().includes(searchLower) ||
+        item.type?.toLowerCase().includes(searchLower)
       );
     }
 
@@ -158,15 +173,17 @@ export function useSchematics(filters?: {
     let result = [...schematics];
 
     if (filters?.category_id) {
-      result = result.filter(schematic => schematic.category_id === filters.category_id);
+      result = result.filter(schematic => schematic.category === filters.category_id);
     }
 
     if (filters?.type_id) {
-      result = result.filter(schematic => schematic.type_id === filters.type_id);
+      result = result.filter(schematic => schematic.type === filters.type_id);
     }
 
     if (filters?.tier_id) {
-      result = result.filter(schematic => schematic.tier_id === filters.tier_id);
+      // tier_id comes as string but tier_number is a number
+      const tierNumber = parseInt(filters.tier_id, 10);
+      result = result.filter(schematic => schematic.tier_number === tierNumber);
     }
 
     if (filters?.searchTerm) {
@@ -174,8 +191,8 @@ export function useSchematics(filters?: {
       result = result.filter(schematic => 
         schematic.name.toLowerCase().includes(searchLower) ||
         schematic.description?.toLowerCase().includes(searchLower) ||
-        schematic.category?.name.toLowerCase().includes(searchLower) ||
-        schematic.type?.name.toLowerCase().includes(searchLower)
+        schematic.category?.toLowerCase().includes(searchLower) ||
+        schematic.type?.toLowerCase().includes(searchLower)
       );
     }
 
@@ -226,7 +243,7 @@ export function useEntityCounts(entityType: 'items' | 'schematics') {
     const countMap = new Map<string, number>();
     
     entities.forEach(entity => {
-      const categoryId = entity.category_id;
+      const categoryId = entity.category;
       countMap.set(categoryId, (countMap.get(categoryId) || 0) + 1);
     });
     

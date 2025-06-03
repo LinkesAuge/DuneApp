@@ -370,6 +370,7 @@ interface AuthContextType {
 -   **Database operation safety**: UPSERT operations with conflict resolution prevent constraint violations.
 -   **File cleanup security**: Proper cleanup of both current and original files during deletion operations.
 -   **Authentication security**: Dual authentication methods with controlled registration access.
+-   **RLS Policy Management**: Proper Row Level Security policies for admin operations on system-imported entities.
 
 ## 9. Client-Side Image Processing
 
@@ -496,7 +497,41 @@ This pattern ensures that:
 The `is_explored` field is now managed consistently across all operations:
 - **Upload/Crop Operations**: Set `is_explored: true`
 - **Delete Operations**: Set `is_explored: false`
-- **Dashboard Integration**: Real-time updates via global event broadcasting 
+- **Dashboard Integration**: Real-time updates via global event broadcasting
+
+## RLS Policy Management for System Entities
+
+### Issue: Admin Operations on Imported Entities
+
+When performing admin operations on entities imported from external data sources (like Excel migrations), Row Level Security policies can block updates if not properly configured.
+
+### Root Cause
+
+- **Imported entities**: Have `created_by = NULL` (system entities)
+- **Admin users**: May authenticate as service accounts with `auth.uid() = NULL`
+- **Standard RLS policy**: `(created_by = auth.uid())` blocks updates because `NULL = NULL` evaluates to `FALSE` in SQL
+
+### Solution: Additional RLS Policy
+
+```sql
+-- Allow admin updates for system entities (created_by = NULL)
+CREATE POLICY "Allow admin updates for system entities" ON entities
+FOR UPDATE TO public
+USING (created_by IS NULL);
+```
+
+### Application Areas
+
+This pattern applies to:
+- **Entity Icons Upload**: Admin uploading icons for imported entities
+- **Bulk Data Updates**: Admin operations on migrated content
+- **System Maintenance**: Updates to entities without user ownership
+
+### Security Considerations
+
+- Policy allows updates to system entities (created_by = NULL) by any authenticated user
+- Appropriate for imported game data that should be maintainable by admins
+- Does not affect user-created entities with proper ownership attribution 
 
 ## Enhanced Backup System with Storage Files
 
