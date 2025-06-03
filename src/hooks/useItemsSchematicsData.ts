@@ -16,14 +16,12 @@ export function useCategories(entityType: 'items' | 'schematics') {
   // In unified system, derive categories from actual entities
   const filteredCategories = useMemo(() => {
     const entities = entityType === 'items' ? items : schematics;
-    const categoryNames = Array.from(new Set(entities.map(e => e.category))).sort();
+    const categoryObjs = entities.map(e => e.category).filter(Boolean);
+    const uniqueCategories = Array.from(
+      new Map(categoryObjs.map(cat => [cat.id, cat])).values()
+    ).sort((a, b) => a.name.localeCompare(b.name));
     
-    // Convert to legacy format for compatibility
-    return categoryNames.map(name => ({
-      id: name,
-      name: name,
-      applies_to: 'both' as const
-    }));
+    return uniqueCategories;
   }, [items, schematics, entityType]);
 
   useEffect(() => {
@@ -52,15 +50,13 @@ export function useTypes(categoryId?: string) {
     if (!categoryId) return [];
     
     const allEntities = [...items, ...schematics];
-    const categoryEntities = allEntities.filter(e => e.category === categoryId);
-    const typeNames = Array.from(new Set(categoryEntities.map(e => e.type))).sort();
+    const categoryEntities = allEntities.filter(e => e.category?.id === categoryId);
+    const typeObjs = categoryEntities.map(e => e.type).filter(Boolean);
+    const uniqueTypes = Array.from(
+      new Map(typeObjs.map(type => [type.id, type])).values()
+    ).sort((a, b) => a.name.localeCompare(b.name));
     
-    // Convert to legacy format for compatibility
-    return typeNames.map(name => ({
-      id: name,
-      name: name,
-      category_id: categoryId
-    }));
+    return uniqueTypes;
   }, [items, schematics, categoryId]);
 
   useEffect(() => {
@@ -115,11 +111,11 @@ export function useItems(filters?: {
     let result = [...items];
 
     if (filters?.category_id) {
-      result = result.filter(item => item.category === filters.category_id);
+      result = result.filter(item => item.category?.id === filters.category_id);
     }
 
     if (filters?.type_id) {
-      result = result.filter(item => item.type === filters.type_id);
+      result = result.filter(item => item.type?.id === filters.type_id);
     }
 
     if (filters?.tier_id) {
@@ -133,8 +129,8 @@ export function useItems(filters?: {
       result = result.filter(item => 
         item.name.toLowerCase().includes(searchLower) ||
         item.description?.toLowerCase().includes(searchLower) ||
-        item.category?.toLowerCase().includes(searchLower) ||
-        item.type?.toLowerCase().includes(searchLower)
+        item.category?.name?.toLowerCase().includes(searchLower) ||
+        item.type?.name?.toLowerCase().includes(searchLower)
       );
     }
 
@@ -173,11 +169,11 @@ export function useSchematics(filters?: {
     let result = [...schematics];
 
     if (filters?.category_id) {
-      result = result.filter(schematic => schematic.category === filters.category_id);
+      result = result.filter(schematic => schematic.category?.id === filters.category_id);
     }
 
     if (filters?.type_id) {
-      result = result.filter(schematic => schematic.type === filters.type_id);
+      result = result.filter(schematic => schematic.type?.id === filters.type_id);
     }
 
     if (filters?.tier_id) {
@@ -191,8 +187,8 @@ export function useSchematics(filters?: {
       result = result.filter(schematic => 
         schematic.name.toLowerCase().includes(searchLower) ||
         schematic.description?.toLowerCase().includes(searchLower) ||
-        schematic.category?.toLowerCase().includes(searchLower) ||
-        schematic.type?.toLowerCase().includes(searchLower)
+        schematic.category?.name?.toLowerCase().includes(searchLower) ||
+        schematic.type?.name?.toLowerCase().includes(searchLower)
       );
     }
 

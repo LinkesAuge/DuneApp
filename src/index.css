@@ -207,6 +207,53 @@
   .badge-secondary {
     @apply bg-slate-700 text-slate-200;
   }
+
+  /* Dune-themed POI Linking Panel Styles */
+  .dune-panel {
+    background: rgba(15, 23, 42, 0.95);
+    border: 1px solid rgb(71, 85, 105);
+    backdrop-filter: blur(8px);
+  }
+
+  .dune-button-primary {
+    background: rgb(217, 119, 6);
+    color: rgb(15, 23, 42);
+    border: 1px solid rgb(245, 158, 11);
+    @apply px-3 py-1 rounded font-medium transition-all duration-200;
+  }
+
+  .dune-button-primary:hover {
+    background: rgb(245, 158, 11);
+  }
+
+  .dune-button-secondary {
+    background: rgb(51, 65, 85);
+    color: rgb(251, 191, 36);
+    border: 1px solid rgb(71, 85, 105);
+    @apply px-3 py-1 rounded font-medium transition-all duration-200;
+  }
+
+  .dune-button-secondary:hover {
+    background: rgb(71, 85, 105);
+    border-color: rgb(251, 191, 36);
+  }
+
+  .tab-active {
+    background: rgb(217, 119, 6);
+    color: rgb(15, 23, 42);
+    border-color: rgb(245, 158, 11);
+  }
+
+  .tab-inactive {
+    background: rgb(51, 65, 85);
+    color: rgb(251, 191, 36);
+    border: 1px solid rgb(71, 85, 105);
+  }
+
+  .tab-inactive:hover {
+    background: rgb(71, 85, 105);
+    border-color: rgb(251, 191, 36);
+  }
 }
 
 @layer utilities {

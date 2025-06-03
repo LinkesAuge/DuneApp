@@ -187,7 +187,6 @@ const UserManagement: React.FC<UserManagementProps> = ({
 
   const formatDate = (dateString: string | null | undefined): string => {
     if (!dateString) {
-      console.warn('Date string is null or undefined:', dateString);
       return 'Unknown';
     }
 
@@ -196,28 +195,18 @@ const UserManagement: React.FC<UserManagementProps> = ({
 
       // Check if date is valid
       if (isNaN(date.getTime())) {
-        console.warn('Invalid date:', dateString);
         return 'Unknown';
       }
 
-      // Check if this is a recent placeholder date (within last few seconds)
-      const now = new Date();
-      const timeDiff = Math.abs(now.getTime() - date.getTime());
-      if (timeDiff < 10000) { // Within 10 seconds - likely a placeholder
-        return 'Recently joined';
-      }
-
-      // European format with Berlin time
-      const berlinTime = new Intl.DateTimeFormat('de-DE', {
-        timeZone: 'Europe/Berlin',
-        day: '2-digit',
-        month: '2-digit',
+      // Format as a simple date without time for user join dates
+      const formattedDate = new Intl.DateTimeFormat('en-US', {
         year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
+        month: 'short',
+        day: 'numeric',
+        timeZone: 'UTC'
       }).format(date);
   
-      return `${berlinTime} (Berlin Time)`;
+      return formattedDate;
     } catch (error) {
       console.error('Date formatting error:', error, 'for input:', dateString);
       return 'Unknown';

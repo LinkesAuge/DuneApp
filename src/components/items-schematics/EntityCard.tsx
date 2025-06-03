@@ -1,16 +1,16 @@
 // EntityCard Component for Unified Entities System
 import React from 'react';
 import { Package, FileText, Edit, Trash, MapPin, CheckSquare, Square } from 'lucide-react';
-import type { Entity } from '../../types/unified-entities';
-import { TIER_NAMES } from '../../types/unified-entities';
+import type { EntityWithRelations } from '../../types/unified-entities';
 import { ImagePreview } from '../shared/ImagePreview';
+import { useTiers } from '../../hooks/useTiers';
 
 interface EntityCardProps {
-  entity: Entity;
-  onClick: (entity: Entity) => void;
-  onEdit?: (entity: Entity) => void;
-  onDelete?: (entity: Entity) => void;
-  onPoiLink?: (entity: Entity) => void;
+  entity: EntityWithRelations;
+  onClick: (entity: EntityWithRelations) => void;
+  onEdit?: (entity: EntityWithRelations) => void;
+  onDelete?: (entity: EntityWithRelations) => void;
+  onPoiLink?: (entity: EntityWithRelations) => void;
   // Bulk selection props
   isSelected?: boolean;
   onSelectionToggle?: (entityId: string) => void;
@@ -32,7 +32,8 @@ const EntityCard: React.FC<EntityCardProps> = ({
   showActions = true,
   compact = false
 }) => {
-  const tierName = TIER_NAMES[entity.tier_number] || `Tier ${entity.tier_number}`;
+  const { getTierName } = useTiers();
+  const tierName = getTierName(entity.tier_number);
   const isSchematic = entity.is_schematic;
 
   const handleCardClick = (e: React.MouseEvent) => {
@@ -127,16 +128,16 @@ const EntityCard: React.FC<EntityCardProps> = ({
           <div className="mb-3 space-y-1">
             <div className="flex items-center justify-between text-sm">
               <span className="text-amber-200/60 font-light">Category:</span>
-              <span className="text-amber-200 font-medium">{entity.category}</span>
+              <span className="text-amber-200 font-medium">{entity.category?.name || 'Unknown'}</span>
             </div>
             <div className="flex items-center justify-between text-sm">
               <span className="text-amber-200/60 font-light">Type:</span>
-              <span className="text-amber-200 font-medium">{entity.type}</span>
+              <span className="text-amber-200 font-medium">{entity.type?.name || 'Unknown'}</span>
             </div>
             {entity.subtype && (
               <div className="flex items-center justify-between text-sm">
                 <span className="text-amber-200/60 font-light">Subtype:</span>
-                <span className="text-amber-200 font-medium">{entity.subtype}</span>
+                <span className="text-amber-200 font-medium">{entity.subtype.name}</span>
               </div>
             )}
             <div className="flex items-center justify-between text-sm">

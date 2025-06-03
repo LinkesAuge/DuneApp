@@ -1,5 +1,7 @@
 import { supabase } from './supabase';
-import { createBulkPoiItemLinks, deleteBulkPoiItemLinks, type PoiItemLink } from './api/poiItemLinks';
+// DEPRECATED: This file contains legacy code that will be replaced in the new POI linking system
+// The new system uses simple direct API calls instead of complex utility functions
+import { createBulkPoiEntityLinks, deleteBulkPoiEntityLinks, getEntityIdFromLegacyId, type PoiEntityLink } from './api/poiEntityLinks';
 import type { LinkingStats, LinkingValidation } from '../hooks/useLinkingState';
 import { PerformanceMonitor, performanceUtils } from './performanceUtils';
 
@@ -369,11 +371,22 @@ export async function createPoiItemLinks(
       const batchNumber = Math.floor(i / batchSize) + 1;
       
       try {
-        // Remove entityType before database insertion
-        const dbBatch = batch.map(({ entityType, ...link }) => link);
+        // Convert to entity format for database insertion
+        const dbBatch = await Promise.all(
+          batch.map(async ({ entityType, item_id, schematic_id, ...link }) => {
+            const entityId = await getEntityIdFromLegacyId(item_id, schematic_id);
+            return {
+              poi_id: link.poi_id,
+              entity_id: entityId
+            };
+          })
+        );
+        
+        // Filter out any failed conversions
+        const validBatch = dbBatch.filter(link => link.entity_id !== null);
         
         const requestStart = performance.now();
-        const createdLinks = await createBulkPoiItemLinks(dbBatch);
+        const createdLinks = await createBulkPoiEntityLinks(validBatch, user.id);
         const requestTime = performance.now() - requestStart;
         const batchTime = performance.now() - batchStart;
         
@@ -743,45 +756,42 @@ export async function checkExistingLinks(
   const existingLinks: ExistingLinkInfo[] = [];
 
   try {
-    // Check POI-Item links
-    if (poiIds.size > 0 && itemIds.size > 0) {
-      const { data: itemLinks, error: itemError } = await supabase
-        .from('poi_item_links')
-        .select('id, poi_id, item_id')
+    // Combine all entity IDs (items and schematics) for unified query
+    const allEntityIds = new Set([...Array.from(itemIds), ...Array.from(schematicIds)]);
+
+    if (poiIds.size > 0 && allEntityIds.size > 0) {
+      const { data: entityLinks, error: entityError } = await supabase
+        .from('poi_entity_links')
+        .select(`
+          id, 
+          poi_id, 
+          entity_id,
+          entities!entity_id(id, item_id, is_schematic)
+        `)
         .in('poi_id', Array.from(poiIds))
-        .in('item_id', Array.from(itemIds))
-        .not('item_id', 'is', null);
+        .in('entity_id', Array.from(allEntityIds));
 
-      if (itemError) {
-        console.error('Error checking existing item links:', itemError);
-      } else if (itemLinks) {
-        existingLinks.push(...itemLinks.map(link => ({
-          poiId: link.poi_id,
-          itemId: link.item_id,
-          entityType: 'item' as const,
-          linkId: link.id
-        })));
-      }
-    }
-
-    // Check POI-Schematic links
-    if (poiIds.size > 0 && schematicIds.size > 0) {
-      const { data: schematicLinks, error: schematicError } = await supabase
-        .from('poi_item_links')
-        .select('id, poi_id, schematic_id')
-        .in('poi_id', Array.from(poiIds))
-        .in('schematic_id', Array.from(schematicIds))
-        .not('schematic_id', 'is', null);
-
-      if (schematicError) {
-        console.error('Error checking existing schematic links:', schematicError);
-      } else if (schematicLinks) {
-        existingLinks.push(...schematicLinks.map(link => ({
-          poiId: link.poi_id,
-          schematicId: link.schematic_id,
-          entityType: 'schematic' as const,
-          linkId: link.id
-        })));
+      if (entityError) {
+        console.error('Error checking existing entity links:', entityError);
+      } else if (entityLinks) {
+        existingLinks.push(...entityLinks.map(link => {
+          const entity = link.entities;
+          if (entity.is_schematic) {
+            return {
+              poiId: link.poi_id,
+              schematicId: entity.item_id, // Use item_id as the external identifier
+              entityType: 'schematic' as const,
+              linkId: link.id
+            };
+          } else {
+            return {
+              poiId: link.poi_id,
+              itemId: entity.item_id, // Use item_id as the external identifier  
+              entityType: 'item' as const,
+              linkId: link.id
+            };
+          }
+        }));
       }
     }
   } catch (error) {
@@ -934,4 +944,48 @@ export function parseLinkingParams(search: string): {
     itemIds: params.get('item_ids')?.split(',').filter(Boolean) || [],
     schematicIds: params.get('schematic_ids')?.split(',').filter(Boolean) || []
   };
+}
+
+// ==========================================
+// Backward Compatibility Wrapper
+// ==========================================
+
+/**
+ * Backward-compatible wrapper for existing components that still use separate item/schematic IDs
+ * This function converts to entity IDs and calls the new unified API
+ */
+export async function createPoiItemLinksLegacy(
+  selectedPoiIds: Set<string>,
+  selectedItemIds: Set<string>,
+  selectedSchematicIds: Set<string>,
+  options: LinkCreationOptions = {}
+): Promise<LinkCreationResult> {
+  
+  try {
+    // Convert legacy item/schematic IDs to unified entity IDs
+    const entityIds = new Set<string>();
+    
+    // Convert item IDs to entity IDs
+    for (const itemId of selectedItemIds) {
+      const entityId = await getEntityIdFromLegacyId(itemId, undefined);
+      if (entityId) {
+        entityIds.add(entityId);
+      }
+    }
+    
+    // Convert schematic IDs to entity IDs
+    for (const schematicId of selectedSchematicIds) {
+      const entityId = await getEntityIdFromLegacyId(undefined, schematicId);
+      if (entityId) {
+        entityIds.add(entityId);
+      }
+    }
+    
+    // Call the updated main function (which now uses entity IDs internally)
+    return await createPoiItemLinks(selectedPoiIds, selectedItemIds, selectedSchematicIds, options);
+    
+  } catch (error) {
+    console.error('Error in legacy wrapper:', error);
+    throw error;
+  }
 } 

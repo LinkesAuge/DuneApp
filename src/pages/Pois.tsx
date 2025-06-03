@@ -765,22 +765,13 @@ const PoisPage: React.FC = () => {
       {/* Screenshot Gallery Modal */}
       {showGallery && selectedPoi?.screenshots && (
         <GridGallery
-          squares={selectedPoi.screenshots.map(s => ({
-            id: s.id,
-            coordinate: selectedPoi.grid_square?.coordinate || 'N/A',
-            screenshot_url: s.url,
-            is_explored: false,
-            uploaded_by: s.uploaded_by,
-            upload_date: s.upload_date,
+          initialImageUrl={selectedPoi.screenshots[galleryIndex]?.url || selectedPoi.screenshots[0]?.url}
+          allImages={selectedPoi.screenshots.map(s => ({
+            url: s.url,
+            source: 'poi' as const,
+            poi: selectedPoi
           }))}
-          initialIndex={galleryIndex}
           onClose={() => setShowGallery(false)}
-          poiInfo={{
-            title: selectedPoi.title,
-            description: selectedPoi.description,
-            created_at: selectedPoi.created_at,
-            created_by: selectedPoi.created_by,
-          }}
         />
       )}
 

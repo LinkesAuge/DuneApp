@@ -1,0 +1,17 @@
+{
+  "categories": [],
+  "types": [],
+  "subtypes": [],
+  "hierarchy": {},
+  "relationships": [],
+  "stats": {
+    "total_entities": 0,
+    "total_categories": 0,
+    "total_types": 0,
+    "total_subtypes": 0,
+    "null_categories": 0,
+    "null_types": 0,
+    "null_subtypes": 0,
+    "unique_combinations": 0
+  }
+}

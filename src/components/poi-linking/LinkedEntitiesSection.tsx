@@ -15,7 +15,8 @@ import {
   Loader2,
   MapPin
 } from 'lucide-react';
-import { Entity, POIEntityLinkWithDetails, TIER_NAMES } from '../../types/unified-entities';
+import { EntityWithRelations, POIEntityLinkWithDetails } from '../../types/unified-entities';
+import { useTiers } from '../../hooks/useTiers';
 import { poiEntityLinksAPI } from '../../lib/api/poi-entity-links';
 import { ImagePreview } from '../shared/ImagePreview';
 import { useAuth } from '../auth/AuthProvider';
@@ -38,6 +39,7 @@ const LinkedEntitiesSection: React.FC<LinkedEntitiesSectionProps> = ({
   canEdit = true,
   onLinksChanged
 }) => {
+  const { getTierName } = useTiers();
   const { user } = useAuth();
   
   // State management
@@ -120,7 +122,7 @@ const LinkedEntitiesSection: React.FC<LinkedEntitiesSectionProps> = ({
   };
 
   // Navigate to unified entities page (filtered by entity)
-  const navigateToEntity = (entity: Entity) => {
+  const navigateToEntity = (entity: EntityWithRelations) => {
     // This could navigate to a filtered view of the entities page
     window.open(`/entities?search=${encodeURIComponent(entity.name)}`, '_blank');
   };
@@ -131,7 +133,7 @@ const LinkedEntitiesSection: React.FC<LinkedEntitiesSectionProps> = ({
     
     const entity = link.entity;
     const isEditing = editingLink === `${link.poi_id}-${link.entity_id}`;
-    const tierName = TIER_NAMES[entity.tier_number] || `Tier ${entity.tier_number}`;
+    const tierName = getTierName(entity.tier_number);
 
     return (
       <div 
@@ -177,11 +179,11 @@ const LinkedEntitiesSection: React.FC<LinkedEntitiesSectionProps> = ({
                 </span>
                 
                 <span className="text-xs px-2 py-1 bg-slate-600/50 text-amber-200/80 rounded border border-slate-600">
-                  {entity.category}
+                  {entity.category?.name}
                 </span>
                 
                 <span className="text-xs px-2 py-1 bg-slate-600/50 text-amber-200/80 rounded border border-slate-600">
-                  {entity.type}
+                  {entity.type?.name}
                 </span>
                 
                 {entity.tier_number > 0 && (

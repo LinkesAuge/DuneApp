@@ -53,6 +53,7 @@ flowchart TD
         SS_MGT[Enhanced Screenshot Management] --> P
         IS_SYS[Items & Schematics System] --> P
         SI_SYS[Shared Images System] --> P
+        POI_LINK[POI Entity Linking System - PLANNED] --> P
     end
 
     subgraph "Frontend Logic (TypeScript) - OPTIMIZED ✅"
@@ -126,6 +127,11 @@ flowchart TD
         HB_BASE["screenshots/hagga-basin/base-maps/"]
         HB_OVERLAYS["screenshots/hagga-basin/overlays/"]
         SHARED_IMG_STORE["screenshots/shared-images/ (universal library)"]
+        
+        subgraph "POI Entity Linking (4-Panel Interface) - PLANNED"
+            POI_LINK_STORE["poi_entity_links (operational)"]
+            POI_LINK_HIST["poi_entity_link_history (planned)"]
+        end
     end
 
     subgraph "Scheduled Tasks Flow - OPERATIONAL ✅"
@@ -163,6 +169,18 @@ flowchart TD
         IMG_UP --> SHARED_IMAGES
         IMG_PREV --> SHARED_IMAGES
         IMG_UP --> SHARED_IMG_STORE
+    end
+
+    subgraph "POI Entity Linking Flow - PLANNED ✅"
+        POI_LINK --> FILTER_PANEL["FiltersPanel (Dual-tab)"]
+        POI_LINK --> POI_PANEL["POIsPanel (Multi-select)"]
+        POI_LINK --> ENTITY_PANEL["EntitiesPanel (Multi-select)"]
+        POI_LINK --> SUMMARY_PANEL["SelectionSummaryPanel (Actions)"]
+        FILTER_PANEL --> POI_LINK_STORE
+        POI_PANEL --> POI_LINK_STORE
+        ENTITY_PANEL --> POI_LINK_STORE
+        SUMMARY_PANEL --> POI_LINK_STORE
+        SUMMARY_PANEL --> POI_LINK_HIST
     end
 
     P --> S
@@ -299,4 +317,88 @@ The settings unification showcases modern system architecture:
 
 ---
 
-**Final Status**: The Dune Awakening Deep Desert Tracker represents a **mature, production-ready application** with clean architecture, optimized performance, and professional-grade implementation. The recent cleanup and unification work has resulted in a streamlined system that balances feature richness with maintainable simplicity. 
+## 7. Upcoming Enhancement: POI Entity Linking System
+
+### **System Overview** 🚀
+**Status**: Planning Complete - Ready for Implementation  
+**Priority**: HIGH - Next Major Feature Enhancement  
+**Timeline**: 12 development days estimated
+
+### **Technical Architecture**
+The POI Entity Linking system will provide a sophisticated 4-panel interface for managing relationships between POIs and game entities:
+
+#### **Component Architecture**
+```
+src/components/poi-linking/
+├── POIEntityLinkingPage.tsx          # Main container with 4-panel layout
+├── panels/
+│   ├── FiltersPanel.tsx              # Left: Dual-tab filters (POI/Entity)
+│   ├── POIsPanel.tsx                 # Middle-left: POI selection
+│   ├── EntitiesPanel.tsx             # Middle-right: Entity selection
+│   └── SelectionSummaryPanel.tsx     # Right: Actions & summary
+├── components/
+│   ├── CollapsiblePanel.tsx          # Reusable panel system
+│   ├── POICard.tsx & EntityCard.tsx  # Individual item displays
+│   └── BulkActionMenu.tsx            # Bulk operations
+├── modals/
+│   ├── LinkConfirmationModal.tsx     # Confirm link creation
+│   ├── LinkHistoryModal.tsx          # History management
+│   └── BulkEditModal.tsx             # Bulk editing
+└── hooks/
+    ├── usePOIEntityLinks.ts          # Link management
+    ├── useFilterState.ts             # Filter controls
+    ├── useSelectionState.ts          # Multi-selection
+    └── usePanelState.ts              # Panel collapse/expand
+```
+
+#### **Database Schema Enhancement**
+```sql
+-- Existing (operational)
+poi_entity_links (
+    poi_id uuid REFERENCES pois(id),
+    entity_id uuid REFERENCES entities(id),
+    quantity integer DEFAULT 1,
+    notes text,
+    added_by uuid REFERENCES profiles(id),
+    PRIMARY KEY (poi_id, entity_id)
+);
+
+-- New (planned)
+poi_entity_link_history (
+    id uuid PRIMARY KEY,
+    poi_id uuid,
+    entity_id uuid,
+    action_type text CHECK (action_type IN ('created', 'updated', 'deleted')),
+    old_values jsonb,
+    new_values jsonb,
+    performed_by uuid REFERENCES profiles(id),
+    performed_at timestamp DEFAULT now()
+);
+```
+
+### **Key Features Planned**
+1. **4-Panel Collapsible Interface**: Professional desktop-focused layout
+2. **Dual-Tab Filtering**: Separate POI and Entity filter systems  
+3. **Multi-Selection Workflow**: Bulk operations with confirmation
+4. **Link History & Audit Trail**: Complete tracking of all changes
+5. **Advanced Search**: Real-time filtering with counters
+6. **Permission Integration**: Creator access with admin/editor overrides
+
+### **Integration Points**
+- **Items & Schematics System**: Leverage existing 934 entities
+- **POI Management**: Integrate with existing POI infrastructure
+- **User Authentication**: Respect role-based access controls
+- **Database Performance**: Optimize for large-scale linking operations
+
+### **Development Approach**
+The system will be implemented using the established architectural patterns:
+- **Database-First**: Ensure schema supports all planned features
+- **Component Reusability**: Leverage existing UI patterns and themes
+- **TypeScript Safety**: Complete type coverage from planning phase
+- **Progressive Enhancement**: Phase-by-phase implementation with testing
+
+This enhancement will complete the transformation of the tracker from a basic mapping tool into a comprehensive resource management platform, providing users with powerful tools for collaborative location-based entity tracking.
+
+---
+
+**Final Status**: The Dune Awakening Deep Desert Tracker represents a **mature, production-ready application** with clean architecture, optimized performance, and professional-grade implementation. The recent cleanup and unification work has resulted in a streamlined system that balances feature richness with maintainable simplicity. The upcoming POI Entity Linking system will add the final major feature to complete the platform's comprehensive capabilities. 

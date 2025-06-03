@@ -19,11 +19,10 @@ const PoiLinkCounter: React.FC<PoiLinkCounterProps> = ({
   useEffect(() => {
     const fetchLinkCount = async () => {
       try {
-        const linkField = entityType === 'item' ? 'item_id' : 'schematic_id';
         const { count, error } = await supabase
-          .from('poi_item_links')
+          .from('poi_entity_links')
           .select('*', { count: 'exact' })
-          .eq(linkField, entityId);
+          .eq('entity_id', entityId);
 
         if (error) throw error;
         setCount(count || 0);

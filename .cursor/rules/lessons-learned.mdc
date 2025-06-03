@@ -761,6 +761,41 @@ This document serves as a learning journal for the Dune Awakening Deep Desert Tr
 
 ---
 
+### 2025-01-30: Comprehensive Project Documentation & Planning Excellence
+-   **Topic/Feature**: Documentation Management & Project Planning - Comprehensive Status Update & POI Entity Linking System Planning.
+-   **Observation/Pattern**: 
+    1.  After completing major system milestones (Items & Schematics 100% complete), maintaining accurate documentation becomes critical for project clarity and future development efficiency.
+    2.  Comprehensive planning with detailed mockups and implementation plans significantly reduces development risk and improves execution quality.
+    3.  User requirements clarification during planning phase prevents costly rework during implementation.
+    4.  Cleaning up completed tasks and outdated information is essential for maintaining useful documentation.
+-   **Decision/Action Taken**:
+    1.  **Comprehensive Documentation Update**: Completely updated `active_context.md` and `tasks_plan.md` to reflect actual project status, removing 15+ completed phases and obsolete content.
+    2.  **POI Entity Linking System Planning**: Created comprehensive 651-line implementation plan with 12-day development roadmap, component architecture, and database schema.
+    3.  **Interactive HTML Mockup**: Built 863-line fully functional mockup demonstrating 4-panel collapsible interface with Dune theming and interactive features.
+    4.  **Requirements Finalization**: Gathered critical user clarifications on access control, metadata requirements, platform support, and UI preferences.
+    5.  **Architecture Documentation**: Updated `architecture.md` with new system components and integration points, maintaining architectural coherence.
+-   **Rationale**:
+    1.  To maintain project intelligence and prevent loss of critical planning decisions and system knowledge.
+    2.  To provide comprehensive planning foundation that reduces implementation risk and improves development velocity.
+    3.  To ensure all stakeholders have clear understanding of current status and upcoming development priorities.
+    4.  To establish documentation patterns that scale with project complexity and maintain accuracy over time.
+-   **Impact/Outcome**:
+    -   **Documentation Accuracy**: Memory files now accurately reflect 100% completion of core systems and clear focus on POI Entity Linking.
+    -   **Development Readiness**: Comprehensive planning artifacts provide clear roadmap for immediate implementation start.
+    -   **Risk Reduction**: User requirements clarification and technical planning eliminate major implementation uncertainties.
+    -   **Project Intelligence**: Preserved critical knowledge about completed systems and architectural decisions.
+    -   **Stakeholder Alignment**: Clear communication of project status and next development priorities.
+    -   **Quality Foundation**: Established patterns for comprehensive planning that can be applied to future features.
+-   **Future Consideration**:
+    -   Schedule regular documentation reviews (weekly/bi-weekly) to maintain accuracy as project evolves and prevent documentation debt.
+    -   When completing major milestones, immediately update all memory files to prevent knowledge loss and maintain project clarity.
+    -   For complex feature development, invest time in comprehensive planning including mockups, requirements clarification, and technical architecture before implementation.
+    -   Use interactive mockups for user feedback and requirements validation - significantly more effective than written descriptions.
+    -   Maintain consistent documentation patterns and template structures to reduce cognitive overhead when updating project status.
+    -   Document user requirements clarifications immediately to prevent assumption drift during development cycles.
+
+---
+
 ### 2025-01-30: Final UI Polish - Navbar Spacing & Filter State Management Success
 -   **Topic/Feature**: Final UI Polish - Navbar Spacing Optimization & Filter Bug Resolution.
 -   **Observation/Pattern**: 
@@ -828,5 +863,40 @@ This document serves as a learning journal for the Dune Awakening Deep Desert Tr
     -   When simplifying complex architectures, prioritize unified data models over specialized table structures for better scalability.
     -   Direct database tools should be part of standard migration toolkit for projects with large datasets.
     -   Document migration tools thoroughly as they become valuable assets for ongoing data maintenance.
+
+---
+
+### 2025-01-30: Critical Tier System Architecture Fix - Database-First Data Management
+-   **Topic/Feature**: Tier System Data Integrity - Hardcoded Constants vs Database-Driven Architecture.
+-   **Observation/Pattern**: 
+    1.  User identified that tier values like "Exquisite" were appearing in the application when our tiers table contained different tier names
+    2.  Root cause was a hardcoded `TIER_NAMES` constant in `src/types/unified-entities.ts` that contained incorrect tier names completely unrelated to the database
+    3.  Frontend components were using this hardcoded constant instead of fetching tier data from the database `tiers` table
+    4.  This created a fundamental architecture flaw where display data was disconnected from the database source of truth
+-   **Decision/Action Taken**:
+    1.  **Complete Constant Removal**: Eliminated the hardcoded `TIER_NAMES` constant entirely from the codebase
+    2.  **Database-Driven API Creation**: Built `src/lib/api/tiers.ts` to provide proper database access for tier data
+    3.  **React Hook Implementation**: Created `src/hooks/useTiers.ts` to manage tier state and provide `getTierName()` function to components
+    4.  **Comprehensive Component Migration**: Updated all 6 components using tier data to fetch from database instead of hardcoded constants
+    5.  **Import Cleanup**: Removed all `TIER_NAMES` imports and replaced with database-driven hooks and APIs
+-   **Rationale**:
+    1.  To establish the database as the single source of truth for all reference data rather than having parallel hardcoded systems
+    2.  To eliminate data inconsistency issues where frontend displays incorrect information compared to database content
+    3.  To create a scalable architecture that automatically reflects database changes without requiring code updates
+    4.  To follow proper software architecture principles where reference data comes from persistence layer, not application constants
+-   **Impact/Outcome**:
+    -   **Data Consistency**: All tier names now display correctly according to actual database content
+    -   **Architecture Improvement**: Established database-first approach for all reference data throughout the application
+    -   **Scalability**: System now automatically reflects database changes without requiring frontend code modifications
+    -   **Maintainability**: Eliminated risk of hardcoded values becoming outdated or inconsistent with database
+    -   **Type Safety**: Maintained TypeScript safety while enabling dynamic data fetching with proper fallback handling
+    -   **Component Architecture**: All tier-related components now follow consistent database-driven patterns
+-   **Future Consideration**:
+    -   Apply this database-first principle to all other reference data in the application (categories, types, etc.)
+    -   Never create hardcoded constants for data that exists in the database - always fetch dynamically
+    -   When building new features, ensure display data comes from database queries, not static application constants
+    -   Implement proper error handling and fallback values for database-driven components to handle loading and error states
+    -   Use React hooks and API layers to provide clean abstractions for database access patterns
+    -   Document this architecture pattern as a standard for all future development to prevent similar issues
 
 ---

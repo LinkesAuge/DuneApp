@@ -774,7 +774,7 @@ export interface PoiSearchWithItems {
 
 // Statistics for POI-Item integration
 export interface PoiItemStats {
-  total_poi_item_links: number;
+
   pois_with_items: number;
   items_with_locations: number;
   schematics_with_locations: number;

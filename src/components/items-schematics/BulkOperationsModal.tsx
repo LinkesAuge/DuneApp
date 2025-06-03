@@ -2,24 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { X, Save, Trash, Edit, AlertCircle, Package, FileText, Check } from 'lucide-react';
 import { useItemsSchematics } from '../../hooks/useItemsSchematics';
 import type { AppliesTo } from '../../types';
+import { EntityWithRelations } from '../../types/unified-entities';
 
 // =================================
 // Types and Interfaces
 // =================================
-
-interface Entity {
-  id: string;
-  name: string;
-  description?: string;
-  category_id: string;
-  type_id?: string;
-  tier_id?: string;
-  icon_url?: string;
-  field_values?: Record<string, any>;
-  created_at?: string;
-  updated_at?: string;
-  created_by?: string;
-}
 
 interface BulkEditData {
   category_id?: string;
@@ -32,7 +19,7 @@ interface BulkEditData {
 interface BulkOperationsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  selectedEntities: Entity[];
+  selectedEntities: EntityWithRelations[];
   entityType: 'items' | 'schematics';
   operation: 'edit' | 'delete';
   onSuccess: (operation: string, count: number) => void;
@@ -92,7 +79,7 @@ const ProgressBar: React.FC<{
 // =================================
 
 const BulkDeleteContent: React.FC<{
-  entities: Entity[];
+  entities: EntityWithRelations[];
   entityType: 'items' | 'schematics';
   onConfirm: () => void;
   onCancel: () => void;
@@ -159,7 +146,7 @@ const BulkDeleteContent: React.FC<{
                     {entity.name}
                   </h5>
                   <p className="text-xs text-amber-200/60 font-light">
-                    {entity.category_id} {entity.type_id ? `• ${entity.type_id}` : ''}
+                    {entity.category?.name} {entity.type?.name ? `• ${entity.type.name}` : ''}
                   </p>
                 </div>
               </div>
@@ -230,7 +217,7 @@ const BulkDeleteContent: React.FC<{
 // =================================
 
 const BulkEditContent: React.FC<{
-  entities: Entity[];
+  entities: EntityWithRelations[];
   entityType: 'items' | 'schematics';
   onSave: (data: BulkEditData) => void;
   onCancel: () => void;

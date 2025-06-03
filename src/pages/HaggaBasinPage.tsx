@@ -995,31 +995,16 @@ const HaggaBasinPage: React.FC = () => {
       {/* Gallery Modal */}
       {showGallery && galleryPoi?.screenshots && (
         <GridGallery
-          squares={galleryPoi.screenshots.map(s => ({
-            id: s.id,
-            coordinate: galleryPoi.title || 'POI',
-            screenshot_url: s.url,
-            original_screenshot_url: s.url, // Use same URL for original
-            is_explored: false,
-            uploaded_by: s.uploaded_by,
-            upload_date: s.upload_date,
-            created_at: s.upload_date,
-            crop_x: 0, // Default crop values for POI screenshots
-            crop_y: 0,
-            crop_width: 2000, // Default dimensions
-            crop_height: 2000,
-            crop_created_at: s.upload_date, // Use upload date for crop creation
+          initialImageUrl={galleryPoi.screenshots[galleryIndex]?.url || galleryPoi.screenshots[0]?.url}
+          allImages={galleryPoi.screenshots.map(s => ({
+            url: s.url,
+            source: 'poi' as const,
+            poi: galleryPoi,
+            poiType: poiTypes.find(pt => pt.id === galleryPoi.poi_type_id)
           }))}
-          initialIndex={galleryIndex}
           onClose={() => {
             setShowGallery(false);
             setGalleryPoi(null);
-          }}
-          poiInfo={{
-            title: galleryPoi.title,
-            description: galleryPoi.description,
-            created_at: galleryPoi.created_at,
-            created_by: galleryPoi.created_by,
           }}
         />
       )}

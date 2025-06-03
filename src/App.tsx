@@ -13,8 +13,8 @@ import GridPage from './pages/GridPage';
 import UITestPage from './pages/UITestPage';
 import ProfilePage from './pages/ProfilePage';
 import UnifiedEntitiesPage from './pages/UnifiedEntitiesPage';
-import PoiLinkingPage from './pages/PoiLinkingPage';
-import UnifiedPoiLinkingPage from './pages/UnifiedPoiLinkingPage';
+import POIEntityLinkingPage from './pages/POIEntityLinkingPage';
+
 import { SharedImagesTest } from './pages/SharedImagesTest';
 import { AlertTriangle } from 'lucide-react';
 import ItemDetailPage from './pages/ItemDetailPage';
@@ -146,35 +146,12 @@ const AppRoutes: React.FC = () => {
       <Route 
         path="/poi-linking" 
         element={
-          <AdminRoute>
-            <UnifiedPoiLinkingPage />
-          </AdminRoute>
-        } 
-      />
-      <Route 
-        path="/items/:entityId/link-pois" 
-        element={
           <ProtectedRoute>
-            <PoiLinkingPage />
+            <POIEntityLinkingPage />
           </ProtectedRoute>
         } 
       />
-      <Route 
-        path="/schematics/:entityId/link-pois" 
-        element={
-          <ProtectedRoute>
-            <PoiLinkingPage />
-          </ProtectedRoute>
-        } 
-      />
-      <Route 
-        path="/pois/:poiId/link-items" 
-        element={
-          <ProtectedRoute>
-            <PoiLinkingPage />
-          </ProtectedRoute>
-        } 
-      />
+
       <Route 
         path="/items/:itemId" 
         element={

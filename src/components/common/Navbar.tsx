@@ -17,7 +17,7 @@ const Navbar: React.FC = () => {
   const toggleDatabaseDropdown = () => setIsDatabaseDropdownOpen(!isDatabaseDropdownOpen);
 
   // Check if any database route is active
-  const isDatabaseActive = location.pathname === '/database' || location.pathname === '/poi-linking';
+  const isDatabaseActive = location.pathname === '/database';
 
   const NavButton: React.FC<{
     to: string;
@@ -210,15 +210,15 @@ const Navbar: React.FC = () => {
               <Database size={14} strokeWidth={1.5} className="mr-3 text-amber-300 group-hover:text-amber-100" />
               <span className="text-amber-200 group-hover:text-amber-50 font-light text-sm">Database Management</span>
             </Link>
-            
             <Link
               to="/poi-linking"
               onClick={() => setIsDatabaseDropdownOpen(false)}
               className="group relative flex items-center px-4 py-3 hover:bg-violet-600/20 transition-all duration-200"
             >
               <LinkIcon size={14} strokeWidth={1.5} className="mr-3 text-amber-300 group-hover:text-amber-100" />
-              <span className="text-amber-200 group-hover:text-amber-50 font-light text-sm">POI Linking</span>
+              <span className="text-amber-200 group-hover:text-amber-50 font-light text-sm">POI Entity Linking</span>
             </Link>
+
           </div>
         </>
       )}
@@ -683,14 +683,7 @@ const Navbar: React.FC = () => {
                 >
                   Database Management
                 </MobileNavButton>
-                <MobileNavButton
-                  to="/poi-linking"
-                  icon={<LinkIcon size={15} strokeWidth={1.5} />}
-                  isActive={location.pathname === '/poi-linking'}
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  POI Linking
-                </MobileNavButton>
+
                 {user.role === 'admin' && (
                   <MobileNavButton
                     to="/admin"

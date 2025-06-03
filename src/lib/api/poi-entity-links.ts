@@ -29,20 +29,25 @@ function handleSupabaseError(error: any, operation: string): never {
   );
 }
 
+// Helper function to format entity with relationships (same as entities.ts)
+function formatEntityWithRelations(entity: any) {
+  if (!entity) return entity;
+  
+  // For now, return entity as-is since we're not loading relationships in the query
+  // The relationships will be resolved by the frontend components
+  return entity;
+}
+
 // Interface for creating new POI-entity links
 export interface CreatePOIEntityLinkData {
   poi_id: string;
   entity_id: string;
   quantity: number;
-  notes?: string;
-  assignment_source?: string;
 }
 
 // Interface for updating existing POI-entity links
 export interface UpdatePOIEntityLinkData {
   quantity?: number;
-  notes?: string;
-  assignment_source?: string;
 }
 
 // Interface for bulk linking operations
@@ -51,9 +56,7 @@ export interface BulkLinkData {
   entity_links: Array<{
     entity_id: string;
     quantity: number;
-    notes?: string;
   }>;
-  assignment_source?: string;
 }
 
 // Main POI Entity Links API
@@ -96,7 +99,9 @@ export const poiEntityLinksAPI = {
       const { data, error } = await supabase
         .from('poi_entity_links')
         .insert([{
-          ...linkData,
+          poi_id: linkData.poi_id,
+          entity_id: linkData.entity_id,
+          quantity: linkData.quantity,
           added_by: userId,
           added_at: new Date().toISOString()
         }])
@@ -158,8 +163,6 @@ export const poiEntityLinksAPI = {
         poi_id: bulkData.poi_id,
         entity_id: link.entity_id,
         quantity: link.quantity,
-        notes: link.notes,
-        assignment_source: bulkData.assignment_source || 'bulk_link',
         added_by: userId,
         added_at: new Date().toISOString()
       }));
@@ -202,9 +205,9 @@ export const poiEntityLinksAPI = {
             description,
             icon_image_id,
             icon_fallback,
-            category,
-            type,
-            subtype,
+            category_id,
+            type_id,
+            subtype_id,
             tier_number,
             is_schematic,
             is_global
@@ -219,7 +222,7 @@ export const poiEntityLinksAPI = {
 
       return (data || []).map(link => ({
         ...link,
-        entity: link.entities
+        entity: formatEntityWithRelations(link.entities)
       }));
     } catch (error) {
       if (error instanceof POIEntityLinkAPIError) throw error;
@@ -285,9 +288,9 @@ export const poiEntityLinksAPI = {
             description,
             icon_image_id,
             icon_fallback,
-            category,
-            type,
-            subtype,
+            category_id,
+            type_id,
+            subtype_id,
             tier_number,
             is_schematic,
             is_global
@@ -314,7 +317,7 @@ export const poiEntityLinksAPI = {
 
       return {
         ...data,
-        entity: data.entities,
+        entity: formatEntityWithRelations(data.entities),
         poi: data.pois
       };
     } catch (error) {
@@ -528,9 +531,9 @@ export async function getPoiWithEntities(poiId: string): Promise<any> {
         ...link.entity,
         // Map to legacy item structure
         icon_url: null, // Will be handled by ImagePreview component
-        category: { name: link.entity.category },
-        type: { name: link.entity.type },
-        subtype: link.entity.subtype ? { name: link.entity.subtype } : null,
+        category: { name: link.entity.category?.name || 'Unknown' },
+        type: { name: link.entity.type?.name || 'Unknown' },
+        subtype: link.entity.subtype ? { name: link.entity.subtype.name } : null,
         tier: link.entity.tier_number > 0 ? { 
           name: `Tier ${link.entity.tier_number}`,
           color: '#fbbf24' // Default amber color
@@ -544,9 +547,9 @@ export async function getPoiWithEntities(poiId: string): Promise<any> {
         ...link.entity,
         // Map to legacy schematic structure
         icon_url: null, // Will be handled by ImagePreview component
-        category: { name: link.entity.category },
-        type: { name: link.entity.type },
-        subtype: link.entity.subtype ? { name: link.entity.subtype } : null,
+        category: { name: link.entity.category?.name || 'Unknown' },
+        type: { name: link.entity.type?.name || 'Unknown' },
+        subtype: link.entity.subtype ? { name: link.entity.subtype.name } : null,
         tier: link.entity.tier_number > 0 ? { 
           name: `Tier ${link.entity.tier_number}`,
           color: '#3b82f6' // Default blue color

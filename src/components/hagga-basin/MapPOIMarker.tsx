@@ -81,7 +81,7 @@ const MapPOIMarker: React.FC<MapPOIMarkerProps> = ({
     rank?: Rank | null;
   } | null>(null);
   const [tooltipPosition, setTooltipPosition] = useState<{ x: number; y: number } | null>(null);
-  const [linkedItems, setLinkedItems] = useState<Array<{ id: string; name: string; type: 'item' | 'schematic' }>>([]);
+  const [linkedItems, setLinkedItems] = useState<Array<{ id: string; name: string; type: 'item' | 'schematic'; quantity: number }>>([]);
   const [linkedItemsLoading, setLinkedItemsLoading] = useState(false);
   const markerRef = useRef<HTMLDivElement>(null);
   
@@ -115,7 +115,7 @@ const MapPOIMarker: React.FC<MapPOIMarkerProps> = ({
     fetchUserInfo();
   }, [poi.created_by]);
 
-  // Fetch linked items and schematics for tooltip
+  // Fetch linked items for tooltip
   useEffect(() => {
     const fetchLinkedItems = async () => {
       if (!showCard) return; // Only fetch when tooltip is about to show
@@ -123,43 +123,34 @@ const MapPOIMarker: React.FC<MapPOIMarkerProps> = ({
       setLinkedItemsLoading(true);
       try {
         const { data: links, error } = await supabase
-          .from('poi_item_links')
+          .from('poi_entity_links')
           .select(`
             id,
-            item_id,
-            schematic_id,
-            items(id, name),
-            schematics(id, name)
+            entity_id,
+            entities!entity_id(id, name, is_schematic)
           `)
           .eq('poi_id', poi.id);
 
         if (error) {
-          console.error('Error fetching linked items:', error);
+          console.error('Error fetching linked entities:', error);
           return;
         }
 
         const linkedItemsList: Array<{ id: string; name: string; type: 'item' | 'schematic' }> = [];
         
         links?.forEach(link => {
-          if (link.item_id && link.items) {
+          if (link.entities) {
             linkedItemsList.push({
-              id: link.items.id,
-              name: link.items.name,
-              type: 'item'
-            });
-          }
-          if (link.schematic_id && link.schematics) {
-            linkedItemsList.push({
-              id: link.schematics.id,
-              name: link.schematics.name,
-              type: 'schematic'
+              id: link.entities.id,
+              name: link.entities.name,
+              type: link.entities.is_schematic ? 'schematic' : 'item'
             });
           }
         });
 
         setLinkedItems(linkedItemsList);
       } catch (error) {
-        console.error('Error fetching linked items:', error);
+        console.error('Error fetching linked entities:', error);
       } finally {
         setLinkedItemsLoading(false);
       }
@@ -485,9 +476,10 @@ const MapPOIMarker: React.FC<MapPOIMarkerProps> = ({
                         <span className={`w-2 h-2 rounded-full ${
                           item.type === 'item' ? 'bg-blue-400' : 'bg-purple-400'
                         }`}></span>
-                        <span className="text-amber-300/85 font-light truncate">
+                        <span className="text-amber-300/85 font-light truncate flex-1">
                           {item.name}
                         </span>
+
                         <span className={`text-xs px-1.5 py-0.5 rounded ${
                           item.type === 'item' 
                             ? 'bg-blue-500/20 text-blue-300 border border-blue-400/30' 

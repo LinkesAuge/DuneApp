@@ -3,7 +3,8 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Search, Plus, Package, FileText, X, LinkIcon, Loader2, Check } from 'lucide-react';
-import { Entity, TIER_NAMES } from '../../types/unified-entities';
+import { EntityWithRelations } from '../../types/unified-entities';
+import { useTiers } from '../../hooks/useTiers';
 import { entitiesAPI } from '../../lib/api/entities';
 import { poiEntityLinksAPI, CreatePOIEntityLinkData } from '../../lib/api/poi-entity-links';
 import { ImagePreview } from '../shared/ImagePreview';
@@ -19,7 +20,7 @@ interface POIEntityLinkingModalProps {
 }
 
 interface EntityLinkData {
-  entity: Entity;
+  entity: EntityWithRelations;
   quantity: number;
   notes: string;
   isSelected: boolean;
@@ -33,10 +34,11 @@ const POIEntityLinkingModal: React.FC<POIEntityLinkingModalProps> = ({
   existingEntityIds = [],
   onLinksUpdated
 }) => {
+  const { tiers, getTierName } = useTiers();
   const { user } = useAuth();
   
   // State management
-  const [entities, setEntities] = useState<Entity[]>([]);
+  const [entities, setEntities] = useState<EntityWithRelations[]>([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -50,15 +52,15 @@ const POIEntityLinkingModal: React.FC<POIEntityLinkingModalProps> = ({
   
   // Derived data
   const categories = useMemo(() => {
-    const cats = Array.from(new Set(entities.map(e => e.category))).sort();
+    const cats = Array.from(new Set(entities.map(e => e.category?.name).filter(Boolean))).sort();
     return cats;
   }, [entities]);
 
   const types = useMemo(() => {
     const filteredEntities = selectedCategory 
-      ? entities.filter(e => e.category === selectedCategory)
+      ? entities.filter(e => e.category?.name === selectedCategory)
       : entities;
-    const typeList = Array.from(new Set(filteredEntities.map(e => e.type))).sort();
+    const typeList = Array.from(new Set(filteredEntities.map(e => e.type?.name).filter(Boolean))).sort();
     return typeList;
   }, [entities, selectedCategory]);
 
@@ -106,19 +108,19 @@ const POIEntityLinkingModal: React.FC<POIEntityLinkingModalProps> = ({
         const term = searchTerm.toLowerCase();
         if (!entity.name.toLowerCase().includes(term) &&
             !entity.description?.toLowerCase().includes(term) &&
-            !entity.category.toLowerCase().includes(term) &&
-            !entity.type.toLowerCase().includes(term)) {
+            !entity.category?.name?.toLowerCase().includes(term) &&
+            !entity.type?.name?.toLowerCase().includes(term)) {
           return false;
         }
       }
 
       // Category filter
-      if (selectedCategory && entity.category !== selectedCategory) {
+      if (selectedCategory && entity.category?.name !== selectedCategory) {
         return false;
       }
 
       // Type filter
-      if (selectedType && entity.type !== selectedType) {
+      if (selectedType && entity.type?.name !== selectedType) {
         return false;
       }
 
@@ -142,7 +144,7 @@ const POIEntityLinkingModal: React.FC<POIEntityLinkingModalProps> = ({
   }, [entities, searchTerm, selectedCategory, selectedType, selectedTier, entityClassFilter, existingEntityIds]);
 
   // Handle entity selection
-  const toggleEntitySelection = (entity: Entity) => {
+  const toggleEntitySelection = (entity: EntityWithRelations) => {
     const newLinks = new Map(entityLinks);
     
     if (newLinks.has(entity.id)) {
@@ -312,8 +314,8 @@ const POIEntityLinkingModal: React.FC<POIEntityLinkingModalProps> = ({
               className="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-amber-100 text-sm focus:outline-none focus:border-amber-500"
             >
               <option value="">All Tiers</option>
-              {Object.entries(TIER_NAMES).map(([tier, name]) => (
-                <option key={tier} value={tier}>T{tier}: {name}</option>
+              {tiers.map((tier) => (
+                <option key={tier.tier_number} value={tier.tier_number}>T{tier.tier_number}: {tier.tier_name}</option>
               ))}
             </select>
 
@@ -426,7 +428,7 @@ const POIEntityLinkingModal: React.FC<POIEntityLinkingModalProps> = ({
 
                     {/* Entity Details */}
                     <div className="text-xs text-amber-200/60 mb-3">
-                      <div>{entity.category} → {entity.type}</div>
+                      <div>{entity.category?.name} → {entity.type?.name}</div>
                       {entity.subtype && <div>Subtype: {entity.subtype}</div>}
                     </div>
 

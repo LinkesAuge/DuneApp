@@ -139,7 +139,19 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
   useEffect(() => {
     loadAvailableUsers();
     loadCurrentShares();
-  }, []);
+  }, [poi.id, poi.privacy_level]); // Re-run when POI changes or privacy level changes
+
+  // Initialize sharing section visibility and load shares when modal opens
+  useEffect(() => {
+    if (poi.privacy_level === 'shared') {
+      setShowSharingSection(true);
+      // Ensure shares are loaded when modal opens with shared POI
+      loadCurrentShares();
+    } else {
+      setShowSharingSection(false);
+      setSelectedUsers([]); // Clear selected users for non-shared POIs
+    }
+  }, []); // Run only once when modal opens
 
   // Show sharing section when privacy level is shared
   useEffect(() => {
@@ -173,30 +185,46 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
   };
 
   const loadCurrentShares = async () => {
+    // Reset selected users first
+    setSelectedUsers([]);
+    
     if (poi.privacy_level !== 'shared') {
-
+      console.log('POI is not shared, clearing selected users');
       return;
     }
     
-    
+    console.log('Loading current shares for POI:', poi.id);
     
     try {
-      const { data: shares, error } = await supabase
+      // First get the poi_shares
+      const { data: shares, error: sharesError } = await supabase
         .from('poi_shares')
-        .select(`
-          *,
-          profiles (id, username, email, display_name, discord_username, custom_avatar_url, discord_avatar_url, use_discord_avatar)
-        `)
+        .select('*')
         .eq('poi_id', poi.id);
 
-      if (error) throw error;
+      if (sharesError) throw sharesError;
       
+      console.log('Loaded shares:', shares);
       
+      if (!shares || shares.length === 0) {
+        console.log('No shares found for this POI');
+        return;
+      }
+
+      // Get the user IDs from shares
+      const userIds = shares.map(share => share.shared_with_user_id);
       
-      const currentSharedUsers = shares?.map(share => share.profiles).filter(Boolean) || [];
+      // Separately fetch the user profiles
+      const { data: userProfiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, username, email, display_name, discord_username, custom_avatar_url, discord_avatar_url, use_discord_avatar')
+        .in('id', userIds);
+
+      if (profilesError) throw profilesError;
       
-      
-      setSelectedUsers(currentSharedUsers);
+      console.log('Loaded user profiles:', userProfiles);
+      console.log('Setting selected users:', userProfiles);
+      setSelectedUsers(userProfiles || []);
     } catch (err) {
       console.error('Error loading current shares:', err);
     }

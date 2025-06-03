@@ -9,9 +9,10 @@ import BulkOperationsModal from './BulkOperationsModal';
 import LinkPoisButton from './LinkPoisButton';
 import LinkingButton from './LinkingButton';
 import PoiLinkCounter from './PoiLinkCounter';
-import { getItemWithLocations, getSchematicWithLocations } from '../../lib/api/poiItemLinks';
+import { getItemWithLocations, getSchematicWithLocations } from '../../lib/api/poiEntityLinks';
 import { supabase } from '../../lib/supabase';
 import type { ItemWithLocations, SchematicWithLocations, PoiLocationInfo, Poi, PoiType } from '../../types';
+import type { EntityWithRelations, EntityFilters, Category, Type, Tier } from '../../types/unified-entities';
 
 // Import types
 type ViewMode = 'tree' | 'grid' | 'list';
@@ -19,58 +20,26 @@ type ActiveView = 'all' | 'items' | 'schematics';
 type SortField = 'name' | 'category' | 'type' | 'tier' | 'created_at' | 'updated_at';
 type SortDirection = 'asc' | 'desc';
 
-interface Category {
-  id: string;
-  name: string;
-  icon?: string;
-  icon_image_id?: string;
-  icon_fallback?: string;
-}
-
-interface ItemSchematicFilters {
-  categories?: string[];
-  types?: string[];
-  tiers?: string[];
-  creators?: string[];
-  dateRange?: {
-    start?: string;
-    end?: string;
-  };
-  dynamicFields?: Record<string, any>;
-}
-
-interface Entity {
-  id: string;
-  name: string;
-  description?: string;
-  category_id: string;
-  type_id?: string | null;
-  tier_id?: string | null;
-  icon_url?: string;
-  created_at: string;
-  updated_at?: string;
-  created_by?: string;
-  entityType?: 'items' | 'schematics'; // Added to distinguish between items and schematics in 'all' view
-}
+// Use centralized types instead of local interfaces
 
 interface ItemsSchematicsContentProps {
   activeView: 'all' | 'items' | 'schematics';
   viewMode: ViewMode;
   selectedCategory: Category | null;
   searchTerm: string;
-  filters: ItemSchematicFilters;
-  onItemSelect: (item: Entity | null) => void;
+  filters: EntityFilters;
+  onItemSelect: (item: EntityWithRelations | null) => void;
   leftSidebarCollapsed: boolean;
   onToggleLeftSidebar: () => void;
   rightSidebarCollapsed: boolean;
   onToggleRightSidebar: () => void;
-  onEntityUpdated?: (entity: Entity) => void; // Callback for when entity is updated
+  onEntityUpdated?: (entity: EntityWithRelations) => void; // Callback for when entity is updated
   onEntityDeleted?: (entityId: string) => void; // Callback for when entity is deleted
   refreshTrigger?: number; // Trigger data refresh when this changes
   // Bulk operations
   selectedEntities?: string[]; // IDs of selected entities
   onSelectionChange?: (selectedIds: string[]) => void;
-  onBulkOperationTriggered?: (operation: 'edit' | 'delete', selectedEntities: Entity[]) => void;
+  onBulkOperationTriggered?: (operation: 'edit' | 'delete', selectedEntities: EntityWithRelations[]) => void;
 }
 
 const LoadingSpinner: React.FC = () => (
@@ -121,17 +90,13 @@ const EmptyState: React.FC<{ activeView: ActiveView }> = ({ activeView }) => (
 );
 
 const EntityCard: React.FC<{
-  entity: Entity;
+  entity: EntityWithRelations;
   type: ActiveView;
-  onClick: (entity: Entity) => void;
-  onEdit?: (entity: Entity) => void;
-  onDelete?: (entity: Entity) => void;
-  onPoiLink?: (entity: Entity) => void;
+  onClick: (entity: EntityWithRelations) => void;
+  onEdit?: (entity: EntityWithRelations) => void;
+  onDelete?: (entity: EntityWithRelations) => void;
+  onPoiLink?: (entity: EntityWithRelations) => void;
   onLinksUpdated?: () => void;
-  // Helper functions
-  getCategoryName: (categoryId: string) => string;
-  getTypeName: (typeId: string) => string;
-  getTierName: (tierId: string) => string;
   // Bulk selection props
   isSelected?: boolean;
   onSelectionToggle?: (entityId: string) => void;
@@ -144,9 +109,6 @@ const EntityCard: React.FC<{
   onDelete, 
   onPoiLink, 
   onLinksUpdated,
-  getCategoryName,
-  getTypeName,
-  getTierName,
   isSelected = false, 
   onSelectionToggle, 
   selectionMode = false 
@@ -223,19 +185,19 @@ const EntityCard: React.FC<{
                   {displayType === 'items' ? 'Item' : 'Schematic'}
                 </span>
               )}
-              {entity.category_id && (
+              {entity.category && (
                 <span className="px-2 py-0.5 bg-slate-700 text-amber-300 rounded">
-                  {getCategoryName(entity.category_id)}
+                  {entity.category.name}
                 </span>
               )}
-              {entity.type_id && (
+              {entity.type && (
                 <span className="px-2 py-0.5 bg-blue-600/70 text-blue-200 rounded">
-                  {getTypeName(entity.type_id)}
+                  {entity.type.name}
                 </span>
               )}
-              {entity.tier_id && (
+              {entity.tier_number !== undefined && (
                 <span className="px-2 py-0.5 bg-amber-600/70 text-amber-200 rounded">
-                  {getTierName(entity.tier_id)}
+                  Tier {entity.tier_number}
                 </span>
               )}
             </div>
@@ -320,17 +282,13 @@ const EntityCard: React.FC<{
 };
 
 const GridView: React.FC<{
-  entities: Entity[];
+  entities: EntityWithRelations[];
   activeView: ActiveView;
-  onItemSelect: (item: Entity) => void;
-  onEdit?: (entity: Entity) => void;
-  onDelete?: (entity: Entity) => void;
-  onPoiLink?: (entity: Entity) => void;
+  onItemSelect: (item: EntityWithRelations) => void;
+  onEdit?: (entity: EntityWithRelations) => void;
+  onDelete?: (entity: EntityWithRelations) => void;
+  onPoiLink?: (entity: EntityWithRelations) => void;
   onLinksUpdated?: () => void;
-  // Helper functions
-  getCategoryName: (categoryId: string) => string;
-  getTypeName: (typeId: string) => string;
-  getTierName: (tierId: string) => string;
   // Bulk selection props
   selectedEntities?: string[];
   onSelectionToggle?: (entityId: string) => void;
@@ -343,9 +301,6 @@ const GridView: React.FC<{
   onDelete, 
   onPoiLink, 
   onLinksUpdated,
-  getCategoryName,
-  getTypeName,
-  getTierName,
   selectedEntities = [], 
   onSelectionToggle, 
   selectionMode = false 
@@ -370,9 +325,6 @@ const GridView: React.FC<{
             isSelected={selectedEntities.includes(entity.id)}
             onSelectionToggle={onSelectionToggle}
             selectionMode={selectionMode}
-            getCategoryName={getCategoryName}
-            getTypeName={getTypeName}
-            getTierName={getTierName}
           />
         ))}
       </div>
@@ -381,17 +333,13 @@ const GridView: React.FC<{
 };
 
 const ListView: React.FC<{
-  entities: Entity[];
+  entities: EntityWithRelations[];
   activeView: ActiveView;
-  onItemSelect: (item: Entity) => void;
-  onEdit?: (entity: Entity) => void;
-  onDelete?: (entity: Entity) => void;
-  onPoiLink?: (entity: Entity) => void;
+  onItemSelect: (item: EntityWithRelations) => void;
+  onEdit?: (entity: EntityWithRelations) => void;
+  onDelete?: (entity: EntityWithRelations) => void;
+  onPoiLink?: (entity: EntityWithRelations) => void;
   onLinksUpdated?: () => void;
-  // Helper functions
-  getCategoryName: (categoryId: string) => string;
-  getTypeName: (typeId: string) => string;
-  getTierName: (tierId: string) => string;
   // Bulk selection props
   selectedEntities?: string[];
   onSelectionToggle?: (entityId: string) => void;
@@ -404,9 +352,6 @@ const ListView: React.FC<{
   onDelete, 
   onPoiLink, 
   onLinksUpdated,
-  getCategoryName, 
-  getTypeName, 
-  getTierName,
   selectedEntities = [], 
   onSelectionToggle, 
   selectionMode = false 
@@ -489,19 +434,19 @@ const ListView: React.FC<{
                   
                   {/* Tags */}
                   <div className="flex items-center space-x-2 mb-2">
-                    {entity.category_id && (
+                    {entity.category && (
                       <span className="px-2 py-0.5 text-xs bg-slate-700 text-amber-300 rounded">
-                        {getCategoryName(entity.category_id)}
+                        {entity.category.name}
                       </span>
                     )}
-                    {entity.type_id && (
+                    {entity.type && (
                       <span className="px-2 py-0.5 text-xs bg-blue-600/70 text-blue-200 rounded">
-                        {getTypeName(entity.type_id)}
+                        {entity.type.name}
                       </span>
                     )}
-                    {entity.tier_id && (
+                    {entity.tier_number !== undefined && (
                       <span className="px-2 py-0.5 text-xs bg-amber-600/70 text-amber-200 rounded">
-                        {getTierName(entity.tier_id)}
+                        Tier {entity.tier_number}
                       </span>
                     )}
                   </div>
@@ -582,18 +527,14 @@ const ListView: React.FC<{
 };
 
 const TreeView: React.FC<{
-  entities: Entity[];
+  entities: EntityWithRelations[];
   activeView: ActiveView;
   selectedCategory: Category | null;
-  onItemSelect: (item: Entity) => void;
-  onEdit?: (entity: Entity) => void;
-  onDelete?: (entity: Entity) => void;
-  onPoiLink?: (entity: Entity) => void;
+  onItemSelect: (item: EntityWithRelations) => void;
+  onEdit?: (entity: EntityWithRelations) => void;
+  onDelete?: (entity: EntityWithRelations) => void;
+  onPoiLink?: (entity: EntityWithRelations) => void;
   onLinksUpdated?: () => void;
-  // Helper functions
-  getCategoryName: (categoryId: string) => string;
-  getTypeName: (typeId: string) => string;
-  getTierName: (tierId: string) => string;
   // Bulk selection props
   selectedEntities?: string[];
   onSelectionToggle?: (entityId: string) => void;
@@ -607,9 +548,6 @@ const TreeView: React.FC<{
   onDelete, 
   onPoiLink, 
   onLinksUpdated,
-  getCategoryName, 
-  getTypeName, 
-  getTierName,
   selectedEntities = [], 
   onSelectionToggle, 
   selectionMode = false 
@@ -620,8 +558,8 @@ const TreeView: React.FC<{
 
   // Group entities by category for tree view
   const groupedEntities = entities.reduce((acc, entity) => {
-    const categoryId = entity.category_id || 'uncategorized';
-    const categoryName = getCategoryName(entity.category_id) || 'Uncategorized';
+    const categoryId = entity.category?.id || 'uncategorized';
+    const categoryName = entity.category?.name || 'Uncategorized';
     
     if (!acc[categoryId]) {
       acc[categoryId] = {
@@ -631,7 +569,7 @@ const TreeView: React.FC<{
     }
     acc[categoryId].entities.push(entity);
     return acc;
-  }, {} as Record<string, { category: { id: string; name: string }; entities: Entity[] }>);
+  }, {} as Record<string, { category: { id: string; name: string }; entities: EntityWithRelations[] }>);
 
   return (
     <div className="space-y-4">
@@ -728,14 +666,14 @@ const TreeView: React.FC<{
                         
                         {/* Tags */}
                         <div className="flex items-center space-x-2 mb-1">
-                          {entity.type_id && (
+                          {entity.type && (
                             <span className="px-2 py-0.5 text-xs bg-blue-600/70 text-blue-200 rounded">
-                              {getTypeName(entity.type_id)}
+                              {entity.type.name}
                             </span>
                           )}
-                          {entity.tier_id && (
+                          {entity.tier_number !== undefined && (
                             <span className="px-2 py-0.5 text-xs bg-amber-600/70 text-amber-200 rounded">
-                              {getTierName(entity.tier_id)}
+                              Tier {entity.tier_number}
                             </span>
                           )}
                         </div>
@@ -861,8 +799,8 @@ const ItemsSchematicsContent: React.FC<ItemsSchematicsContentProps> = ({
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
   // Modal states
-  const [editingEntity, setEditingEntity] = useState<Entity | null>(null);
-  const [deletingEntity, setDeletingEntity] = useState<Entity | null>(null);
+  const [editingEntity, setEditingEntity] = useState<EntityWithRelations | null>(null);
+  const [deletingEntity, setDeletingEntity] = useState<EntityWithRelations | null>(null);
 
   // Handle refresh trigger from parent
   useEffect(() => {
@@ -873,24 +811,10 @@ const ItemsSchematicsContent: React.FC<ItemsSchematicsContentProps> = ({
     }
   }, [refreshTrigger, refetchItems, refetchSchematics]);
 
-  // Helper functions to get display names
-  const getCategoryName = (categoryId: string): string => {
-    const category = categories.find(c => c.id === categoryId);
-    return category ? category.name : 'Unknown Category';
-  };
-
-  const getTypeName = (typeId: string): string => {
-    const type = types.find(t => t.id === typeId);
-    return type ? type.name : 'Unknown Type';
-  };
-
-  const getTierName = (tierId: string): string => {
-    const tier = tiers.find(t => t.id === tierId);
-    return tier ? tier.name : 'Unknown Tier';
-  };
+  // Helper functions removed - now using resolved relationship data directly
 
   // Action handlers
-  const handleEdit = (entity: Entity) => {
+  const handleEdit = (entity: EntityWithRelations) => {
     // Get the latest version from local state to ensure we have fresh data
     const latestEntity = entity.entityType === 'items' 
       ? getItemById(entity.id)
@@ -903,7 +827,7 @@ const ItemsSchematicsContent: React.FC<ItemsSchematicsContentProps> = ({
     }
   };
 
-  const handleDelete = (entity: Entity) => {
+  const handleDelete = (entity: EntityWithRelations) => {
     setDeletingEntity(entity);
   };
 
@@ -932,7 +856,7 @@ const ItemsSchematicsContent: React.FC<ItemsSchematicsContentProps> = ({
 
 
 
-  const handleEntitySaved = (savedEntity: Entity) => {
+  const handleEntitySaved = (savedEntity: EntityWithRelations) => {
     // Ensure entityType is preserved from the original editing entity
     const updatedEntity = {
       ...savedEntity,
@@ -966,7 +890,7 @@ const ItemsSchematicsContent: React.FC<ItemsSchematicsContentProps> = ({
   // Simple, clean filtering logic
   const getFilteredEntities = () => {
 
-    let entities: Entity[] = [];
+    let entities: EntityWithRelations[] = [];
 
     // Step 1: Determine which entity types to include based on view
     const viewFromFilters = filters?.view || activeView;
@@ -987,78 +911,63 @@ const ItemsSchematicsContent: React.FC<ItemsSchematicsContentProps> = ({
 
     // Step 2: Apply hierarchical filters (categories, types, tiers)
     if (filters) {
-      // Get available categories and tiers for comparison
-      const availableCategories = categories.filter(cat => {
-        if (viewFromFilters === 'all') return true;
-        if (Array.isArray(cat.applies_to)) {
-          return cat.applies_to.includes(viewFromFilters) || cat.applies_to.includes('both');
-        }
-        return cat.applies_to === 'both' || cat.applies_to === viewFromFilters;
-      });
-      const availableCategoryIds = availableCategories.map(cat => cat.id);
-      const availableTierIds = tiers.map(tier => tier.id);
-
       // Category filtering - always apply, handle empty array as "hide all"
-      if (filters.categories) {
-        if (filters.categories.length === 0) {
-          // Empty array means "Hide All" - filter out everything
-          entities = [];
-        } else {
-          // Check if all available categories are selected (show all)
-          const allCategoriesSelected = availableCategoryIds.length > 0 && 
-            availableCategoryIds.every(catId => filters.categories.includes(catId));
-            
-          if (!allCategoriesSelected) {
+      if (filters.category_id) {
+        if (Array.isArray(filters.category_id)) {
+          if (filters.category_id.length === 0) {
+            // Empty array means "Hide All" - filter out everything
+            entities = [];
+          } else {
             // Some categories selected - filter to show only those
             entities = entities.filter(entity => 
-              filters.categories.includes(entity.category_id)
+              entity.category_id && filters.category_id.includes(entity.category_id)
             );
           }
-          // If allCategoriesSelected is true, don't filter (show all)
-        }
-      }
-
-      // Type filtering - only filter if we have types selected and not all are selected
-      if (filters.types && filters.types.length > 0) {
-        // Get available types for current categories
-        const availableTypes = types.filter(type => 
-          filters.categories ? filters.categories.includes(type.category_id) : true
-        );
-        const availableTypeIds = availableTypes.map(type => type.id);
-        
-        const allTypesSelected = availableTypeIds.length > 0 && 
-          availableTypeIds.every(typeId => filters.types.includes(typeId));
-          
-        if (!allTypesSelected) {
+        } else {
+          // Single category ID
           entities = entities.filter(entity => 
-            !entity.type_id || filters.types.includes(entity.type_id)
+            entity.category_id === filters.category_id
           );
         }
       }
 
-      // Tier filtering - always apply, handle empty array as "hide all"
-      if (filters.tiers) {
-        if (filters.tiers.length === 0) {
-          // Empty array means "Hide All" - filter out everything
-          entities = [];
-        } else {
-          // Check if all available tiers are selected (show all)
-          const allTiersSelected = availableTierIds.length > 0 && 
-            availableTierIds.every(tierId => filters.tiers.includes(tierId));
-            
-          if (!allTiersSelected) {
-            // Some tiers selected - filter to show only those
+      // Type filtering
+      if (filters.type_id) {
+        if (Array.isArray(filters.type_id)) {
+          if (filters.type_id.length > 0) {
             entities = entities.filter(entity => 
-              !entity.tier_id || filters.tiers.includes(entity.tier_id)
+              entity.type_id && filters.type_id.includes(entity.type_id)
             );
           }
-          // If allTiersSelected is true, don't filter (show all)
+        } else {
+          entities = entities.filter(entity => 
+            entity.type_id === filters.type_id
+          );
+        }
+      }
+
+      // Tier filtering
+      if (filters.tier_number) {
+        if (Array.isArray(filters.tier_number)) {
+          if (filters.tier_number.length === 0) {
+            // Empty array means "Hide All" - filter out everything
+            entities = [];
+          } else {
+            // Some tiers selected - filter to show only those
+            entities = entities.filter(entity => 
+              entity.tier_number !== undefined && filters.tier_number.includes(entity.tier_number)
+            );
+          }
+        } else {
+          entities = entities.filter(entity => 
+            entity.tier_number === filters.tier_number
+          );
         }
       }
 
       // Search filtering
-      if (filters.searchTerm && filters.searchTerm.trim()) {
-        const searchLower = filters.searchTerm.toLowerCase();
+      if (filters.search && filters.search.trim()) {
+        const searchLower = filters.search.toLowerCase();
         entities = entities.filter(entity =>
           entity.name.toLowerCase().includes(searchLower) ||
           (entity.description && entity.description.toLowerCase().includes(searchLower))
@@ -1104,12 +1013,14 @@ const ItemsSchematicsContent: React.FC<ItemsSchematicsContentProps> = ({
         comparison = a.name.localeCompare(b.name);
         break;
       case 'category':
-        comparison = getCategoryName(a.category_id).localeCompare(getCategoryName(b.category_id));
+        const categoryA = a.category?.name || '';
+        const categoryB = b.category?.name || '';
+        comparison = categoryA.localeCompare(categoryB);
         break;
       case 'tier':
-        const tierA = a.tier_id ? getTierName(a.tier_id) : '';
-        const tierB = b.tier_id ? getTierName(b.tier_id) : '';
-        comparison = tierA.localeCompare(tierB);
+        const tierA = a.tier_number ?? -1;
+        const tierB = b.tier_number ?? -1;
+        comparison = tierA - tierB;
         break;
       case 'created_at':
         comparison = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
@@ -1239,9 +1150,6 @@ const ItemsSchematicsContent: React.FC<ItemsSchematicsContentProps> = ({
                   }
                 }}
                 selectionMode={selectedEntities.length > 0}
-                getCategoryName={getCategoryName}
-                getTypeName={getTypeName}
-                getTierName={getTierName}
               />
             )}
             {localViewMode === 'list' && (
@@ -1262,9 +1170,6 @@ const ItemsSchematicsContent: React.FC<ItemsSchematicsContentProps> = ({
                   }
                 }}
                 selectionMode={selectedEntities.length > 0}
-                getCategoryName={getCategoryName}
-                getTypeName={getTypeName}
-                getTierName={getTierName}
               />
             )}
             {localViewMode === 'tree' && (
@@ -1286,9 +1191,6 @@ const ItemsSchematicsContent: React.FC<ItemsSchematicsContentProps> = ({
                   }
                 }}
                 selectionMode={selectedEntities.length > 0}
-                getCategoryName={getCategoryName}
-                getTypeName={getTypeName}
-                getTierName={getTierName}
               />
             )}
           </div>

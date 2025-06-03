@@ -50,25 +50,24 @@ const Landing: React.FC = () => {
         {/* Minimal overlay only for text readability if needed */}
         {/* <div className="absolute inset-0 bg-slate-950/20" /> */}
 
-        <div className="relative max-w-7xl mx-auto px-6 py-24 lg:py-32">
+        {/* Background hero image - positioned absolutely behind everything */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <img 
+              src={`/images/landing_top.webp?v=${Date.now()}`}
+              alt="Dune Awakening Desert" 
+              className="w-full max-w-2xl h-auto object-contain opacity-70"
+          />
+        </div>
+
+        <div className="relative z-10 max-w-7xl mx-auto px-6 py-16 lg:py-20">
           <div className="text-center">
-            {/* Landing top image positioned behind logo and title */}
-            <div className="relative">
-              {/* Landing top image - positioned behind logo area, offset to bottom */}
-              <div className="absolute top-16 left-1/2 transform -translate-x-1/2">
-                <img 
-                    src={`/images/landing_top.webp?v=${Date.now()}`}
-                    alt="Dune Awakening Desert" 
-                    className="w-full max-w-4xl h-auto object-contain drop-shadow-2xl"
-                />
-              </div>
-              
-                {/* Logo and title overlay */}
-                <img 
-                  src={`/images/dune-log.webp?v=${Date.now()}`}
-                  alt="Dune Awakening Tracker Logo" 
-                  className="absolute inset-0 mx-auto mt-12 w-full max-w-lg h-auto object-contain z-10 drop-shadow-lg"
-                />
+            {/* Logo section - positioned above background */}
+            <div className="relative mb-8">
+              <img 
+                src={`/images/dune-log.webp?v=${Date.now()}`}
+                alt="Dune Awakening Tracker Logo" 
+                className="mx-auto w-full max-w-md h-auto object-contain drop-shadow-2xl"
+              />
             </div>
             
             {/* Buttons section */}
@@ -156,7 +155,7 @@ const Landing: React.FC = () => {
       </div>
 
       {/* Advanced Features Section - No backgrounds */}
-      <div className="relative py-20">
+      <div className="relative py-12">
         <div className="relative max-w-7xl mx-auto px-6">
           <div className="text-center mb-16">
             <div className="inline-flex items-center gap-3 mb-6">
@@ -179,7 +178,7 @@ const Landing: React.FC = () => {
             </p>
           </div>
 
-          <div className="grid lg:grid-cols-2 gap-12 items-center mb-20">
+          <div className="grid lg:grid-cols-2 gap-12 items-center mb-12">
             <div className="space-y-8">
               {[
                 {
@@ -332,7 +331,7 @@ const Landing: React.FC = () => {
       </div>
 
       {/* Call to Action - No backgrounds */}
-      <div className="relative py-20">
+      <div className="relative py-12">
         <div className="relative max-w-5xl mx-auto text-center px-6">
           <h2 className="text-4xl md:text-5xl lg:text-6xl font-light tracking-[0.1em] text-yellow-300 mb-8" style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
             MASTER THE DEEP DESERT

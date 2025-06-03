@@ -6,10 +6,10 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { usePagination } from '../../hooks/usePagination';
 import { VirtualizedList, VirtualizedGrid, PaginationControls } from '../shared';
-import type { Entity, Tier } from '../../types/unified-entities';
+import type { EntityWithRelations, Tier } from '../../types/unified-entities';
 // Legacy type aliases for compatibility
-type Item = Entity;
-type Schematic = Entity;
+type Item = EntityWithRelations;
+type Schematic = EntityWithRelations;
 
 interface ItemSchematicSelectionPanelProps {
   selectedItemIds: Set<string>;
@@ -246,8 +246,8 @@ const ItemSchematicSelectionPanel: React.FC<ItemSchematicSelectionPanelProps> = 
         const searchFields = [
           item.name,
           item.description || '',
-          item.category || '',
-          item.type || '',
+          item.category?.name || '',
+          item.type?.name || '',
           item.tier_number?.toString() || ''
         ];
         
@@ -893,11 +893,11 @@ const ItemSchematicGridView: React.FC<ItemSchematicGridViewProps> = ({
               <div className="flex items-center space-x-2 text-xs text-slate-400 mt-1">
                 {item.category && (
                   <span className="px-1.5 py-0.5 bg-slate-700 text-blue-300 rounded text-xs">
-                    {item.category}
+                    {item.category.name}
                   </span>
                 )}
                 {item.type && (
-                  <span className="text-slate-400">{item.type}</span>
+                  <span className="text-slate-400">{item.type.name}</span>
                 )}
                 {item.tier_number !== undefined && (
                   <span className="text-slate-400">T{item.tier_number}</span>
@@ -1018,11 +1018,11 @@ const ItemSchematicListView: React.FC<ItemSchematicListViewProps> = ({
           <div className="flex items-center space-x-2 text-xs text-slate-400 mt-1">
             {item.category && (
               <span className="px-2 py-0.5 bg-slate-700 text-blue-300 rounded">
-                {item.category}
+                {item.category.name}
               </span>
             )}
             {item.type && (
-              <span>{item.type}</span>
+              <span>{item.type.name}</span>
             )}
             {item.tier_number !== undefined && (
               <span className="text-amber-400">Tier {item.tier_number}</span>

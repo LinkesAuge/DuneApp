@@ -51,7 +51,7 @@ entities
 -- Tier hierarchy system (8 records)
 tiers
 ├── tier_number (integer, PRIMARY KEY)
-└── tier_name (text) -- Makeshift, Copper, Iron, Steel, Aluminium, Titanium, Exquisite, Plastanium
+└── tier_name (text) -- Makeshift, Crude, Basic, Standard, Advanced, Premium, Superior, Plastanium
 
 -- Recipe system infrastructure (ready for population)
 recipes

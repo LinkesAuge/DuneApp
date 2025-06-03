@@ -1,10 +1,10 @@
 // Entities API Test Component
 import React, { useState, useEffect } from 'react';
 import { entitiesAPI, EntityAPIError } from '../../lib/api/entities';
-import type { Entity, EntityStats } from '../../types/unified-entities';
+import type { EntityWithRelations, EntityStats } from '../../types/unified-entities';
 
 const EntitiesAPITest: React.FC = () => {
-  const [entities, setEntities] = useState<Entity[]>([]);
+  const [entities, setEntities] = useState<EntityWithRelations[]>([]);
   const [stats, setStats] = useState<EntityStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -30,8 +30,8 @@ const EntitiesAPITest: React.FC = () => {
       results.push(`✅ Success! Found ${entitiesResponse.total} total entities`);
       results.push(`📊 Retrieved ${entitiesResponse.data.length} entities`);
       if (entitiesResponse.data.length > 0) {
-        results.push(`🔍 First entity: ${entitiesResponse.data[0].name} (${entitiesResponse.data[0].category})`);
-        results.push(`🔍 Last entity: ${entitiesResponse.data[entitiesResponse.data.length - 1].name} (${entitiesResponse.data[entitiesResponse.data.length - 1].category})`);
+        results.push(`🔍 First entity: ${entitiesResponse.data[0].name} (${entitiesResponse.data[0].category?.name})`);
+        results.push(`🔍 Last entity: ${entitiesResponse.data[entitiesResponse.data.length - 1].name} (${entitiesResponse.data[entitiesResponse.data.length - 1].category?.name})`);
       }
       results.push('');
 
@@ -40,7 +40,7 @@ const EntitiesAPITest: React.FC = () => {
       const itemsResponse = await entitiesAPI.getAll({ is_schematic: false, limit: 5 });
       results.push(`✅ Success! Found ${itemsResponse.data.length} items`);
       itemsResponse.data.forEach((item, idx) => {
-        results.push(`   ${idx + 1}. ${item.name} (Tier ${item.tier_number}, ${item.category})`);
+        results.push(`   ${idx + 1}. ${item.name} (Tier ${item.tier_number}, ${item.category?.name})`);
       });
       results.push('');
 
@@ -49,7 +49,7 @@ const EntitiesAPITest: React.FC = () => {
       const schematicsResponse = await entitiesAPI.getAll({ is_schematic: true, limit: 5 });
       results.push(`✅ Success! Found ${schematicsResponse.data.length} schematics`);
       schematicsResponse.data.forEach((schematic, idx) => {
-        results.push(`   ${idx + 1}. ${schematic.name} (Tier ${schematic.tier_number}, ${schematic.category})`);
+        results.push(`   ${idx + 1}. ${schematic.name} (Tier ${schematic.tier_number}, ${schematic.category?.name})`);
       });
       results.push('');
 
@@ -58,7 +58,7 @@ const EntitiesAPITest: React.FC = () => {
       const searchResults = await entitiesAPI.search('sword');
       results.push(`✅ Success! Found ${searchResults.length} entities matching "sword"`);
       searchResults.forEach((result, idx) => {
-        results.push(`   ${idx + 1}. ${result.name} (${result.is_schematic ? 'Schematic' : 'Item'}, ${result.category})`);
+        results.push(`   ${idx + 1}. ${result.name} (${result.is_schematic ? 'Schematic' : 'Item'}, ${result.category?.name})`);
       });
       results.push('');
 
@@ -166,7 +166,7 @@ const EntitiesAPITest: React.FC = () => {
                     </span>
                   </div>
                   <div className="text-sm text-amber-200/60 mt-1">
-                    {entity.category} • Tier {entity.tier_number}
+                    {entity.category?.name} • Tier {entity.tier_number}
                   </div>
                 </div>
               ))}

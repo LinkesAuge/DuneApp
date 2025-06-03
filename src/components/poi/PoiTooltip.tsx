@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Package, FileText } from 'lucide-react';
-import { getPoiWithItems } from '../../lib/api/poiItemLinks';
+import { getPoiWithItems } from '../../lib/api/poiEntityLinks';
 import { PoiWithItems } from '../../types';
 
 interface PoiTooltipProps {

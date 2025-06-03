@@ -254,6 +254,23 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
     setTempImageFile(null);
     setTempImageUrl(null);
     setShowCropModal(false);
+    
+    // Remove the current file from pending queue since it was canceled
+    setPendingFiles(prevPending => {
+      const remainingFiles = prevPending.slice(1);
+      
+      // Process next file if any (with slight delay to ensure state is updated)
+      if (remainingFiles.length > 0) {
+        setTimeout(() => {
+          const nextFile = remainingFiles[0];
+          setTempImageFile(nextFile);
+          setTempImageUrl(URL.createObjectURL(nextFile));
+          setShowCropModal(true);
+        }, 100);
+      }
+      
+      return remainingFiles;
+    });
   };
 
   const processNextFile = () => {

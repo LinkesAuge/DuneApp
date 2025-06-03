@@ -5,28 +5,26 @@ import EntityPOILinksSection from '../poi-linking/EntityPOILinksSection';
 // Import types
 type ActiveView = 'items' | 'schematics';
 
-// Use the unified Entity interface from types
-import { Entity } from '../../types/unified-entities';
+// Use the unified EntityWithRelations interface from types
+import { EntityWithRelations } from '../../types/unified-entities';
 
 interface DetailsPanelProps {
   activeView: ActiveView;
-  selectedItem: Entity | null;
+  selectedItem: EntityWithRelations | null;
   onClose?: () => void;
 }
 
-const TierBadge: React.FC<{ tier: Entity['tier'] }> = ({ tier }) => {
-  if (!tier) return null;
+const TierBadge: React.FC<{ tierNumber: number }> = ({ tierNumber }) => {
+  if (tierNumber === undefined || tierNumber === null) return null;
 
   return (
     <span 
-      className="inline-flex items-center px-2 py-1 text-xs font-light rounded-full tracking-wide"
+      className="inline-flex items-center px-2 py-1 text-xs font-light rounded-full tracking-wide bg-amber-600/70 text-amber-200"
       style={{ 
-        backgroundColor: tier.color ? `${tier.color}30` : 'rgba(251, 191, 36, 0.2)',
-        color: tier.color || '#f59e0b',
         fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif"
       }}
     >
-      {tier.name}
+      Tier {tierNumber}
     </span>
   );
 };
@@ -86,7 +84,7 @@ const EmptyDetailsPanel: React.FC<{ activeView: ActiveView }> = ({ activeView })
   </div>
 );
 
-const EntityActions: React.FC<{ entity: Entity }> = ({ entity }) => {
+const EntityActions: React.FC<{ entity: EntityWithRelations }> = ({ entity }) => {
   const permissions = {
     canEdit: true, // TODO: Implement real permissions
     canDelete: true, // TODO: Implement real permissions
@@ -247,7 +245,7 @@ const DetailsPanel: React.FC<DetailsPanelProps> = ({
                     {selectedItem.type.name}
                   </span>
                 )}
-                {selectedItem.tier && <TierBadge tier={selectedItem.tier} />}
+                {selectedItem.tier_number !== undefined && <TierBadge tierNumber={selectedItem.tier_number} />}
               </div>
             </div>
           </div>

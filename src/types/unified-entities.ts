@@ -1,7 +1,8 @@
 // Unified Entities System - TypeScript Interfaces
 // Generated from database schema with 934 entities (711 Items + 223 Schematics)
+// Updated for normalized database structure with foreign key relationships
 
-// Core entity interface matching the entities table
+// Core entity interface matching the entities table (NORMALIZED)
 export interface Entity {
   id: string;                    // uuid, PRIMARY KEY
   item_id: string;              // text, UNIQUE - secondary identifier
@@ -10,9 +11,12 @@ export interface Entity {
   icon?: string;               // text - LEGACY: icon filename (migrated to icon_fallback)
   icon_image_id?: string | null; // uuid - reference to shared_images.id
   icon_fallback?: string | null; // text - fallback text/emoji icon
-  category: string;            // text - entity category
-  type: string;                // text - entity type
-  subtype?: string;            // text - optional subtype
+  
+  // NORMALIZED FOREIGN KEY STRUCTURE
+  category_id: number;         // integer, NOT NULL - references categories.id
+  type_id: number;             // integer, NOT NULL - references types.id
+  subtype_id?: number | null;  // integer, NULLABLE - references subtypes.id
+  
   tier_number: number;         // integer, 0-7 - tier level
   is_global: boolean;          // boolean - global availability
   is_schematic: boolean;       // boolean - true for schematics, false for items
@@ -20,6 +24,48 @@ export interface Entity {
   created_by?: string;         // uuid - user who created
   created_at?: string;         // timestamp - creation time
   updated_at?: string;         // timestamp - last update time
+}
+
+// Category interface matching the categories table
+export interface Category {
+  id: number;                  // integer, PRIMARY KEY
+  name: string;                // text, NOT NULL - category name
+  description?: string;        // text - optional description
+  icon?: string;               // text - optional icon
+  sort_order: number;          // integer - display order
+  created_at?: string;         // timestamp - creation time
+  updated_at?: string;         // timestamp - last update time
+}
+
+// Type interface matching the types table
+export interface Type {
+  id: number;                  // integer, PRIMARY KEY
+  name: string;                // text, NOT NULL - type name
+  category_id: number;         // integer, NOT NULL - references categories.id
+  description?: string;        // text - optional description
+  icon?: string;               // text - optional icon
+  sort_order: number;          // integer - display order
+  created_at?: string;         // timestamp - creation time
+  updated_at?: string;         // timestamp - last update time
+}
+
+// Subtype interface matching the subtypes table
+export interface Subtype {
+  id: number;                  // integer, PRIMARY KEY
+  name: string;                // text, NOT NULL - subtype name
+  type_id: number;             // integer, NOT NULL - references types.id
+  description?: string;        // text - optional description
+  icon?: string;               // text - optional icon
+  sort_order: number;          // integer - display order
+  created_at?: string;         // timestamp - creation time
+  updated_at?: string;         // timestamp - last update time
+}
+
+// Extended entity with resolved relationships for display
+export interface EntityWithRelations extends Entity {
+  category?: Category;         // Resolved category data
+  type?: Type;                 // Resolved type data
+  subtype?: Subtype;           // Resolved subtype data (if applicable)
 }
 
 // Tier system interface matching the tiers table
@@ -64,19 +110,23 @@ export interface POIEntityLink {
   poi_id: string;              // uuid - references pois.id
   entity_id: string;           // uuid - references entities.id
   quantity: number;            // integer - amount found/required
-  notes?: string;              // text - optional notes
-  assignment_source?: string;  // text - how link was created
   added_by?: string;           // uuid - user who created link
   added_at?: string;           // timestamp - creation time
+  updated_by?: string;         // uuid - user who last updated link
+  updated_at?: string;         // timestamp - last update time
 }
 
 // Filter interfaces for API operations
 export interface EntityFilters {
-  search?: string;             // Search across name, description, category, type
-  category?: string;           // Filter by category
-  type?: string;               // Filter by type
-  subtype?: string;            // Filter by subtype
+  search?: string;             // Search across name, description
+  category_id?: number;        // Filter by category ID
+  type_id?: number;            // Filter by type ID
+  subtype_id?: number;         // Filter by subtype ID
+  category_ids?: number[];     // Filter by multiple category IDs
+  type_ids?: number[];         // Filter by multiple type IDs
+  subtype_ids?: number[];      // Filter by multiple subtype IDs
   tier_number?: number;        // Filter by tier
+  tier_numbers?: number[];     // Filter by multiple tiers
   is_schematic?: boolean;      // Filter items vs schematics
   is_global?: boolean;         // Filter global vs local
   created_by?: string;         // Filter by creator
@@ -134,17 +184,8 @@ export interface EntityStats {
   entities_by_type: Record<string, number>;
 }
 
-// Constants for the tier system
-export const TIER_NAMES: Record<number, string> = {
-  0: 'Makeshift',
-  1: 'Copper',
-  2: 'Iron', 
-  3: 'Steel',
-  4: 'Aluminium',
-  5: 'Titanium',
-  6: 'Exquisite',
-  7: 'Plastanium'
-};
+// NOTE: Tier names are now fetched from database, not hardcoded
+// Use tiersAPI.getAll() to fetch current tier data from the tiers table
 
 // Constants for validation
 export const ENTITY_CONSTRAINTS = {
@@ -166,8 +207,8 @@ export function isEntity(obj: any): obj is Entity {
     typeof obj.id === 'string' &&
     typeof obj.item_id === 'string' &&
     typeof obj.name === 'string' &&
-    typeof obj.category === 'string' &&
-    typeof obj.type === 'string' &&
+    typeof obj.category_id === 'number' &&
+    typeof obj.type_id === 'number' &&
     typeof obj.tier_number === 'number' &&
     typeof obj.is_global === 'boolean' &&
     typeof obj.is_schematic === 'boolean' &&

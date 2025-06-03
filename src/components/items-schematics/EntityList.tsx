@@ -2,8 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { Grid3X3, List, Search, SortAsc, SortDesc, Filter, Package, FileText } from 'lucide-react';
 import { entitiesAPI, EntityAPIError } from '../../lib/api/entities';
-import type { Entity, EntityFilters, EntityResponse } from '../../types/unified-entities';
-import { TIER_NAMES } from '../../types/unified-entities';
+import type { EntityWithRelations, EntityFilters, EntityResponse } from '../../types/unified-entities';
+// TIER_NAMES removed - using database-driven tiers via useTiers hook
 import EntityCard from './EntityCard';
 
 interface EntityListProps {
@@ -15,10 +15,10 @@ interface EntityListProps {
   showSearch?: boolean;
   showFilters?: boolean;
   // Actions
-  onEntitySelect?: (entity: Entity) => void;
-  onEntityEdit?: (entity: Entity) => void;
-  onEntityDelete?: (entity: Entity) => void;
-  onEntityPoiLink?: (entity: Entity) => void;
+  onEntitySelect?: (entity: EntityWithRelations) => void;
+  onEntityEdit?: (entity: EntityWithRelations) => void;
+  onEntityDelete?: (entity: EntityWithRelations) => void;
+  onEntityPoiLink?: (entity: EntityWithRelations) => void;
   // Bulk selection
   selectedEntityIds?: string[];
   onSelectionChange?: (selectedIds: string[]) => void;
@@ -63,7 +63,7 @@ const ErrorMessage: React.FC<{ error: string; onRetry?: () => void }> = ({ error
 );
 
 const EmptyState: React.FC<{ filters?: EntityFilters; searchTerm?: string }> = ({ filters, searchTerm }) => {
-  const hasFilters = searchTerm || filters?.category || filters?.type || filters?.tier_number !== undefined || filters?.is_schematic !== undefined;
+  const hasFilters = searchTerm || filters?.category_id || filters?.type_id || filters?.tier_number !== undefined || filters?.is_schematic !== undefined;
   
   return (
     <div className="text-center py-12">
@@ -97,7 +97,7 @@ const EntityList: React.FC<EntityListProps> = ({
   selectionMode = false,
   refreshTrigger = 0
 }) => {
-  const [entities, setEntities] = useState<Entity[]>([]);
+  const [entities, setEntities] = useState<EntityWithRelations[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [localSearchTerm, setLocalSearchTerm] = useState(searchTerm);
@@ -171,7 +171,7 @@ const EntityList: React.FC<EntityListProps> = ({
   };
 
   // Handle entity selection
-  const handleEntityClick = (entity: Entity) => {
+  const handleEntityClick = (entity: EntityWithRelations) => {
     onEntitySelect?.(entity);
   };
 

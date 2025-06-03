@@ -2,15 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { ChevronDown, ChevronRight, X, Plus, Package, FileText, Search, Filter, Check, Eye } from 'lucide-react';
 import { useItemsSchematics } from '../../hooks/useItemsSchematics';
 import CreateEditItemSchematicModal from './CreateEditItemSchematicModal';
+import type { Category, Type, Tier, EntityFilters } from '../../types/unified-entities';
 
 type ActiveView = 'all' | 'items' | 'schematics';
 
 interface CategoryHierarchyNavProps {
   activeView: 'all' | 'items' | 'schematics';
-  selectedCategory: any;
-  onCategorySelect: (category: any) => void;
-  filters: any;
-  onFiltersChange: (filters: any) => void;
+  selectedCategory: Category | null;
+  onCategorySelect: (category: Category | null) => void;
+  filters: EntityFilters;
+  onFiltersChange: (filters: EntityFilters) => void;
   onClose: () => void;
   filteredCount: number;
   onEntityCreated?: (entity: any) => void;
@@ -43,10 +44,10 @@ const CategoryHierarchyNav: React.FC<CategoryHierarchyNavProps> = ({
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   
-  // Simple filter state - just track what's selected
-  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
-  const [selectedTypes, setSelectedTypes] = useState<Set<string>>(new Set());
-  const [selectedTiers, setSelectedTiers] = useState<Set<string>>(new Set());
+  // Simple filter state - just track what's selected (using numbers for normalized IDs)
+  const [selectedCategories, setSelectedCategories] = useState<Set<number>>(new Set());
+  const [selectedTypes, setSelectedTypes] = useState<Set<number>>(new Set());
+  const [selectedTiers, setSelectedTiers] = useState<Set<number>>(new Set());
   const [filtersInitialized, setFiltersInitialized] = useState(false);
 
   // Advanced search state
@@ -78,14 +79,14 @@ const CategoryHierarchyNav: React.FC<CategoryHierarchyNavProps> = ({
         .map(type => type.id);
       setSelectedTypes(new Set(typeIds));
       
-      // Select all tiers
-      const tierIds = tiers.map(tier => tier.id);
-      setSelectedTiers(new Set(tierIds));
+      // Select all tiers (using tier_number as the ID)
+      const tierNumbers = tiers.map(tier => tier.tier_number);
+      setSelectedTiers(new Set(tierNumbers));
       
       setFiltersInitialized(true);
       
       // Update parent with initial filters (all selected = show all)
-      updateParentFilters(localActiveView, new Set(categoryIds), new Set(typeIds), new Set(tierIds));
+      updateParentFilters(localActiveView, new Set(categoryIds), new Set(typeIds), new Set(tierNumbers));
     } else if (categories.length === 0 || tiers.length === 0) {
       // If data isn't loaded yet, send empty filters but don't mark as initialized
       // This ensures the parent component shows all entities while data is loading
@@ -120,27 +121,19 @@ const CategoryHierarchyNav: React.FC<CategoryHierarchyNavProps> = ({
 
   // Get categories that apply to a specific view
   const getApplicableCategoriesForView = (view: ActiveView) => {
-    if (view === 'all') {
-      return categories; // All categories are applicable for 'all' view
-    }
-    
-    return categories.filter(category => {
-      if (Array.isArray(category.applies_to)) {
-        return category.applies_to.includes(view) || category.applies_to.includes('both');
-      }
-      return category.applies_to === 'both' || category.applies_to === view;
-    });
+    // For now, return all categories since the normalized structure doesn't have applies_to field yet
+    // TODO: Add applies_to field to Category interface if needed for filtering by view
+    return categories;
   };
 
   // Update parent component with current filter state
-  const updateParentFilters = (view: ActiveView, categories: Set<string>, types: Set<string>, tiers: Set<string>) => {
-    const filters = {
-      view: view,
-      categories: Array.from(categories),
-      types: Array.from(types),
-      tiers: Array.from(tiers),
-      searchTerm: localSearchTerm,
-      ...advancedFilters
+  const updateParentFilters = (view: ActiveView, categories: Set<number>, types: Set<number>, tiers: Set<number>) => {
+    const filters: EntityFilters = {
+      category_id: categories.size > 0 ? Array.from(categories) : undefined,
+      type_id: types.size > 0 ? Array.from(types) : undefined,
+      tier_number: tiers.size > 0 ? Array.from(tiers) : undefined,
+      search: localSearchTerm || undefined,
+      is_schematic: view === 'items' ? false : view === 'schematics' ? true : undefined,
     };
     
     onFiltersChange(filters);
@@ -178,7 +171,7 @@ const CategoryHierarchyNav: React.FC<CategoryHierarchyNavProps> = ({
   };
 
   // Handle category toggle
-  const handleCategoryToggle = (categoryId: string) => {
+  const handleCategoryToggle = (categoryId: number) => {
     const newSelectedCategories = new Set(selectedCategories);
     const newSelectedTypes = new Set(selectedTypes);
     
@@ -202,7 +195,7 @@ const CategoryHierarchyNav: React.FC<CategoryHierarchyNavProps> = ({
   };
 
   // Handle type toggle
-  const handleTypeToggle = (typeId: string) => {
+  const handleTypeToggle = (typeId: number) => {
     const newSelectedTypes = new Set(selectedTypes);
     
     if (selectedTypes.has(typeId)) {
@@ -216,13 +209,13 @@ const CategoryHierarchyNav: React.FC<CategoryHierarchyNavProps> = ({
   };
 
   // Handle tier toggle
-  const handleTierToggle = (tierId: string) => {
+  const handleTierToggle = (tierNumber: number) => {
     const newSelectedTiers = new Set(selectedTiers);
     
-    if (selectedTiers.has(tierId)) {
-      newSelectedTiers.delete(tierId);
+    if (selectedTiers.has(tierNumber)) {
+      newSelectedTiers.delete(tierNumber);
     } else {
-      newSelectedTiers.add(tierId);
+      newSelectedTiers.add(tierNumber);
     }
     
     setSelectedTiers(newSelectedTiers);
@@ -236,8 +229,8 @@ const CategoryHierarchyNav: React.FC<CategoryHierarchyNavProps> = ({
     const allSelected = applicableCategoryIds.length > 0 && 
       applicableCategoryIds.every(catId => selectedCategories.has(catId));
     
-    let newSelectedCategories: Set<string>;
-    let newSelectedTypes: Set<string>;
+    let newSelectedCategories: Set<number>;
+    let newSelectedTypes: Set<number>;
     
     if (allSelected) {
       // Currently showing all (all categories selected) -> Hide all (select none)
@@ -261,25 +254,25 @@ const CategoryHierarchyNav: React.FC<CategoryHierarchyNavProps> = ({
 
   // Toggle all tiers - Fixed for new filtering logic  
   const handleToggleAllTiers = () => {
-    const tierIds = tiers.map(tier => tier.id);
-    const allSelected = tierIds.length > 0 && 
-      tierIds.every(tierId => selectedTiers.has(tierId));
+    const tierNumbers = tiers.map(tier => tier.tier_number);
+    const allSelected = tierNumbers.length > 0 && 
+      tierNumbers.every(tierNumber => selectedTiers.has(tierNumber));
     
-    let newSelectedTiers: Set<string>;
+    let newSelectedTiers: Set<number>;
     
     if (allSelected) {
       // Currently showing all (all tiers selected) -> Hide all (select none)
       newSelectedTiers = new Set();
     } else {
       // Currently filtered -> Show all (select all tiers)
-      newSelectedTiers = new Set(tierIds);
+      newSelectedTiers = new Set(tierNumbers);
     }
     
     setSelectedTiers(newSelectedTiers);
     updateParentFilters(localActiveView, selectedCategories, selectedTypes, newSelectedTiers);
   };
 
-  const getTypesForCategory = (categoryId: string) => {
+  const getTypesForCategory = (categoryId: number) => {
     return types.filter(type => type.category_id === categoryId);
   };
 
@@ -645,9 +638,9 @@ const CategoryHierarchyNav: React.FC<CategoryHierarchyNavProps> = ({
                           style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
                         >
                           {(() => {
-                            const tierIds = tiers.map(tier => tier.id);
-                            const allSelected = tierIds.length > 0 && 
-                              tierIds.every(tierId => selectedTiers.has(tierId));
+                            const tierNumbers = tiers.map(tier => tier.tier_number);
+                            const allSelected = tierNumbers.length > 0 && 
+                              tierNumbers.every(tierNumber => selectedTiers.has(tierNumber));
                             return allSelected ? 'Hide All' : 'Show All';
                           })()}
                         </button>
@@ -656,12 +649,12 @@ const CategoryHierarchyNav: React.FC<CategoryHierarchyNavProps> = ({
                       {/* Tiers in Two Columns */}
                       <div className="grid grid-cols-2 gap-1">
                         {tiers.map((tier) => {
-                          const isSelected = selectedTiers.has(tier.id);
+                          const isSelected = selectedTiers.has(tier.tier_number);
                           
                           return (
                             <button
-                              key={tier.id}
-                              onClick={() => handleTierToggle(tier.id)}
+                              key={tier.tier_number}
+                              onClick={() => handleTierToggle(tier.tier_number)}
                               className={`flex items-center gap-1 px-2 py-1 rounded transition-colors text-left ${
                                 isSelected 
                                   ? 'bg-amber-500/10 text-amber-200' 
@@ -675,7 +668,7 @@ const CategoryHierarchyNav: React.FC<CategoryHierarchyNavProps> = ({
                               />
                               <span className="text-xs truncate"
                                     style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-                                {tier.name}
+                                {tier.tier_name}
                               </span>
                             </button>
                           );

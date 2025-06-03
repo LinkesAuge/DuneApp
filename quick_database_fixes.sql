@@ -88,4 +88,47 @@ DO $$ BEGIN
     CREATE POLICY "Enable insert for authenticated users only" ON shared_images
       FOR INSERT WITH CHECK (auth.role() = 'authenticated');
   END IF;
-END $$; 
+END $$;
+
+-- Quick Database Fixes - Remove poi_items references
+-- Run this in your Supabase SQL editor
+
+-- 1. Drop the poi_items table completely (if it still exists)
+DROP TABLE IF EXISTS poi_items CASCADE;
+
+-- 2. Drop any triggers that might reference poi_items
+DROP TRIGGER IF EXISTS trigger_poi_items_update ON pois;
+DROP TRIGGER IF EXISTS update_poi_items_count ON pois;
+DROP TRIGGER IF EXISTS sync_poi_items_trigger ON pois;
+DROP TRIGGER IF EXISTS poi_items_sync_trigger ON pois;
+
+-- 3. Drop any functions that might reference poi_items
+DROP FUNCTION IF EXISTS update_poi_items_count();
+DROP FUNCTION IF EXISTS sync_poi_items();
+DROP FUNCTION IF EXISTS update_poi_items_count_function();
+DROP FUNCTION IF EXISTS sync_poi_items_function();
+
+-- 4. Check if any views reference poi_items (will show results if any exist)
+SELECT viewname, definition 
+FROM pg_views 
+WHERE schemaname = 'public' 
+AND definition LIKE '%poi_items%';
+
+-- 5. Check for any remaining functions that reference poi_items
+SELECT proname as function_name
+FROM pg_proc p
+JOIN pg_namespace n ON p.pronamespace = n.oid
+WHERE n.nspname = 'public' 
+AND pg_get_functiondef(p.oid) LIKE '%poi_items%';
+
+-- 6. Verify poi_items is completely gone
+SELECT table_name 
+FROM information_schema.tables 
+WHERE table_schema = 'public' 
+AND table_name LIKE '%poi_items%';
+
+-- 7. If the above query returns any results, run:
+-- DROP TABLE IF EXISTS [table_name] CASCADE;
+
+-- This should resolve the POI creation error
+SELECT 'Database cleanup completed successfully' as status; 

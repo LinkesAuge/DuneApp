@@ -3,24 +3,13 @@ import { X, Package, FileText, Save, AlertCircle, Upload, Image as ImageIcon } f
 import { useItemsSchematics } from '../../hooks/useItemsSchematics';
 import { useAuth } from '../auth/AuthProvider';
 import type { AppliesTo, ResolvedField, FieldType } from '../../types';
+import type { EntityWithRelations } from '../../types/unified-entities';
 
 // =================================
 // Types and Interfaces
 // =================================
 
-interface Entity {
-  id: string;
-  name: string;
-  description?: string;
-  category_id: string;
-  type_id?: string;
-  tier_id?: string;
-  icon_url?: string;
-  field_values?: Record<string, any>;
-  created_at?: string;
-  updated_at?: string;
-  created_by?: string;
-}
+// Use centralized EntityWithRelations type instead of local interface
 
 interface FormData {
   name: string;

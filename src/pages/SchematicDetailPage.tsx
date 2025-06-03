@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, MapPin, FileText, Info, ExternalLink, Package } from 'lucide-react';
-import { getSchematicWithLocations } from '../lib/api/poiItemLinks';
+import { getSchematicWithLocations } from '../lib/api/poiEntityLinks';
 import { SchematicWithLocations, PoiLocationInfo } from '../types';
 import { useAuth } from '../components/auth/AuthProvider';
 

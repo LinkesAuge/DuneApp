@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, MapPin, Package, Info, ExternalLink } from 'lucide-react';
-import { getItemWithLocations } from '../lib/api/poiItemLinks';
+import { getItemWithLocations } from '../lib/api/poiEntityLinks';
 import { ItemWithLocations, PoiLocationInfo } from '../types';
 import { useAuth } from '../components/auth/AuthProvider';
 
