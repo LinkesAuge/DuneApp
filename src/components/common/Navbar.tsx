@@ -422,9 +422,8 @@ const Navbar: React.FC = () => {
                     >
                       Points of Interest
                     </NavButton>
+                    <DatabaseDropdownButton />
                     {user.role === 'admin' && (
-                      <>
-                      <DatabaseDropdownButton />
                       <NavButton
                         to="/admin"
                         icon={<Shield size={14} strokeWidth={1.5} />}
@@ -432,7 +431,6 @@ const Navbar: React.FC = () => {
                       >
                         Admin
                       </NavButton>
-                      </>
                     )}
                   </>
                 )}
@@ -677,24 +675,23 @@ const Navbar: React.FC = () => {
                 >
                   Profile Settings
                 </MobileNavButton>
+                <MobileNavButton
+                  to="/database"
+                  icon={<Database size={15} strokeWidth={1.5} />}
+                  isActive={location.pathname === '/database'}
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  Database Management
+                </MobileNavButton>
+                <MobileNavButton
+                  to="/poi-linking"
+                  icon={<LinkIcon size={15} strokeWidth={1.5} />}
+                  isActive={location.pathname === '/poi-linking'}
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  POI Linking
+                </MobileNavButton>
                 {user.role === 'admin' && (
-                  <>
-                    <MobileNavButton
-                      to="/database"
-                      icon={<Database size={15} strokeWidth={1.5} />}
-                      isActive={location.pathname === '/database'}
-                      onClick={() => setIsMenuOpen(false)}
-                    >
-                      Database Management
-                    </MobileNavButton>
-                    <MobileNavButton
-                      to="/poi-linking"
-                      icon={<LinkIcon size={15} strokeWidth={1.5} />}
-                      isActive={location.pathname === '/poi-linking'}
-                      onClick={() => setIsMenuOpen(false)}
-                    >
-                      POI Linking
-                    </MobileNavButton>
                   <MobileNavButton
                     to="/admin"
                     icon={<Shield size={15} strokeWidth={1.5} />}
@@ -703,7 +700,6 @@ const Navbar: React.FC = () => {
                   >
                     Admin Panel
                   </MobileNavButton>
-                  </>
                 )}
                 
                 {/* Mobile Profile */}
