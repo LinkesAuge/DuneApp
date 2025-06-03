@@ -93,7 +93,8 @@ export interface Poi {
   coordinates_x: number | null; // pixel coordinates for Hagga Basin
   coordinates_y: number | null; // pixel coordinates for Hagga Basin
   privacy_level: PrivacyLevel;
-
+  // POI-Entity linking support
+  linkCount?: number; // Number of entity links for this POI
 }
 
 export interface PoiWithGridSquare extends Poi {

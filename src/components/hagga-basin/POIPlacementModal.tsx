@@ -425,7 +425,7 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
         .select(`
           *,
           poi_types (*),
-          profiles (username)
+          profiles!pois_created_by_fkey (username)
         `)
         .single();
 

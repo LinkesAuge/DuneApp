@@ -154,7 +154,7 @@ const HaggaBasinPage: React.FC = () => {
       .select(`
         *,
         poi_types (*),
-        profiles (username)
+        profiles!pois_created_by_fkey (username)
       `)
       .eq('map_type', 'hagga_basin')
       .order('created_at', { ascending: false });
@@ -571,7 +571,7 @@ const HaggaBasinPage: React.FC = () => {
               .select(`
                 *,
                 poi_types (*),
-                profiles (username)
+                profiles!pois_created_by_fkey (username)
               `)
               .eq('id', newPoi.id)
               .single();
@@ -616,7 +616,7 @@ const HaggaBasinPage: React.FC = () => {
                 .select(`
                   *,
                   poi_types (*),
-                  profiles (username)
+                  profiles!pois_created_by_fkey (username)
                 `)
                 .eq('id', updatedPoi.id)
                 .eq('map_type', 'hagga_basin') // Ensure we only get Hagga Basin POIs
@@ -700,7 +700,7 @@ const HaggaBasinPage: React.FC = () => {
               .select(`
                 *,
                 poi_types (*),
-                profiles (username)
+                profiles!pois_created_by_fkey (username)
               `)
               .eq('id', poiId)
               .eq('map_type', 'hagga_basin')

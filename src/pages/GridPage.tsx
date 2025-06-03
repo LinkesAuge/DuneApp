@@ -881,7 +881,7 @@ const GridPage: React.FC = () => {
                 .select(`
                   *,
                   poi_types (*),
-                  profiles (username)
+                  profiles!pois_created_by_fkey (username)
                 `)
                 .eq('id', newPoi.id)
                 .single();
@@ -920,7 +920,7 @@ const GridPage: React.FC = () => {
               .select(`
                 *,
                 poi_types (*),
-                profiles (username)
+                profiles!pois_created_by_fkey (username)
               `)
               .eq('id', updatedPoi.id)
               .single();

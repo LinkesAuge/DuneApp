@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
+import { fetchPrivacyFilteredPois } from '../lib/poiPrivacy';
 import { Poi, PoiType, GridSquare, PoiWithGridSquare, MapType } from '../types';
 import { Search, Compass, LayoutGrid, List, Edit2, Trash2, ArrowDownUp, SortAsc, SortDesc, Image as ImageIconLucide, Share2, Bookmark, MessageSquare, MapPin, Tag } from 'lucide-react';
 import GridGallery from '../components/grid/GridGallery';
@@ -76,17 +77,8 @@ const PoisPage: React.FC = () => {
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        // Fetch all POIs with proper privacy filtering via RLS
-        const { data: poisData, error: poisError } = await supabase
-          .from('pois')
-          .select(`
-            *,
-            poi_types (*),
-            profiles (username)
-          `)
-          .order('created_at', { ascending: false });
-
-        if (poisError) throw poisError;
+        // Fetch POIs with proper privacy filtering
+        const poisData = await fetchPrivacyFilteredPois(user);
 
         // Fetch grid squares for POIs that have grid_square_id
         const gridSquareIds = poisData

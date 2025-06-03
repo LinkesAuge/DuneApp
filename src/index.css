@@ -254,6 +254,47 @@
     background: rgb(71, 85, 105);
     border-color: rgb(251, 191, 36);
   }
+
+  /* POI and Entity Card Styles */
+  .poi-card {
+    background: rgba(30, 41, 59, 0.8);
+    border: 1px solid rgb(71, 85, 105);
+    @apply transition-all duration-200;
+  }
+
+  .poi-card:hover {
+    border-color: rgb(251, 191, 36);
+    background: rgba(30, 41, 59, 0.95);
+  }
+
+  .poi-card.selected {
+    border-color: rgb(34, 197, 94);
+    background: rgba(34, 197, 94, 0.1);
+  }
+
+  .entity-card {
+    background: rgba(30, 41, 59, 0.8);
+    border: 1px solid rgb(71, 85, 105);
+    @apply transition-all duration-200;
+  }
+
+  .entity-card:hover {
+    border-color: rgb(251, 191, 36);
+    background: rgba(30, 41, 59, 0.95);
+  }
+
+  .entity-card.selected {
+    border-color: rgb(168, 85, 247);
+    background: rgba(168, 85, 247, 0.1);
+  }
+
+  /* Text truncation utility */
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
 }
 
 @layer utilities {

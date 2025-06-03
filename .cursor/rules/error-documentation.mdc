@@ -424,3 +424,101 @@ This document tracks known issues, their states, context, and resolutions encoun
 -   **Lesson Learned**: When implementing toggle-based filtering systems with "Show All/Hide All" functionality: (1) Always handle empty filter arrays explicitly as "hide all" rather than "skip filtering", (2) Design filtering logic to handle three distinct states rather than just two, (3) Test all toggle combinations including the "Hide All" state which often gets overlooked, (4) Be careful with conditional filtering logic that might skip execution entirely when arrays are empty, (5) Consider using explicit state values instead of inferring behavior from array length.
 
 ---
+
+-   **Date**: 2025-01-30
+-   **Error Description**: Supabase PostgREST relationship ambiguity error - "Could not embed because more than one relationship was found for 'pois' and 'profiles'".
+-   **Context/Symptoms**: 
+    1. Hagga Basin map page failed to load with HTTP error about multiple relationships between pois and profiles tables
+    2. Error suggested two relationships: 'profiles!pois_created_by_fkey' and 'profiles!poi_shares'
+    3. POI list page had the same issue with ambiguous profile embedding
+    4. Error occurred when trying to embed `profiles (username)` in POI queries
+-   **Investigation/Diagnosis**:
+    -   **Root Cause**: Database schema evolution introduced multiple foreign key relationships between pois and profiles tables
+    -   **Query Ambiguity**: Generic `profiles (username)` embedding couldn't determine which relationship to use
+    -   **Affected Queries**: Both HaggaBasinPage.tsx and Pois.tsx had queries that embedded profiles without specifying the relationship
+    -   **PostgREST Behavior**: When multiple relationships exist, explicit relationship naming is required
+-   **Solution/Fix**:
+    1.  **Specified Explicit Relationship**: Changed `profiles (username)` to `profiles!pois_created_by_fkey (username)` in both files
+    2.  **HaggaBasinPage.tsx**: Updated fetchHaggaBasinPOIs query to use explicit relationship
+    3.  **Pois.tsx**: Updated main POI fetch query to use explicit relationship  
+    4.  **Build Verification**: Confirmed TypeScript compilation successful with no errors
+-   **Files Affected**:
+    -   `src/pages/HaggaBasinPage.tsx` (Fixed POI query relationship)
+    -   `src/pages/Pois.tsx` (Fixed POI query relationship)
+-   **Lesson Learned**: When database schemas evolve to include multiple foreign key relationships between tables, all Supabase queries that embed related data must specify the exact relationship using the `!foreign_key_name` syntax. Generic relationship names become ambiguous and cause PostgREST errors. Always specify explicit relationships when multiple options exist to avoid runtime query failures.
+
+---
+
+-   **Date**: 2025-01-30
+-   **Error Description**: POI Entity Link creation failed with Supabase PostgREST error: "Could not find the 'created_at' column of 'poi_entity_links' in the schema cache".
+-   **Context/Symptoms**: 
+    1. Users could select POIs and Entities in the POI Entity Linking interface
+    2. Link creation preview worked correctly showing statistics and duplicate detection
+    3. When clicking "Create Links" button, the operation failed with HTTP 400 error from Supabase
+    4. Console showed specific error: `PGRST204: Could not find the 'created_at' column of 'poi_entity_links' in the schema cache`
+    5. The actual table schema used `added_at` column instead of `created_at` for timestamp tracking
+-   **Investigation/Diagnosis**:
+    -   **Root Cause**: Database schema mismatch - `poi_entity_links` table used `added_at` column but frontend code was trying to insert `created_at`
+    -   **Schema Analysis**: The table was created with columns: `poi_id`, `entity_id`, `quantity`, `added_by`, `added_at`, `updated_by`, `updated_at`
+    -   **Code Issue**: SelectionSummaryPanel was creating insert objects with `created_at: new Date().toISOString()` instead of `added_at`
+    -   **Database Standards**: The POI Entity Links table follows different naming convention than other tables (uses `added_at`/`added_by` vs `created_at`/`created_by`)
+-   **Solution/Fix**:
+    1.  **Fixed Column Name**: Changed insert object from `created_at: new Date().toISOString()` to `added_at: new Date().toISOString()` in SelectionSummaryPanel.tsx
+    2.  **Added User Reference**: Added `added_by: null` to insert object (will be handled by database trigger/RLS policies)
+    3.  **Verified Schema**: Confirmed the actual table schema uses: `added_at` for timestamps and `added_by` for user references
+    4.  **Build Validation**: Tested successful compilation and deployment
+-   **Files Affected**:
+    -   `src/components/poi-linking/panels/SelectionSummaryPanel.tsx` (Fixed insert object column names)
+-   **Lesson Learned**: Always verify actual database schema column names before implementing CRUD operations. Different tables may use different naming conventions (created_at vs added_at). When PostgREST reports missing columns, check the actual schema vs. the assumed schema in the frontend code. Use schema validation tools or direct database queries to confirm column names before implementation.
+
+---
+
+-   **Date**: 2025-01-30
+-   **Error Description**: POI Entity Links `added_by` field not being populated - staying as null despite successful link creation.
+-   **Context/Symptoms**: 
+    1. POI entity links were being created successfully with proper `poi_id`, `entity_id`, and `added_at` fields
+    2. However, the `added_by` field remained null in all created records
+    3. Frontend code was setting `added_by: null` expecting database triggers to populate it automatically
+    4. No database trigger existed to set `added_by` field on INSERT operations
+-   **Investigation/Diagnosis**:
+    -   **Root Cause**: Frontend code was setting `added_by: null` expecting database trigger/RLS policies to handle user ID assignment automatically
+    -   **Database Analysis**: The `poi_entity_links` table has UPDATE triggers but no INSERT triggers to populate `added_by` field
+    -   **Frontend Issue**: Component wasn't using the current user's ID from auth context to explicitly set the `added_by` field
+    -   **Missing Pattern**: Other tables rely on explicit user ID setting rather than database triggers for user tracking fields
+-   **Solution/Fix**:
+    1.  **Added Auth Context**: Imported `useAuth` hook from `AuthProvider` in `SelectionSummaryPanel.tsx`
+    2.  **User ID Extraction**: Added `const { user } = useAuth();` to access current authenticated user
+    3.  **Explicit User Assignment**: Changed `added_by: null` to `added_by: user?.id || null` in link creation objects
+    4.  **Build Verification**: Confirmed TypeScript compilation and successful development server startup
+-   **Files Affected**:
+    -   `src/components/poi-linking/panels/SelectionSummaryPanel.tsx` (Added auth context and explicit user ID assignment)
+-   **Lesson Learned**: When implementing user-created content, always explicitly set user tracking fields (created_by, added_by, etc.) using the current authenticated user's ID rather than relying on database triggers. Database triggers are better suited for timestamp updates and automated field population, while user identification should be handled explicitly in the frontend with proper auth context integration. Always test that user tracking fields are populated correctly after implementing CRUD operations.
+
+---
+
+-   **Date**: 2025-01-30
+-   **Error Description**: Critical privacy policy violations - POI Entity Linking system bypassing access control, showing private and shared POIs to unauthorized users.
+-   **Context/Symptoms**: 
+    1. Users reported seeing private POIs belonging to other users in the POI Entity Linking interface
+    2. Shared POIs were visible to users who weren't explicitly granted access
+    3. No visible errors in console, but privacy policies were being completely bypassed
+    4. The filtering UI showed privacy level options but didn't enforce actual access control
+-   **Investigation/Diagnosis**:
+    -   **Root Cause**: POI filtering logic in `useFilterState.ts` was only checking privacy_level values for display filtering but not enforcing user access rights
+    -   **Privacy Policy Bypass**: Frontend filtering logic checked if `poi.privacy_level === 'private'` but didn't verify if `user.id === poi.created_by`
+    -   **Access Control Gap**: No validation was performed to ensure users only see POIs they're authorized to access
+    -   **Share Table Ignored**: Shared POI access wasn't checking the `poi_shares` table for granted permissions
+-   **Solution/Fix**:
+    1.  **Added Authentication Context**: Integrated `useAuth` hook into `useFilterState` to access current user information
+    2.  **Implemented Access Control Logic**: Added comprehensive access validation before applying display filters:
+        - **Public POIs**: Accessible to all authenticated users 
+        - **Private POIs**: Only accessible to the POI creator (`user.id === poi.created_by`)
+        - **Shared POIs**: Currently limited to creator (TODO: implement poi_shares table lookup)
+    3.  **Dual-Layer Filtering**: Applied access control first, then display filtering, ensuring unauthorized POIs are never shown
+    4.  **Enforced on All Paths**: Access control applies whether privacy filters are selected or not
+    5.  **Updated Dependencies**: Added `user` to useMemo dependencies for proper reactivity
+-   **Files Affected**:
+    -   `src/hooks/useFilterState.ts` (Added authentication context and access control logic)
+-   **Lesson Learned**: Critical privacy lesson: Frontend filtering must always enforce access control BEFORE applying display filters. Privacy levels are metadata for categorization, not access control mechanisms. Always validate user authorization first: (1) Check if user has access to the resource, (2) Then apply user-selected filters. For shared resources, implement proper lookup tables rather than assuming creator-only access. Privacy violations are security issues that must be resolved immediately with comprehensive access validation.
+
+---
