@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { X, MapPin, Lock, Users, Eye, Image, Upload, Plus, Search, UserPlus } from 'lucide-react';
+import { X, MapPin, Lock, Users, Eye, Image, Upload, Plus, Search, UserPlus, Link2 } from 'lucide-react';
 import type { 
   PixelCoordinates, 
   PoiType, 
@@ -917,6 +917,17 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
                 Upload up to 5 screenshots total. Each image must be under 10MB. PNG, JPG formats supported.
               </p>
             </div>
+          </div>
+
+          {/* Entity Linking Note */}
+          <div className="bg-blue-900/20 border border-blue-800/50 rounded-lg p-4">
+            <div className="flex items-center gap-2 text-blue-300 mb-2">
+              <Link2 className="w-5 h-5" />
+              <span className="font-medium">Item / Schematic Linking</span>
+            </div>
+            <p className="text-blue-200/80 text-sm">
+              You can link items and schematics to this POI after it's created. Use the edit button on the POI to access linking features.
+            </p>
           </div>
 
           {/* Error Display */}

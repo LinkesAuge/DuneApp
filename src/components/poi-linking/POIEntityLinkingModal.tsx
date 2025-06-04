@@ -71,6 +71,11 @@ const POIEntityLinkingModal: React.FC<POIEntityLinkingModalProps> = ({
     }
   }, [isOpen]);
 
+  // Debug: Log when modal opens/closes
+  useEffect(() => {
+    console.log('POIEntityLinkingModal: isOpen changed to:', isOpen);
+  }, [isOpen]);
+
   // Reset filters when modal closes
   useEffect(() => {
     if (!isOpen) {
@@ -340,7 +345,7 @@ const POIEntityLinkingModal: React.FC<POIEntityLinkingModalProps> = ({
           <div className="p-4 bg-amber-500/10 border-b border-slate-700">
             <div className="flex items-center justify-between">
               <span className="text-amber-200 text-sm">
-                {selectedCount} entit{selectedCount === 1 ? 'y' : 'ies'} selected for linking
+                {selectedCount} item{selectedCount === 1 ? '' : 's'} selected for linking
               </span>
               <button
                 onClick={clearSelections}
@@ -357,13 +362,13 @@ const POIEntityLinkingModal: React.FC<POIEntityLinkingModalProps> = ({
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="w-6 h-6 text-amber-300 animate-spin" />
-              <span className="ml-2 text-amber-200">Loading entities...</span>
+              <span className="ml-2 text-amber-200">Loading items and schematics...</span>
             </div>
           ) : filteredEntities.length === 0 ? (
             <div className="text-center py-12">
               <Package className="w-12 h-12 text-amber-300/40 mx-auto mb-4" />
               <p className="text-amber-200/60">
-                {entities.length === 0 ? 'No entities available' : 'No entities match your filters'}
+                {entities.length === 0 ? 'No items or schematics available' : 'No items or schematics match your filters'}
               </p>
             </div>
           ) : (
@@ -428,8 +433,12 @@ const POIEntityLinkingModal: React.FC<POIEntityLinkingModalProps> = ({
 
                     {/* Entity Details */}
                     <div className="text-xs text-amber-200/60 mb-3">
-                      <div>{entity.category?.name} → {entity.type?.name}</div>
-                      {entity.subtype && <div>Subtype: {entity.subtype}</div>}
+                      <div>
+                        {typeof entity.category === 'object' ? entity.category?.name : entity.category || 'Unknown Category'} → {typeof entity.type === 'object' ? entity.type?.name : entity.type || 'Unknown Type'}
+                      </div>
+                      {entity.subtype && (
+                        <div>Subtype: {typeof entity.subtype === 'object' ? entity.subtype?.name : entity.subtype}</div>
+                      )}
                     </div>
 
                     {/* Link Configuration (if selected) */}
@@ -482,7 +491,7 @@ const POIEntityLinkingModal: React.FC<POIEntityLinkingModalProps> = ({
         <div className="p-6 border-t border-slate-700 bg-slate-800/50">
           <div className="flex items-center justify-between">
             <div className="text-sm text-amber-200/60">
-              {filteredEntities.length} entit{filteredEntities.length === 1 ? 'y' : 'ies'} available
+              {filteredEntities.length} item{filteredEntities.length === 1 ? '' : 's'} available
               {existingEntityIds.length > 0 && (
                 <span className="ml-2">
                   ({existingEntityIds.length} already linked)
@@ -510,7 +519,7 @@ const POIEntityLinkingModal: React.FC<POIEntityLinkingModalProps> = ({
                 ) : (
                   <>
                     <LinkIcon className="w-4 h-4" />
-                    <span>Link {selectedCount} Entit{selectedCount === 1 ? 'y' : 'ies'}</span>
+                    <span>Link {selectedCount} Item{selectedCount === 1 ? '' : 's'}</span>
                   </>
                 )}
               </button>
