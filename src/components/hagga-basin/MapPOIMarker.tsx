@@ -125,7 +125,7 @@ const MapPOIMarker: React.FC<MapPOIMarkerProps> = ({
         const { data: links, error } = await supabase
           .from('poi_entity_links')
           .select(`
-            id,
+            poi_id,
             entity_id,
             entities!entity_id(id, name, is_schematic)
           `)
@@ -224,37 +224,46 @@ const MapPOIMarker: React.FC<MapPOIMarkerProps> = ({
       <div className="relative">
         {/* POI Icon */}
         <div 
-          className={`flex items-center justify-center transition-all duration-200 cursor-pointer hover:scale-110 ${
+          className={`flex items-center justify-center transition-all duration-300 cursor-pointer ${
             selectionMode 
               ? isSelected 
-                ? 'ring-2 ring-amber-400/50' 
-                : 'hover:ring-1 hover:ring-amber-300/50'
-              : ''
+                ? 'ring-4 ring-amber-400/80 shadow-lg scale-110 hover:scale-115' 
+                : 'hover:ring-2 hover:ring-amber-300/60 hover:scale-105'
+              : 'hover:scale-110'
           }`}
           style={{
             width: `${iconSize}px`,
             height: `${iconSize}px`,
-            backgroundColor: 'transparent'
+            backgroundColor: 'transparent',
+            borderRadius: '50%'
           }}
         >
           {imageUrl ? (
             <img
               src={imageUrl}
               alt={poiType.name}
-              className="object-contain"
+              className={`object-contain transition-all duration-300 ${
+                selectionMode && isSelected ? 'brightness-110' : ''
+              }`}
               style={{
                 width: `${innerIconSize}px`,
                 height: `${innerIconSize}px`,
-                filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.8)) drop-shadow(0 0 8px rgba(0,0,0,0.5)) drop-shadow(0 0 12px rgba(0,0,0,0.3)) drop-shadow(0 0 18px rgba(0,0,0,0.2))'
+                filter: selectionMode && isSelected 
+                  ? 'drop-shadow(0 2px 6px rgba(0,0,0,0.8)) drop-shadow(0 0 8px rgba(251,191,36,0.4)) drop-shadow(0 0 12px rgba(251,191,36,0.3)) drop-shadow(0 0 18px rgba(0,0,0,0.2))'
+                  : 'drop-shadow(0 2px 6px rgba(0,0,0,0.8)) drop-shadow(0 0 8px rgba(0,0,0,0.5)) drop-shadow(0 0 12px rgba(0,0,0,0.3)) drop-shadow(0 0 18px rgba(0,0,0,0.2))'
               }}
             />
           ) : (
             <span 
-              className="leading-none font-medium"
+              className={`leading-none font-medium transition-all duration-300 ${
+                selectionMode && isSelected ? 'scale-110' : ''
+              }`}
               style={{ 
                 fontSize: `${innerIconSize * 0.6}px`,
                 color: poiType.color,
-                textShadow: '0 2px 6px rgba(0,0,0,0.8), 0 0 8px rgba(0,0,0,0.5), 0 0 12px rgba(0,0,0,0.3), 0 0 18px rgba(0,0,0,0.2)'
+                textShadow: selectionMode && isSelected
+                  ? '0 2px 6px rgba(0,0,0,0.8), 0 0 8px rgba(251,191,36,0.4), 0 0 12px rgba(251,191,36,0.3), 0 0 18px rgba(0,0,0,0.2)'
+                  : '0 2px 6px rgba(0,0,0,0.8), 0 0 8px rgba(0,0,0,0.5), 0 0 12px rgba(0,0,0,0.3), 0 0 18px rgba(0,0,0,0.2)'
               }}
             >
               {poiType.icon}
@@ -322,10 +331,10 @@ const MapPOIMarker: React.FC<MapPOIMarkerProps> = ({
           </div>
         )}
 
-        {/* Selection Indicator */}
+        {/* Enhanced Selection Indicator */}
         {selectionMode && isSelected && (
-          <div className="absolute -top-2 -right-2 w-6 h-6 bg-amber-500 rounded-full border-2 border-white flex items-center justify-center shadow-lg">
-            <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+          <div className="absolute -top-2 -right-2 w-8 h-8 bg-gradient-to-br from-green-400 to-green-600 rounded-full border-3 border-white flex items-center justify-center shadow-xl animate-pulse ring-2 ring-green-300/50">
+            <svg className="w-5 h-5 text-white drop-shadow-md font-bold" fill="currentColor" viewBox="0 0 20 20" strokeWidth="2">
               <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
             </svg>
           </div>

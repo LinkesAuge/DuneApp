@@ -180,11 +180,16 @@ const RegionalStatsPanel: React.FC<RegionalStatsPanelProps> = ({
   if (loading) {
     return (
       <div className="group relative">
-        {/* Multi-layer background system */}
-        <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 rounded-lg" />
-        <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-800/40 to-slate-900/60 rounded-lg" />
+        {/* Golden border */}
+        <div className="absolute inset-0 bg-amber-400/60 rounded-lg" />
         
-        <div className="relative p-4 rounded-lg border border-amber-400/20">
+        {/* Dark purple-tinted background */}
+        <div 
+          className="absolute inset-0.5 rounded-lg"
+          style={{ backgroundColor: 'rgb(8, 12, 20)' }}
+        />
+        
+        <div className="relative p-4 rounded-lg">
           <div className="animate-pulse space-y-4">
             <div className="h-6 bg-slate-700/40 rounded w-3/4"></div>
             <div className="space-y-2">
@@ -199,15 +204,30 @@ const RegionalStatsPanel: React.FC<RegionalStatsPanelProps> = ({
 
   return (
     <div className="group relative">
-      {/* Multi-layer background system */}
-      <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 rounded-lg" />
-      <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-800/40 to-slate-900/60 rounded-lg" />
-      <div className={`absolute inset-0 ${config.bg} rounded-lg`} />
+      {/* Golden border */}
+      <div className="absolute inset-0 bg-amber-400/60 group-hover:bg-amber-300/70 transition-all duration-300 rounded-lg" />
+      
+      {/* Dark purple-tinted background */}
+      <div 
+        className="absolute inset-0.5 rounded-lg"
+        style={{ backgroundColor: 'rgb(8, 12, 20)' }}
+      />
+      
+      {/* Very subtle sandy gradient overlay */}
+      <div 
+        className="absolute inset-0.5 rounded-lg"
+        style={{
+          background: 'linear-gradient(to right, rgba(0, 0, 0, 0) 0%, rgba(194, 154, 108, 0.02) 50%, rgba(0, 0, 0, 0) 100%)'
+        }}
+      />
       
       {/* Interactive purple overlay */}
-      <div className="absolute inset-0 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 ease-in-out bg-gradient-to-b from-violet-600/10 via-violet-700/5 to-transparent" />
+      <div className="absolute inset-0.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 ease-in-out"
+           style={{
+             background: 'radial-gradient(circle at center, rgba(139, 92, 246, 0.06) 0%, rgba(124, 58, 237, 0.03) 70%, transparent 100%)'
+           }} />
       
-      <div className={`relative p-4 rounded-lg border ${config.border} hover:border-amber-300/30 transition-all duration-300`}>
+      <div className="relative p-4 rounded-lg transition-all duration-300">
         {/* Header */}
         <div className="flex items-center gap-3 mb-4">
           <DiamondIcon

@@ -78,7 +78,8 @@ const PoisPage: React.FC = () => {
       setIsLoading(true);
       try {
         // Fetch POIs with proper privacy filtering
-        const poisData = await fetchPrivacyFilteredPois(user);
+        const poisResult = await fetchPrivacyFilteredPois(user);
+        const poisData = poisResult.items; // Extract the items array
 
         // Fetch grid squares for POIs that have grid_square_id
         const gridSquareIds = poisData

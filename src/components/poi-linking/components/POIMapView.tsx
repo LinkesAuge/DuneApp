@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Map as MapIcon, RotateCcw, Mountain, X } from 'lucide-react';
+import { Map as MapIcon, RotateCcw, Mountain, X, MousePointer, CheckSquare, Info } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import type { HaggaBasinBaseMap, GridSquare, Poi, PoiType } from '../../../types';
 import InteractiveMap from '../../hagga-basin/InteractiveMap';
 import DeepDesertSelectionMode from '../DeepDesertSelectionMode';
+import POICard from '../../common/POICard';
 
 interface POIMapViewProps {
   pois: Poi[];
@@ -13,6 +14,8 @@ interface POIMapViewProps {
   selectedPOIIds?: Set<string>;
   poiTypes?: PoiType[];
 }
+
+type InteractionMode = 'selection' | 'normal';
 
 const POIMapView: React.FC<POIMapViewProps> = ({
   pois,
@@ -39,6 +42,10 @@ const POIMapView: React.FC<POIMapViewProps> = ({
   const [currentGridId, setCurrentGridId] = useState('A1');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // State for interaction mode
+  const [interactionMode, setInteractionMode] = useState<InteractionMode>('selection');
+  const [selectedPoi, setSelectedPoi] = useState<Poi | null>(null);
 
   // Load map-specific data
   useEffect(() => {
@@ -77,10 +84,15 @@ const POIMapView: React.FC<POIMapViewProps> = ({
     loadMapData();
   }, [currentMapType]);
 
-  // Handle POI selection
-  const handlePoiSelect = (poi: Poi) => {
-    if (onPOISelect) {
-      onPOISelect(poi.id);
+  // Handle POI interaction based on current mode
+  const handlePoiClick = (poi: Poi) => {
+    if (interactionMode === 'selection') {
+      if (onPOISelect) {
+        onPOISelect(poi.id);
+      }
+    } else {
+      // Normal mode - show POI details
+      setSelectedPoi(poi);
     }
   };
 
@@ -99,35 +111,74 @@ const POIMapView: React.FC<POIMapViewProps> = ({
         <span className="text-sm text-slate-400">
           ({currentMapPOIs.length} POIs)
         </span>
+        {selectedPOIIds.size > 0 && interactionMode === 'selection' && (
+          <span className={`text-xs px-2 py-1 rounded-full border font-medium ${
+            currentMapType === 'hagga'
+              ? 'text-blue-300 border-blue-500/50 bg-blue-500/10'
+              : 'text-orange-300 border-orange-500/50 bg-orange-500/10'
+          }`}>
+            {selectedPOIIds.size} selected
+          </span>
+        )}
       </div>
-      
-      {mapType === 'both' && onMapTypeChange && (
-        <div className="flex items-center space-x-2">
-          <span className="text-xs text-slate-500">Map Type:</span>
-          <div className="flex bg-slate-700 rounded p-1">
-            <button
-              onClick={() => onMapTypeChange('hagga')}
-              className={`px-2 py-1 text-xs rounded ${
-                currentMapType === 'hagga' 
-                  ? 'bg-amber-600 text-amber-100' 
-                  : 'text-slate-300 hover:bg-slate-600'
-              }`}
-            >
-              🏔️ Hagga Basin
-            </button>
-            <button
-              onClick={() => onMapTypeChange('deep')}
-              className={`px-2 py-1 text-xs rounded ${
-                currentMapType === 'deep' 
-                  ? 'bg-amber-600 text-amber-100' 
-                  : 'text-slate-300 hover:bg-slate-600'
-              }`}
-            >
-              🏜️ Deep Desert
-            </button>
-          </div>
+
+      {/* Interaction Mode Toggle */}
+      <div className="flex items-center space-x-3">
+        <div className="flex bg-slate-700 rounded-lg p-1">
+          <button
+            onClick={() => setInteractionMode('selection')}
+            className={`px-3 py-1 text-xs rounded flex items-center space-x-1 transition-colors ${
+              interactionMode === 'selection'
+                ? 'bg-green-600 text-white'
+                : 'text-slate-300 hover:bg-slate-600'
+            }`}
+            title="Selection mode - click to select POIs"
+          >
+            <CheckSquare className="w-3 h-3" />
+            <span>Select</span>
+          </button>
+          <button
+            onClick={() => setInteractionMode('normal')}
+            className={`px-3 py-1 text-xs rounded flex items-center space-x-1 transition-colors ${
+              interactionMode === 'normal'
+                ? 'bg-blue-600 text-white'
+                : 'text-slate-300 hover:bg-slate-600'
+            }`}
+            title="Normal mode - click to view POI details"
+          >
+            <Info className="w-3 h-3" />
+            <span>View</span>
+          </button>
         </div>
-      )}
+        
+        {mapType === 'both' && onMapTypeChange && (
+          <div className="flex items-center space-x-2">
+            <span className="text-xs text-slate-500">Map Type:</span>
+            <div className="flex bg-slate-700 rounded p-1">
+              <button
+                onClick={() => onMapTypeChange('hagga')}
+                className={`px-2 py-1 text-xs rounded ${
+                  currentMapType === 'hagga' 
+                    ? 'bg-amber-600 text-amber-100' 
+                    : 'text-slate-300 hover:bg-slate-600'
+                }`}
+              >
+                🏔️ Hagga Basin
+              </button>
+              <button
+                onClick={() => onMapTypeChange('deep')}
+                className={`px-2 py-1 text-xs rounded ${
+                  currentMapType === 'deep' 
+                    ? 'bg-amber-600 text-amber-100' 
+                    : 'text-slate-300 hover:bg-slate-600'
+                }`}
+              >
+                🏜️ Deep Desert
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 
@@ -188,17 +239,54 @@ const POIMapView: React.FC<POIMapViewProps> = ({
         <EmptyMapState />
       ) : (
         <div className="flex-1 relative">
-          {/* Selection indicator */}
-          <div className="absolute top-4 right-4 z-30 bg-slate-900/90 backdrop-blur-sm border border-slate-700/50 rounded-lg px-3 py-2 shadow-lg">
-            <div className="text-center">
-              <div className={`text-lg font-bold ${
-                currentMapType === 'hagga' ? 'text-blue-300' : 'text-orange-300'
-              }`}>
-                {selectedPOIIds.size}
+          {/* Enhanced Selection indicator with tools - only show in selection mode */}
+          {interactionMode === 'selection' && (
+            <div className="absolute top-4 right-4 z-30 bg-slate-900/95 backdrop-blur-sm border border-slate-700/50 rounded-lg shadow-xl">
+              <div className="p-3">
+                <div className="text-center mb-2">
+                  <div className={`text-xl font-bold ${
+                    currentMapType === 'hagga' ? 'text-blue-300' : 'text-orange-300'
+                  }`}>
+                    {selectedPOIIds.size}
+                  </div>
+                  <div className="text-slate-400 text-xs">POIs Selected</div>
+                </div>
+                
+                {/* Selection Tools */}
+                {selectedPOIIds.size > 0 && onPOISelect && (
+                  <div className="flex flex-col gap-1 pt-2 border-t border-slate-700/50">
+                    <button
+                      onClick={() => selectedPOIIds.forEach(id => onPOISelect(id))}
+                      className="px-2 py-1 text-xs text-slate-300 hover:text-white border border-slate-600 rounded hover:bg-slate-700 transition-colors"
+                      title="Clear all selected POIs"
+                    >
+                      Clear All
+                    </button>
+                    
+                    {currentMapPOIs.length > selectedPOIIds.size && (
+                      <button
+                        onClick={() => {
+                          currentMapPOIs.forEach(poi => {
+                            if (!selectedPOIIds.has(poi.id)) {
+                              onPOISelect(poi.id);
+                            }
+                          });
+                        }}
+                        className={`px-2 py-1 text-xs border rounded transition-colors ${
+                          currentMapType === 'hagga'
+                            ? 'text-blue-300 border-blue-500/50 hover:bg-blue-500/20'
+                            : 'text-orange-300 border-orange-500/50 hover:bg-orange-500/20'
+                        }`}
+                        title="Select all visible POIs on this map"
+                      >
+                        Select All ({currentMapPOIs.length})
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
-              <div className="text-slate-400 text-xs">Selected</div>
             </div>
-          </div>
+          )}
 
           {/* Render appropriate map component */}
           {currentMapType === 'hagga' ? (
@@ -207,10 +295,10 @@ const POIMapView: React.FC<POIMapViewProps> = ({
                 baseMap={activeBaseMap}
                 overlays={[]}
                 pois={currentMapPOIs}
-                poiTypes={poiTypes}
-                selectionMode={true}
+                poiTypes={poiTypes || []}
+                selectionMode={interactionMode === 'selection'}
                 selectedPoiIds={selectedPOIIds}
-                onPoiClick={handlePoiSelect}
+                onPoiClick={handlePoiClick}
                 mapType="hagga_basin"
               />
             ) : (
@@ -229,7 +317,7 @@ const POIMapView: React.FC<POIMapViewProps> = ({
               currentGridId={currentGridId}
               allGridSquares={gridSquares}
               pois={pois}
-              poiTypes={poiTypes}
+              poiTypes={poiTypes || []}
               selectedPoiIds={selectedPOIIds}
               onPoiSelect={(poiId) => onPOISelect?.(poiId)}
               onPoiDeselect={(poiId) => onPOISelect?.(poiId)}
@@ -239,6 +327,36 @@ const POIMapView: React.FC<POIMapViewProps> = ({
           )}
         </div>
       )}
+
+      {/* POI Detail Modal - only in normal mode */}
+      {interactionMode === 'normal' && selectedPoi && poiTypes && (() => {
+        const poiType = poiTypes.find(type => type.id === selectedPoi.poi_type_id);
+        if (!poiType) return null;
+        
+        return (
+          <POICard
+            poi={selectedPoi}
+            poiType={poiType}
+            isOpen={true}
+            onClose={() => setSelectedPoi(null)}
+            onEdit={() => {
+              // Edit functionality could be added here if needed
+              setSelectedPoi(null);
+            }}
+            onDelete={() => {
+              // Delete functionality could be added here if needed
+              setSelectedPoi(null);
+            }}
+            onShare={() => {
+              // Share functionality could be added here if needed
+              setSelectedPoi(null);
+            }}
+            onImageClick={() => {
+              // Gallery functionality could be added here if needed
+            }}
+          />
+        );
+      })()}
     </div>
   );
 };

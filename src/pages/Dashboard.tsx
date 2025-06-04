@@ -19,15 +19,28 @@ const Dashboard: React.FC = () => {
     gradient: string;
   }> = ({ to, title, description, icon, gradient }) => (
     <Link to={to} className="group relative block">
-      {/* Multi-layer background system */}
-      <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 rounded-lg" />
-      <div className={`absolute inset-0 ${gradient} rounded-lg opacity-20 group-hover:opacity-30 transition-opacity duration-300`} />
+      {/* Solid golden border */}
+      <div className="absolute inset-0 bg-amber-400 group-hover:bg-amber-300 transition-all duration-300 rounded-lg" />
       
-      {/* Interactive purple overlay */}
-      <div className="absolute inset-0 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 ease-in-out bg-gradient-to-b from-violet-600/10 via-violet-700/5 to-transparent" />
+             {/* Dark purple-tinted background */}
+       <div 
+         className="absolute inset-0.5 rounded-lg"
+         style={{ backgroundColor: 'rgb(8, 12, 20)' }}
+       />
+       
+       {/* Subtle gradient shine effect */}
+       <div className="absolute inset-0.5 bg-gradient-to-b from-slate-700/20 via-transparent to-slate-950/40 rounded-lg" />
+       
+       {/* Linear gradient from center to sides - darker overall */}
+       <div 
+         className="absolute inset-0.5 rounded-lg"
+         style={{
+           background: 'linear-gradient(to right, rgba(15, 23, 42, 0.8) 0%, rgba(51, 65, 85, 0.4) 50%, rgba(15, 23, 42, 0.8) 100%)'
+         }}
+       />
       
       {/* Content */}
-      <div className="relative p-4 rounded-lg border border-amber-400/20 hover:border-amber-300/40 transition-all duration-300">
+      <div className="relative p-4 rounded-lg transition-all duration-300">
         <div className="flex items-center gap-3">
           <DiamondIcon
             icon={icon}
@@ -131,9 +144,26 @@ const Dashboard: React.FC = () => {
             <div className="space-y-6">
               {/* Exploration Progress */}
               <div className="group relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 rounded-lg" />
-                <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-800/40 to-slate-900/60 rounded-lg" />
-                <div className="relative p-6 rounded-lg border border-amber-400/20">
+                <div className="absolute inset-0 bg-amber-400 rounded-lg" />
+                <div 
+                  className="absolute inset-0.5 rounded-lg"
+                  style={{ backgroundColor: 'rgb(8, 12, 20)' }}
+                />
+                {/* Very subtle sandy gradient overlay */}
+                <div 
+                  className="absolute inset-0.5 rounded-lg"
+                  style={{
+                    background: 'linear-gradient(to right, rgba(0, 0, 0, 0) 0%, rgba(194, 154, 108, 0.02) 50%, rgba(0, 0, 0, 0) 100%)'
+                  }}
+                />
+                <div className="absolute inset-0.5 bg-gradient-to-b from-slate-700/20 via-transparent to-slate-950/40 rounded-lg" />
+                <div 
+                  className="absolute inset-0.5 rounded-lg"
+                  style={{
+                    background: 'linear-gradient(to right, rgba(15, 23, 42, 0.8) 0%, rgba(51, 65, 85, 0.4) 50%, rgba(15, 23, 42, 0.8) 100%)'
+                  }}
+                />
+                <div className="relative p-6 rounded-lg">
                   <h3 className="text-lg font-light tracking-wide text-amber-200 mb-4 flex items-center gap-2"
                       style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
                     <Eye size={16} className="text-gold-300" />
@@ -145,9 +175,26 @@ const Dashboard: React.FC = () => {
 
               {/* Quick Actions */}
               <div className="group relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 rounded-lg" />
-                <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-800/40 to-slate-900/60 rounded-lg" />
-                <div className="relative p-6 rounded-lg border border-amber-400/20">
+                <div className="absolute inset-0 bg-amber-400 rounded-lg" />
+                <div 
+                  className="absolute inset-0.5 rounded-lg"
+                  style={{ backgroundColor: 'rgb(8, 12, 20)' }}
+                />
+                {/* Very subtle sandy gradient overlay */}
+                <div 
+                  className="absolute inset-0.5 rounded-lg"
+                  style={{
+                    background: 'linear-gradient(to right, rgba(0, 0, 0, 0) 0%, rgba(194, 154, 108, 0.02) 50%, rgba(0, 0, 0, 0) 100%)'
+                  }}
+                />
+                <div className="absolute inset-0.5 bg-gradient-to-b from-slate-700/20 via-transparent to-slate-950/40 rounded-lg" />
+                <div 
+                  className="absolute inset-0.5 rounded-lg"
+                  style={{
+                    background: 'linear-gradient(to right, rgba(15, 23, 42, 0.8) 0%, rgba(51, 65, 85, 0.4) 50%, rgba(15, 23, 42, 0.8) 100%)'
+                  }}
+                />
+                <div className="relative p-6 rounded-lg">
                   <h3 className="text-lg font-light tracking-wide text-amber-200 mb-4 flex items-center gap-2"
                       style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
                     <Map size={16} className="text-gold-300" />
@@ -190,9 +237,26 @@ const Dashboard: React.FC = () => {
 
               {/* Community Stats */}
               <div className="group relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 rounded-lg" />
-                <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-800/40 to-slate-900/60 rounded-lg" />
-                <div className="relative p-6 rounded-lg border border-amber-400/20">
+                <div className="absolute inset-0 bg-amber-400 rounded-lg" />
+                <div 
+                  className="absolute inset-0.5 rounded-lg"
+                  style={{ backgroundColor: 'rgb(8, 12, 20)' }}
+                />
+                {/* Very subtle sandy gradient overlay */}
+                <div 
+                  className="absolute inset-0.5 rounded-lg"
+                  style={{
+                    background: 'linear-gradient(to right, rgba(0, 0, 0, 0) 0%, rgba(194, 154, 108, 0.02) 50%, rgba(0, 0, 0, 0) 100%)'
+                  }}
+                />
+                <div className="absolute inset-0.5 bg-gradient-to-b from-slate-700/20 via-transparent to-slate-950/40 rounded-lg" />
+                <div 
+                  className="absolute inset-0.5 rounded-lg"
+                  style={{
+                    background: 'linear-gradient(to right, rgba(15, 23, 42, 0.8) 0%, rgba(51, 65, 85, 0.4) 50%, rgba(15, 23, 42, 0.8) 100%)'
+                  }}
+                />
+                <div className="relative p-6 rounded-lg">
                   <h3 className="text-lg font-light tracking-wide text-amber-200 mb-4 flex items-center gap-2"
                       style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
                     <Users size={16} className="text-gold-300" />

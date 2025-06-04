@@ -107,7 +107,6 @@ export interface RecipeOutput {
 export interface POIEntityLink {
   poi_id: string;              // uuid - references pois.id
   entity_id: string;           // uuid - references entities.id
-  quantity: number;            // integer - amount found/required
   added_by?: string;           // uuid - user who created link
   added_at?: string;           // timestamp - creation time
   updated_by?: string;         // uuid - user who last updated link

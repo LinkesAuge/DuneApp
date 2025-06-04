@@ -1,6 +1,5 @@
 import React from 'react';
 import { LucideIcon } from 'lucide-react';
-import DiamondIcon from '../common/DiamondIcon';
 
 interface StatCardProps {
   title: string;
@@ -26,140 +25,151 @@ const StatCard: React.FC<StatCardProps> = ({
     blue: {
       icon: 'text-blue-400',
       trend: 'text-blue-300',
-      bg: 'bg-gradient-to-b from-blue-600/10 via-blue-500/5 to-transparent',
-      border: 'border-blue-400/30'
     },
     green: {
       icon: 'text-green-400',
       trend: 'text-green-300',
-      bg: 'bg-gradient-to-b from-green-600/10 via-green-500/5 to-transparent',
-      border: 'border-green-400/30'
     },
     orange: {
       icon: 'text-amber-400',
       trend: 'text-amber-300',
-      bg: 'bg-gradient-to-b from-amber-600/10 via-amber-500/5 to-transparent',
-      border: 'border-amber-400/30'
     },
     purple: {
       icon: 'text-purple-400',
       trend: 'text-purple-300',
-      bg: 'bg-gradient-to-b from-purple-600/10 via-purple-500/5 to-transparent',
-      border: 'border-purple-400/30'
     },
     indigo: {
       icon: 'text-indigo-400',
       trend: 'text-indigo-300',
-      bg: 'bg-gradient-to-b from-indigo-600/10 via-indigo-500/5 to-transparent',
-      border: 'border-indigo-400/30'
-    }
+    },
   };
 
-  const config = colorConfig[color];
-
-  // Octagonal clip path matching HexCard
+  // Octagonal clip path
   const octagonalClipPath = {
     clipPath: "polygon(15px 0%, calc(100% - 15px) 0%, 100% 15px, 100% calc(100% - 15px), calc(100% - 15px) 100%, 15px 100%, 0% calc(100% - 15px), 0% 15px)"
   };
 
   return (
     <div 
-      className="group relative overflow-hidden"
+      className="group relative transition-all duration-300 overflow-hidden p-2"
       style={octagonalClipPath}
       onMouseEnter={(e) => {
-        // Purple overlay effect matching HexCard
-        const purpleOverlay = e.currentTarget.querySelector('.absolute.inset-0\\.5.transition-all') as HTMLElement;
+        // Purple overlay effect
+        const purpleOverlay = e.currentTarget.querySelector('.purple-hover-overlay') as HTMLElement;
         if (purpleOverlay) {
-          purpleOverlay.style.background = 'radial-gradient(ellipse at center top, rgba(139, 92, 246, 0.15) 0%, rgba(124, 58, 237, 0.08) 40%, transparent 70%)';
+          purpleOverlay.style.background = 'radial-gradient(circle at center, rgba(139, 92, 246, 0.08) 0%, rgba(124, 58, 237, 0.04) 70%, transparent 100%)';
         }
         
         // Text glow effects
-        const titleElement = e.currentTarget.querySelector('.text-lg') as HTMLElement;
+        const titleElement = e.currentTarget.querySelector('.stat-title') as HTMLElement;
         if (titleElement) {
-          titleElement.style.textShadow = '0 0 8px rgba(251, 191, 36, 0.6)';
+          titleElement.style.textShadow = '0 0 12px rgba(251, 191, 36, 0.8)';
         }
       }}
       onMouseLeave={(e) => {
         // Reset purple overlay
-        const purpleOverlay = e.currentTarget.querySelector('.absolute.inset-0\\.5.transition-all') as HTMLElement;
+        const purpleOverlay = e.currentTarget.querySelector('.purple-hover-overlay') as HTMLElement;
         if (purpleOverlay) {
-          purpleOverlay.style.background = 'radial-gradient(ellipse at center top, rgba(139, 92, 246, 0) 0%, rgba(124, 58, 237, 0) 40%, transparent 70%)';
+          purpleOverlay.style.background = 'radial-gradient(circle at center, rgba(139, 92, 246, 0) 0%, rgba(124, 58, 237, 0) 70%, transparent 100%)';
         }
         
-        // Reset text glow
-        const titleElement = e.currentTarget.querySelector('.text-lg') as HTMLElement;
+        // Reset text glow effects
+        const titleElement = e.currentTarget.querySelector('.stat-title') as HTMLElement;
         if (titleElement) {
           titleElement.style.textShadow = 'none';
         }
       }}
     >
-      {/* Multi-layer background system with octagonal clip */}
+      {/* Very dark background - almost black like in facelift1.jpg */}
       <div 
-        className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950"
-        style={octagonalClipPath}
-      />
-      <div 
-        className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-800/40 to-slate-900/60"
-        style={octagonalClipPath}
-      />
-      <div 
-        className={`absolute inset-0 ${config.bg}`}
-        style={octagonalClipPath}
-      />
-      
-      {/* Elegant border with octagonal clip */}
-      <div 
-        className={`absolute inset-0 bg-gradient-to-r from-amber-400/55 via-amber-300/75 to-amber-400/55 group-hover:from-amber-300/75 group-hover:via-amber-200/85 group-hover:to-amber-300/75 transition-all duration-300`}
+        className="absolute inset-0"
         style={{
           ...octagonalClipPath,
-          padding: '1px'
+          backgroundColor: 'rgb(8, 15, 32)' // Very dark blue, almost black
         }}
       />
       
-      {/* Inner background with octagonal clip */}
+      {/* Elegant golden border - matching screenshot */}
       <div 
-        className="absolute inset-0.5 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950"
-        style={octagonalClipPath}
-      />
-      
-      {/* Interactive purple overlay matching HexCard */}
-      <div 
-        className="absolute inset-0.5 transition-all duration-300"
+        className="absolute inset-0 bg-gradient-to-r from-amber-400/60 via-amber-300/75 to-amber-400/60 group-hover:from-amber-300/75 group-hover:via-amber-200/85 group-hover:to-amber-300/75 transition-all duration-300"
         style={{
           ...octagonalClipPath,
-          background: 'radial-gradient(ellipse at center top, rgba(139, 92, 246, 0) 0%, rgba(124, 58, 237, 0) 40%, transparent 70%)'
+          padding: '2px' // Clean border thickness
         }}
       />
       
-      <div className="relative p-2 flex flex-col justify-center text-center min-h-[80px]">
-        {/* Icon with trend indicator positioned at top */}
-        <div className="flex items-center justify-center gap-1 mb-1">
-          <Icon size={12} className={config.icon} strokeWidth={1.5} />
+      {/* Inner dark background - clean and minimal */}
+      <div 
+        className="absolute inset-[2px]"
+        style={{
+          ...octagonalClipPath,
+          backgroundColor: 'rgb(8, 12, 20)' // Dark purple-tinted background
+        }}
+      />
+      
+      {/* Very subtle sandy gradient overlay - barely visible */}
+      <div 
+        className="absolute inset-[2px]"
+        style={{
+          ...octagonalClipPath,
+          background: 'linear-gradient(to right, rgba(0, 0, 0, 0) 0%, rgba(194, 154, 108, 0.02) 50%, rgba(0, 0, 0, 0) 100%)'
+        }}
+      />
+      
+      {/* Purple hover overlay - elegant effect */}
+      <div 
+        className="purple-hover-overlay absolute inset-[2px] transition-all duration-300"
+        style={{
+          ...octagonalClipPath,
+          background: 'radial-gradient(circle at center, rgba(139, 92, 246, 0) 0%, rgba(124, 58, 237, 0) 70%, transparent 100%)'
+        }}
+      />
+      
+      {/* Content */}
+      <div className="relative z-10 text-center">
+        {/* Icon and trend indicator */}
+        <div className="flex items-center justify-center mb-1">
+          <Icon 
+            className={`w-3 h-3 ${colorConfig[color].icon} group-hover:scale-110 transition-transform duration-300`} 
+          />
           {trend && (
-            <span className={`text-xs ${config.trend} font-light`}>
-              {trend.value}
+            <span className={`ml-1 text-xs ${colorConfig[color].trend} font-medium`}>
+              {trend.direction === 'up' ? '↗' : '↘'} {trend.value}
             </span>
           )}
         </div>
         
-        {/* Value - larger and prominent */}
-        <div className="text-lg font-light text-amber-200 tracking-wide mb-1 transition-all duration-300">
+        {/* Value */}
+        <div className="text-2xl font-bold text-amber-200 group-hover:text-amber-50 mb-1 transition-all duration-300">
           {value.toLocaleString()}
         </div>
         
         {/* Title */}
-        <div className="text-xs text-amber-300/80 font-light tracking-wide mb-1"
-             style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+        <div 
+          className="stat-title text-xs text-amber-300 group-hover:text-amber-100 font-medium transition-all duration-300"
+          style={{ 
+            fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif"
+          }}
+        >
           {title}
         </div>
         
         {/* Subtitle */}
         {subtitle && (
-          <div className="text-xs text-amber-300/60 font-light tracking-wide">
+          <div className="text-xs text-amber-400/70 group-hover:text-amber-200/80 mt-1 transition-all duration-300">
             {subtitle}
           </div>
         )}
       </div>
+      
+      {/* Drop shadow effect */}
+      <div 
+        className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+        style={{
+          ...octagonalClipPath,
+          filter: 'drop-shadow(0 4px 12px rgba(139, 92, 246, 0.2))'
+        }}
+      />
     </div>
   );
 };

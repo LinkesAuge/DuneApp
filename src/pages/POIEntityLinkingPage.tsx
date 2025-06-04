@@ -30,12 +30,23 @@ const POIEntityLinkingPage: React.FC = () => {
   // Panel visibility state with localStorage persistence
   const [panelState, setPanelState] = useState<PanelState>(() => {
     const saved = localStorage.getItem('poi-linking-panel-state');
-    return saved ? JSON.parse(saved) : {
+    const defaultState = {
       filters: true,
       pois: true,
-      entities: true,
+      entities: true, // Always start with entities expanded
       summary: true
     };
+    
+    if (saved) {
+      const parsedState = JSON.parse(saved);
+      // Always ensure entities starts expanded on page load, regardless of saved state
+      return {
+        ...parsedState,
+        entities: true
+      };
+    }
+    
+    return defaultState;
   });
 
   // Persist panel state to localStorage

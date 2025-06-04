@@ -42,12 +42,12 @@ function formatEntityWithRelations(entity: any) {
 export interface CreatePOIEntityLinkData {
   poi_id: string;
   entity_id: string;
-  quantity: number;
 }
 
 // Interface for updating existing POI-entity links
 export interface UpdatePOIEntityLinkData {
-  quantity?: number;
+  // Currently no updatable fields besides audit trail
+  // Future: could add notes, tags, etc.
 }
 
 // Interface for bulk linking operations
@@ -55,7 +55,6 @@ export interface BulkLinkData {
   poi_id: string;
   entity_links: Array<{
     entity_id: string;
-    quantity: number;
   }>;
 }
 
@@ -75,10 +74,6 @@ export const poiEntityLinksAPI = {
 
       if (!linkData.entity_id?.trim()) {
         throw new POIEntityLinkAPIError('Entity ID is required', 'VALIDATION_ERROR');
-      }
-
-      if (!linkData.quantity || linkData.quantity <= 0) {
-        throw new POIEntityLinkAPIError('Quantity must be greater than 0', 'VALIDATION_ERROR');
       }
 
       // Check if link already exists
@@ -101,7 +96,6 @@ export const poiEntityLinksAPI = {
         .insert([{
           poi_id: linkData.poi_id,
           entity_id: linkData.entity_id,
-          quantity: linkData.quantity,
           added_by: userId,
           added_at: new Date().toISOString()
         }])
@@ -137,9 +131,6 @@ export const poiEntityLinksAPI = {
         if (!link.entity_id?.trim()) {
           throw new POIEntityLinkAPIError('All entity IDs are required', 'VALIDATION_ERROR');
         }
-        if (!link.quantity || link.quantity <= 0) {
-          throw new POIEntityLinkAPIError('All quantities must be greater than 0', 'VALIDATION_ERROR');
-        }
       }
 
       // Check for existing links
@@ -162,7 +153,6 @@ export const poiEntityLinksAPI = {
       const insertData = bulkData.entity_links.map(link => ({
         poi_id: bulkData.poi_id,
         entity_id: link.entity_id,
-        quantity: link.quantity,
         added_by: userId,
         added_at: new Date().toISOString()
       }));
@@ -341,9 +331,7 @@ export const poiEntityLinksAPI = {
         throw new POIEntityLinkAPIError('Both POI ID and Entity ID are required', 'VALIDATION_ERROR');
       }
 
-      if (updates.quantity !== undefined && updates.quantity <= 0) {
-        throw new POIEntityLinkAPIError('Quantity must be greater than 0', 'VALIDATION_ERROR');
-      }
+
 
       const { data, error } = await supabase
         .from('poi_entity_links')

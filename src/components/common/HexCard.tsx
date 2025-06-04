@@ -1,5 +1,5 @@
 import React from 'react';
-import DiamondIcon from './DiamondIcon'; // Import DiamondIcon
+import DiamondIcon from './DiamondIcon';
 
 interface HexCardProps {
   children?: React.ReactNode;
@@ -34,7 +34,7 @@ const HexCard: React.FC<HexCardProps> = ({
     lg: "p-8 min-h-[200px]"
   };
 
-  // Octagonal clip path with more elegant angles
+  // Clean octagonal clip path
   const octagonalClipPath = {
     clipPath: "polygon(25px 0%, calc(100% - 25px) 0%, 100% 25px, 100% calc(100% - 25px), calc(100% - 25px) 100%, 25px 100%, 0% calc(100% - 25px), 0% 25px)"
   };
@@ -44,33 +44,25 @@ const HexCard: React.FC<HexCardProps> = ({
       case 'feature':
         return {
           background: 'from-slate-950 via-slate-900 to-slate-950',
-          backgroundSecondary: 'from-slate-950 via-slate-900 to-slate-950',
-          border: 'from-amber-400/60 via-amber-300/80 to-amber-400/60',
-          borderHover: 'from-amber-300/80 via-amber-200/90 to-amber-300/80'
+          border: 'from-amber-400/70 via-amber-300/85 to-amber-400/70',
+          borderHover: 'from-amber-300/85 via-amber-200/95 to-amber-300/85'
         };
       case 'secondary':
         return {
           background: 'from-slate-950 via-slate-900 to-slate-950',
-          backgroundSecondary: 'from-slate-950 via-slate-900 to-slate-950',
-          border: 'from-amber-400/50 via-amber-300/70 to-amber-400/50',
-          borderHover: 'from-amber-300/70 via-amber-200/80 to-amber-300/70'
+          border: 'from-amber-400/65 via-amber-300/80 to-amber-400/65',
+          borderHover: 'from-amber-300/80 via-amber-200/90 to-amber-300/80'
         };
       default: // primary
         return {
           background: 'from-slate-950 via-slate-900 to-slate-950',
-          backgroundSecondary: 'from-slate-950 via-slate-900 to-slate-950',
-          border: 'from-amber-400/55 via-amber-300/75 to-amber-400/55',
+          border: 'from-amber-400/60 via-amber-300/75 to-amber-400/60',
           borderHover: 'from-amber-300/75 via-amber-200/85 to-amber-300/75'
         };
     }
   };
 
   const styles = getVariantStyles();
-
-  // Determine DiamondIcon size based on HexCard's size
-  // HexCard size: 'sm', 'md', 'lg'. DiamondIcon size: 'sm', 'md', 'lg', 'xl'.
-  // We'll map HexCard's size directly to DiamondIcon's size.
-  const diamondIconSize: 'sm' | 'md' | 'lg' = size;
 
   return (
     <div 
@@ -81,9 +73,9 @@ const HexCard: React.FC<HexCardProps> = ({
         if (!hoverable) return;
         
         // Purple overlay effect
-        const purpleOverlay = e.currentTarget.querySelector('.absolute.inset-0\\.5.transition-all') as HTMLElement;
+        const purpleOverlay = e.currentTarget.querySelector('.purple-hover-overlay') as HTMLElement;
         if (purpleOverlay) {
-          purpleOverlay.style.background = 'radial-gradient(ellipse at center top, rgba(139, 92, 246, 0.15) 0%, rgba(124, 58, 237, 0.08) 40%, transparent 70%)';
+          purpleOverlay.style.background = 'radial-gradient(circle at center, rgba(139, 92, 246, 0.08) 0%, rgba(124, 58, 237, 0.04) 70%, transparent 100%)';
         }
         
         // Text glow effects
@@ -93,7 +85,7 @@ const HexCard: React.FC<HexCardProps> = ({
         }
         
         // Underline animation with purple glow
-        const underline = e.currentTarget.querySelector('.absolute.bottom-4') as HTMLElement;
+        const underline = e.currentTarget.querySelector('.animated-underline') as HTMLElement;
         if (underline) {
           underline.style.width = '80%';
           underline.style.boxShadow = '0 0 12px rgba(139, 92, 246, 0.6)';
@@ -103,9 +95,9 @@ const HexCard: React.FC<HexCardProps> = ({
         if (!hoverable) return;
         
         // Reset purple overlay
-        const purpleOverlay = e.currentTarget.querySelector('.absolute.inset-0\\.5.transition-all') as HTMLElement;
+        const purpleOverlay = e.currentTarget.querySelector('.purple-hover-overlay') as HTMLElement;
         if (purpleOverlay) {
-          purpleOverlay.style.background = 'radial-gradient(ellipse at center top, rgba(139, 92, 246, 0) 0%, rgba(124, 58, 237, 0) 40%, transparent 70%)';
+          purpleOverlay.style.background = 'radial-gradient(circle at center, rgba(139, 92, 246, 0) 0%, rgba(124, 58, 237, 0) 70%, transparent 100%)';
         }
         
         // Reset text glow effects
@@ -115,58 +107,71 @@ const HexCard: React.FC<HexCardProps> = ({
         }
         
         // Reset underline animation
-        const underline = e.currentTarget.querySelector('.absolute.bottom-4') as HTMLElement;
+        const underline = e.currentTarget.querySelector('.animated-underline') as HTMLElement;
         if (underline) {
           underline.style.width = '0%';
           underline.style.boxShadow = '0 0 8px rgba(139, 92, 246, 0)';
         }
       }}
     >
-      {/* Dark blue to nearly black background - no whitish tint */}
+      {/* Very dark background - almost black like in facelift1.jpg */}
       <div 
-        className={`absolute inset-0 bg-gradient-to-r ${styles.background}`}
-        style={octagonalClipPath}
+        className="absolute inset-0"
+        style={{
+          ...octagonalClipPath,
+          backgroundColor: 'rgb(8, 15, 32)' // Very dark blue, almost black
+        }}
       />
       
-      {/* Elegant sandy border - fine and bright */}
+      {/* Elegant golden border - matching screenshot */}
       <div 
         className={`absolute inset-0 bg-gradient-to-r ${styles.border} ${hoverable ? `group-hover:${styles.borderHover}` : ''} transition-all duration-300`}
         style={{
           ...octagonalClipPath,
-          padding: '1px' // Thinner, more elegant border
+          padding: '2px' // Clean border thickness
         }}
       />
       
-      {/* Inner dark background */}
+      {/* Inner dark background - clean and minimal */}
       <div 
-        className={`absolute inset-0.5 bg-gradient-to-r ${styles.backgroundSecondary}`}
-        style={octagonalClipPath}
+        className="absolute inset-[2px]"
+        style={{
+          ...octagonalClipPath,
+          backgroundColor: 'rgb(8, 12, 20)' // Dark purple-tinted background
+        }}
       />
       
-      {/* Light purple overlay on hover - navbar style */}
+      {/* Very subtle sandy gradient overlay - barely visible */}
+      <div 
+        className="absolute inset-[2px]"
+        style={{
+          ...octagonalClipPath,
+          background: 'linear-gradient(to right, rgba(0, 0, 0, 0) 0%, rgba(194, 154, 108, 0.02) 50%, rgba(0, 0, 0, 0) 100%)'
+        }}
+      />
+      
+      {/* Light purple overlay on hover - elegant effect */}
       {hoverable && (
         <div 
-          className="absolute inset-0.5 transition-all duration-300"
+          className="purple-hover-overlay absolute inset-[2px] transition-all duration-300"
           style={{
             ...octagonalClipPath,
-            background: 'radial-gradient(ellipse at center top, rgba(139, 92, 246, 0) 0%, rgba(124, 58, 237, 0) 40%, transparent 70%)'
+            background: 'radial-gradient(circle at center, rgba(139, 92, 246, 0) 0%, rgba(124, 58, 237, 0) 70%, transparent 100%)'
           }}
         />
       )}
       
       {/* Content */}
       <div className="relative z-10 h-full flex flex-col justify-center">
-        {/* Custom children content */}
         {children}
         
-        {/* Standard card layout */}
         {(icon || title || subtitle || description) && (
           <div className="text-center">
             {icon && (
               <div className="flex justify-center mb-3">
                 <DiamondIcon 
                   icon={icon} 
-                  size={diamondIconSize}
+                  size={size}
                   bgColor="bg-void-950"
                   actualBorderColor="bg-gold-300" 
                   borderThickness={1}
@@ -177,21 +182,23 @@ const HexCard: React.FC<HexCardProps> = ({
             )}
             
             {title && (
-              <h3 className="text-lg font-light text-amber-200 group-hover:text-amber-50 mb-2 tracking-wide transition-all duration-300 group-hover:drop-shadow-lg" 
-              style={{ 
-                fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif"
-              }}
+              <h3 className="text-lg font-medium text-amber-200 group-hover:text-amber-50 mb-2 tracking-wide transition-all duration-300" 
+                style={{ 
+                  fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif"
+                }}
               >
                 {title}
               </h3>
             )}
             
             {subtitle && (
-              <div className="text-sm text-amber-300 group-hover:text-amber-100 tracking-widest uppercase mb-2 transition-all duration-300">{subtitle}</div>
+              <div className="text-sm text-amber-400/70 group-hover:text-amber-200 tracking-widest uppercase mb-2 transition-all duration-300">
+                {subtitle}
+              </div>
             )}
             
             {description && (
-              <p className="text-amber-300/80 group-hover:text-amber-200/90 leading-relaxed font-light text-sm transition-all duration-300">
+              <p className="text-amber-400/60 group-hover:text-amber-300/80 leading-relaxed font-light text-sm transition-all duration-300">
                 {description}
               </p>
             )}
@@ -199,10 +206,10 @@ const HexCard: React.FC<HexCardProps> = ({
         )}
       </div>
       
-      {/* Animated underline - navbar style with purple colors */}
+      {/* Animated underline - elegant purple effect */}
       {hoverable && (
         <div 
-          className="absolute bottom-4 left-8 right-8 h-0.5 bg-gradient-to-r from-transparent via-violet-400/0 to-transparent group-hover:via-violet-400/80 transition-all duration-700 ease-out"
+          className="animated-underline absolute bottom-4 h-0.5 bg-gradient-to-r from-transparent via-violet-400/0 to-transparent group-hover:via-violet-400/80 transition-all duration-700 ease-out"
           style={{
             clipPath: "polygon(20% 0%, 80% 0%, 80% 100%, 20% 100%)",
             width: '0%',

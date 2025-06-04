@@ -192,12 +192,16 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ limit = 20 }) => {
 
           let poi = null;
           if (comment.poi_id) {
-            const { data } = await supabase
+            const { data, error } = await supabase
               .from('pois')
               .select('title')
               .eq('id', comment.poi_id)
-              .single();
-            poi = data;
+              .maybeSingle();
+            
+            // Only use POI data if query was successful and POI exists
+            if (!error && data) {
+              poi = data;
+            }
           }
 
           activities.push({
@@ -221,12 +225,16 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ limit = 20 }) => {
 
             let poi = null;
             if (comment.poi_id) {
-              const { data } = await supabase
+              const { data, error } = await supabase
                 .from('pois')
                 .select('title')
                 .eq('id', comment.poi_id)
-                .single();
-              poi = data;
+                .maybeSingle();
+              
+              // Only use POI data if query was successful and POI exists
+              if (!error && data) {
+                poi = data;
+              }
             }
 
             activities.push({
@@ -320,15 +328,31 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ limit = 20 }) => {
 
   const ActivityItemComponent: React.FC<{ activity: EnhancedActivityItem }> = ({ activity }) => (
     <div className="group relative">
-      {/* Multi-layer background system */}
-      <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 rounded-lg" />
-      <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-800/40 to-slate-900/60 rounded-lg" />
+      {/* Golden border */}
+      <div className="absolute inset-0 bg-amber-400/60 group-hover:bg-amber-300/70 transition-all duration-300 rounded-lg" />
+      
+      {/* Dark purple-tinted background */}
+      <div 
+        className="absolute inset-0.5 rounded-lg"
+        style={{ backgroundColor: 'rgb(8, 12, 20)' }}
+      />
+      
+      {/* Very subtle sandy gradient overlay */}
+      <div 
+        className="absolute inset-0.5 rounded-lg"
+        style={{
+          background: 'linear-gradient(to right, rgba(0, 0, 0, 0) 0%, rgba(194, 154, 108, 0.02) 50%, rgba(0, 0, 0, 0) 100%)'
+        }}
+      />
       
       {/* Interactive purple overlay */}
-      <div className="absolute inset-0 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 ease-in-out bg-gradient-to-r from-violet-600/5 via-violet-700/3 to-transparent" />
+      <div className="absolute inset-0.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 ease-in-out"
+           style={{
+             background: 'radial-gradient(circle at center, rgba(139, 92, 246, 0.06) 0%, rgba(124, 58, 237, 0.03) 70%, transparent 100%)'
+           }} />
       
       {/* Content */}
-      <div className="relative p-4 rounded-lg border border-amber-400/10 hover:border-amber-300/20 transition-all duration-300">
+      <div className="relative p-4 rounded-lg transition-all duration-300">
         <div className="flex items-start gap-3">
           <DiamondIcon
             icon={getActivityIcon(activity.icon)}
@@ -399,8 +423,12 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ limit = 20 }) => {
       <div className="space-y-4">
         {[...Array(5)].map((_, i) => (
           <div key={i} className="group relative">
-            <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 rounded-lg" />
-            <div className="relative p-4 rounded-lg border border-amber-400/10">
+            <div className="absolute inset-0 bg-amber-400/60 rounded-lg" />
+            <div 
+              className="absolute inset-0.5 rounded-lg"
+              style={{ backgroundColor: 'rgb(8, 12, 20)' }}
+            />
+            <div className="relative p-4 rounded-lg">
               <div className="flex items-start gap-3">
                 <div className="w-12 h-12 bg-amber-400/10 rounded-lg animate-pulse" />
                 <div className="flex-1 space-y-2">
@@ -419,8 +447,12 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ limit = 20 }) => {
   if (error) {
     return (
       <div className="group relative">
-        <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 rounded-lg" />
-        <div className="relative p-6 rounded-lg border border-red-400/20 text-center">
+        <div className="absolute inset-0 bg-red-400/60 rounded-lg" />
+        <div 
+          className="absolute inset-0.5 rounded-lg"
+          style={{ backgroundColor: 'rgb(8, 12, 20)' }}
+        />
+        <div className="relative p-6 rounded-lg text-center">
           <DiamondIcon
             icon={<Clock size={16} strokeWidth={1.5} />}
             size="sm"
@@ -439,8 +471,12 @@ const ActivityFeed: React.FC<ActivityFeedProps> = ({ limit = 20 }) => {
   if (activities.length === 0) {
     return (
       <div className="group relative">
-        <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 rounded-lg" />
-        <div className="relative p-8 rounded-lg border border-amber-400/10 text-center">
+        <div className="absolute inset-0 bg-amber-400/60 rounded-lg" />
+        <div 
+          className="absolute inset-0.5 rounded-lg"
+          style={{ backgroundColor: 'rgb(8, 12, 20)' }}
+        />
+        <div className="relative p-8 rounded-lg text-center">
           <DiamondIcon
             icon={<Eye size={16} strokeWidth={1.5} />}
             size="sm"

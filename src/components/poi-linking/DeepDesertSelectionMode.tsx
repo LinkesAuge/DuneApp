@@ -261,18 +261,18 @@ const DeepDesertSelectionMode: React.FC<DeepDesertSelectionModeProps> = ({
                         }}
                         onClick={(event) => handlePoiClick(poi, event)}
                       >
-                        {/* Selection overlay */}
+                        {/* Enhanced Selection overlay */}
                         <div className={`
-                          relative rounded-full transition-all
+                          relative rounded-full transition-all duration-300
                           ${isSelected 
-                            ? 'ring-4 ring-amber-400 bg-amber-400/20' 
-                            : 'hover:ring-2 hover:ring-amber-300/50'
+                            ? 'ring-4 ring-amber-400/80 bg-amber-400/20 scale-110 shadow-lg' 
+                            : 'hover:ring-2 hover:ring-amber-300/60 hover:scale-105'
                           }
                         `}>
-                          {/* Selection checkbox */}
+                          {/* Enhanced Selection checkbox */}
                           {isSelected && (
-                            <div className="absolute -top-2 -right-2 w-6 h-6 bg-amber-400 border-2 border-white rounded-full flex items-center justify-center z-30">
-                              <Check className="w-3 h-3 text-slate-900" />
+                            <div className="absolute -top-2 -right-2 w-8 h-8 bg-gradient-to-br from-green-400 to-green-600 border-3 border-white rounded-full flex items-center justify-center z-30 shadow-xl animate-pulse ring-2 ring-green-300/50">
+                              <Check className="w-5 h-5 text-white drop-shadow-md font-bold" strokeWidth={3} />
                             </div>
                           )}
                           

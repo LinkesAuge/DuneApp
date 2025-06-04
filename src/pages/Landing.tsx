@@ -77,19 +77,19 @@ const Landing: React.FC = () => {
                   <HexButton 
                     to="/dashboard" 
                     icon={<BarChart3 size={18} strokeWidth={1.5} />}
-                    size="md"
+                    size="lg"
                     variant="primary"
                   >
-                    View Dashboard
+                    VIEW DASHBOARD
                   </HexButton>
                   
                   <HexButton 
                     to="/deep-desert" 
                     icon={<Pyramid size={18} strokeWidth={1.5} />}
-                    size="md"
+                    size="lg"
                     variant="secondary"
                   >
-                    Enter Deep Desert
+                    ENTER DEEP DESERT
                   </HexButton>
                 </>
               ) : (
@@ -99,7 +99,7 @@ const Landing: React.FC = () => {
                   size="lg"
                   variant="primary"
                 >
-                  Begin Expedition
+                  BEGIN EXPEDITION
                 </HexButton>
               )}
             </div>
@@ -347,19 +347,19 @@ const Landing: React.FC = () => {
                 <HexButton 
                   to="/dashboard" 
                   icon={<BarChart3 size={20} strokeWidth={1.5} />}
-                  size="md"
+                  size="lg"
                   variant="primary"
                 >
-                  Command Center
+                  COMMAND CENTER
                 </HexButton>
                 
                 <HexButton 
                   to="/deep-desert" 
                   icon={<Map size={20} strokeWidth={1.5} />}
-                  size="md"
+                  size="lg"
                   variant="secondary"
                 >
-                  Explore Desert
+                  EXPLORE DESERT
                 </HexButton>
               </>
             ) : (
