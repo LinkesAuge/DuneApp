@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronDown, ChevronRight, Package, FileText, ExternalLink, Link2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Package, FileText, ExternalLink, Scroll } from 'lucide-react';
 import { getPoiWithEntities } from '../../lib/api/poi-entity-links';
 import { PoiWithItems, ItemWithRelations, SchematicWithRelations } from '../../types';
 import { useNavigate } from 'react-router-dom';
@@ -42,11 +42,11 @@ const LinkedItemsSection: React.FC<LinkedItemsSectionProps> = ({
   }, [poiId]);
 
   const navigateToItem = (itemId: string) => {
-    navigate(`/items/${itemId}`);
+    navigate(`/database`);
   };
 
   const navigateToSchematic = (schematicId: string) => {
-    navigate(`/schematics/${schematicId}`);
+    navigate(`/database`);
   };
 
   const canShowLinkButton = () => {
@@ -95,7 +95,10 @@ const LinkedItemsSection: React.FC<LinkedItemsSectionProps> = ({
             <div className="flex items-center gap-2 mb-1">
               <h4 className="font-medium text-amber-100 truncate">{item.name}</h4>
               <button
-                onClick={() => navigateToItem(item.id)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigateToItem(item.id);
+                }}
                 className="p-1 text-amber-200/60 hover:text-amber-200 transition-colors flex-shrink-0"
                 title="View item details"
               >
@@ -165,7 +168,10 @@ const LinkedItemsSection: React.FC<LinkedItemsSectionProps> = ({
             <div className="flex items-center gap-2 mb-1">
               <h4 className="font-medium text-amber-100 truncate">{schematic.name}</h4>
               <button
-                onClick={() => navigateToSchematic(schematic.id)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigateToSchematic(schematic.id);
+                }}
                 className="p-1 text-amber-200/60 hover:text-amber-200 transition-colors flex-shrink-0"
                 title="View schematic details"
               >
@@ -225,20 +231,23 @@ const LinkedItemsSection: React.FC<LinkedItemsSectionProps> = ({
     <div className={className}>
       {/* Linked Items Section */}
       {hasLinkedItems && (
-        <div className="mb-4">
+        <div className="mb-3">
           <button
-            onClick={() => setItemsExpanded(!itemsExpanded)}
-            className="w-full flex items-center justify-between p-3 bg-slate-700/50 border border-slate-600 rounded-lg hover:bg-slate-700/70 transition-colors"
+            onClick={(e) => {
+              e.stopPropagation();
+              setItemsExpanded(!itemsExpanded);
+            }}
+            className="w-full flex items-center justify-between p-2 bg-slate-700/50 border border-slate-600 rounded hover:bg-slate-700/70 transition-colors"
           >
             <div className="flex items-center gap-2">
-              <Package className="w-4 h-4 text-green-400" />
-              <span className="font-medium text-amber-200">Linked Items</span>
-              <span className="text-sm text-amber-200/60">({linkedItems.length})</span>
+              <Package className="w-3.5 h-3.5 text-blue-400" />
+              <span className="text-sm font-medium text-amber-200">Linked Items</span>
+              <span className="text-xs text-amber-200/60">({linkedItems.length})</span>
             </div>
             {itemsExpanded ? (
-              <ChevronDown className="w-4 h-4 text-amber-200/60" />
+              <ChevronDown className="w-3.5 h-3.5 text-amber-200/60" />
             ) : (
-              <ChevronRight className="w-4 h-4 text-amber-200/60" />
+              <ChevronRight className="w-3.5 h-3.5 text-amber-200/60" />
             )}
           </button>
           
@@ -254,18 +263,21 @@ const LinkedItemsSection: React.FC<LinkedItemsSectionProps> = ({
       {hasLinkedSchematics && (
         <div>
           <button
-            onClick={() => setSchematicsExpanded(!schematicsExpanded)}
-            className="w-full flex items-center justify-between p-3 bg-slate-700/50 border border-slate-600 rounded-lg hover:bg-slate-700/70 transition-colors"
+            onClick={(e) => {
+              e.stopPropagation();
+              setSchematicsExpanded(!schematicsExpanded);
+            }}
+            className="w-full flex items-center justify-between p-2 bg-slate-700/50 border border-slate-600 rounded hover:bg-slate-700/70 transition-colors"
           >
             <div className="flex items-center gap-2">
-              <FileText className="w-4 h-4 text-blue-400" />
-              <span className="font-medium text-amber-200">Linked Schematics</span>
-              <span className="text-sm text-amber-200/60">({linkedSchematics.length})</span>
+              <Scroll className="w-3.5 h-3.5 text-purple-400" />
+              <span className="text-sm font-medium text-amber-200">Linked Schematics</span>
+              <span className="text-xs text-amber-200/60">({linkedSchematics.length})</span>
             </div>
             {schematicsExpanded ? (
-              <ChevronDown className="w-4 h-4 text-amber-200/60" />
+              <ChevronDown className="w-3.5 h-3.5 text-amber-200/60" />
             ) : (
-              <ChevronRight className="w-4 h-4 text-amber-200/60" />
+              <ChevronRight className="w-3.5 h-3.5 text-amber-200/60" />
             )}
           </button>
           

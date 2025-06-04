@@ -8,13 +8,13 @@ import {
   Package, 
   FileText, 
   Plus, 
-  Edit, 
   Trash, 
   Trash2,
   ExternalLink, 
   Link2,
   Loader2,
-  MapPin
+  MapPin,
+  Scroll
 } from 'lucide-react';
 import { EntityWithRelations, POIEntityLinkWithDetails } from '../../types/unified-entities';
 import { useTiers } from '../../hooks/useTiers';
@@ -54,10 +54,6 @@ const LinkedEntitiesSection: React.FC<LinkedEntitiesSectionProps> = ({
   useEffect(() => {
     console.log('LinkedEntitiesSection: showLinkingModal changed to:', showLinkingModal);
   }, [showLinkingModal]);
-  const [editingLink, setEditingLink] = useState<string | null>(null);
-  const [editQuantity, setEditQuantity] = useState<number>(1);
-  const [editNotes, setEditNotes] = useState<string>('');
-
   // Load entity links
   useEffect(() => {
     loadEntityLinks();
@@ -86,33 +82,7 @@ const LinkedEntitiesSection: React.FC<LinkedEntitiesSectionProps> = ({
   const linkedItems = entityLinks.filter(link => link.entity && !link.entity.is_schematic);
   const linkedSchematics = entityLinks.filter(link => link.entity && link.entity.is_schematic);
 
-  // Handle link editing
-  const startEditingLink = (link: POIEntityLinkWithDetails) => {
-    setEditingLink(`${link.poi_id}-${link.entity_id}`);
-    setEditQuantity(link.quantity);
-    setEditNotes(link.notes || '');
-  };
 
-  const cancelEditingLink = () => {
-    setEditingLink(null);
-    setEditQuantity(1);
-    setEditNotes('');
-  };
-
-  const saveEditingLink = async (poiId: string, entityId: string) => {
-    try {
-      await poiEntityLinksAPI.updatePOIEntityLink(poiId, entityId, {
-        quantity: editQuantity,
-        notes: editNotes.trim() || undefined
-      });
-      
-      setEditingLink(null);
-      loadEntityLinks();
-      onLinksChanged?.();
-    } catch (error) {
-      console.error('Failed to update entity link:', error);
-    }
-  };
 
   // Handle link deletion
   const removeEntityLink = async (poiId: string, entityId: string) => {
@@ -138,7 +108,6 @@ const LinkedEntitiesSection: React.FC<LinkedEntitiesSectionProps> = ({
     if (!link.entity) return null;
     
     const entity = link.entity;
-    const isEditing = editingLink === `${link.poi_id}-${link.entity_id}`;
     const tierName = getTierName(entity.tier_number);
 
     return (
@@ -178,8 +147,8 @@ const LinkedEntitiesSection: React.FC<LinkedEntitiesSectionProps> = ({
               <div className="flex flex-wrap gap-1 mb-2">
                 <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
                   entity.is_schematic 
-                    ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' 
-                    : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                    ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' 
+                    : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
                 }`}>
                   {entity.is_schematic ? 'Schematic' : 'Item'}
                 </span>
@@ -194,7 +163,7 @@ const LinkedEntitiesSection: React.FC<LinkedEntitiesSectionProps> = ({
                 
                 {entity.tier_number > 0 && (
                   <span className="text-xs px-1.5 py-0.5 bg-slate-700 text-amber-300 rounded font-medium border border-slate-600">
-                    T{entity.tier_number}
+                    {getTierName(entity.tier_number)}
                   </span>
                 )}
                 
@@ -205,66 +174,7 @@ const LinkedEntitiesSection: React.FC<LinkedEntitiesSectionProps> = ({
                 )}
               </div>
 
-              {/* Link Details */}
-              <div className="bg-slate-800/50 rounded p-2 mb-2">
-                {isEditing ? (
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <label className="text-xs text-amber-200/80 min-w-0 flex-shrink-0">Quantity:</label>
-                      <input
-                        type="number"
-                        min="1"
-                        value={editQuantity}
-                        onChange={(e) => setEditQuantity(parseInt(e.target.value) || 1)}
-                        className="w-20 px-2 py-1 text-xs bg-slate-700 border border-slate-600 rounded text-amber-100 focus:outline-none focus:border-amber-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-amber-200/80 mb-1">Notes:</label>
-                      <input
-                        type="text"
-                        placeholder="Optional notes..."
-                        value={editNotes}
-                        onChange={(e) => setEditNotes(e.target.value)}
-                        className="w-full px-2 py-1 text-xs bg-slate-700 border border-slate-600 rounded text-amber-100 placeholder-amber-200/30 focus:outline-none focus:border-amber-500"
-                      />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => saveEditingLink(link.poi_id, link.entity_id)}
-                        className="px-2 py-1 text-xs bg-amber-600 hover:bg-amber-500 text-white rounded transition-colors"
-                      >
-                        Save
-                      </button>
-                      <button
-                        onClick={cancelEditingLink}
-                        className="px-2 py-1 text-xs text-amber-200 hover:text-amber-100 transition-colors"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-xs space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span className="text-amber-200/60">Quantity:</span>
-                      <span className="text-amber-200 font-medium">{link.quantity}</span>
-                    </div>
-                    {link.notes && (
-                      <div className="flex items-start justify-between">
-                        <span className="text-amber-200/60 flex-shrink-0 mr-2">Notes:</span>
-                        <span className="text-amber-200/80 text-right">{link.notes}</span>
-                      </div>
-                    )}
-                    {link.assignment_source && (
-                      <div className="flex items-center justify-between">
-                        <span className="text-amber-200/60">Source:</span>
-                        <span className="text-amber-200/60 capitalize">{link.assignment_source.replace('_', ' ')}</span>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
+
               
               {/* Entity Description */}
               {entity.description && (
@@ -274,15 +184,8 @@ const LinkedEntitiesSection: React.FC<LinkedEntitiesSectionProps> = ({
           </div>
 
           {/* Actions */}
-          {canEdit && !isEditing && (
+          {canEdit && (
             <div className="flex items-center gap-0.5 ml-2">
-              <button
-                onClick={() => startEditingLink(link)}
-                className="p-1 hover:bg-slate-700/50 rounded text-amber-400/70 hover:text-amber-300 transition-colors"
-                title="Edit link"
-              >
-                <Edit className="w-3 h-3" />
-              </button>
               <button
                 onClick={() => removeEntityLink(link.poi_id, link.entity_id)}
                 className="p-1 hover:bg-slate-700/50 rounded text-red-400/70 hover:text-red-400 transition-colors"
@@ -371,10 +274,10 @@ const LinkedEntitiesSection: React.FC<LinkedEntitiesSectionProps> = ({
             <div>
               <button
                 onClick={() => setSchematicsExpanded(!schematicsExpanded)}
-                className="flex items-center gap-2 text-amber-200 hover:text-amber-100 transition-colors mb-2"
+                className="flex items-center gap-2 text-purple-300 hover:text-purple-200 transition-colors mb-2"
               >
                 {schematicsExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                <FileText className="w-4 h-4" />
+                <Scroll className="w-4 h-4" />
                 <span className="text-sm font-medium">Schematics ({linkedSchematics.length})</span>
               </button>
               

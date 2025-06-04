@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { entitiesAPI, EntityAPIError } from '../../lib/api/entities';
 import type { EntityWithRelations, EntityStats } from '../../types/unified-entities';
+import { useTiers } from '../../hooks/useTiers';
 
 const EntitiesAPITest: React.FC = () => {
   const [entities, setEntities] = useState<EntityWithRelations[]>([]);
@@ -9,6 +10,7 @@ const EntitiesAPITest: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [testResults, setTestResults] = useState<string[]>([]);
+  const { getTierName } = useTiers();
 
   useEffect(() => {
     runTests();
@@ -40,7 +42,7 @@ const EntitiesAPITest: React.FC = () => {
       const itemsResponse = await entitiesAPI.getAll({ is_schematic: false, limit: 5 });
       results.push(`✅ Success! Found ${itemsResponse.data.length} items`);
       itemsResponse.data.forEach((item, idx) => {
-        results.push(`   ${idx + 1}. ${item.name} (Tier ${item.tier_number}, ${item.category?.name})`);
+        results.push(`   ${idx + 1}. ${item.name} (${getTierName(item.tier_number)}, ${item.category?.name})`);
       });
       results.push('');
 
@@ -49,7 +51,7 @@ const EntitiesAPITest: React.FC = () => {
       const schematicsResponse = await entitiesAPI.getAll({ is_schematic: true, limit: 5 });
       results.push(`✅ Success! Found ${schematicsResponse.data.length} schematics`);
       schematicsResponse.data.forEach((schematic, idx) => {
-        results.push(`   ${idx + 1}. ${schematic.name} (Tier ${schematic.tier_number}, ${schematic.category?.name})`);
+        results.push(`   ${idx + 1}. ${schematic.name} (${getTierName(schematic.tier_number)}, ${schematic.category?.name})`);
       });
       results.push('');
 
@@ -166,7 +168,7 @@ const EntitiesAPITest: React.FC = () => {
                     </span>
                   </div>
                   <div className="text-sm text-amber-200/60 mt-1">
-                    {entity.category?.name} • Tier {entity.tier_number}
+                    {entity.category?.name} • {getTierName(entity.tier_number)}
                   </div>
                 </div>
               ))}

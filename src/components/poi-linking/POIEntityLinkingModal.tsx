@@ -2,12 +2,15 @@
 // Allows users to search and link entities to a specific POI
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { Search, Plus, Package, FileText, X, LinkIcon, Loader2, Check } from 'lucide-react';
 import { EntityWithRelations } from '../../types/unified-entities';
 import { useTiers } from '../../hooks/useTiers';
+import { usePagination } from '../../hooks/usePagination';
 import { entitiesAPI } from '../../lib/api/entities';
 import { poiEntityLinksAPI, CreatePOIEntityLinkData } from '../../lib/api/poi-entity-links';
 import { ImagePreview } from '../shared/ImagePreview';
+import PaginationControls from '../shared/PaginationControls';
 import { useAuth } from '../auth/AuthProvider';
 
 interface POIEntityLinkingModalProps {
@@ -21,8 +24,6 @@ interface POIEntityLinkingModalProps {
 
 interface EntityLinkData {
   entity: EntityWithRelations;
-  quantity: number;
-  notes: string;
   isSelected: boolean;
 }
 
@@ -91,7 +92,7 @@ const POIEntityLinkingModal: React.FC<POIEntityLinkingModalProps> = ({
   const loadEntities = async () => {
     try {
       setLoading(true);
-      const response = await entitiesAPI.getAll({ limit: 100 });
+      const response = await entitiesAPI.getAll(); // Remove limit to get all entities
       setEntities(response.data);
     } catch (error) {
       console.error('Failed to load entities:', error);
@@ -148,6 +149,14 @@ const POIEntityLinkingModal: React.FC<POIEntityLinkingModalProps> = ({
     return filtered.sort((a, b) => a.name.localeCompare(b.name));
   }, [entities, searchTerm, selectedCategory, selectedType, selectedTier, entityClassFilter, existingEntityIds]);
 
+  // Add pagination
+  const pagination = usePagination(filteredEntities, {
+    itemsPerPage: 20, // Start with 20 items per page for good performance
+    persistInUrl: false
+  });
+
+  const paginatedEntities = pagination.paginatedData(filteredEntities);
+
   // Handle entity selection
   const toggleEntitySelection = (entity: EntityWithRelations) => {
     const newLinks = new Map(entityLinks);
@@ -157,8 +166,6 @@ const POIEntityLinkingModal: React.FC<POIEntityLinkingModalProps> = ({
     } else {
       newLinks.set(entity.id, {
         entity,
-        quantity: 1,
-        notes: '',
         isSelected: true
       });
     }
@@ -166,29 +173,7 @@ const POIEntityLinkingModal: React.FC<POIEntityLinkingModalProps> = ({
     setEntityLinks(newLinks);
   };
 
-  // Update quantity for selected entity
-  const updateEntityQuantity = (entityId: string, quantity: number) => {
-    const newLinks = new Map(entityLinks);
-    const linkData = newLinks.get(entityId);
-    
-    if (linkData && quantity > 0) {
-      linkData.quantity = quantity;
-      newLinks.set(entityId, linkData);
-      setEntityLinks(newLinks);
-    }
-  };
 
-  // Update notes for selected entity
-  const updateEntityNotes = (entityId: string, notes: string) => {
-    const newLinks = new Map(entityLinks);
-    const linkData = newLinks.get(entityId);
-    
-    if (linkData) {
-      linkData.notes = notes;
-      newLinks.set(entityId, linkData);
-      setEntityLinks(newLinks);
-    }
-  };
 
   // Submit entity links
   const handleSubmit = async () => {
@@ -201,8 +186,6 @@ const POIEntityLinkingModal: React.FC<POIEntityLinkingModalProps> = ({
         const createData: CreatePOIEntityLinkData = {
           poi_id: poiId,
           entity_id: linkData.entity.id,
-          quantity: linkData.quantity,
-          notes: linkData.notes.trim() || undefined,
           assignment_source: 'manual_link'
         };
         
@@ -232,8 +215,8 @@ const POIEntityLinkingModal: React.FC<POIEntityLinkingModalProps> = ({
 
   const selectedCount = entityLinks.size;
 
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
+  return createPortal(
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999]" onClick={onClose}>
       <div 
         className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
@@ -243,7 +226,7 @@ const POIEntityLinkingModal: React.FC<POIEntityLinkingModalProps> = ({
           <div>
             <h2 className="text-xl font-semibold text-amber-100"
                 style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-              Link Entities to POI
+              Link Items / Schematics to POI
             </h2>
             <p className="text-amber-200/60 text-sm mt-1">
               Add items and schematics to: <span className="text-amber-300 font-medium">{poiTitle}</span>
@@ -306,7 +289,7 @@ const POIEntityLinkingModal: React.FC<POIEntityLinkingModalProps> = ({
               className="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-amber-100 text-sm focus:outline-none focus:border-amber-500"
               disabled={!selectedCategory}
             >
-              <option value="">All Types</option>
+              <option value="">All Subtypes</option>
               {types.map(type => (
                 <option key={type} value={type}>{type}</option>
               ))}
@@ -320,7 +303,7 @@ const POIEntityLinkingModal: React.FC<POIEntityLinkingModalProps> = ({
             >
               <option value="">All Tiers</option>
               {tiers.map((tier) => (
-                <option key={tier.tier_number} value={tier.tier_number}>T{tier.tier_number}: {tier.tier_name}</option>
+                <option key={tier.tier_number} value={tier.tier_number}>{tier.tier_name}</option>
               ))}
             </select>
 
@@ -373,7 +356,7 @@ const POIEntityLinkingModal: React.FC<POIEntityLinkingModalProps> = ({
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {filteredEntities.map(entity => {
+              {paginatedEntities.map(entity => {
                 const isSelected = entityLinks.has(entity.id);
                 const linkData = entityLinks.get(entity.id);
                 
@@ -408,14 +391,14 @@ const POIEntityLinkingModal: React.FC<POIEntityLinkingModalProps> = ({
                         <div className="flex items-center space-x-2 mt-1">
                           <span className={`px-2 py-0.5 rounded text-xs font-medium ${
                             entity.is_schematic 
-                              ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' 
-                              : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                              ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' 
+                              : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
                           }`}>
                             {entity.is_schematic ? 'Schematic' : 'Item'}
                           </span>
                           {entity.tier_number > 0 && (
                             <span className="px-2 py-0.5 bg-slate-700 text-amber-300 rounded text-xs font-medium border border-slate-600">
-                              T{entity.tier_number}
+                              {getTierName(entity.tier_number)}
                             </span>
                           )}
                         </div>
@@ -441,34 +424,9 @@ const POIEntityLinkingModal: React.FC<POIEntityLinkingModalProps> = ({
                       )}
                     </div>
 
-                    {/* Link Configuration (if selected) */}
-                    {isSelected && linkData && (
-                      <div className="space-y-3 pt-3 border-t border-amber-500/30" onClick={(e) => e.stopPropagation()}>
-                        {/* Quantity */}
-                        <div>
-                          <label className="block text-xs text-amber-200/80 mb-1">Quantity:</label>
-                          <input
-                            type="number"
-                            min="1"
-                            value={linkData.quantity}
-                            onChange={(e) => updateEntityQuantity(entity.id, parseInt(e.target.value) || 1)}
-                            className="w-20 px-2 py-1 text-xs bg-slate-700 border border-slate-600 rounded text-amber-100 focus:outline-none focus:border-amber-500"
-                          />
-                        </div>
-
-                        {/* Notes */}
-                        <div>
-                          <label className="block text-xs text-amber-200/80 mb-1">Notes (optional):</label>
-                          <input
-                            type="text"
-                            placeholder="e.g., Found in chest, rare spawn..."
-                            value={linkData.notes}
-                            onChange={(e) => updateEntityNotes(entity.id, e.target.value)}
-                            className="w-full px-2 py-1 text-xs bg-slate-700 border border-slate-600 rounded text-amber-100 placeholder-amber-200/30 focus:outline-none focus:border-amber-500"
-                          />
-                        </div>
-
-                        {/* Remove Button */}
+                    {/* Remove Button (if selected) */}
+                    {isSelected && (
+                      <div className="pt-3 border-t border-amber-500/30" onClick={(e) => e.stopPropagation()}>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -486,6 +444,21 @@ const POIEntityLinkingModal: React.FC<POIEntityLinkingModalProps> = ({
             </div>
           )}
         </div>
+
+        {/* Pagination Controls */}
+        {filteredEntities.length > 0 && (
+          <PaginationControls
+            currentPage={pagination.currentPage}
+            totalPages={pagination.totalPages}
+            totalItems={pagination.totalItems}
+            itemsPerPage={pagination.itemsPerPage}
+            onPageChange={pagination.goToPage}
+            onItemsPerPageChange={pagination.setItemsPerPage}
+            loading={loading}
+            itemLabel="items"
+            className="border-t-0"
+          />
+        )}
 
         {/* Footer */}
         <div className="p-6 border-t border-slate-700 bg-slate-800/50">
@@ -527,7 +500,8 @@ const POIEntityLinkingModal: React.FC<POIEntityLinkingModalProps> = ({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

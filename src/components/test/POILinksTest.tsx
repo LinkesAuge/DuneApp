@@ -1,5 +1,6 @@
 import React from 'react';
 import { usePOILinks } from '../../hooks/usePOILinks';
+import { useTiers } from '../../hooks/useTiers';
 
 /**
  * Test component to validate POI Links hook and data transformation
@@ -19,6 +20,7 @@ export const POILinksTest: React.FC = () => {
     setSorting,
     setFilters
   } = usePOILinks();
+  const { getTierName } = useTiers();
 
   if (loading) {
     return (
@@ -139,7 +141,7 @@ export const POILinksTest: React.FC = () => {
                         </span>
                       </div>
                       <div className="text-xs text-sand-400">
-                        Tier {entityLink.entity.tier_number}
+                        {getTierName(entityLink.entity.tier_number)}
                       </div>
                     </div>
                   ))}

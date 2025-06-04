@@ -12,12 +12,14 @@ import POILinkFiltersPanel from '../components/POILinkFiltersPanel';
 import { ConfirmationModal } from '../components/shared/ConfirmationModal';
 import { useAuth } from '../components/auth/AuthProvider';
 import { supabase } from '../lib/supabase';
+import { useTiers } from '../hooks/useTiers';
 
 const POILinkManagerPage: React.FC = () => {
   // Initialize POI links hook
   const poiLinksState = usePOILinks();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { getTierName } = useTiers();
   
   // Panel state management (only filters panel is collapsible)
   const [filtersOpen, setFiltersOpen] = useState(true);
@@ -915,7 +917,7 @@ const POIGridCard: React.FC<POIGridCardProps> = ({
                     </div>
                     <div className="flex items-center gap-1">
                       <span className="text-slate-400 text-xs">
-                        T{entityLink.entity.tier_number}
+                        {getTierName(entityLink.entity.tier_number)}
                       </span>
                       {canModify && !selectionMode && (
                         <div className="flex items-center gap-1 ml-2">

@@ -512,6 +512,29 @@ export async function getPoiWithEntities(poiId: string): Promise<any> {
     // Get all linked entities for this POI
     const entityLinks = await poiEntityLinksAPI.getPOIEntityLinks(poiId);
 
+    // Get tier names from the database
+    const { data: tiers, error: tiersError } = await supabase
+      .from('tiers')
+      .select('tier_number, tier_name');
+
+    const tierMap = new Map();
+    if (!tiersError && tiers) {
+      tiers.forEach(tier => {
+        tierMap.set(tier.tier_number, { 
+          name: tier.tier_name, 
+          color: '#fbbf24' // Default amber color for all tiers
+        });
+      });
+    }
+
+    // Helper function to get tier info
+    const getTierInfo = (tierNumber: number) => {
+      return tierMap.get(tierNumber) || { 
+        name: `Tier ${tierNumber}`, 
+        color: '#fbbf24' 
+      };
+    };
+
     // Separate items and schematics for legacy compatibility
     const linked_items = entityLinks
       ?.filter(link => link.entity && !link.entity.is_schematic)
@@ -522,10 +545,7 @@ export async function getPoiWithEntities(poiId: string): Promise<any> {
         category: { name: link.entity.category?.name || 'Unknown' },
         type: { name: link.entity.type?.name || 'Unknown' },
         subtype: link.entity.subtype ? { name: link.entity.subtype.name } : null,
-        tier: link.entity.tier_number > 0 ? { 
-          name: `Tier ${link.entity.tier_number}`,
-          color: '#fbbf24' // Default amber color
-        } : null,
+        tier: link.entity.tier_number > 0 ? getTierInfo(link.entity.tier_number) : null,
         field_values: {} // No custom fields in unified system yet
       })) || [];
     
@@ -538,10 +558,7 @@ export async function getPoiWithEntities(poiId: string): Promise<any> {
         category: { name: link.entity.category?.name || 'Unknown' },
         type: { name: link.entity.type?.name || 'Unknown' },
         subtype: link.entity.subtype ? { name: link.entity.subtype.name } : null,
-        tier: link.entity.tier_number > 0 ? { 
-          name: `Tier ${link.entity.tier_number}`,
-          color: '#3b82f6' // Default blue color
-        } : null,
+        tier: link.entity.tier_number > 0 ? getTierInfo(link.entity.tier_number) : null,
         field_values: {} // No custom fields in unified system yet
       })) || [];
 

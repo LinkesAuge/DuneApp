@@ -106,14 +106,14 @@ const EntityCard: React.FC<EntityCardProps> = ({
             <div className="flex items-center space-x-2">
               <span className={`px-2 py-1 rounded text-xs font-medium ${
                 isSchematic 
-                  ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' 
-                  : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                  ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' 
+                  : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
               }`}>
                 {isSchematic ? 'Schematic' : 'Item'}
               </span>
               {entity.tier_number > 0 && (
                 <span className="px-2 py-1 bg-slate-700 text-amber-300 rounded text-xs font-medium border border-slate-600">
-                  T{entity.tier_number}
+                  {getTierName(entity.tier_number)}
                 </span>
               )}
             </div>

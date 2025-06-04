@@ -10,6 +10,7 @@ import UserAvatar from './UserAvatar';
 import RankBadge from './RankBadge';
 import CommentsList from '../comments/CommentsList';
 import LinkedItemsSection from '../poi/LinkedItemsSection';
+import POIEntityLinkingModal from '../poi-linking/POIEntityLinkingModal';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 interface POIPreviewCardProps {
@@ -113,6 +114,7 @@ const POIPreviewCard: React.FC<POIPreviewCardProps> = ({
   const [editorInfo, setEditorInfo] = useState<{ username: string; display_name?: string | null; custom_avatar_url?: string | null; discord_avatar_url?: string | null; use_discord_avatar?: boolean; rank?: Rank | null } | null>(null);
   const [loadingUserInfo, setLoadingUserInfo] = useState(true);
   const [commentCount, setCommentCount] = useState(0);
+  const [showLinkingModal, setShowLinkingModal] = useState(false);
 
   const [expanded, setExpanded] = useState(false);
   
@@ -203,7 +205,7 @@ const POIPreviewCard: React.FC<POIPreviewCardProps> = ({
 
   const handleLinkItems = (e: React.MouseEvent) => {
     e.stopPropagation();
-    navigate(`/pois/${poi.id}/link-items`);
+    setShowLinkingModal(true);
   };
 
   const handleImageClick = (e: React.MouseEvent) => {
@@ -769,6 +771,20 @@ const POIPreviewCard: React.FC<POIPreviewCardProps> = ({
           />
         </div>
       </div>
+      
+      {/* POI Entity Linking Modal */}
+      {showLinkingModal && (
+        <POIEntityLinkingModal
+          isOpen={showLinkingModal}
+          onClose={() => setShowLinkingModal(false)}
+          poiId={poi.id}
+          poiTitle={poi.title}
+          onLinksUpdated={() => {
+            // Optionally refresh the LinkedItemsSection
+            // Could trigger a refresh here if needed
+          }}
+        />
+      )}
     </div>
   );
 };

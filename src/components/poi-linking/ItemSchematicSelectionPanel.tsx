@@ -119,6 +119,7 @@ const ItemSchematicSelectionPanel: React.FC<ItemSchematicSelectionPanelProps> = 
   const itemCategories = useCategories('items');
   const schematicCategories = useCategories('schematics');
   const tiers = useTiers();
+  const { getTierName } = tiers;
 
   // Enhanced filter state
   const [filters, setFilters] = useState<FilterState>({
@@ -798,7 +799,7 @@ const ItemSchematicSelectionPanel: React.FC<ItemSchematicSelectionPanelProps> = 
                       ) : (
                         <Square className="w-2 h-2 text-slate-500 flex-shrink-0" />
                       )}
-                      <span className="truncate">T{tier.tier_number}</span>
+                      <span className="truncate">{getTierName(tier.tier_number)}</span>
                     </button>
                   );
                 })}
@@ -817,6 +818,7 @@ const ItemSchematicSelectionPanel: React.FC<ItemSchematicSelectionPanelProps> = 
             onToggleSelection={toggleItemSelection}
             activeTab={activeTab}
             pagination={currentPagination}
+            getTierName={getTierName}
           />
         ) : (
           <ItemSchematicListView
@@ -825,6 +827,7 @@ const ItemSchematicSelectionPanel: React.FC<ItemSchematicSelectionPanelProps> = 
             onToggleSelection={toggleItemSelection}
             activeTab={activeTab}
             pagination={currentPagination}
+            getTierName={getTierName}
           />
         )}
       </div>
@@ -839,6 +842,7 @@ interface ItemSchematicGridViewProps {
   onToggleSelection: (id: string) => void;
   activeTab: ActiveTab;
   pagination: any; // UsePaginationReturn type
+  getTierName: (tierNumber: number) => string;
 }
 
 const ItemSchematicGridView: React.FC<ItemSchematicGridViewProps> = ({
@@ -846,7 +850,8 @@ const ItemSchematicGridView: React.FC<ItemSchematicGridViewProps> = ({
   selectedIds,
   onToggleSelection,
   activeTab,
-  pagination
+  pagination,
+  getTierName
 }) => {
   // Render individual item callback for virtualization
   const renderItem = useCallback((index: number, item: Item | Schematic) => {
@@ -900,7 +905,7 @@ const ItemSchematicGridView: React.FC<ItemSchematicGridViewProps> = ({
                   <span className="text-slate-400">{item.type.name}</span>
                 )}
                 {item.tier_number !== undefined && (
-                  <span className="text-slate-400">T{item.tier_number}</span>
+                  <span className="text-slate-400">{getTierName(item.tier_number)}</span>
                 )}
               </div>
               {item.description && (
@@ -911,7 +916,7 @@ const ItemSchematicGridView: React.FC<ItemSchematicGridViewProps> = ({
         </div>
       </div>
     );
-  }, [selectedIds, onToggleSelection, activeTab]);
+  }, [selectedIds, onToggleSelection, activeTab, getTierName]);
 
   if (data.length === 0) {
     return (
@@ -967,6 +972,7 @@ interface ItemSchematicListViewProps {
   onToggleSelection: (id: string) => void;
   activeTab: ActiveTab;
   pagination: any; // UsePaginationReturn type
+  getTierName: (tierNumber: number) => string;
 }
 
 const ItemSchematicListView: React.FC<ItemSchematicListViewProps> = ({
@@ -974,7 +980,8 @@ const ItemSchematicListView: React.FC<ItemSchematicListViewProps> = ({
   selectedIds,
   onToggleSelection,
   activeTab,
-  pagination
+  pagination,
+  getTierName
 }) => {
   // Render individual item callback for virtualization
   const renderItem = useCallback((index: number, item: Item | Schematic) => {
@@ -1025,7 +1032,7 @@ const ItemSchematicListView: React.FC<ItemSchematicListViewProps> = ({
               <span>{item.type.name}</span>
             )}
             {item.tier_number !== undefined && (
-              <span className="text-amber-400">Tier {item.tier_number}</span>
+              <span className="text-amber-400">{getTierName(item.tier_number)}</span>
             )}
           </div>
           {item.description && (
@@ -1034,7 +1041,7 @@ const ItemSchematicListView: React.FC<ItemSchematicListViewProps> = ({
         </div>
       </div>
     );
-  }, [selectedIds, onToggleSelection, activeTab]);
+  }, [selectedIds, onToggleSelection, activeTab, getTierName]);
 
   if (data.length === 0) {
     return (
@@ -1057,7 +1064,7 @@ const ItemSchematicListView: React.FC<ItemSchematicListViewProps> = ({
 
   return (
     <div className="flex flex-col h-full">
-      {/* List Content */}
+      {/* List Content */>
       <div className="flex-1 p-4">
         <VirtualizedList
           items={data}

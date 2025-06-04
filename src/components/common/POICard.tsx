@@ -10,6 +10,7 @@ import UserAvatar from './UserAvatar';
 import RankBadge from './RankBadge';
 import CommentsList from '../comments/CommentsList';
 import LinkedItemsSection from '../poi/LinkedItemsSection';
+import POIEntityLinkingModal from '../poi-linking/POIEntityLinkingModal';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 interface POICardProps {
@@ -81,6 +82,7 @@ const POICard: React.FC<POICardProps> = ({
   const [editorInfo, setEditorInfo] = useState<{ username: string; display_name?: string | null; custom_avatar_url?: string | null; discord_avatar_url?: string | null; use_discord_avatar?: boolean; rank?: Rank | null } | null>(null);
   const [loadingUserInfo, setLoadingUserInfo] = useState(true);
   const [commentCount, setCommentCount] = useState(0);
+  const [showLinkingModal, setShowLinkingModal] = useState(false);
   
   const imageUrl = getDisplayImageUrl(poi, poiType);
   const PrivacyIcon = privacyIcons[poi.privacy_level];
@@ -297,16 +299,16 @@ const POICard: React.FC<POICardProps> = ({
 
             {/* Link Items button - show for members who own POI or editors/admins */}
             {user && (user.role === 'admin' || user.role === 'editor' || (user.role === 'member' && user.id === poi.created_by)) && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigate(`/pois/${poi.id}/link-items`);
-                }}
-                className="p-1.5 text-amber-300 hover:text-amber-100 hover:bg-slate-700/50 rounded transition-colors"
-                title="Link Items & Schematics"
-              >
-                <Link2 className="w-4 h-4" />
-              </button>
+                          <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowLinkingModal(true);
+              }}
+              className="p-1.5 text-amber-300 hover:text-amber-100 hover:bg-slate-700/50 rounded transition-colors"
+              title="Link Items & Schematics"
+            >
+              <Link2 className="w-4 h-4" />
+            </button>
             )}
 
             <button
@@ -503,6 +505,20 @@ const POICard: React.FC<POICardProps> = ({
           </div>
         </div>
       </div>
+      
+      {/* POI Entity Linking Modal */}
+      {showLinkingModal && (
+        <POIEntityLinkingModal
+          isOpen={showLinkingModal}
+          onClose={() => setShowLinkingModal(false)}
+          poiId={poi.id}
+          poiTitle={poi.title}
+          onLinksUpdated={() => {
+            // Optionally refresh the LinkedItemsSection
+            // Could trigger a refresh here if needed
+          }}
+        />
+      )}
     </div>
   );
 };

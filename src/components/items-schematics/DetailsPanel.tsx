@@ -1,6 +1,7 @@
 import React from 'react';
 import { Package, FileText, Calendar, User, Tag, Edit, Trash, Star, Share, X } from 'lucide-react';
 import EntityPOILinksSection from '../poi-linking/EntityPOILinksSection';
+import { useTiers } from '../../hooks/useTiers';
 
 // Import types
 type ActiveView = 'items' | 'schematics';
@@ -15,6 +16,8 @@ interface DetailsPanelProps {
 }
 
 const TierBadge: React.FC<{ tierNumber: number }> = ({ tierNumber }) => {
+  const { getTierName } = useTiers();
+  
   if (tierNumber === undefined || tierNumber === null) return null;
 
   return (
@@ -24,7 +27,7 @@ const TierBadge: React.FC<{ tierNumber: number }> = ({ tierNumber }) => {
         fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif"
       }}
     >
-      Tier {tierNumber}
+      {getTierName(tierNumber)}
     </span>
   );
 };

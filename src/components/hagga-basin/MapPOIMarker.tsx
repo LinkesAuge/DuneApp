@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Lock, Users, Eye, Share, Award } from 'lucide-react';
+import { Lock, Users, Eye, Share, Award, Scroll } from 'lucide-react';
 import type { Poi, PoiType } from '../../types';
 import type { MapSettings } from '../../lib/useMapSettings';
 import { Rank } from '../../types/profile';
@@ -83,6 +83,7 @@ const MapPOIMarker: React.FC<MapPOIMarkerProps> = ({
   const [tooltipPosition, setTooltipPosition] = useState<{ x: number; y: number } | null>(null);
   const [linkedItems, setLinkedItems] = useState<Array<{ id: string; name: string; type: 'item' | 'schematic'; quantity: number }>>([]);
   const [linkedItemsLoading, setLinkedItemsLoading] = useState(false);
+  const [hasLinkedSchematics, setHasLinkedSchematics] = useState(false);
   const markerRef = useRef<HTMLDivElement>(null);
   
   const imageUrl = getDisplayImageUrl(poi, poiType);
@@ -114,6 +115,35 @@ const MapPOIMarker: React.FC<MapPOIMarkerProps> = ({
 
     fetchUserInfo();
   }, [poi.created_by]);
+
+  // Check for linked schematics for indicator (runs immediately)
+  useEffect(() => {
+    const checkLinkedSchematics = async () => {
+      try {
+        const { data: links, error } = await supabase
+          .from('poi_entity_links')
+          .select(`
+            poi_id,
+            entity_id,
+            entities!entity_id(is_schematic)
+          `)
+          .eq('poi_id', poi.id);
+
+        if (error) {
+          console.error('Error checking linked schematics:', error);
+          return;
+        }
+
+        // Check if any linked entities are schematics
+        const hasSchematic = links?.some(link => link.entities?.is_schematic) || false;
+        setHasLinkedSchematics(hasSchematic);
+      } catch (error) {
+        console.error('Error checking linked schematics:', error);
+      }
+    };
+
+    checkLinkedSchematics();
+  }, [poi.id]);
 
   // Fetch linked items for tooltip
   useEffect(() => {
@@ -340,12 +370,23 @@ const MapPOIMarker: React.FC<MapPOIMarkerProps> = ({
           </div>
         )}
 
-        {/* Privacy Indicator */}
+        {/* Privacy Indicator - Top Left */}
         {poi.privacy_level !== 'global' && (
-          <div className={`absolute -top-1 w-4 h-4 bg-white rounded-full border border-sand-200 flex items-center justify-center ${
-            selectionMode && isSelected ? '-right-8' : '-right-1'
+          <div className={`absolute -top-1 -left-1 w-4 h-4 bg-white rounded-full border border-sand-200 flex items-center justify-center ${
+            selectionMode && isSelected ? 'scale-110' : ''
           }`}>
             <PrivacyIcon className={`w-2.5 h-2.5 ${privacyColor}`} />
+          </div>
+        )}
+
+        {/* Schematic Indicator - Top Right */}
+        {hasLinkedSchematics && (
+          <div className={`absolute -top-1 -right-1 w-5 h-5 bg-purple-900 rounded-full border border-purple-600 flex items-center justify-center ${
+            selectionMode && isSelected ? 'scale-110' : ''
+          }`}
+          title="Has linked schematics"
+          >
+            <Scroll className="w-3 h-3 text-purple-300" />
           </div>
         )}
 
@@ -370,13 +411,11 @@ const MapPOIMarker: React.FC<MapPOIMarkerProps> = ({
         >
           {/* Enhanced Modal-like Tooltip */}
           <div className="relative group w-80">
-            {/* Multi-layer background system matching modals */}
-            <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 rounded-lg border border-amber-400/40 shadow-2xl" />
-            <div className="absolute inset-0 bg-gradient-to-b from-slate-900/95 via-slate-800/90 to-slate-900/95 rounded-lg" />
-            <div className="absolute inset-0 bg-gradient-to-b from-amber-600/8 via-amber-500/4 to-transparent rounded-lg" />
+            {/* Solid background like POI modals */}
+            <div className="absolute inset-0 bg-slate-900 rounded-lg border border-amber-400/40 shadow-2xl" />
             
-            {/* Interactive purple overlay */}
-            <div className="absolute inset-0 rounded-lg opacity-60 bg-gradient-to-b from-violet-600/12 via-violet-700/6 to-transparent" />
+            {/* Subtle amber overlay for modal consistency */}
+            <div className="absolute inset-0 bg-gradient-to-b from-amber-600/5 via-amber-500/3 to-transparent rounded-lg" />
             
             {/* Enhanced Content */}
             <div className="relative p-5 space-y-4">
@@ -494,7 +533,7 @@ const MapPOIMarker: React.FC<MapPOIMarkerProps> = ({
                             ? 'bg-blue-500/20 text-blue-300 border border-blue-400/30' 
                             : 'bg-purple-500/20 text-purple-300 border border-purple-400/30'
                         }`}>
-                          {item.type}
+                          {item.type === 'item' ? 'Item' : 'Schematic'}
                         </span>
                       </div>
                     ))}

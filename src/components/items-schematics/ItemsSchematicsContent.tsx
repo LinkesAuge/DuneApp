@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Package, FileText, Eye, Edit, Trash, PanelLeftOpen, PanelLeftClose, PanelRightOpen, PanelRightClose, CheckSquare, Square, Edit2, Link2, Cube, DocumentText, Search, Grid3X3, List, TreePine, SortAsc, SortDesc, Filter, ArrowUp, ArrowDown, MapPin } from 'lucide-react';
 import { useActiveViewData } from '../../hooks/useItemsSchematicsData';
 import { useItemsSchematics } from '../../hooks/useItemsSchematics';
+import { useTiers } from '../../hooks/useTiers';
 import CreateEditItemSchematicModal from './CreateEditItemSchematicModal';
 import BulkOperationsModal from './BulkOperationsModal';
 
@@ -180,7 +181,7 @@ const EntityCard: React.FC<{
               {/* Show entity type badge when in 'all' view */}
               {type === 'all' && (
                 <span className={`px-2 py-0.5 rounded ${
-                  displayType === 'items' ? 'bg-amber-600/70 text-amber-200' : 'bg-blue-600/70 text-blue-200'
+                  displayType === 'items' ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' : 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
                 }`}>
                   {displayType === 'items' ? 'Item' : 'Schematic'}
                 </span>
@@ -197,7 +198,7 @@ const EntityCard: React.FC<{
               )}
               {entity.tier_number !== undefined && (
                 <span className="px-2 py-0.5 bg-amber-600/70 text-amber-200 rounded">
-                  Tier {entity.tier_number}
+                  {useTiers().getTierName(entity.tier_number)}
                 </span>
               )}
             </div>
@@ -425,7 +426,7 @@ const ListView: React.FC<{
                     {/* Entity type badge when in 'all' view */}
                     {activeView === 'all' && (
                       <span className={`px-2 py-0.5 text-xs rounded ${
-                        displayType === 'items' ? 'bg-amber-600/70 text-amber-200' : 'bg-blue-600/70 text-blue-200'
+                        displayType === 'items' ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' : 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
                       }`}>
                         {displayType === 'items' ? 'Item' : 'Schematic'}
                       </span>
@@ -446,7 +447,7 @@ const ListView: React.FC<{
                     )}
                     {entity.tier_number !== undefined && (
                       <span className="px-2 py-0.5 text-xs bg-amber-600/70 text-amber-200 rounded">
-                        Tier {entity.tier_number}
+                        {useTiers().getTierName(entity.tier_number)}
                       </span>
                     )}
                   </div>
@@ -657,7 +658,7 @@ const TreeView: React.FC<{
                           {/* Entity type badge when in 'all' view */}
                           {activeView === 'all' && (
                             <span className={`px-2 py-0.5 text-xs rounded ${
-                              displayType === 'items' ? 'bg-amber-600/70 text-amber-200' : 'bg-blue-600/70 text-blue-200'
+                              displayType === 'items' ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30' : 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
                             }`}>
                               {displayType === 'items' ? 'Item' : 'Schematic'}
                             </span>
@@ -673,7 +674,7 @@ const TreeView: React.FC<{
                           )}
                           {entity.tier_number !== undefined && (
                             <span className="px-2 py-0.5 text-xs bg-amber-600/70 text-amber-200 rounded">
-                              Tier {entity.tier_number}
+                              {useTiers().getTierName(entity.tier_number)}
                             </span>
                           )}
                         </div>
