@@ -1,15 +1,26 @@
-import React, { useState } from 'react';
-import { Map, List, Grid, Eye, CheckSquare, Square, Lock, Users } from 'lucide-react';
+import React, { useState, Suspense } from 'react';
+import { Map, Eye, CheckSquare, Square, Lock, Users } from 'lucide-react';
 import UserAvatar from '../../common/UserAvatar';
 import PaginationControls from '../../shared/PaginationControls';
+import ViewModeSelector, { ViewMode } from '../components/ViewModeSelector';
+
+// Lazy load the map view component
+const POIMapView = React.lazy(() => import('../components/POIMapView'));
 
 interface POIsPanelProps {
   onTogglePanel: () => void;
   filterState: any; // Will be properly typed when we import the hook
+  onViewModeChange?: (mode: ViewMode) => void; // New prop for parent notification
 }
 
-const POIsPanel: React.FC<POIsPanelProps> = ({ onTogglePanel, filterState }) => {
-  const [viewMode, setViewMode] = useState<'list' | 'grid' | 'map'>('grid');
+const POIsPanel: React.FC<POIsPanelProps> = ({ onTogglePanel, filterState, onViewModeChange }) => {
+  const [viewMode, setViewMode] = useState<ViewMode>('grid');
+  
+  // Handle view mode changes and notify parent
+  const handleViewModeChange = (mode: ViewMode) => {
+    setViewMode(mode);
+    onViewModeChange?.(mode);
+  };
   
   const {
     pois,
@@ -201,35 +212,11 @@ const POIsPanel: React.FC<POIsPanelProps> = ({ onTogglePanel, filterState }) => 
           </h3>
           
           <div className="flex items-center space-x-2">
-            {/* View Mode Toggle - Changed order: grid first */}
-            <div className="flex bg-slate-800 rounded-lg p-1">
-              <button
-                onClick={() => setViewMode('grid')}
-                className={`py-1 px-2 text-xs rounded ${
-                  viewMode === 'grid' ? 'dune-button-primary' : 'dune-button-secondary'
-                }`}
-              >
-                <Grid size={14} />
-              </button>
-              <button
-                onClick={() => setViewMode('list')}
-                className={`py-1 px-2 text-xs rounded ${
-                  viewMode === 'list' ? 'dune-button-primary' : 'dune-button-secondary'
-                }`}
-              >
-                <List size={14} />
-              </button>
-              <button
-                onClick={() => setViewMode('map')}
-                className={`py-1 px-2 text-xs rounded ${
-                  viewMode === 'map' ? 'dune-button-primary' : 'dune-button-secondary'
-                }`}
-                disabled
-                title="Map view coming in Phase 6"
-              >
-                <Map size={14} />
-              </button>
-            </div>
+            {/* View Mode Selector */}
+            <ViewModeSelector 
+              viewMode={viewMode}
+              onViewModeChange={handleViewModeChange}
+            />
             {/* Collapse Button */}
             <button 
               className="dune-button-secondary py-1 px-2 text-xs rounded"
@@ -270,38 +257,58 @@ const POIsPanel: React.FC<POIsPanelProps> = ({ onTogglePanel, filterState }) => 
       </div>
       
       {/* POI Content Area */}
-      <div className="flex-1 overflow-y-auto p-4">
-        {viewMode === 'grid' ? (
-          <div className="grid grid-cols-2 gap-3"> {/* Changed to 2 columns */}
-            {pois.map((poi: any) => (
-              <POICard key={poi.id} poi={poi} />
-            ))}
-          </div>
+      <div className="flex-1 overflow-hidden">
+        {viewMode === 'map' ? (
+          <Suspense fallback={
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-amber-300">Loading map view...</div>
+            </div>
+          }>
+            <POIMapView 
+              pois={pois}
+              mapType={filterState.poiFilters.mapType || 'hagga'}
+              selectedPOIIds={selectedPOIIds}
+              onPOISelect={togglePOISelection}
+              poiTypes={filterState.poiTypes}
+            />
+          </Suspense>
         ) : (
-          <div className="grid grid-cols-1 gap-3">
-            {pois.map((poi: any) => (
-              <POICard key={poi.id} poi={poi} />
-            ))}
-          </div>
-        )}
-        
-        {pois.length === 0 && (
-          <div className="text-center py-8 text-slate-400">
-            No POIs match the current filters
+          <div className="h-full overflow-y-auto p-4">
+            {viewMode === 'grid' ? (
+              <div className="grid grid-cols-2 gap-3"> {/* Changed to 2 columns */}
+                {pois.map((poi: any) => (
+                  <POICard key={poi.id} poi={poi} />
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-3">
+                {pois.map((poi: any) => (
+                  <POICard key={poi.id} poi={poi} />
+                ))}
+              </div>
+            )}
+            
+            {pois.length === 0 && (
+              <div className="text-center py-8 text-slate-400">
+                No POIs match the current filters
+              </div>
+            )}
           </div>
         )}
       </div>
 
-      {/* Pagination Controls */}
-      <PaginationControls
-        currentPage={pagination.pois.currentPage}
-        totalPages={pagination.pois.totalPages}
-        totalItems={pagination.pois.totalItems}
-        itemsPerPage={pagination.pois.itemsPerPage}
-        onPageChange={(page) => changePage('pois', page)}
-        onItemsPerPageChange={(itemsPerPage) => changeItemsPerPage('pois', itemsPerPage)}
-        loading={loading}
-      />
+      {/* Pagination Controls - Hidden in map mode */}
+      {viewMode !== 'map' && (
+        <PaginationControls
+          currentPage={pagination.pois.currentPage}
+          totalPages={pagination.pois.totalPages}
+          totalItems={pagination.pois.totalItems}
+          itemsPerPage={pagination.pois.itemsPerPage}
+          onPageChange={(page) => changePage('pois', page)}
+          onItemsPerPageChange={(itemsPerPage) => changeItemsPerPage('pois', itemsPerPage)}
+          loading={loading}
+        />
+      )}
     </div>
   );
 };

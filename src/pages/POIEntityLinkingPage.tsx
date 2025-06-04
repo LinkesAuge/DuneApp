@@ -10,10 +10,8 @@ import SelectionSummaryPanel from '../components/poi-linking/panels/SelectionSum
 // Import hooks
 import { useFilterState } from '../hooks/useFilterState';
 
-// Import hooks (to be created)
-// import { usePanelState } from '../components/poi-linking/hooks/usePanelState';
-// import { useFilterState } from '../components/poi-linking/hooks/useFilterState';
-// import { useSelectionState } from '../components/poi-linking/hooks/useSelectionState';
+// Import view mode type
+import { ViewMode } from '../components/poi-linking/components/ViewModeSelector';
 
 interface PanelState {
   filters: boolean;
@@ -25,6 +23,9 @@ interface PanelState {
 const POIEntityLinkingPage: React.FC = () => {
   // Initialize filter state hook
   const filterState = useFilterState();
+  
+  // Store pre-map panel state for restoration
+  const [preMapEntitiesState, setPreMapEntitiesState] = useState<boolean>(true);
   
   // Panel visibility state with localStorage persistence
   const [panelState, setPanelState] = useState<PanelState>(() => {
@@ -47,6 +48,32 @@ const POIEntityLinkingPage: React.FC = () => {
       ...prev,
       [panel]: !prev[panel]
     }));
+  };
+
+  // Handle POI view mode changes - auto-collapse entities panel in map mode
+  const handlePOIViewModeChange = (mode: ViewMode) => {
+    if (mode === 'map') {
+      // Store current entities panel state before collapsing
+      setPreMapEntitiesState(panelState.entities);
+      
+      // Auto-collapse entities panel for maximum map space
+      setPanelState(prev => ({
+        ...prev,
+        entities: false
+      }));
+      
+      // Handle filter restrictions: "both" → "hagga_basin" 
+      if (filterState.poiFilters.mapType === 'both') {
+        filterState.updatePOIFilters({
+          ...filterState.poiFilters,
+          mapType: 'hagga'
+        });
+      }
+    } else {
+      // Optionally restore entities panel when leaving map mode
+      // For now, keep it collapsed (Option B behavior)
+      // setPanelState(prev => ({ ...prev, entities: preMapEntitiesState }));
+    }
   };
 
   // Panel components - now using real implementations
@@ -85,7 +112,11 @@ const POIEntityLinkingPage: React.FC = () => {
 
       {/* Middle Left Panel - POIs */}
       {panelState.pois ? (
-        <POIsPanel onTogglePanel={() => togglePanel('pois')} filterState={filterState} />
+        <POIsPanel 
+          onTogglePanel={() => togglePanel('pois')} 
+          filterState={filterState}
+          onViewModeChange={handlePOIViewModeChange}
+        />
       ) : (
         <CollapsedPanel 
           panel="pois" 
