@@ -61,8 +61,8 @@ export interface SelectionSummary {
 
 // Pagination state for tree view
 export interface TreePaginationState {
-  currentPage: number;
-  pageSize: number;
+  page: number;
+  itemsPerPage: number;
   totalItems: number;
   totalPages: number;
 }
@@ -104,30 +104,30 @@ export interface UsePOILinksReturn {
   poiLinks: POILinkTreeNode[];
   loading: boolean;
   error: string | null;
-  
-  // Pagination
   pagination: TreePaginationState;
-  
-  // Sorting
   sorting: POISortingState;
-  
-  // Filtering
   filters: POILinkFilters;
-  
-  // Totals
+  expandedPOIs: Set<string>;
   totalCount: number;
   filteredCount: number;
-  
-  // Actions
-  deleteLink: (poi_id: string, entity_id: string) => Promise<void>;
-  bulkDeleteLinks: (links: Array<{poi_id: string; entity_id: string}>) => Promise<void>;
-  bulkDeletePOIs: (poiIds: string[]) => Promise<void>;
-  refreshData: () => void;
-  
+
+  // Filter options data
+  filterOptions: {
+    poiTypes: any[];
+    entityCategories: string[];
+    entityTypes: string[];
+    tiers: Array<{ id: number; name: string }>;
+  };
+
   // State setters
   setPage: (page: number) => void;
   setSorting: (sorting: POISortingState) => void;
   setFilters: (filters: Partial<POILinkFilters>) => void;
+  setItemsPerPage: (itemsPerPage: number) => void;
+  setExpandedPOIs: (expandedSet: Set<string>) => void;
+  refreshData: () => void;
+  deleteLink: (linkId: string) => Promise<void>;
+  bulkDeleteLinks: (selectedItems: Set<string>) => Promise<void>;
 }
 
 // Expand/collapse state management

@@ -10,6 +10,7 @@ interface PaginationControlsProps {
   onItemsPerPageChange: (itemsPerPage: number) => void;
   loading?: boolean;
   className?: string;
+  itemLabel?: string; // e.g., "POIs", "items", "entities"
 }
 
 const PaginationControls: React.FC<PaginationControlsProps> = ({
@@ -20,7 +21,8 @@ const PaginationControls: React.FC<PaginationControlsProps> = ({
   onPageChange,
   onItemsPerPageChange,
   loading = false,
-  className = ''
+  className = '',
+  itemLabel = 'items'
 }) => {
   // Calculate display info
   const startItem = totalItems === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1;
@@ -73,7 +75,7 @@ const PaginationControls: React.FC<PaginationControlsProps> = ({
   if (totalItems === 0) {
     return (
       <div className={`text-center py-4 text-slate-400 ${className}`}>
-        No items to display
+        No {itemLabel} to display
       </div>
     );
   }
@@ -83,7 +85,7 @@ const PaginationControls: React.FC<PaginationControlsProps> = ({
       {/* Items info and per-page selector */}
       <div className="flex items-center space-x-4 text-sm text-slate-400">
         <span>
-          Showing {startItem}-{endItem} of {totalItems} items
+          Showing {startItem}-{endItem} of {totalItems} {itemLabel}
         </span>
         
         <div className="flex items-center space-x-2">

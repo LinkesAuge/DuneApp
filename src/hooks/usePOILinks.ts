@@ -1,317 +1,173 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
-import { 
-  POILinkTreeNode, 
-  EntityLinkNode, 
-  POILinkFilters, 
-  POISortingState, 
-  TreePaginationState, 
-  POILinkQueryResult,
-  UsePOILinksReturn 
-} from '../types/poi-link-manager';
-import { POI, Entity } from '../types';
 import { useAuth } from '../components/auth/AuthProvider';
-
-// Default filter state
-const defaultFilters: POILinkFilters = {
-  search: '',
-  mapType: 'both',
-  poiCategories: [],
-  entityTypes: [],
-  entityCategories: [],
-  entityTiers: [],
-  dateRange: null,
-  createdBy: []
-};
-
-// Default sorting state (latest POI link creation first)
-const defaultSorting: POISortingState = {
-  field: 'poi_created_at',
-  direction: 'desc'
-};
-
-// Default pagination state
-const defaultPagination: TreePaginationState = {
-  currentPage: 1,
-  pageSize: 50,
-  totalItems: 0,
-  totalPages: 0
-};
+import { entitiesAPI } from '../lib/api/entities';
+import { useTiers } from './useTiers';
+import type { 
+  POILinkTreeNode, 
+  TreePaginationState, 
+  POISortingState, 
+  POILinkFilters,
+  UsePOILinksReturn
+} from '../types/poi-link-manager';
 
 export const usePOILinks = (): UsePOILinksReturn => {
   const { user } = useAuth();
-  
-  // State management
+  const { tiers, getTierName } = useTiers();
+
+  // Raw data state
+  const [rawData, setRawData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [rawData, setRawData] = useState<POILinkQueryResult[]>([]);
-  const [totalCount, setTotalCount] = useState(0);
-  const [filteredCount, setFilteredCount] = useState(0);
-  
-  // Filter, sorting, and pagination state
-  const [filters, setFiltersState] = useState<POILinkFilters>(defaultFilters);
-  const [sorting, setSortingState] = useState<POISortingState>(defaultSorting);
+
+  // Filter options data
+  const [poiTypes, setPOITypes] = useState<any[]>([]);
+  const [entityCategories, setEntityCategories] = useState<string[]>([]);
+  const [entityTypes, setEntityTypes] = useState<string[]>([]);
+
+  // Default states
+  const defaultPagination: TreePaginationState = {
+    page: 1,
+    itemsPerPage: 50,
+    totalItems: 0,
+    totalPages: 0
+  };
+
+  const defaultSorting: POISortingState = {
+    field: 'created_at',
+    direction: 'desc'
+  };
+
+  const defaultFilters: POILinkFilters = {
+    search: '',
+    mapType: 'both',
+    poiCategories: [],
+    entityCategories: [],
+    entityTypes: [],
+    entityTiers: [],
+    dateRange: null,
+    createdBy: []
+  };
+
+  // Component state
   const [pagination, setPaginationState] = useState<TreePaginationState>(defaultPagination);
+  const [sorting, setSortingState] = useState<POISortingState>(defaultSorting);
+  const [filters, setFiltersState] = useState<POILinkFilters>(defaultFilters);
 
-  // Fetch data manually using separate queries and combine
-  const fetchDataManually = useCallback(async () => {
-    console.log('Fetching POI links manually...');
-    
-    // Step 1: Get the link records
-    const { data: links, error: linksError } = await supabase
-      .from('poi_entity_links')
-      .select('*')
-      .range(0, 49); // First 50 for testing
-    
-    if (linksError) {
-      console.error('Error fetching links:', linksError);
-      throw linksError;
-    }
-    
-    console.log('Step 1: Got', links?.length, 'link records');
-    
-    if (!links || links.length === 0) {
-      return [];
-    }
-    
-    // Step 2: Get unique POI IDs and fetch POIs
-    const poiIds = [...new Set(links.map(link => link.poi_id))];
-    console.log('Step 2: Fetching', poiIds.length, 'unique POIs');
-    
-    const { data: pois, error: poisError } = await supabase
-      .from('pois')
-      .select('id, title, description, created_at, poi_type_id, map_type')
-      .in('id', poiIds);
-    
-    if (poisError) {
-      console.error('Error fetching POIs:', poisError);
-      throw poisError;
-    }
-    
-    console.log('Step 2: Got', pois?.length, 'POI records');
-    
-    // Step 3: Get unique entity IDs and fetch entities
-    const entityIds = [...new Set(links.map(link => link.entity_id))];
-    console.log('Step 3: Fetching', entityIds.length, 'unique entities');
-    
-    const { data: entities, error: entitiesError } = await supabase
-      .from('entities')
-      .select('id, name, icon_fallback, icon_image_id, category_id, type_id, tier_number, is_schematic')
-      .in('id', entityIds);
-    
-    if (entitiesError) {
-      console.error('Error fetching entities:', entitiesError);
-      throw entitiesError;
-    }
-    
-    console.log('Step 3: Got', entities?.length, 'entity records');
-    
-    // Step 4: Create lookup maps
-    const poiMap = new Map(pois?.map(poi => [poi.id, poi]) || []);
-    const entityMap = new Map(entities?.map(entity => [entity.id, entity]) || []);
-    
-    // Step 5: Combine the data
-    const combinedData = links.map(link => ({
-      ...link,
-      pois: poiMap.get(link.poi_id),
-      entities: entityMap.get(link.entity_id)
-    }));
-    
-    const validLinks = combinedData.filter(link => link.pois && link.entities);
-    const invalidLinks = combinedData.filter(link => !link.pois || !link.entities);
-    
-    console.log('Step 5: Combined data - Valid:', validLinks.length, 'Invalid:', invalidLinks.length);
-    
-    if (invalidLinks.length > 0) {
-      console.warn('Invalid links found:', invalidLinks);
-    }
-    
-    return validLinks;
-  }, []);
+  // Expansion state
+  const [expandedPOIs, setExpandedPOIsState] = useState<Set<string>>(new Set());
+  const [hasInitialized, setHasInitialized] = useState(false);
 
-  // Build the database query with all JOINs (keeping as backup)
-  const buildQuery = useCallback(() => {
-    let query = supabase
-      .from('poi_entity_links')
-      .select(`
-        *,
-        pois!inner (
-          id,
-          title,
-          description,
-          created_at,
-          poi_type_id,
-          map_type
-        ),
-        entities!inner (
-          id,
-          name,
-          icon_fallback,
-          icon_image_id,
-          category_id,
-          type_id,
-          tier_number,
-          is_schematic
-        )
-      `);
-
-    return query;
-  }, []);
-
-  // Apply filters to the query
-  const applyFilters = useCallback((query: any) => {
-    // Map type filter
-    if (filters.mapType !== 'both') {
-      query = query.eq('pois.map_type', filters.mapType);
-    }
-
-    // Search filter (POI title/description or entity name)
-    if (filters.search.trim()) {
-      const searchTerm = filters.search.trim();
-      query = query.or(
-        `pois.title.ilike.%${searchTerm}%,pois.description.ilike.%${searchTerm}%,entities.name.ilike.%${searchTerm}%`
-      );
-    }
-
-    // POI categories filter - temporarily disabled until poi_types relationship is fixed
-    // if (filters.poiCategories.length > 0) {
-    //   query = query.in('pois.poi_types.category', filters.poiCategories);
-    // }
-
-    // Entity categories filter
-    if (filters.entityCategories.length > 0) {
-      query = query.in('entities.category', filters.entityCategories);
-    }
-
-    // Entity types filter
-    if (filters.entityTypes.length > 0) {
-      query = query.in('entities.type', filters.entityTypes);
-    }
-
-    // Entity tiers filter
-    if (filters.entityTiers.length > 0) {
-      query = query.in('entities.tier_number', filters.entityTiers);
-    }
-
-    // Date range filter
-    if (filters.dateRange) {
-      const [startDate, endDate] = filters.dateRange;
-      query = query
-        .gte('added_at', startDate.toISOString())
-        .lte('added_at', endDate.toISOString());
-    }
-
-    // Created by filter
-    if (filters.createdBy.length > 0) {
-      query = query.in('added_by', filters.createdBy);
-    }
-
-    return query;
-  }, [filters]);
-
-  // Apply sorting to the query
-  const applySorting = useCallback((query: any) => {
-    // Simple sorting by link creation date for now
-    return query.order('added_at', { ascending: sorting.direction === 'asc' });
-  }, [sorting]);
-
-  // Transform raw query results into tree structure
-  const transformToTreeNodes = useCallback((data: any[]): POILinkTreeNode[] => {
-    console.log('Raw POI links data count:', data?.length || 0);
-    console.log('First few raw records:', data?.slice(0, 2));
-    
-    if (!data || data.length === 0) {
-      return [];
-    }
-
-    // Group data by POI
-    const poiMap = new Map<string, POILinkTreeNode>();
-
-    data.forEach((link, index) => {
-      // Handle missing data gracefully - this indicates orphaned links
-      if (!link.pois || !link.entities) {
-        console.warn(`Record ${index}: Skipping orphaned link - POI or entity no longer exists`, {
-          poi_id: link.poi_id,
-          entity_id: link.entity_id,
-          has_poi: !!link.pois,
-          has_entity: !!link.entities
-        });
-        return;
-      }
-
-      const poiId = link.poi_id;
-      
-      // Get or create POI tree node
-      if (!poiMap.has(poiId)) {
-        poiMap.set(poiId, {
-          poi: {
-            id: link.pois.id,
-            title: link.pois.title,
-            description: link.pois.description,
-            created_at: link.pois.created_at,
-            poi_type_id: link.pois.poi_type_id,
-            map_type: link.pois.map_type
-          } as POI,
-          entities: [],
-          expanded: true, // Default expanded as per requirements
-          totalLinks: 0
-        });
-      }
-
-      // Create EntityLinkNode
-      const entityLink: EntityLinkNode = {
-        entity: {
-          id: link.entities.id,
-          name: link.entities.name,
-          icon: link.entities.icon_fallback || '🔍',
-          icon_image_id: link.entities.icon_image_id,
-          entity_class: link.entities.is_schematic ? 'Schematic' : 'Item',
-          category_id: link.entities.category_id,
-          type_id: link.entities.type_id,
-          tier_number: link.entities.tier_number
-        } as Entity,
-        poi_id: link.poi_id,
-        entity_id: link.entity_id,
-        added_at: link.added_at,
-        added_by: link.added_by,
-        updated_by: link.updated_by,
-        updated_at: link.updated_at
-      };
-
-      const poiNode = poiMap.get(poiId)!;
-      poiNode.entities.push(entityLink);
-      poiNode.totalLinks = poiNode.entities.length;
-    });
-
-    return Array.from(poiMap.values());
-  }, []);
-
-  // Fetch POI links data
-  const fetchPOILinks = useCallback(async () => {
+  // Fetch filter options data
+  const fetchFilterOptions = useCallback(async () => {
     try {
-      setLoading(true);
-      setError(null);
+      // Fetch POI types
+      const { data: poiTypesData, error: poiTypesError } = await supabase
+        .from('poi_types')
+        .select('*')
+        .order('category', { ascending: true });
 
-      // Use manual fetch instead of JOIN query for now
-      const data = await fetchDataManually();
+      if (poiTypesError) throw poiTypesError;
+      setPOITypes(poiTypesData || []);
 
-      console.log('Manual fetch returned', data?.length, 'valid records');
-      if (data && data.length > 0) {
-        console.log('Sample record structure:', data[0]);
-      }
-
-      setRawData(data || []);
+      // Fetch entities for category/type options
+      const entitiesResponse = await entitiesAPI.getAll({ limit: 10000 });
+      const entities = entitiesResponse.data || [];
       
-      // For now, set total count to the manual fetch count
-      setTotalCount(data?.length || 0);
-      setFilteredCount(data?.length || 0);
+      // Extract categories and types from normalized structure
+      const categories = [...new Set(entities
+        .map(e => e.category?.name)
+        .filter(c => c && typeof c === 'string')
+      )].sort();
       
-      // Update pagination total pages
-      setPaginationState(prev => ({
+      const types = [...new Set(entities
+        .map(e => e.type?.name)
+        .filter(t => t && typeof t === 'string')
+      )].sort();
+
+      setEntityCategories(categories);
+      setEntityTypes(types);
+
+      // Initialize filters with all options selected
+      setFiltersState(prev => ({
         ...prev,
-        totalItems: data?.length || 0,
-        totalPages: Math.ceil((data?.length || 0) / prev.pageSize)
+        poiCategories: [...new Set(poiTypesData?.map(pt => pt.category) || [])],
+        entityCategories: [...categories],
+        entityTypes: [...types],
+        entityTiers: tiers.map(t => t.tier_number.toString())
       }));
+
+    } catch (error) {
+      console.error('Error fetching filter options:', error);
+    }
+  }, [tiers]);
+
+  // Fetch raw POI links data
+  const fetchData = useCallback(async () => {
+    if (!user) return;
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const { data, error: fetchError } = await supabase
+        .from('poi_entity_links')
+        .select(`
+          poi_id,
+          entity_id,
+          added_at,
+          added_by,
+          pois!inner (
+            id,
+            title,
+            description,
+            map_type,
+            poi_type_id,
+            created_at,
+            created_by,
+            privacy_level,
+            poi_types (
+              id,
+              name,
+              category,
+              icon
+            ),
+            profiles!pois_created_by_fkey (
+              username
+            )
+          ),
+          entities!inner (
+            id,
+            name,
+            category_id,
+            type_id,
+            subtype_id,
+            tier_number,
+            icon,
+            icon_image_id,
+            created_by,
+            categories (
+              id,
+              name
+            ),
+            types (
+              id,
+              name
+            ),
+            subtypes (
+              id,
+              name
+            ),
+            shared_images (
+              id,
+              image_url
+            )
+          )
+        `)
+        .order('added_at', { ascending: false });
+
+      if (fetchError) throw fetchError;
+      setRawData(data || []);
 
     } catch (err) {
       console.error('Error fetching POI links:', err);
@@ -319,127 +175,259 @@ export const usePOILinks = (): UsePOILinksReturn => {
     } finally {
       setLoading(false);
     }
-  }, [fetchDataManually]);
+  }, [user]);
 
-  // Transform raw data to tree structure
-  const poiLinks = useMemo(() => {
-    return transformToTreeNodes(rawData);
-  }, [rawData, transformToTreeNodes]);
+  // Apply filters to raw data
+  const filteredData = useMemo(() => {
+    if (!rawData.length) return [];
 
-  // Delete individual link using composite key
-  const deleteLink = useCallback(async (poi_id: string, entity_id: string) => {
-    try {
-      const { error } = await supabase
-        .from('poi_entity_links')
-        .delete()
-        .eq('poi_id', poi_id)
-        .eq('entity_id', entity_id);
+    return rawData.filter(link => {
+      const poi = link.pois;
+      const entity = link.entities;
 
-      if (error) throw error;
-
-      // Refresh data after deletion
-      await fetchPOILinks();
-    } catch (err) {
-      console.error('Error deleting link:', err);
-      throw err;
-    }
-  }, [fetchPOILinks]);
-
-  // Bulk delete links using composite keys
-  const bulkDeleteLinks = useCallback(async (links: Array<{poi_id: string; entity_id: string}>) => {
-    try {
-      // Since we can't use .in() with composite keys, delete one by one
-      for (const link of links) {
-        const { error } = await supabase
-          .from('poi_entity_links')
-          .delete()
-          .eq('poi_id', link.poi_id)
-          .eq('entity_id', link.entity_id);
-
-        if (error) throw error;
+      // Search filter
+      if (filters.search) {
+        const searchTerm = filters.search.toLowerCase();
+        const titleMatch = poi.title?.toLowerCase().includes(searchTerm);
+        const entityMatch = entity.name?.toLowerCase().includes(searchTerm);
+        if (!titleMatch && !entityMatch) return false;
       }
 
-      // Refresh data after deletion
-      await fetchPOILinks();
-    } catch (err) {
-      console.error('Error bulk deleting links:', err);
-      throw err;
+      // Map type filter
+      if (filters.mapType !== 'both') {
+        if (filters.mapType === 'hagga_basin' && poi.map_type !== 'hagga_basin') return false;
+        if (filters.mapType === 'deep_desert' && poi.map_type !== 'deep_desert') return false;
+      }
+
+      // POI category filter
+      if (filters.poiCategories.length > 0) {
+        const poiCategory = poi.poi_types?.category;
+        if (!poiCategory || !filters.poiCategories.includes(poiCategory)) return false;
+      }
+
+      // Entity category filter
+      if (filters.entityCategories.length > 0) {
+        const entityCategory = entity.categories?.name;
+        if (!entityCategory || !filters.entityCategories.includes(entityCategory)) return false;
+      }
+
+      // Entity type filter
+      if (filters.entityTypes.length > 0) {
+        const entityType = entity.types?.name;
+        if (!entityType || !filters.entityTypes.includes(entityType)) return false;
+      }
+
+      // Entity tier filter
+      if (filters.entityTiers.length > 0) {
+        const tierNumber = entity.tier_number?.toString();
+        if (!filters.entityTiers.includes(tierNumber)) return false;
+      }
+
+      return true;
+    });
+  }, [rawData, filters]);
+
+  // Transform data to tree structure
+  const transformToTreeNodes = useCallback((data: any[]): POILinkTreeNode[] => {
+    // Group by POI
+    const poiGroups = new Map<string, { poi: any; entities: any[] }>();
+
+    data.forEach(link => {
+      const poiId = link.poi_id;
+      if (!poiGroups.has(poiId)) {
+        poiGroups.set(poiId, {
+          poi: link.pois,
+          entities: []
+        });
+      }
+      
+      poiGroups.get(poiId)!.entities.push({
+        entity: link.entities,
+        linkId: `${link.poi_id}|${link.entity_id}`, // Composite key (using | to avoid UUID dash conflicts)
+        created_at: link.added_at
+      });
+    });
+
+    // Convert to tree nodes
+    const treeNodes: POILinkTreeNode[] = Array.from(poiGroups.values()).map(group => ({
+      poi: group.poi,
+      entities: group.entities.sort((a, b) => 
+        a.entity.name.localeCompare(b.entity.name)
+      ),
+      expanded: expandedPOIs.has(group.poi.id),
+      totalLinks: group.entities.length
+    }));
+
+    // Apply sorting
+    return treeNodes.sort((a, b) => {
+      switch (sorting.field) {
+        case 'title':
+          return sorting.direction === 'asc' 
+            ? a.poi.title.localeCompare(b.poi.title)
+            : b.poi.title.localeCompare(a.poi.title);
+        case 'created_at':
+        default:
+          const aDate = new Date(a.poi.created_at).getTime();
+          const bDate = new Date(b.poi.created_at).getTime();
+          return sorting.direction === 'asc' ? aDate - bDate : bDate - aDate;
+      }
+    });
+  }, [expandedPOIs, sorting]);
+
+  // Transform filtered data to tree structure with pagination
+  const poiLinks = useMemo(() => {
+    const allPOINodes = transformToTreeNodes(filteredData);
+    
+    // Count unique POIs for pagination
+    const uniquePOIIds = new Set(filteredData.map(link => link.poi_id));
+    const poiCount = uniquePOIIds.size;
+    
+    // Update pagination total pages based on POI count
+    setPaginationState(prev => ({
+      ...prev,
+      totalItems: poiCount,
+      totalPages: Math.ceil(poiCount / prev.itemsPerPage)
+    }));
+
+    // Apply POI-based pagination
+    const startIndex = (pagination.page - 1) * pagination.itemsPerPage;
+    const endIndex = startIndex + pagination.itemsPerPage;
+    
+    return allPOINodes.slice(startIndex, endIndex);
+  }, [filteredData, transformToTreeNodes, pagination.page, pagination.itemsPerPage]);
+
+  // Auto-expand POIs on initial load
+  useEffect(() => {
+    if (poiLinks.length > 0 && !hasInitialized) {
+      const poiIds = poiLinks.map(poiLink => poiLink.poi.id);
+      setExpandedPOIsState(new Set(poiIds));
+      setHasInitialized(true);
     }
-  }, [fetchPOILinks]);
-
-  // Delete all links for specific POIs
-  const bulkDeletePOIs = useCallback(async (poiIds: string[]) => {
-    try {
-      const { error } = await supabase
-        .from('poi_entity_links')
-        .delete()
-        .in('poi_id', poiIds);
-
-      if (error) throw error;
-
-      // Refresh data after deletion
-      await fetchPOILinks();
-    } catch (err) {
-      console.error('Error bulk deleting POI links:', err);
-      throw err;
-    }
-  }, [fetchPOILinks]);
-
-  // Refresh data
-  const refreshData = useCallback(() => {
-    fetchPOILinks();
-  }, [fetchPOILinks]);
+  }, [poiLinks, hasInitialized]);
 
   // State setters
   const setPage = useCallback((page: number) => {
-    setPaginationState(prev => ({ ...prev, currentPage: page }));
+    setPaginationState(prev => ({ ...prev, page }));
   }, []);
 
   const setSorting = useCallback((newSorting: POISortingState) => {
     setSortingState(newSorting);
-    // Reset to first page when sorting changes
-    setPaginationState(prev => ({ ...prev, currentPage: 1 }));
+    setPaginationState(prev => ({ ...prev, page: 1 }));
   }, []);
 
   const setFilters = useCallback((newFilters: Partial<POILinkFilters>) => {
     setFiltersState(prev => ({ ...prev, ...newFilters }));
-    // Reset to first page when filters change
-    setPaginationState(prev => ({ ...prev, currentPage: 1 }));
+    setPaginationState(prev => ({ ...prev, page: 1 }));
   }, []);
 
-  // Fetch data when dependencies change
+  const setItemsPerPage = useCallback((itemsPerPage: number) => {
+    setPaginationState(prev => ({ 
+      ...prev, 
+      itemsPerPage,
+      page: 1,
+      totalPages: Math.ceil(prev.totalItems / itemsPerPage)
+    }));
+  }, []);
+
+  const setExpandedPOIs = useCallback((expandedSet: Set<string>) => {
+    setExpandedPOIsState(expandedSet);
+  }, []);
+
+  // Initialize data
   useEffect(() => {
-    fetchPOILinks();
-  }, [fetchPOILinks]);
+    fetchFilterOptions();
+  }, [fetchFilterOptions]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // Delete operations
+  const deleteLink = useCallback(async (linkId: string) => {
+    if (!user) return;
+
+    try {
+      const [poiId, entityId] = linkId.split('|');
+      const { error } = await supabase
+        .from('poi_entity_links')
+        .delete()
+        .eq('poi_id', poiId)
+        .eq('entity_id', entityId);
+
+      if (error) throw error;
+      
+      // Refresh data after successful deletion
+      await fetchData();
+    } catch (err) {
+      console.error('Error deleting POI link:', err);
+      throw err;
+    }
+  }, [user, fetchData]);
+
+  const bulkDeleteLinks = useCallback(async (selectedItems: Set<string>) => {
+    if (!user) return;
+
+    try {
+      const linkIds = Array.from(selectedItems)
+        .filter(item => item.startsWith('link:'))
+        .map(item => item.replace('link:', ''));
+
+      const deletions = linkIds.map(linkId => {
+        const [poiId, entityId] = linkId.split('|');
+        return supabase
+          .from('poi_entity_links')
+          .delete()
+          .eq('poi_id', poiId)
+          .eq('entity_id', entityId);
+      });
+
+      const results = await Promise.all(deletions);
+      
+      // Check for errors
+      const errors = results.filter(result => result.error);
+      if (errors.length > 0) {
+        throw new Error(`Failed to delete ${errors.length} links`);
+      }
+
+      // Refresh data after successful deletion
+      await fetchData();
+    } catch (err) {
+      console.error('Error bulk deleting POI links:', err);
+      throw err;
+    }
+  }, [user, fetchData]);
+
+  // Calculate counts (POI-based, not link-based)
+  const totalCount = new Set(rawData.map(link => link.poi_id)).size;
+  const filteredCount = new Set(filteredData.map(link => link.poi_id)).size;
 
   return {
-    // Data
     poiLinks,
     loading,
     error,
-    
-    // Pagination
     pagination,
-    
-    // Sorting
     sorting,
-    
-    // Filtering
     filters,
-    
-    // Totals
+    expandedPOIs,
     totalCount,
     filteredCount,
     
+    // Filter options data
+    filterOptions: {
+      poiTypes,
+      entityCategories,
+      entityTypes,
+      tiers: tiers.map(t => ({ id: t.tier_number, name: getTierName(t.tier_number) }))
+    },
+
     // Actions
-    deleteLink,
-    bulkDeleteLinks,
-    bulkDeletePOIs,
-    refreshData,
-    
-    // State setters
     setPage,
     setSorting,
-    setFilters
+    setFilters,
+    setItemsPerPage,
+    setExpandedPOIs,
+    refreshData: fetchData,
+    deleteLink,
+    bulkDeleteLinks
   };
 }; 
