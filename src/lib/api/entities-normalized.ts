@@ -79,9 +79,9 @@ function handleSupabaseError(error: any, operation: string): never {
 function buildSelectWithHierarchy() {
   return `
     *,
-    category:categories(id, name, description, icon),
-    type:types(id, name, description, icon),
-    subtype:subtypes(id, name, description, icon),
+          category:categories(id, name, icon),
+      type:types(id, name, icon),
+      subtype:subtypes(id, name, icon),
     tier:tiers(tier_number, tier_name),
     shared_image:shared_images(id, image_url)
   `;

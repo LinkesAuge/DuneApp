@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { Database, Search, X } from 'lucide-react';
+import { Database, Search, X, Eye, ChevronRight } from 'lucide-react';
 
 interface FiltersPanelProps {
   onTogglePanel: () => void;
@@ -8,6 +8,9 @@ interface FiltersPanelProps {
 
 const FiltersPanel: React.FC<FiltersPanelProps> = ({ onTogglePanel, filterState }) => {
   const [activeTab, setActiveTab] = React.useState<'poi' | 'entity'>('poi');
+  const [collapsedPOICategories, setCollapsedPOICategories] = React.useState<Set<string>>(new Set());
+  const [collapsedEntityCategories, setCollapsedEntityCategories] = React.useState<Set<string>>(new Set());
+  const [collapsedSubtypes, setCollapsedSubtypes] = React.useState<Set<string>>(new Set());
   const poiSearchRef = useRef<HTMLInputElement>(null);
   const entitySearchRef = useRef<HTMLInputElement>(null);
   
@@ -20,54 +23,271 @@ const FiltersPanel: React.FC<FiltersPanelProps> = ({ onTogglePanel, filterState 
   const {
     poiFilters,
     entityFilters,
-    filterCounts,
     updatePOIFilters,
     updateEntityFilters,
+    clearAllFilters,
+    filterCounts,
     togglePOICategory,
     togglePOIType,
     toggleAllPOIs,
     toggleEntityCategory,
     toggleEntityType,
+    toggleEntitySubtype,
     toggleEntityTier,
-    clearAllFilters,
+    toggleAllEntities,
     poiTypes,
     tiers,
+    validTiers,
     entityCategories,
     entityTypes,
+    entities,
+    pois,
+    allEntities,
+    allPOIs,
     getTierName,
     loading
   } = filterState;
+
+  // Store ALL entities reference for filter calculations - NOT paginated data
+  const allEntitiesRef = React.useRef(allEntities || []);
+  React.useEffect(() => {
+    // Always use the complete allEntities dataset for filter building
+    if (allEntities && allEntities.length > 0) {
+      allEntitiesRef.current = allEntities;
+    }
+  }, [allEntities]);
+
+  // Initialize all subtypes as collapsed by default - AFTER entities is available
+  React.useEffect(() => {
+    if (allEntitiesRef.current.length > 0) {
+      const subtypeKeys = new Set<string>();
+      allEntitiesRef.current.forEach(entity => {
+        if (entity.category?.name && entity.type?.name && entity.subtype?.name) {
+          const subtypeKey = `${entity.category.name}-${entity.type.name}`;
+          subtypeKeys.add(subtypeKey);
+        }
+      });
+      setCollapsedSubtypes(subtypeKeys);
+    }
+  }, [allEntitiesRef.current]);
 
   // Memoize category calculations to prevent unnecessary re-renders
   const poiCategories = React.useMemo(() => 
     [...new Set(poiTypes.map(type => type.category))], 
     [poiTypes]
   );
-  
+
   // Use the entity categories and types from the hook with safe conversion
   const memoizedEntityCategories = React.useMemo(() => {
     if (!Array.isArray(entityCategories)) return [];
     
-    return entityCategories
-      .filter(c => c != null && typeof c !== 'object')  // Filter out objects
-      .map(c => String(c))
-      .filter(c => c !== '' && c !== 'undefined' && c !== 'null'); // Filter out invalid strings
-  }, [entityCategories]);
+    // Get categories directly from ALL entities to ensure accuracy - ALWAYS show all categories
+    const categoriesFromEntities = Array.from(new Set(
+      allEntitiesRef.current
+        .filter(entity => entity.category?.name)
+        .map(entity => entity.category!.name)
+        .filter(name => name && name.trim() !== '')
+    )).sort();
+    
+    // Always return all categories, regardless of filter state - UI handles visibility
+    return categoriesFromEntities;
+  }, [allEntitiesRef.current, entityCategories]);
   
   const memoizedEntityTypes = React.useMemo(() => {
     if (!Array.isArray(entityTypes)) return [];
     
-    return entityTypes
-      .filter(t => t != null && typeof t !== 'object')  // Filter out objects
-      .map(t => String(t))
-      .filter(t => t !== '' && t !== 'undefined' && t !== 'null'); // Filter out invalid strings
+    // Use Set to ensure uniqueness and prevent duplicates
+    const uniqueTypes = Array.from(new Set(
+      entityTypes
+        .filter(t => t != null && typeof t !== 'object')  // Filter out objects
+        .map(t => String(t))
+        .filter(t => t !== '' && t !== 'undefined' && t !== 'null') // Filter out invalid strings
+    ));
+    
+    return uniqueTypes.sort(); // Sort for consistent ordering
   }, [entityTypes]);
   
-  // Valid tiers (excluding T69)
-  const validTiers = React.useMemo(() => 
-    tiers.filter(tier => tier.tier_number !== 69), 
-    [tiers]
+  // Use the validTiers from hook instead of local filtering
+  const tiersToDisplay = React.useMemo(() => 
+    validTiers || tiers, 
+    [validTiers, tiers]
   );
+
+  // Render entity category section exactly like POI filters but with subtype support
+  const renderEntityCategorySection = (category: string, columnIndex?: number) => {
+    const categoryVisible = entityFilters.categories[category] !== false;
+    const isCollapsed = collapsedEntityCategories.has(category);
+    
+    // Get types for this category - ALWAYS show category even if types are filtered
+    const categoryTypes = Array.from(new Set(
+      allEntitiesRef.current
+        .filter(entity => entity.category?.name === category && entity.type?.name)
+        .map(entity => entity.type!.name)
+    )).sort();
+
+    // Always render category section - filtering is visual only, not structural
+    // if (categoryTypes.length === 0) return null;
+
+    return (
+      <div key={`entity-${category}-${columnIndex || 0}`} className="mb-4">
+        {/* Enhanced Category Header - exact match to POI filters */}
+        <div className="flex items-center justify-between mb-2 px-3 py-2 rounded-lg bg-gradient-to-r from-slate-800/40 via-slate-700/30 to-slate-800/40 border border-amber-400/20">
+          <h4 className="text-sm font-medium text-amber-200 tracking-wide flex-1"
+              style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+            {category} ({getEntityCountForCategory(category)})
+          </h4>
+          <div className="flex items-center gap-1">
+            {/* Category Visibility Toggle */}
+            <button
+              onClick={() => toggleEntityCategory(category, !categoryVisible)}
+              className={`p-1 rounded transition-all duration-200 ${
+                !categoryVisible 
+                  ? 'text-red-400 hover:text-red-300 hover:bg-red-500/10' 
+                  : 'text-amber-400/70 hover:text-amber-300 hover:bg-amber-500/10'
+              }`}
+              title={categoryVisible ? 'Hide category' : 'Show category'}
+            >
+              <Eye className="w-3 h-3" />
+            </button>
+            {/* Category Collapse Toggle */}
+            <button
+              onClick={() => toggleEntityCategoryCollapse(category)}
+              className="p-1 text-amber-400/70 hover:text-amber-300 hover:bg-amber-500/10 rounded transition-all duration-200"
+              title={isCollapsed ? 'Expand category' : 'Collapse category'}
+            >
+              <ChevronRight className={`w-3 h-3 transition-transform duration-200 ${isCollapsed ? '' : 'rotate-90'}`} />
+            </button>
+          </div>
+        </div>
+
+        {/* Category Types - exact match to POI filters with subtype support */}
+        {!isCollapsed && (
+          <div className="space-y-1 ml-2">
+            {categoryTypes.map(type => {
+              const typeVisible = entityFilters.types[type] !== false;
+              const typeEntityCount = allEntitiesRef.current.filter(entity => 
+                entity.category?.name === category && entity.type?.name === type
+              ).length;
+              
+              // Get subtypes for this type - only show if there are meaningful subtypes (not just "None")
+              const allTypeSubtypes = Array.from(new Set(
+                allEntitiesRef.current
+                  .filter(entity => 
+                    entity.category?.name === category && 
+                    entity.type?.name === type && 
+                    entity.subtype?.name
+                  )
+                  .map(entity => entity.subtype!.name)
+              )).sort();
+              
+              // Only show subtypes if there are meaningful ones (more than just "None" or has real subtypes alongside "None")
+              const meaningfulSubtypes = allTypeSubtypes.filter(subtype => subtype.toLowerCase() !== 'none');
+              const typeSubtypes = meaningfulSubtypes.length > 0 ? allTypeSubtypes : [];
+
+              const subtypeKey = `${category}-${type}`;
+              const subtypesCollapsed = collapsedSubtypes.has(subtypeKey);
+              
+              return (
+                <div key={`entity-type-${category}-${type}`} className="space-y-1">
+                  {/* Type Header with Toggle Controls */}
+                  <div className="flex items-center justify-between mb-1 px-2 py-1.5 rounded-lg bg-gradient-to-r from-slate-800/40 via-slate-700/30 to-slate-800/40 border border-amber-400/20">
+                    <div className="flex items-center gap-2 flex-1">
+                      {/* Type Icon */}
+                      <div className="w-4 h-4 flex items-center justify-center flex-shrink-0">
+                        <span className="text-xs leading-none text-amber-300">
+                          📦
+                        </span>
+                      </div>
+                      
+                      {/* Type Name with Count */}
+                      <span className="text-xs font-light tracking-wide text-amber-200">
+                        {type} ({getEntityCountForType(category, type)})
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1">
+                      {/* Type Visibility Toggle */}
+                      <button
+                        onClick={() => toggleEntityType(type, !typeVisible)}
+                        className={`p-1 rounded transition-all duration-200 ${
+                          !typeVisible 
+                            ? 'text-red-400 hover:text-red-300 hover:bg-red-500/10' 
+                            : 'text-amber-400/70 hover:text-amber-300 hover:bg-amber-500/10'
+                        }`}
+                        title={typeVisible ? 'Hide type' : 'Show type'}
+                      >
+                        <Eye className="w-3 h-3" />
+                      </button>
+                      
+                      {/* Subtype Collapse Toggle - only show if subtypes exist */}
+                      {typeSubtypes.length > 0 && (
+                        <button
+                          onClick={() => {
+                            setCollapsedSubtypes(prev => {
+                              const newSet = new Set(prev);
+                              if (newSet.has(subtypeKey)) {
+                                newSet.delete(subtypeKey);
+                              } else {
+                                newSet.add(subtypeKey);
+                              }
+                              return newSet;
+                            });
+                          }}
+                          className="p-1 text-amber-400/70 hover:text-amber-300 hover:bg-amber-500/10 rounded transition-all duration-200"
+                          title={subtypesCollapsed ? 'Show subtypes' : 'Hide subtypes'}
+                        >
+                          <ChevronRight className={`w-3 h-3 transition-transform duration-200 ${subtypesCollapsed ? '' : 'rotate-90'}`} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Subtypes - collapsible, collapsed by default */}
+                  {typeSubtypes.length > 0 && !subtypesCollapsed && (
+                    <div className="ml-6 space-y-1 relative">
+                      {typeSubtypes.map((subtype) => {
+                        const subtypeEntityCount = allEntitiesRef.current.filter(entity => 
+                          entity.category?.name === category && 
+                          entity.type?.name === type && 
+                          entity.subtype?.name === subtype
+                        ).length;
+
+                        const subtypeVisible = entityFilters.subtypes?.[subtype] !== false;
+                        
+                        return (
+                          <button
+                            key={`entity-subtype-${category}-${type}-${subtype}`}
+                            onClick={() => toggleEntitySubtype(subtype, !subtypeVisible)}
+                            className={`w-full flex items-center gap-2 px-2 py-1 text-xs rounded transition-all duration-200 text-left ${
+                              subtypeVisible
+                                ? 'text-amber-200/90 bg-slate-800/40 border border-amber-400/30'
+                                : 'text-amber-200/50 bg-slate-800/20 hover:bg-slate-800/30 hover:text-amber-200/70'
+                            }`}
+                          >
+                            {/* Subtype Icon */}
+                            <div className="w-4 h-4 flex items-center justify-center flex-shrink-0">
+                              <span className="text-xs text-amber-300/50">
+                                ·
+                              </span>
+                            </div>
+                            
+                            {/* Subtype Name with Count */}
+                            <span className="font-light tracking-wide flex-1">
+                              {subtype} ({subtypeEntityCount})
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   // Focus management effect
   useEffect(() => {
@@ -136,6 +356,33 @@ const FiltersPanel: React.FC<FiltersPanelProps> = ({ onTogglePanel, filterState 
     }, 10);
   };
 
+  // Category collapse functions
+  const togglePOICategoryCollapse = (category: string) => {
+    setCollapsedPOICategories(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(category)) {
+        newSet.delete(category);
+      } else {
+        newSet.add(category);
+      }
+      return newSet;
+    });
+  };
+
+    const toggleEntityCategoryCollapse = (category: string) => {
+    setCollapsedEntityCategories(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(category)) {
+        newSet.delete(category);
+      } else {
+        newSet.add(category);
+      }
+      return newSet;
+    });
+  };
+
+
+
   // Helper function to check if an icon is a URL
   const isIconUrl = (icon: string): boolean => {
     return icon.startsWith('http') || icon.startsWith('/') || icon.includes('.');
@@ -149,10 +396,29 @@ const FiltersPanel: React.FC<FiltersPanelProps> = ({ onTogglePanel, filterState 
     return icon; // Return emoji as-is
   };
 
-  // Get POI count for a type
+  // Get POI count for a type - implement proper counting
   const getPoiCountForType = (typeId: string) => {
-    // This would ideally come from filterState, but for now return empty
-    return '';
+    return pois.filter(poi => poi.poi_type_id === typeId).length;
+  };
+
+  // Get POI count for a category
+  const getPoiCountForCategory = (category: string) => {
+    const categoryTypeIds = poiTypes
+      .filter(type => type.category === category)
+      .map(type => type.id);
+    return pois.filter(poi => categoryTypeIds.includes(poi.poi_type_id)).length;
+  };
+
+  // Get entity count for a category
+  const getEntityCountForCategory = (category: string) => {
+    return allEntitiesRef.current.filter(entity => entity.category?.name === category).length;
+  };
+
+  // Get entity count for a type
+  const getEntityCountForType = (category: string, type: string) => {
+    return allEntitiesRef.current.filter(entity => 
+      entity.category?.name === category && entity.type?.name === type
+    ).length;
   };
 
   // Check if category is visible (all types in category are selected)
@@ -161,86 +427,102 @@ const FiltersPanel: React.FC<FiltersPanelProps> = ({ onTogglePanel, filterState 
     return categoryTypes.some(type => poiFilters.selectedPoiTypes.includes(type.id));
   };
 
-  // Render category section like other pages
-  const renderCategorySection = (category: string) => {
+  // Render category section exactly like MapControlPanel
+  const renderPOICategorySection = (category: string) => {
     const categoryTypes = poiTypes
       .filter(type => type.category === category)
       .sort((a, b) => a.name.localeCompare(b.name));
     
     if (categoryTypes.length === 0) return null;
     
-    const categoryVisible = isCategoryVisible(category);
+    const categoryTypeIds = categoryTypes.map(type => type.id);
+    const categoryVisible = categoryTypeIds.length > 0 && categoryTypeIds.some(id => poiFilters.selectedPoiTypes.includes(id));
+    const isCollapsed = collapsedPOICategories.has(category);
 
     return (
-      <div key={category} className="border border-slate-600/40 rounded-lg overflow-hidden mb-3">
-        {/* Category Header */}
-        <div className="relative overflow-hidden">
-          <div className="absolute inset-0 bg-slate-800/30" />
-          <div className="absolute inset-0 bg-gradient-to-b from-slate-700/20 via-transparent to-slate-800/30" />
-          
-          <div className="relative z-10 border-b border-slate-600/40 px-3 py-2 backdrop-blur-sm">
-            <div className="flex items-center justify-between">
-              <label className="flex items-center cursor-pointer group">
-                <input
-                  type="checkbox"
-                  checked={categoryVisible}
-                  onChange={(e) => togglePOICategory(category, e.target.checked)}
-                  className="rounded border-slate-500/50 text-amber-500 focus:ring-amber-500/30 bg-slate-800/60"
-                />
-                <span className="ml-2 text-sm font-light text-amber-200 capitalize group-hover:text-amber-100 transition-colors tracking-wide">
-                  {String(category)}
-                </span>
-              </label>
-              <span className="text-xs text-amber-300/70 font-light px-2 py-1 bg-slate-700/40 rounded border border-slate-600/30">
-                {categoryTypes.length}
-              </span>
-            </div>
+      <div key={category} className="mb-4">
+        {/* Enhanced Category Header - exact match to MapControlPanel */}
+        <div className="flex items-center justify-between mb-2 px-3 py-2 rounded-lg bg-gradient-to-r from-slate-800/40 via-slate-700/30 to-slate-800/40 border border-amber-400/20">
+          <h4 className="text-sm font-medium text-amber-200 tracking-wide flex-1"
+              style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+            {category} ({getPoiCountForCategory(category)})
+          </h4>
+          <div className="flex items-center gap-1">
+            {/* Category Visibility Toggle */}
+            <button
+              onClick={() => togglePOICategory(category, !categoryVisible)}
+              className={`p-1 rounded transition-all duration-200 ${
+                !categoryVisible 
+                  ? 'text-red-400 hover:text-red-300 hover:bg-red-500/10' 
+                  : 'text-amber-400/70 hover:text-amber-300 hover:bg-amber-500/10'
+              }`}
+              title={categoryVisible ? 'Hide category' : 'Show category'}
+            >
+              <Eye className="w-3 h-3" />
+            </button>
+            {/* Category Collapse Toggle */}
+            <button
+              onClick={() => togglePOICategoryCollapse(category)}
+              className="p-1 text-amber-400/70 hover:text-amber-300 hover:bg-amber-500/10 rounded transition-all duration-200"
+              title={isCollapsed ? 'Expand category' : 'Collapse category'}
+            >
+              <ChevronRight className={`w-3 h-3 transition-transform duration-200 ${isCollapsed ? '' : 'rotate-90'}`} />
+            </button>
           </div>
         </div>
 
-        {/* Individual POI Types in Category */}
-        <div className="bg-slate-800/20 p-3">
-          <div className="space-y-2">
-            {categoryTypes.map(type => (
-              <div key={type.id} className="flex items-center justify-between">
-                <label className="flex items-center cursor-pointer group">
-                  <input
-                    type="checkbox"
-                    checked={poiFilters.selectedPoiTypes.includes(type.id)}
-                    onChange={(e) => togglePOIType(type.id)}
-                    className="rounded border-slate-500/50 text-amber-500 focus:ring-amber-500/30 bg-slate-800/60"
-                  />
-                  <div className="ml-2 flex items-center">
-                    <div className="w-4 h-4 mr-2 flex items-center justify-center">
-                      {isIconUrl(type.icon) ? (
-                        <img 
-                          src={getDisplayImageUrl(type.icon)} 
-                          alt={type.name}
-                          className="w-4 h-4 object-contain"
-                        />
-                      ) : (
-                        <span className="text-xs leading-none">{String(type.icon || '')}</span>
-                      )}
-                    </div>
-                    <span className="text-sm text-amber-200 group-hover:text-amber-100 transition-colors">
-                      {String(type.name || '')}
-                    </span>
+        {/* Category Types - exact match to MapControlPanel */}
+        {!isCollapsed && (
+          <div className="space-y-1 ml-2">
+            {categoryTypes.map(type => {
+              const isSelected = poiFilters.selectedPoiTypes.includes(type.id);
+              const poiCount = getPoiCountForType(type.id);
+              const displayIcon = getDisplayImageUrl(type.icon);
+              
+              return (
+                <button
+                  key={type.id}
+                  onClick={() => togglePOIType(type.id)}
+                  className={`w-full flex items-center gap-2 px-2 py-1.5 rounded transition-all duration-200 text-left ${
+                    isSelected
+                      ? 'bg-gradient-to-r from-slate-800/60 to-slate-700/40 text-amber-200 border border-amber-400/40 shadow-sm'
+                      : 'text-amber-300/80 hover:bg-slate-800/30 hover:text-amber-200'
+                  }`}
+                >
+                  {/* Type Icon */}
+                  <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
+                    {isIconUrl(type.icon) ? (
+                      <img 
+                        src={displayIcon} 
+                        alt={type.name}
+                        className="w-4 h-4 object-contain"
+                      />
+                    ) : (
+                      <span 
+                        className="text-sm leading-none"
+                        style={{ color: type.color }}
+                      >
+                        {type.icon}
+                      </span>
+                    )}
                   </div>
-                </label>
-                <span className="text-xs text-amber-300/70">
-                  {getPoiCountForType(type.id)}
-                </span>
-              </div>
-            ))}
+                  
+                  {/* Type Name with Count */}
+                  <span className="text-xs font-light tracking-wide flex-1">
+                    {type.name} ({poiCount})
+                  </span>
+                </button>
+              );
+            })}
           </div>
-        </div>
+        )}
       </div>
     );
   };
 
   if (loading) {
     return (
-      <div className="w-80 dune-panel border-r overflow-hidden flex flex-col">
+      <div className="w-[30rem] dune-panel border-r overflow-hidden flex flex-col">
         <div className="p-4 border-b border-slate-600">
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-xl font-bold text-amber-200 flex items-center">
@@ -318,80 +600,110 @@ const FiltersPanel: React.FC<FiltersPanelProps> = ({ onTogglePanel, filterState 
         </div>
       </div>
 
-      {/* Privacy Level */}
-      <div>
-        <label className="block text-sm font-medium text-amber-200 mb-2">Privacy Level</label>
-        <div className="space-y-2">
-          <label className="flex items-center justify-between">
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                checked={poiFilters.privacyLevels.public}
-                onChange={(e) => updatePOIFilters({ 
-                  privacyLevels: { ...poiFilters.privacyLevels, public: e.target.checked }
-                })}
-                className="mr-2 rounded text-amber-500"
-              />
-              <span className="text-sm">🌍 Public</span>
-            </div>
-          </label>
-          <label className="flex items-center justify-between">
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                checked={poiFilters.privacyLevels.private}
-                onChange={(e) => updatePOIFilters({ 
-                  privacyLevels: { ...poiFilters.privacyLevels, private: e.target.checked }
-                })}
-                className="mr-2 rounded text-amber-500"
-              />
-              <span className="text-sm">🔒 Private</span>
-            </div>
-          </label>
-          <label className="flex items-center justify-between">
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                checked={poiFilters.privacyLevels.shared}
-                onChange={(e) => updatePOIFilters({ 
-                  privacyLevels: { ...poiFilters.privacyLevels, shared: e.target.checked }
-                })}
-                className="mr-2 rounded text-amber-500"
-              />
-              <span className="text-sm">👥 Shared</span>
-            </div>
-          </label>
-        </div>
-      </div>
-
-      {/* All POIs Toggle */}
-      <div className="relative overflow-hidden rounded-lg">
-        <div className="absolute inset-0 bg-slate-800/30" />
-        <div className="absolute inset-0 bg-gradient-to-b from-slate-700/20 via-transparent to-slate-800/30" />
-        
-        <div className="relative z-10 border border-slate-600/40 backdrop-blur-sm">
+      {/* Show/Hide All Toggle - exact match to MapControlPanel */}
+      <div className="flex justify-between items-center mb-4">
+        <label className="block text-sm font-light text-amber-200 tracking-wide" style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+          Points of Interest
+        </label>
+        <div className="flex gap-2">
           <button
             onClick={toggleAllPOIs}
-            className="w-full px-4 py-3 text-left flex items-center justify-between transition-all duration-300 hover:bg-slate-700/20 group"
+            className="text-xs text-amber-300 hover:text-amber-100 font-light transition-all duration-300 px-2 py-1 rounded border border-amber-400/20 hover:border-amber-400/40 hover:bg-amber-400/10"
+            title="Toggle All POIs"
+            style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
           >
-            <div className="flex items-center">
-              <Database className="text-amber-400 mr-3" size={18} />
-              <span className="font-light text-amber-200 tracking-wide">
-                {poiFilters.selectedPoiTypes.length === poiTypes.length ? 'Hide All POIs' : 'Show All POIs'}
-              </span>
-            </div>
-            <span className="text-xs text-amber-300/70 px-2 py-1 bg-slate-700/40 rounded border border-slate-600/30 group-hover:bg-slate-700/50 transition-all duration-300">
-              {poiFilters.selectedPoiTypes.length}
-            </span>
+            {(() => {
+              const allTypeIds = poiTypes.map(type => type.id);
+              const allTypesSelected = allTypeIds.length > 0 && allTypeIds.every(id => poiFilters.selectedPoiTypes.includes(id));
+              return allTypesSelected ? 'Hide All' : 'Show All';
+            })()}
           </button>
         </div>
       </div>
 
-      {/* POI Categories */}
-      <div>
-        <label className="block text-sm font-medium text-amber-200 mb-3">POI Categories</label>
-        <div className="space-y-2">
-          {poiCategories.map(category => renderCategorySection(category))}
+      {/* POI Categories in Two Columns - exact match to MapControlPanel */}
+      <div className="grid grid-cols-2 gap-3 mb-4">
+        {/* Left Column */}
+        <div className="space-y-1">
+          {poiCategories
+            .filter((_, index) => index % 2 === 0)
+            .map(category => renderPOICategorySection(category))}
+        </div>
+        
+        {/* Right Column */}
+        <div className="space-y-1">
+          {poiCategories
+            .filter((_, index) => index % 2 === 1)
+            .map(category => renderPOICategorySection(category))}
+        </div>
+      </div>
+
+      {/* Privacy Level - moved to bottom, exact match to MapControlPanel Additional Filters */}
+      <div className="border-t border-slate-700/50 pt-4">
+        <h4 className="text-sm font-medium text-amber-200 mb-3">Additional Filters</h4>
+        
+        {/* Visibility Presets - exact match to MapControlPanel */}
+        <div>
+          <label className="block text-sm font-medium text-amber-200/80 mb-2">
+            Quick Visibility Filters
+          </label>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => updatePOIFilters({ 
+                privacyLevels: { public: true, private: false, shared: false }
+              })}
+              className={`px-3 py-2 text-xs rounded border flex items-center justify-center gap-1 transition-all ${
+                poiFilters.privacyLevels.public && !poiFilters.privacyLevels.private && !poiFilters.privacyLevels.shared
+                  ? 'bg-amber-600/20 border-amber-500/50 text-amber-200'
+                  : 'bg-slate-800/50 border-slate-600/50 text-amber-300/70 hover:bg-slate-700/50 hover:text-amber-200'
+              }`}
+            >
+              <Eye className="w-3 h-3 text-green-400" />
+              Public Only
+            </button>
+            <button
+              onClick={() => updatePOIFilters({ 
+                privacyLevels: { public: false, private: true, shared: false }
+              })}
+              className={`px-3 py-2 text-xs rounded border flex items-center justify-center gap-1 transition-all ${
+                !poiFilters.privacyLevels.public && poiFilters.privacyLevels.private && !poiFilters.privacyLevels.shared
+                  ? 'bg-amber-600/20 border-amber-500/50 text-amber-200'
+                  : 'bg-slate-800/50 border-slate-600/50 text-amber-300/70 hover:bg-slate-700/50 hover:text-amber-200'
+              }`}
+            >
+              <span className="w-3 h-3 text-red-400">🔒</span>
+              Private Only
+            </button>
+            <button
+              onClick={() => updatePOIFilters({ 
+                privacyLevels: { public: false, private: false, shared: true }
+              })}
+              className={`px-3 py-2 text-xs rounded border flex items-center justify-center gap-1 transition-all ${
+                !poiFilters.privacyLevels.public && !poiFilters.privacyLevels.private && poiFilters.privacyLevels.shared
+                  ? 'bg-amber-600/20 border-amber-500/50 text-amber-200'
+                  : 'bg-slate-800/50 border-slate-600/50 text-amber-300/70 hover:bg-slate-700/50 hover:text-amber-200'
+              }`}
+            >
+              <span className="w-3 h-3 text-blue-400">👥</span>
+              Shared Only
+            </button>
+            <button
+              onClick={() => updatePOIFilters({ 
+                privacyLevels: { public: true, private: true, shared: true }
+              })}
+              className={`px-3 py-2 text-xs rounded border flex items-center justify-center gap-1 transition-all ${
+                poiFilters.privacyLevels.public && poiFilters.privacyLevels.private && poiFilters.privacyLevels.shared
+                  ? 'bg-amber-600/20 border-amber-500/50 text-amber-200'
+                  : 'bg-slate-800/50 border-slate-600/50 text-amber-300/70 hover:bg-slate-700/50 hover:text-amber-200'
+              }`}
+            >
+              <Eye className="w-3 h-3 text-amber-300" />
+              Show All
+            </button>
+          </div>
+          <div className="mt-2 text-xs text-amber-300/70">
+            Icons show privacy levels on map POIs: <Eye className="w-3 h-3 inline text-green-400" /> Public, 🔒 Private, 👥 Shared
+          </div>
         </div>
       </div>
     </div>
@@ -399,13 +711,13 @@ const FiltersPanel: React.FC<FiltersPanelProps> = ({ onTogglePanel, filterState 
 
   const EntityFiltersTab = () => (
     <div className="space-y-4">
-      {/* Search */}
+      {/* Entity Search - Match POI search styling exactly */}
       <div className="relative">
         <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
         <input
           key="entity-search-input"
           type="text"
-          placeholder="Search by name, description..."
+          placeholder="Search items, schematics..."
           value={entityFilters.searchQuery}
           onChange={handleEntitySearchChange}
           ref={entitySearchRef}
@@ -421,133 +733,145 @@ const FiltersPanel: React.FC<FiltersPanelProps> = ({ onTogglePanel, filterState 
         )}
       </div>
 
-      {/* Entity Class (Items/Schematics) */}
-      <div>
-        <label className="block text-sm font-medium text-amber-200 mb-2">Entity Class</label>
-        <div className="grid grid-cols-2 gap-2">
+      {/* Show All / Hide All Button for Entities */}
+      <div className="flex justify-between items-center mb-4">
+        <label className="block text-sm font-light text-amber-200 tracking-wide" style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+          Items & Schematics
+        </label>
+        <div className="flex gap-2">
           <button
             onClick={() => updateEntityFilters({ 
               entityTypes: { ...entityFilters.entityTypes, items: !entityFilters.entityTypes.items }
             })}
-            className={`py-2 px-3 text-xs rounded-lg transition-all duration-200 ${
-              entityFilters.entityTypes.items ? 'dune-button-primary' : 'dune-button-secondary'
+            className={`text-xs font-light transition-all duration-300 px-2 py-1 rounded border border-amber-400/20 hover:border-amber-400/40 hover:bg-amber-400/10 ${
+              entityFilters.entityTypes.items 
+                ? 'text-amber-100 bg-amber-600/20' 
+                : 'text-amber-300 hover:text-amber-100'
             }`}
+            style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
           >
-            ⚔️ Items
+            Items
           </button>
           <button
             onClick={() => updateEntityFilters({ 
               entityTypes: { ...entityFilters.entityTypes, schematics: !entityFilters.entityTypes.schematics }
             })}
-            className={`py-2 px-3 text-xs rounded-lg transition-all duration-200 ${
-              entityFilters.entityTypes.schematics ? 'dune-button-primary' : 'dune-button-secondary'
+            className={`text-xs font-light transition-all duration-300 px-2 py-1 rounded border border-amber-400/20 hover:border-amber-400/40 hover:bg-amber-400/10 ${
+              entityFilters.entityTypes.schematics 
+                ? 'text-amber-100 bg-amber-600/20' 
+                : 'text-amber-300 hover:text-amber-100'
             }`}
+            style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
           >
-            📐 Schematics
+            Schematics
+          </button>
+          <button
+            onClick={toggleAllEntities}
+            className="text-xs text-amber-300 hover:text-amber-100 font-light transition-all duration-300 px-2 py-1 rounded border border-amber-400/20 hover:border-amber-400/40 hover:bg-amber-400/10"
+            title="Toggle All Entities"
+            style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
+          >
+            {(() => {
+              const allCategories = Object.keys(entityFilters.categories);
+              const allTypes = Object.keys(entityFilters.types);
+              const allTiers = Object.keys(entityFilters.tiers);
+              
+              const allCategoriesSelected = allCategories.every(cat => entityFilters.categories[cat] === true);
+              const allTypesSelected = allTypes.every(type => entityFilters.types[type] === true);
+              const allTiersSelected = allTiers.every(tier => entityFilters.tiers[tier] === true);
+              
+              return (allCategoriesSelected && allTypesSelected && allTiersSelected) ? 'Hide All' : 'Show All';
+            })()}
           </button>
         </div>
       </div>
 
-      {/* Entity Categories */}
-      <div>
-        <label className="block text-sm font-medium text-amber-200 mb-2">Categories</label>
-        <div className="space-y-2">
-          {memoizedEntityCategories.map((category, index) => (
-            <label key={`category-${index}-${category}`} className="flex items-center justify-between">
-              <div className="flex items-center">
-                <input
-                  type="checkbox"
-                  checked={entityFilters.categories[category] !== false}
-                  onChange={(e) => toggleEntityCategory(category, e.target.checked)}
-                  className="mr-2 rounded text-amber-500"
-                />
-                <span className="text-sm capitalize">{category}</span>
-              </div>
-            </label>
-          ))}
+      {/* Entity Categories in Two Columns - same as POI filters */}
+      <div className="grid grid-cols-2 gap-3 mb-4">
+        {/* Left Column */}
+        <div className="space-y-1">
+          {memoizedEntityCategories
+            .filter((_, index) => index % 2 === 0)
+            .map((category) => renderEntityCategorySection(category, 0))}
+        </div>
+        
+        {/* Right Column */}
+        <div className="space-y-1">
+          {memoizedEntityCategories
+            .filter((_, index) => index % 2 === 1)
+            .map((category) => renderEntityCategorySection(category, 1))}
         </div>
       </div>
 
-      {/* Entity Types */}
-      <div>
-        <label className="block text-sm font-medium text-amber-200 mb-2">Types</label>
-        <div className="space-y-2">
-          {memoizedEntityTypes.map((type, index) => (
-            <label key={`type-${index}-${type}`} className="flex items-center justify-between">
-              <div className="flex items-center">
-                <input
-                  type="checkbox"
-                  checked={entityFilters.types[type] !== false}
-                  onChange={(e) => toggleEntityType(type, e.target.checked)}
-                  className="mr-2 rounded text-amber-500"
-                />
-                <span className="text-sm capitalize">{type}</span>
-              </div>
-            </label>
-          ))}
-        </div>
-      </div>
-
-      {/* Tiers */}
-      <div>
-        <label className="block text-sm font-medium text-amber-200 mb-2">Tiers</label>
-        <div className="flex flex-wrap gap-2">
-          {validTiers.map(tier => {
-            const tierKey = tier.tier_number.toString();
-            const tierName = getTierName ? getTierName(tier.tier_number) : `T${tier.tier_number}`;
-            
-            return (
-              <button
-                key={tier.tier_number}
-                onClick={() => toggleEntityTier(tierKey, !entityFilters.tiers[tierKey])}
-                className={`px-3 py-1 text-xs rounded-full transition-all duration-200 ${
-                  entityFilters.tiers[tierKey] !== false ? 'dune-button-primary' : 'dune-button-secondary'
-                }`}
-              >
-                {String(tierName || `T${tier.tier_number}`)}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Scope */}
-      <div>
-        <label className="block text-sm font-medium text-amber-200 mb-2">Scope</label>
-        <div className="space-y-2">
-          <label className="flex items-center justify-between">
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                checked={entityFilters.scope.global}
-                onChange={(e) => updateEntityFilters({ 
-                  scope: { ...entityFilters.scope, global: e.target.checked }
-                })}
-                className="mr-2 rounded text-amber-500"
-              />
-              <span className="text-sm">🌍 Global</span>
-            </div>
+      {/* Additional Filters - exact match to POI additional filters */}
+      <div className="border-t border-slate-700/50 pt-4">
+        <h4 className="text-sm font-medium text-amber-200 mb-3">Additional Filters</h4>
+        
+        {/* Entity Tiers Section */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-amber-200/80 mb-2">
+            Entity Tiers
           </label>
-          <label className="flex items-center justify-between">
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                checked={entityFilters.scope.custom}
-                onChange={(e) => updateEntityFilters({ 
-                  scope: { ...entityFilters.scope, custom: e.target.checked }
-                })}
-                className="mr-2 rounded text-amber-500"
-              />
-              <span className="text-sm">👤 Custom</span>
-            </div>
+          <div className="grid grid-cols-2 gap-2">
+            {tiersToDisplay.slice(0, 6).map(tier => {
+              const tierKey = tier.tier_number.toString();
+              const tierName = getTierName ? getTierName(tier.tier_number) : `T${tier.tier_number}`;
+              
+              return (
+                <button
+                  key={tier.tier_number}
+                  onClick={() => toggleEntityTier(tierKey, !entityFilters.tiers[tierKey])}
+                  className={`px-3 py-2 text-xs rounded border flex items-center justify-center gap-1 transition-all ${
+                    entityFilters.tiers[tierKey] !== false
+                      ? 'bg-amber-600/20 border-amber-500/50 text-amber-200'
+                      : 'bg-slate-800/50 border-slate-600/50 text-amber-300/70 hover:bg-slate-700/50 hover:text-amber-200'
+                  }`}
+                >
+                  {String(tierName || `T${tier.tier_number}`)}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Entity Scope Section */}
+        <div>
+          <label className="block text-sm font-medium text-amber-200/80 mb-2">
+            Entity Scope
           </label>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => updateEntityFilters({ 
+                scope: { ...entityFilters.scope, global: !entityFilters.scope.global }
+              })}
+              className={`px-3 py-2 text-xs rounded border flex items-center justify-center gap-1 transition-all ${
+                entityFilters.scope.global
+                  ? 'bg-amber-600/20 border-amber-500/50 text-amber-200'
+                  : 'bg-slate-800/50 border-slate-600/50 text-amber-300/70 hover:bg-slate-700/50 hover:text-amber-200'
+              }`}
+            >
+              🌍 Global
+            </button>
+            <button
+              onClick={() => updateEntityFilters({ 
+                scope: { ...entityFilters.scope, custom: !entityFilters.scope.custom }
+              })}
+              className={`px-3 py-2 text-xs rounded border flex items-center justify-center gap-1 transition-all ${
+                entityFilters.scope.custom
+                  ? 'bg-amber-600/20 border-amber-500/50 text-amber-200'
+                  : 'bg-slate-800/50 border-slate-600/50 text-amber-300/70 hover:bg-slate-700/50 hover:text-amber-200'
+              }`}
+            >
+              👤 Custom
+            </button>
+          </div>
         </div>
       </div>
     </div>
   );
 
   return (
-    <div className="w-80 dune-panel border-r overflow-hidden flex flex-col">
+    <div className="w-[30rem] dune-panel border-r overflow-hidden flex flex-col">
       {/* Header */}
       <div className="p-4 border-b border-slate-600">
         <div className="flex items-center justify-between mb-2">
@@ -582,7 +906,7 @@ const FiltersPanel: React.FC<FiltersPanelProps> = ({ onTogglePanel, filterState 
           className={`flex-1 py-3 px-4 text-sm font-medium transition-all duration-200 ${
             activeTab === 'poi'
               ? 'tab-active bg-amber-600/20 text-amber-200 border-b-2 border-amber-400'
-              : 'tab-inactive text-slate-400 hover:text-amber-300'
+              : 'tab-inactive text-amber-300/80 hover:text-amber-200'
           }`}
         >
           POI Filters
@@ -592,7 +916,7 @@ const FiltersPanel: React.FC<FiltersPanelProps> = ({ onTogglePanel, filterState 
           className={`flex-1 py-3 px-4 text-sm font-medium transition-all duration-200 ${
             activeTab === 'entity'
               ? 'tab-active bg-amber-600/20 text-amber-200 border-b-2 border-amber-400'
-              : 'tab-inactive text-slate-400 hover:text-amber-300'
+              : 'tab-inactive text-amber-300/80 hover:text-amber-200'
           }`}
         >
           Entity Filters
@@ -607,16 +931,6 @@ const FiltersPanel: React.FC<FiltersPanelProps> = ({ onTogglePanel, filterState 
         <div className={activeTab === 'entity' ? 'block' : 'hidden'}>
           <EntityFiltersTab />
         </div>
-      </div>
-
-      {/* Actions */}
-      <div className="p-4 border-t border-slate-600">
-        <button
-          onClick={clearAllFilters}
-          className="w-full dune-button-secondary py-2 px-4 text-sm rounded-lg"
-        >
-          Clear All Filters
-        </button>
       </div>
     </div>
   );

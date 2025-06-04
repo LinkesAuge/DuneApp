@@ -90,11 +90,17 @@ const MapControlPanel: React.FC<MapControlPanelProps> = ({
     });
   };
 
-
-
   // Helper function to get POI count for a type
   const getPoiCountForType = (typeId: string) => {
     return pois.filter(poi => poi.poi_type_id === typeId).length;
+  };
+
+  // Helper function to get POI count for a category
+  const getPoiCountForCategory = (category: string) => {
+    const categoryTypeIds = poiTypes
+      .filter(type => type.category === category)
+      .map(type => type.id);
+    return pois.filter(poi => categoryTypeIds.includes(poi.poi_type_id)).length;
   };
 
   // Get unique categories for filtering
@@ -123,7 +129,7 @@ const MapControlPanel: React.FC<MapControlPanelProps> = ({
         <div className="flex items-center justify-between mb-2 px-3 py-2 rounded-lg bg-gradient-to-r from-slate-800/40 via-slate-700/30 to-slate-800/40 border border-amber-400/20">
           <h4 className="text-sm font-medium text-amber-200 tracking-wide flex-1"
               style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-            {category}
+            {category} ({getPoiCountForCategory(category)})
           </h4>
           <div className="flex items-center gap-1">
             {/* Category Visibility Toggle */}

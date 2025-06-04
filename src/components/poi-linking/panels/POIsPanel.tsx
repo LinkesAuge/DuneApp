@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { Map, List, Grid, Eye, CheckSquare, Square } from 'lucide-react';
+import { Map, List, Grid, Eye, CheckSquare, Square, Lock, Users } from 'lucide-react';
+import UserAvatar from '../../common/UserAvatar';
+import PaginationControls from '../../shared/PaginationControls';
 
 interface POIsPanelProps {
   onTogglePanel: () => void;
@@ -7,15 +9,19 @@ interface POIsPanelProps {
 }
 
 const POIsPanel: React.FC<POIsPanelProps> = ({ onTogglePanel, filterState }) => {
-  const [viewMode, setViewMode] = useState<'list' | 'grid' | 'map'>('list');
+  const [viewMode, setViewMode] = useState<'list' | 'grid' | 'map'>('grid');
   
   const {
     pois,
+    poiTypes,
     filterCounts,
     selectedPOIIds,
     togglePOISelection,
     clearAllSelections,
-    loading
+    loading,
+    pagination,
+    changePage,
+    changeItemsPerPage
   } = filterState;
 
   // Bulk selection handlers
@@ -33,30 +39,41 @@ const POIsPanel: React.FC<POIsPanelProps> = ({ onTogglePanel, filterState }) => 
     });
   };
 
-  // Get POI type info for display
-  const getPOITypeInfo = (poi: any) => {
-    if (!poi.poi_types) return { icon: '📍', color: 'bg-slate-600' };
-    
-    const typeMap: { [key: string]: { icon: string; color: string } } = {
-      'Base': { icon: '⚡', color: 'bg-blue-600' },
-      'Resources': { icon: '💎', color: 'bg-orange-600' },
-      'Locations': { icon: '🏛️', color: 'bg-purple-600' },
-      'NPCs': { icon: '👤', color: 'bg-green-600' },
-      'Exploration': { icon: '🔍', color: 'bg-yellow-600' }
-    };
-    
-    return typeMap[poi.poi_types.category] || { icon: '📍', color: 'bg-slate-600' };
+  // Helper function to check if an icon is a URL
+  const isIconUrl = (icon: string): boolean => {
+    return icon.startsWith('http') || icon.startsWith('/') || icon.includes('.');
   };
 
-  // Get privacy level info
+  // Helper function to get display image URL
+  const getDisplayImageUrl = (icon: string): string => {
+    if (isIconUrl(icon)) {
+      return icon;
+    }
+    return icon; // Return emoji as-is
+  };
+
+  // Get POI type info for display - using actual POI types from data
+  const getPOITypeInfo = (poi: any) => {
+    const poiType = poiTypes.find((type: any) => type.id === poi.poi_type_id);
+    if (!poiType) return { icon: '📍', color: poiType?.color || '#64748b', name: 'Unknown' };
+    
+    return { 
+      icon: poiType.icon || '📍', 
+      color: poiType.color || '#64748b',
+      name: poiType.name || 'Unknown',
+      category: poiType.category || 'Unknown'
+    };
+  };
+
+  // Get privacy level info - using EXACT same icons as MapControlPanel
   const getPrivacyInfo = (privacyLevel: string) => {
-    const privacyMap: { [key: string]: { icon: string; color: string } } = {
-      'global': { icon: '🌍', color: 'text-green-400' },
-      'private': { icon: '🔒', color: 'text-red-400' },
-      'shared': { icon: '👥', color: 'text-blue-400' }
+    const privacyMap: { [key: string]: { icon: React.ReactNode; color: string } } = {
+      'global': { icon: <Eye className="w-3 h-3 text-green-400" />, color: 'text-green-400' },
+      'private': { icon: <Lock className="w-3 h-3 text-red-400" />, color: 'text-red-400' },
+      'shared': { icon: <Users className="w-3 h-3 text-blue-400" />, color: 'text-blue-400' }
     };
     
-    return privacyMap[privacyLevel] || { icon: '❓', color: 'text-slate-400' };
+    return privacyMap[privacyLevel] || { icon: <Eye className="w-3 h-3 text-slate-400" />, color: 'text-slate-400' };
   };
 
   // Render individual POI card
@@ -81,23 +98,64 @@ const POIsPanel: React.FC<POIsPanelProps> = ({ onTogglePanel, filterState }) => 
             onClick={(e) => e.stopPropagation()}
           />
           <div className="flex-1 min-w-0">
-            <div className="flex items-center space-x-2">
-              <div className={`w-6 h-6 ${typeInfo.color} rounded-full flex items-center justify-center text-xs`}>
-                {typeInfo.icon}
+            <div className="flex items-center space-x-2 mb-1">
+              {/* POI Type Icon - use actual type icon */}
+              <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
+                {isIconUrl(typeInfo.icon) ? (
+                  <img 
+                    src={getDisplayImageUrl(typeInfo.icon)} 
+                    alt={typeInfo.name}
+                    className="w-4 h-4 object-contain"
+                  />
+                ) : (
+                  <span 
+                    className="text-sm leading-none"
+                    style={{ color: typeInfo.color }}
+                  >
+                    {typeInfo.icon}
+                  </span>
+                )}
               </div>
-              <h5 className="font-medium text-amber-200 truncate">{String(poi.title || '')}</h5>
-              <span className={`text-xs ${privacyInfo.color}`}>{privacyInfo.icon}</span>
+              <h5 className="font-medium text-amber-200 truncate flex-1">{String(poi.title || '')}</h5>
+              {/* Privacy Icon - exact same as MapControlPanel */}
+              <span className={privacyInfo.color}>{privacyInfo.icon}</span>
             </div>
             <p className="text-xs text-slate-400 mt-1 line-clamp-2">
               {String(poi.description || 'No description available')}
             </p>
-            <div className="flex items-center space-x-3 mt-2 text-xs text-slate-500">
-              <span>📍 {String(poi.map_type) === 'hagga_basin' ? 'Hagga Basin' : 'Deep Desert'}</span>
-              {poi.profiles?.username && (
-                <span>👤 by {String(poi.profiles.username || '')}</span>
+            {/* POI Details - matching format from other POI components */}
+            <div className="flex items-center justify-between mt-2 text-xs text-slate-500">
+              <div className="flex items-center space-x-3">
+                <span>{String(poi.map_type) === 'hagga_basin' ? '🏔️ Hagga Basin' : '🏜️ Deep Desert'}</span>
+                <span>{typeInfo.category}</span>
+                <span>{typeInfo.name}</span>
+              </div>
+              {poi.link_count && (
+                <span className="text-amber-400">🔗 {poi.link_count}</span>
               )}
-              <span>🔗 {poi.linkCount || 0} links</span>
             </div>
+            {/* Creator info with proper avatar */}
+            {poi.profiles && (
+              <div className="flex items-center space-x-2 mt-2">
+                <UserAvatar 
+                  user={{
+                    username: poi.profiles.username,
+                    display_name: poi.profiles.display_name,
+                    custom_avatar_url: poi.profiles.custom_avatar_url,
+                    discord_avatar_url: poi.profiles.discord_avatar_url,
+                    use_discord_avatar: poi.profiles.use_discord_avatar
+                  }}
+                  size="xs"
+                  className="flex-shrink-0"
+                />
+                <span className="text-xs text-slate-500">
+                  by {String(poi.profiles.display_name || poi.profiles.username || '')}
+                </span>
+                <span className="text-xs text-slate-600">
+                  {new Date(poi.created_at).toLocaleDateString()}
+                </span>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -143,16 +201,8 @@ const POIsPanel: React.FC<POIsPanelProps> = ({ onTogglePanel, filterState }) => 
           </h3>
           
           <div className="flex items-center space-x-2">
-            {/* View Mode Toggle */}
+            {/* View Mode Toggle - Changed order: grid first */}
             <div className="flex bg-slate-800 rounded-lg p-1">
-              <button
-                onClick={() => setViewMode('list')}
-                className={`py-1 px-2 text-xs rounded ${
-                  viewMode === 'list' ? 'dune-button-primary' : 'dune-button-secondary'
-                }`}
-              >
-                <List size={14} />
-              </button>
               <button
                 onClick={() => setViewMode('grid')}
                 className={`py-1 px-2 text-xs rounded ${
@@ -160,6 +210,14 @@ const POIsPanel: React.FC<POIsPanelProps> = ({ onTogglePanel, filterState }) => 
                 }`}
               >
                 <Grid size={14} />
+              </button>
+              <button
+                onClick={() => setViewMode('list')}
+                className={`py-1 px-2 text-xs rounded ${
+                  viewMode === 'list' ? 'dune-button-primary' : 'dune-button-secondary'
+                }`}
+              >
+                <List size={14} />
               </button>
               <button
                 onClick={() => setViewMode('map')}
@@ -213,24 +271,37 @@ const POIsPanel: React.FC<POIsPanelProps> = ({ onTogglePanel, filterState }) => 
       
       {/* POI Content Area */}
       <div className="flex-1 overflow-y-auto p-4">
-        {pois.length === 0 ? (
-          <div className="text-center text-slate-400 mt-16">
-            <Map size={48} className="mx-auto mb-4 opacity-50" />
-            <p>No POIs match current filters</p>
-            <p className="text-xs mt-2">Try adjusting your search criteria</p>
+        {viewMode === 'grid' ? (
+          <div className="grid grid-cols-2 gap-3"> {/* Changed to 2 columns */}
+            {pois.map((poi: any) => (
+              <POICard key={poi.id} poi={poi} />
+            ))}
           </div>
         ) : (
-          <div className={`gap-3 ${
-            viewMode === 'grid' 
-              ? 'grid grid-cols-1 xl:grid-cols-2' 
-              : 'flex flex-col'
-          }`}>
+          <div className="grid grid-cols-1 gap-3">
             {pois.map((poi: any) => (
               <POICard key={poi.id} poi={poi} />
             ))}
           </div>
         )}
+        
+        {pois.length === 0 && (
+          <div className="text-center py-8 text-slate-400">
+            No POIs match the current filters
+          </div>
+        )}
       </div>
+
+      {/* Pagination Controls */}
+      <PaginationControls
+        currentPage={pagination.pois.currentPage}
+        totalPages={pagination.pois.totalPages}
+        totalItems={pagination.pois.totalItems}
+        itemsPerPage={pagination.pois.itemsPerPage}
+        onPageChange={(page) => changePage('pois', page)}
+        onItemsPerPageChange={(itemsPerPage) => changeItemsPerPage('pois', itemsPerPage)}
+        loading={loading}
+      />
     </div>
   );
 };

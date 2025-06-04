@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
 import { Package, List, Grid, CheckSquare, Square, Filter } from 'lucide-react';
+import { useTiers } from '../../../hooks/useTiers';
+import { ImagePreview } from '../../shared/ImagePreview';
+import PaginationControls from '../../shared/PaginationControls';
 
 interface EntitiesPanelProps {
   onTogglePanel: () => void;
@@ -7,7 +10,10 @@ interface EntitiesPanelProps {
 }
 
 const EntitiesPanel: React.FC<EntitiesPanelProps> = ({ onTogglePanel, filterState }) => {
-  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('grid');
+  
+  // Use the tiers hook to get tier names
+  const { getTierName } = useTiers();
   
   const {
     entities,
@@ -15,7 +21,10 @@ const EntitiesPanel: React.FC<EntitiesPanelProps> = ({ onTogglePanel, filterStat
     selectedEntityIds,
     toggleEntitySelection,
     clearAllSelections,
-    loading
+    loading,
+    pagination,
+    changePage,
+    changeItemsPerPage
   } = filterState;
 
   // Bulk selection handlers
@@ -56,8 +65,11 @@ const EntitiesPanel: React.FC<EntitiesPanelProps> = ({ onTogglePanel, filterStat
       6: 'bg-red-600'
     };
     
+    // Get tier name from database using the useTiers hook
+    const tierName = getTierName(tierNumber);
+    
     return {
-      label: `T${tierNumber}`,
+      label: tierName || `T${tierNumber}`,
       color: tierColors[tierNumber] || 'bg-gray-600'
     };
   };
@@ -106,20 +118,12 @@ const EntitiesPanel: React.FC<EntitiesPanelProps> = ({ onTogglePanel, filterStat
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
                 <div className="w-5 h-5 bg-slate-600 rounded flex items-center justify-center">
-                  {entity.icon_url ? (
-                    <img 
-                      src={entity.icon_url} 
-                      alt={typeof entity.name === 'string' ? entity.name : 'Entity'} 
-                      className="w-4 h-4 object-cover"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = 'none';
-                        (e.target as HTMLImageElement).nextElementSibling!.style.display = 'inline';
-                      }}
-                    />
-                  ) : null}
-                  <span className={`text-xs ${entity.icon_url ? 'hidden' : ''}`}>
-                    {typeInfo?.icon || '📦'}
-                  </span>
+                  <ImagePreview
+                    iconImageId={entity.icon_image_id}
+                    iconFallback={entity.icon_fallback || (entity.is_schematic ? '📋' : '📦')}
+                    size="xs"
+                    className="w-full h-full"
+                  />
                 </div>
                 <h5 className="font-medium text-amber-200 text-sm truncate">
                   {typeof entity.name === 'string' ? entity.name : 'Unknown Entity'}
@@ -140,6 +144,14 @@ const EntitiesPanel: React.FC<EntitiesPanelProps> = ({ onTogglePanel, filterStat
                   <span className="text-slate-500">•</span>
                   <span className="text-xs text-slate-400 capitalize">
                     {entity.category.name}
+                  </span>
+                </>
+              )}
+              {entity.subtype?.name && entity.subtype.name.toLowerCase() !== 'none' && (
+                <>
+                  <span className="text-slate-500">•</span>
+                  <span className="text-xs text-slate-400 capitalize">
+                    {entity.subtype.name}
                   </span>
                 </>
               )}
@@ -194,16 +206,8 @@ const EntitiesPanel: React.FC<EntitiesPanelProps> = ({ onTogglePanel, filterStat
           </h3>
           
           <div className="flex items-center space-x-2">
-            {/* View Mode Toggle */}
+            {/* View Mode Toggle - Changed order: grid first */}
             <div className="flex bg-slate-800 rounded-lg p-1">
-              <button
-                onClick={() => setViewMode('list')}
-                className={`py-1 px-2 text-xs rounded ${
-                  viewMode === 'list' ? 'dune-button-primary' : 'dune-button-secondary'
-                }`}
-              >
-                <List size={14} />
-              </button>
               <button
                 onClick={() => setViewMode('grid')}
                 className={`py-1 px-2 text-xs rounded ${
@@ -211,6 +215,14 @@ const EntitiesPanel: React.FC<EntitiesPanelProps> = ({ onTogglePanel, filterStat
                 }`}
               >
                 <Grid size={14} />
+              </button>
+              <button
+                onClick={() => setViewMode('list')}
+                className={`py-1 px-2 text-xs rounded ${
+                  viewMode === 'list' ? 'dune-button-primary' : 'dune-button-secondary'
+                }`}
+              >
+                <List size={14} />
               </button>
             </div>
             {/* Collapse Button */}
@@ -254,24 +266,37 @@ const EntitiesPanel: React.FC<EntitiesPanelProps> = ({ onTogglePanel, filterStat
       
       {/* Entity Content Area */}
       <div className="flex-1 overflow-y-auto p-4">
-        {entities.length === 0 ? (
-          <div className="text-center text-slate-400 mt-16">
-            <Package size={48} className="mx-auto mb-4 opacity-50" />
-            <p>No entities match current filters</p>
-            <p className="text-xs mt-2">Try adjusting your search criteria</p>
+        {viewMode === 'grid' ? (
+          <div className="grid grid-cols-2 gap-3">
+            {entities.map((entity: any) => (
+              <EntityCard key={entity.id} entity={entity} />
+            ))}
           </div>
         ) : (
-          <div className={`gap-3 ${
-            viewMode === 'grid' 
-              ? 'grid grid-cols-1 xl:grid-cols-2 2xl:grid-cols-3' 
-              : 'flex flex-col'
-          }`}>
+          <div className="grid grid-cols-1 gap-3">
             {entities.map((entity: any) => (
-              <EntityCard key={String(entity.id || Math.random())} entity={entity} />
+              <EntityCard key={entity.id} entity={entity} />
             ))}
           </div>
         )}
+        
+        {entities.length === 0 && (
+          <div className="text-center py-8 text-slate-400">
+            No entities match the current filters
+          </div>
+        )}
       </div>
+
+      {/* Pagination Controls */}
+      <PaginationControls
+        currentPage={pagination.entities.currentPage}
+        totalPages={pagination.entities.totalPages}
+        totalItems={pagination.entities.totalItems}
+        itemsPerPage={pagination.entities.itemsPerPage}
+        onPageChange={(page) => changePage('entities', page)}
+        onItemsPerPageChange={(itemsPerPage) => changeItemsPerPage('entities', itemsPerPage)}
+        loading={loading}
+      />
     </div>
   );
 };

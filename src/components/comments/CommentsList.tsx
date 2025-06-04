@@ -152,7 +152,7 @@ const CommentsList: React.FC<CommentsListProps> = ({
             className="flex items-center gap-2 text-left hover:bg-slate-700/50 transition-colors p-2 -m-2 text-slate-300 hover:text-amber-300 rounded-md"
           >
             <MessageSquare size={18} className="" />
-            <span className="font-medium bg-gradient-to-r from-spice-500 to-spice-600 bg-clip-text text-transparent">
+            <span className="font-medium text-amber-200">
               Comments ({commentCount})
             </span>
             {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}

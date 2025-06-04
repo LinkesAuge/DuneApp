@@ -30,7 +30,6 @@ export interface Entity {
 export interface Category {
   id: number;                  // integer, PRIMARY KEY
   name: string;                // text, NOT NULL - category name
-  description?: string;        // text - optional description
   icon?: string;               // text - optional icon
   sort_order: number;          // integer - display order
   created_at?: string;         // timestamp - creation time
@@ -42,7 +41,6 @@ export interface Type {
   id: number;                  // integer, PRIMARY KEY
   name: string;                // text, NOT NULL - type name
   category_id: number;         // integer, NOT NULL - references categories.id
-  description?: string;        // text - optional description
   icon?: string;               // text - optional icon
   sort_order: number;          // integer - display order
   created_at?: string;         // timestamp - creation time
@@ -54,7 +52,6 @@ export interface Subtype {
   id: number;                  // integer, PRIMARY KEY
   name: string;                // text, NOT NULL - subtype name
   type_id: number;             // integer, NOT NULL - references types.id
-  description?: string;        // text - optional description
   icon?: string;               // text - optional icon
   sort_order: number;          // integer - display order
   created_at?: string;         // timestamp - creation time
@@ -72,6 +69,7 @@ export interface EntityWithRelations extends Entity {
 export interface Tier {
   tier_number: number;         // integer, PRIMARY KEY (0-7)
   tier_name: string;          // text - tier display name (Makeshift → Plastanium)
+  icon?: string;              // text - optional icon for the tier
 }
 
 // Recipe system interface matching the recipes table
@@ -118,7 +116,7 @@ export interface POIEntityLink {
 
 // Filter interfaces for API operations
 export interface EntityFilters {
-  search?: string;             // Search across name, description
+  search?: string;             // Search across name and entity description only
   category_id?: number;        // Filter by category ID
   type_id?: number;            // Filter by type ID
   subtype_id?: number;         // Filter by subtype ID

@@ -51,9 +51,9 @@ function handleSupabaseError(error: any, operation: string): never {
 function buildSelectWithRelations() {
   return `
     *,
-    category:categories(id, name, description, icon, sort_order),
-    type:types(id, name, description, icon, sort_order, category_id),
-    subtype:subtypes(id, name, description, icon, sort_order, type_id),
+          category:categories(id, name, icon, sort_order),
+      type:types(id, name, icon, sort_order, category_id),
+      subtype:subtypes(id, name, icon, sort_order, type_id),
     shared_image:shared_images(id, image_url)
   `;
 }
@@ -85,7 +85,7 @@ export const entitiesAPI = {
 
       // Apply filters using NORMALIZED foreign key structure
       if (filters.search) {
-        // Full-text search across name and description only (categories/types now in relations)
+        // Full-text search across entity name and description only
         query = query.or(`name.ilike.%${filters.search}%,description.ilike.%${filters.search}%`);
       }
 

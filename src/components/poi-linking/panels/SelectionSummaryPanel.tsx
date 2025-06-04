@@ -42,19 +42,29 @@ const SelectionSummaryPanel: React.FC<SelectionSummaryPanelProps> = ({
     togglePOISelection,
     toggleEntitySelection,
     clearAllSelections,
-    filterCounts
+    filterCounts,
+    getSelectedPOIs,
+    getSelectedEntities,
+    refreshData
   } = filterState;
 
-  // Get selected POIs and Entities data with useMemo for stable references
-  const selectedPOIs = useMemo(() => 
-    pois.filter((poi: any) => selectedPOIIds.has(poi.id)), 
-    [pois, selectedPOIIds]
-  );
-  
-  const selectedEntities = useMemo(() => 
-    entities.filter((entity: any) => selectedEntityIds.has(entity.id)), 
-    [entities, selectedEntityIds]
-  );
+  // State for selected data from all pages
+  const [selectedPOIs, setSelectedPOIs] = useState<any[]>([]);
+  const [selectedEntities, setSelectedEntities] = useState<any[]>([]);
+
+  // Fetch selected data whenever selection changes
+  useEffect(() => {
+    const fetchSelectedData = async () => {
+      const [poisData, entitiesData] = await Promise.all([
+        getSelectedPOIs(),
+        getSelectedEntities()
+      ]);
+      setSelectedPOIs(poisData);
+      setSelectedEntities(entitiesData);
+    };
+
+    fetchSelectedData();
+  }, [selectedPOIIds, selectedEntityIds, getSelectedPOIs, getSelectedEntities]);
 
   // Calculate link previews and detect duplicates
   useEffect(() => {
@@ -185,39 +195,6 @@ const SelectionSummaryPanel: React.FC<SelectionSummaryPanelProps> = ({
     toggleEntitySelection(entityId);
   };
 
-  // Get POI type info for display
-  const getPOITypeInfo = (poi: any) => {
-    if (!poi.poi_types) return { icon: '📍', color: 'bg-slate-600' };
-    
-    const typeMap: { [key: string]: { icon: string; color: string } } = {
-      'Base': { icon: '⚡', color: 'bg-blue-600' },
-      'Resources': { icon: '💎', color: 'bg-orange-600' },
-      'Locations': { icon: '🏛️', color: 'bg-purple-600' },
-      'NPCs': { icon: '👤', color: 'bg-green-600' },
-      'Exploration': { icon: '🔍', color: 'bg-yellow-600' }
-    };
-    
-    return typeMap[poi.poi_types.category] || { icon: '📍', color: 'bg-slate-600' };
-  };
-
-  // Get tier info for entities
-  const getTierInfo = (tierNumber: number | null) => {
-    if (!tierNumber) return null;
-    
-    const tierColors: { [key: number]: string } = {
-      1: 'bg-green-600',
-      2: 'bg-blue-600', 
-      3: 'bg-orange-600',
-      4: 'bg-purple-600',
-      5: 'bg-yellow-600'
-    };
-    
-    return {
-      color: tierColors[tierNumber] || 'bg-slate-600',
-      label: `T${tierNumber}`
-    };
-  };
-
   return (
     <>
       <div className="w-80 dune-panel overflow-hidden flex flex-col">
@@ -240,105 +217,94 @@ const SelectionSummaryPanel: React.FC<SelectionSummaryPanelProps> = ({
           </p>
         </div>
 
-        {/* Selection Content */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {/* Selection Content - Dynamic space allocation */}
+        <div className="flex-1 flex flex-col overflow-hidden p-4">
           
-          {/* Selected POIs */}
-          {selectedPOIs.length > 0 && (
-            <div>
-              <h4 className="text-sm font-medium text-amber-200 mb-3 flex items-center justify-between">
-                🗺️ Selected POIs 
-                <span className="bg-green-600 text-white px-2 py-1 rounded-full text-xs">
-                  {selectedPOIs.length}
-                </span>
-              </h4>
-              <div className="space-y-2 max-h-32 overflow-y-auto">
-                {selectedPOIs.map((poi: any) => {
-                  const typeInfo = getPOITypeInfo(poi);
-                  return (
-                    <div key={poi.id} className="bg-slate-800 rounded-lg p-3 border border-green-500/30">
+          {/* Selection Lists Container - Dynamic space */}
+          <div className="flex-1 flex flex-col space-y-4 overflow-hidden min-h-0">
+            
+            {/* Selected POIs */}
+            {selectedPOIs.length > 0 && (
+              <div className={`flex flex-col min-h-0 ${selectedEntities.length > 0 ? 'flex-1' : 'flex-1'}`}>
+                <h4 className="text-sm font-medium text-amber-200 mb-2 flex items-center justify-between flex-shrink-0">
+                  🗺️ Selected POIs 
+                  <span className="bg-green-600 text-white px-2 py-1 rounded-full text-xs">
+                    {selectedPOIs.length}
+                  </span>
+                </h4>
+                <div className="flex-1 space-y-1 overflow-y-auto min-h-0">
+                  {selectedPOIs.map((poi: any) => (
+                    <div key={poi.id} className="bg-slate-800 rounded-md p-2 border border-green-500/30">
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          <div className={`w-4 h-4 ${typeInfo.color} rounded-full flex items-center justify-center text-xs`}>
-                            {typeInfo.icon}
-                          </div>
-                          <span className="text-sm text-amber-200 font-medium truncate">
-                            {poi.title}
-                          </span>
-                        </div>
+                        <span className="text-sm text-amber-200 font-medium truncate">
+                          {poi.title}
+                        </span>
                         <button 
                           onClick={() => removePOI(poi.id)}
-                          className="text-red-400 hover:text-red-300 text-xs"
+                          className="text-red-400 hover:text-red-300 ml-2 flex-shrink-0"
                         >
                           <X size={12} />
                         </button>
                       </div>
-                      <div className="text-xs text-slate-400 mt-1">
-                        📍 {poi.map_type === 'hagga_basin' ? 'Hagga Basin' : 'Deep Desert'} • 0 existing links
-                      </div>
                     </div>
-                  );
-                })}
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
-          
-          {/* Selected Entities */}
-          {selectedEntities.length > 0 && (
-            <div>
-              <h4 className="text-sm font-medium text-amber-200 mb-3 flex items-center justify-between">
-                📦 Selected Entities 
-                <span className="bg-purple-600 text-white px-2 py-1 rounded-full text-xs">
-                  {selectedEntities.length}
-                </span>
-              </h4>
-              <div className="space-y-2 max-h-32 overflow-y-auto">
-                {selectedEntities.slice(0, 3).map((entity: any) => {
-                  const tierInfo = getTierInfo(entity.tier_number);
-                  return (
-                    <div key={entity.id} className="bg-slate-800 rounded-lg p-3 border border-purple-500/30">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          <div className="w-4 h-4 bg-slate-600 rounded flex items-center justify-center">
-                            {entity.icon_url ? (
-                              <img src={entity.icon_url} alt={entity.name} className="w-3 h-3" />
-                            ) : (
-                              <span className="text-xs">📦</span>
+            )}
+            
+            {/* Selected Entities */}
+            {selectedEntities.length > 0 && (
+              <div className={`flex flex-col min-h-0 ${selectedPOIs.length > 0 ? 'flex-1' : 'flex-1'}`}>
+                <h4 className="text-sm font-medium text-amber-200 mb-2 flex items-center justify-between flex-shrink-0">
+                  📦 Selected Entities 
+                  <span className="bg-purple-600 text-white px-2 py-1 rounded-full text-xs">
+                    {selectedEntities.length}
+                  </span>
+                </h4>
+                <div className="flex-1 space-y-1 overflow-y-auto min-h-0">
+                  {selectedEntities.map((entity: any) => {
+                    const { getTierName } = filterState;
+                    const tierName = getTierName(entity.tier_number);
+                    return (
+                      <div key={entity.id} className="bg-slate-800 rounded-md p-2 border border-purple-500/30">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2 min-w-0 flex-1">
+                            <span className="text-sm text-amber-200 font-medium truncate">
+                              {entity.name}
+                            </span>
+                            {entity.tier_number > 0 && (
+                              <span className="text-xs bg-slate-700 text-amber-300 px-1 rounded flex-shrink-0">
+                                {tierName}
+                              </span>
                             )}
                           </div>
-                          <span className="text-sm text-amber-200 font-medium truncate">
-                            {entity.name}
-                          </span>
-                          {tierInfo && (
-                            <span className={`text-xs ${tierInfo.color} text-white px-1 rounded`}>
-                              {tierInfo.label}
-                            </span>
-                          )}
+                          <button 
+                            onClick={() => removeEntity(entity.id)}
+                            className="text-red-400 hover:text-red-300 ml-2 flex-shrink-0"
+                          >
+                            <X size={12} />
+                          </button>
                         </div>
-                        <button 
-                          onClick={() => removeEntity(entity.id)}
-                          className="text-red-400 hover:text-red-300 text-xs"
-                        >
-                          <X size={12} />
-                        </button>
                       </div>
-                    </div>
-                  );
-                })}
-                {selectedEntities.length > 3 && (
-                  <div className="text-center py-2">
-                    <span className="text-xs text-slate-400">
-                      + {selectedEntities.length - 3} more entities
-                    </span>
-                  </div>
-                )}
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          )}
-          
-          {/* Link Statistics */}
+            )}
+
+            {/* Empty State */}
+            {selectedPOIs.length === 0 && selectedEntities.length === 0 && (
+              <div className="flex-1 flex flex-col items-center justify-center text-slate-400">
+                <BarChart3 size={48} className="mb-4 opacity-50" />
+                <p>No POIs or Entities selected</p>
+                <p className="text-xs mt-2">Select items from the panels to create links</p>
+              </div>
+            )}
+          </div>
+
+          {/* Link Statistics - Static at bottom */}
           {linkPreviews.length > 0 && (
-            <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-600">
+            <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-600 mt-4 flex-shrink-0">
               <h4 className="text-sm font-medium text-amber-200 mb-2 flex items-center">
                 <BarChart3 size={14} className="mr-1" />
                 Link Preview
@@ -359,15 +325,6 @@ const SelectionSummaryPanel: React.FC<SelectionSummaryPanelProps> = ({
                   <span className="text-amber-200 font-medium">{linkStats.totalAfter}</span>
                 </div>
               </div>
-            </div>
-          )}
-
-          {/* Empty State */}
-          {selectedPOIs.length === 0 && selectedEntities.length === 0 && (
-            <div className="text-center text-slate-400 mt-16">
-              <BarChart3 size={48} className="mx-auto mb-4 opacity-50" />
-              <p>No POIs or Entities selected</p>
-              <p className="text-xs mt-2">Select items from the panels to create links</p>
             </div>
           )}
         </div>

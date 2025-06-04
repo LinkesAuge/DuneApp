@@ -2,14 +2,16 @@ import { supabase } from './supabase';
 import type { User } from '@supabase/supabase-js';
 
 /**
- * Fetch POIs with proper privacy filtering and link counts
+ * Fetch POIs with proper privacy filtering, link counts, and pagination
  * @param user - The current authenticated user
- * @returns A promise that resolves to an array of POIs the user has access to, with link counts
+ * @param page - Page number (1-based)
+ * @param limit - Items per page
+ * @returns A promise that resolves to paginated POIs the user has access to, with link counts
  */
-export const fetchPrivacyFilteredPois = async (user: User | null) => {
+export const fetchPrivacyFilteredPois = async (user: User | null, page: number = 1, limit: number = 25) => {
   if (!user) {
-    // Return empty array for unauthenticated users
-    return [];
+    // Return empty result for unauthenticated users
+    return { items: [], totalCount: 0 };
   }
 
   try {
@@ -18,7 +20,7 @@ export const fetchPrivacyFilteredPois = async (user: User | null) => {
     
     const { data: allPois, error: allPoisError } = await supabase
       .from('pois')
-      .select('*, poi_types (*), profiles!pois_created_by_fkey (username)')
+      .select('*, poi_types (*), profiles!pois_created_by_fkey (username, display_name, custom_avatar_url, discord_avatar_url, use_discord_avatar)')
       .order('created_at', { ascending: false });
 
     if (allPoisError) {
@@ -88,13 +90,33 @@ export const fetchPrivacyFilteredPois = async (user: User | null) => {
       }));
 
       console.log('Filtered POIs with link counts:', poisWithLinkCounts.length);
-      return poisWithLinkCounts;
+      
+      // Apply pagination to POIs with link counts
+      const totalCount = poisWithLinkCounts.length;
+      const startIndex = (page - 1) * limit;
+      const endIndex = startIndex + limit;
+      const paginatedPois = poisWithLinkCounts.slice(startIndex, endIndex);
+      
+      return { 
+        items: paginatedPois,
+        totalCount
+      };
     }
 
     console.log('Filtered POIs count:', filteredPois.length);
-    return filteredPois.map(poi => ({ ...poi, linkCount: 0 }));
+    
+    // Apply pagination
+    const totalCount = filteredPois.length;
+    const startIndex = (page - 1) * limit;
+    const endIndex = startIndex + limit;
+    const paginatedPois = filteredPois.slice(startIndex, endIndex);
+    
+    return { 
+      items: paginatedPois.map(poi => ({ ...poi, linkCount: 0 })),
+      totalCount
+    };
   } catch (error) {
     console.error('Error in fetchPrivacyFilteredPois:', error);
-    return [];
+    return { items: [], totalCount: 0 };
   }
 }; 

@@ -348,6 +348,7 @@ export interface Tier {
   level: number;
   color: string;
   description: string | null;
+  icon?: string | null; // NEW: Icon for the tier
   created_by: string | null;
   updated_by: string | null; // Who last updated this tier
   created_at: string;
