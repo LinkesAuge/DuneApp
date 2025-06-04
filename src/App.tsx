@@ -14,11 +14,13 @@ import UITestPage from './pages/UITestPage';
 import ProfilePage from './pages/ProfilePage';
 import UnifiedEntitiesPage from './pages/UnifiedEntitiesPage';
 import POIEntityLinkingPage from './pages/POIEntityLinkingPage';
+import POILinkManagerPage from './pages/POILinkManagerPage';
 
 import { SharedImagesTest } from './pages/SharedImagesTest';
 import { AlertTriangle } from 'lucide-react';
 import ItemDetailPage from './pages/ItemDetailPage';
 import SchematicDetailPage from './pages/SchematicDetailPage';
+import { POILinksTest } from './components/test/POILinksTest';
 
 
 const PendingApprovalMessage: React.FC = () => (
@@ -151,6 +153,14 @@ const AppRoutes: React.FC = () => {
           </ProtectedRoute>
         } 
       />
+      <Route 
+        path="/poi-link-manager" 
+        element={
+          <ProtectedRoute>
+            <POILinkManagerPage />
+          </ProtectedRoute>
+        } 
+      />
 
       <Route 
         path="/items/:itemId" 
@@ -187,6 +197,14 @@ const AppRoutes: React.FC = () => {
             <SharedImagesTest />
           </ProtectedRoute>
         }
+      />
+      <Route 
+        path="/test/poi-links" 
+        element={
+          <ProtectedRoute>
+            <POILinksTest />
+          </ProtectedRoute>
+        } 
       />
       
       <Route path="*" element={<Navigate to="/" replace />} />

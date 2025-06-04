@@ -218,6 +218,14 @@ const Navbar: React.FC = () => {
               <LinkIcon size={14} strokeWidth={1.5} className="mr-3 text-amber-300 group-hover:text-amber-100" />
               <span className="text-amber-200 group-hover:text-amber-50 font-light text-sm">POI Entity Linking</span>
             </Link>
+            <Link
+              to="/poi-link-manager"
+              onClick={() => setIsDatabaseDropdownOpen(false)}
+              className="group relative flex items-center px-4 py-3 hover:bg-violet-600/20 transition-all duration-200"
+            >
+              <Database size={14} strokeWidth={1.5} className="mr-3 text-amber-300 group-hover:text-amber-100" />
+              <span className="text-amber-200 group-hover:text-amber-50 font-light text-sm">POI Link Manager</span>
+            </Link>
 
           </div>
         </>

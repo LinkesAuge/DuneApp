@@ -1,283 +1,182 @@
 # Tasks Plan: Dune Awakening Deep Desert Tracker
 
 **Last Updated**: January 30, 2025  
-**Current Focus**: POI Entity Linking System - Map View Integration  
-**Project Status**: 33% Complete - Phase 3 Map View Integration Active
+**Current Focus**: POI Link Manager - Tree View Implementation  
+**Project Status**: Day 1 Complete ✅ - Day 2 Ready for Implementation
 
 ---
 
-## 🎯 **ACTIVE PROJECT: POI ENTITY LINKING SYSTEM**
+## 🎯 **ACTIVE PROJECT: POI LINK MANAGER**
 
-### **🚀 Current Priority: Phase 3 - Map View Integration**
-**Timeline**: 4 development days (Days 5-8 of 12-day plan)  
-**Status**: 📋 **READY FOR IMPLEMENTATION** - Planning complete  
+### **🚀 Current Priority: POI Link Manager - Tree View Implementation**
+**Timeline**: 5 development days  
+**Status**: 📋 **DAY 2 READY** - Day 1 Foundation Complete ✅  
 
-### **📊 PROJECT PROGRESS OVERVIEW**
+### **📊 PROJECT OVERVIEW**
 | Phase | Duration | Status | Progress | Key Deliverables |
 |-------|----------|--------|----------|------------------|
-| **Phase 1** | 2 days | ✅ **COMPLETE** | 100% | 4-panel layout, routing, state management |
-| **Phase 2** | 2 days | ✅ **COMPLETE** | 100% | Filter system, real-time counters, architecture fix |
-| **Phase 3** | 4 days | 🎯 **CURRENT** | 0% | **Map view integration, auto-collapse entities** |
-| **Phase 4** | 2 days | 📋 Planned | 0% | Multi-selection, advanced selection tools |
-| **Phase 5** | 2 days | 📋 Planned | 0% | Link management, performance optimization |
+| **Day 1** | 1 day | ✅ **COMPLETE** | 100% | Database hooks, type definitions, foundation testing |
+| **Day 2** | 1 day | 📋 **NEXT** | 0% | Main page structure, filters panel integration |
+| **Day 3** | 1 day | 📋 Planned | 0% | Tree view components, POI/entity nodes |
+| **Day 4** | 1 day | 📋 Planned | 0% | State management, bulk selection, actions |
+| **Day 5** | 1 day | 📋 Planned | 0% | Integration, edit workflow, polish |
 
-**Total Progress**: **33% Complete** (4 of 12 days)  
-**Next Milestone**: Map view operational with auto-collapse entities
+### **✅ DAY 1 COMPLETED - Foundation Setup**
+**Status**: ✅ **COMPLETE** - All objectives achieved  
+**Duration**: 1 development day  
 
----
+#### **✅ Completed Deliverables:**
+1. **✅ Type Definitions** (`src/types/poi-link-manager.ts`)
+   - POILinkTreeNode, EntityLinkNode interfaces
+   - POILinkFilters, TreeSelectionState, UsePOILinksReturn
+   - Complete TypeScript safety for all operations
 
-## 🗺️ **PHASE 3: MAP VIEW INTEGRATION (ACTIVE)**
+2. **✅ Database Hook** (`src/hooks/usePOILinks.ts`)
+   - JOIN queries: poi_item_links + pois + entities
+   - Pagination, sorting, filtering state management
+   - CRUD operations: deleteLink, bulkDeleteLinks, bulkDeletePOIs
+   - Tree data transformation from flat query results
 
-### **🎯 Core Objectives**
-1. **Enhanced POIs Panel**: Add view mode selector (List/Grid/Map)
-2. **Interactive Map Mode**: Lazy-loaded map view with selectable POI markers
-3. **Auto-Collapse Entities**: Maximize map space, manually expandable
-4. **Smart Filter Behavior**: Restrict "both" option, handle map type switching
-5. **Performance Optimization**: < 2s map activation time
+3. **✅ Foundation Testing** (`src/components/test/POILinksTest.tsx`)
+   - Comprehensive validation component
+   - Route: `/test/poi-links` for development testing
+   - Verified data fetching, transformation, state management
 
-### **📅 Daily Implementation Plan**
+4. **✅ Build Verification**
+   - TypeScript compilation successful
+   - No import path or dependency issues
+   - Production build ready
 
-#### **Day 5: View Mode Enhancement**
-**Primary Goal**: Add map view mode to POIs panel
-- [ ] **ViewModeSelector Component**
-  - Create `src/components/poi-linking/components/ViewModeSelector.tsx`
-  - Implement List/Grid/Map toggle with Dune theming
-  - Add smooth transitions and active state indicators
-- [ ] **POIs Panel Enhancement**
-  - Update `src/components/poi-linking/panels/POIsPanel.tsx`
-  - Add view mode state management
-  - Implement conditional rendering for map view
-- [ ] **Panel Management Setup**
-  - Update `src/components/poi-linking/POIEntityLinkingPage.tsx`
-  - Add auto-collapse entities logic
-  - Implement panel state management for map mode
+#### **✅ Technical Achievements:**
+- **Database Integration**: Complex JOIN queries with proper relationship handling
+- **Data Transformation**: Flat results → grouped tree structure with POI deduplication
+- **State Management**: Comprehensive filtering, sorting, pagination in single hook
+- **Type Safety**: Complete TypeScript interfaces prevent runtime errors
 
-#### **Day 6: Map View Component**
-**Primary Goal**: Build core POIMapView component
-- [ ] **POIMapView Component**
-  - Create `src/components/poi-linking/components/POIMapView.tsx`
-  - Implement lazy loading with Suspense
-  - Add map type detection logic (Hagga Basin vs Deep Desert)
-- [ ] **Map Header & Controls**
-  - Build MapViewHeader with map type display
-  - Add MapTypeToggle for switching between map types
-  - Implement POI count display per map type
-- [ ] **Empty State Handling**
-  - Create EmptyMapState component
-  - Add helpful messages for no POIs found scenarios
-  - Implement quick actions for empty states
+### **📋 DAY 2 IMPLEMENTATION PLAN - Main Page Structure**
+**Status**: 📋 **READY FOR IMPLEMENTATION**  
+**Focus**: Page layout, filters integration, routing setup  
 
-#### **Day 7: Selectable POI Markers**
-**Primary Goal**: Create interactive map markers with selection
-- [ ] **SelectablePOIMarker Component**
-  - Create `src/components/poi-linking/components/SelectablePOIMarker.tsx`
-  - Extend existing MapPOIMarker with selection capabilities
-  - Add visual selection indicators (checkmarks, borders, highlights)
-- [ ] **Selection State Integration**
-  - Update `src/hooks/useSelectionState.ts` for map integration
-  - Implement click-to-select functionality
-  - Add selection state synchronization between views
-- [ ] **Map Selection Tools**
-  - Create `src/components/poi-linking/components/MapSelectionTools.tsx`
-  - Implement "Select All Visible" functionality
-  - Add "Clear Map Selection" and "Zoom to Selected" tools
+#### **📋 Day 2 Objectives:**
+1. **📋 Create POILinkManagerPage.tsx**
+   - Two-panel layout (filters left, tree view right)
+   - Match Hagga Basin page panel proportions
+   - Desktop-only responsive design
 
-#### **Day 8: Auto-Collapse & Filter Integration**
-**Primary Goal**: Complete panel management and filter restrictions
-- [ ] **Panel Auto-Collapse Logic**
-  - Implement automatic entities panel collapse in map mode
-  - Add manual expand capability with visual indicators
-  - Test smooth panel transitions and state persistence
-- [ ] **Filter Restrictions**
-  - Update `src/hooks/useFilterState.ts` for map mode handling
-  - Disable "both" option when in map view
-  - Implement "both" → "hagga_basin" auto-selection
-- [ ] **Filter Visual Indicators**
-  - Update `src/components/poi-linking/panels/FiltersPanel.tsx`
-  - Add "Map View" badges and restriction indicators
-  - Implement bidirectional filter behavior (Option B)
+2. **📋 Filters Panel Integration**
+   - Adapt existing FiltersPanel for POI Link Manager
+   - POI categories, entity types, map type filtering
+   - Search functionality for POI titles and entity names
 
-### **🔧 Technical Requirements**
-- **Performance**: Lazy loading for map components
-- **Responsive**: Maintain 4-panel layout integrity
-- **Integration**: Reuse existing InteractiveMap components
-- **State Management**: Enhanced with map-specific logic
-- **TypeScript**: Full type safety throughout
-- **Testing**: Build verification after each day
+3. **📋 Route & Navigation Setup**
+   - Add `/poi-link-manager` route to App.tsx
+   - Navbar dropdown: "Database" → "POI Link Manager"
+   - Protected route with authentication
 
----
+4. **📋 Basic Tree View Placeholder**
+   - Simple tree structure display
+   - POI expansion/collapse functionality
+   - Entity list rendering under each POI
 
-## 📋 **FUTURE PHASES (POST-MAP INTEGRATION)**
-
-### **Phase 4: Selection Enhancement (Days 9-10)**
-**Goal**: Multi-selection capabilities and advanced selection tools
-- [ ] Multi-selection state management for both map and list views
-- [ ] Rectangle selection tool for map areas
-- [ ] Bulk selection operations (select all filtered, clear all)
-- [ ] Selection persistence across view mode changes
-- [ ] Enhanced selection summary with statistics
-
-### **Phase 5: Link Management & Polish (Days 11-12)**
-**Goal**: Link creation workflow and final optimizations
-- [ ] Link creation workflow with duplicate detection
-- [ ] Preview modal with link statistics
-- [ ] Batch link processing with progress indication
-- [ ] Performance optimization and error boundaries
-- [ ] Final polish and accessibility improvements
-
----
-
-## ✅ **COMPLETED ACHIEVEMENTS**
-
-### **Phase 2: Filter System Excellence (COMPLETE)**
-- ✅ **Dual-Tab Filter Interface**: POI and Entity filters with Dune theming
-- ✅ **Real-Time Counters**: Live POI/Entity counts with database synchronization
-- ✅ **Critical Architecture Fix**: Enhanced useFilterState to work with ALL data
-  - Problem: Filters only worked with current page data
-  - Solution: Added allPOIs/allEntities exports (10K limit)
-  - Impact: Accurate filter options and counts across complete datasets
-- ✅ **MapControlPanel Styling**: Visual consistency with existing app
-- ✅ **Advanced Search**: POI title/description and entity name search
-- ✅ **Filter Categories**: Complete POI type and entity category/type/tier filtering
-
-### **Phase 1: Core Infrastructure (COMPLETE)**
-- ✅ **4-Panel Collapsible Layout**: Filters, POIs, Entities, Selection Summary
-- ✅ **Smooth Animations**: CSS transitions for panel expand/collapse
-- ✅ **State Persistence**: localStorage for panel states
-- ✅ **Navigation Integration**: Database dropdown menu access
-- ✅ **Dune Theming**: Professional styling matching existing app
-- ✅ **TypeScript Safety**: Complete interfaces and type definitions
-
----
-
-## 🎨 **DESIGN SPECIFICATIONS**
-
-### **Map Mode Panel Layout**
+#### **📋 Day 2 File Structure:**
 ```
-┌─────────────┬─────────────┬─────────────┬─────────────┐
-│   Filters   │    POIs     │  Entities   │  Summary    │
-│   280px     │   flex-1    │ 40px (auto- │   300px     │
-│             │ [List|Grid| │  collapsed) │             │
-│  ✅ DONE    │  🗺️ MAP]   │ expandable  │  ✅ DONE    │
-└─────────────┴─────────────┴─────────────┴─────────────┘
+src/
+├── pages/
+│   └── POILinkManagerPage.tsx        # 📋 New main page
+├── components/poi-link-manager/
+│   ├── POILinkFiltersPanel.tsx      # 📋 Specialized filters
+│   └── POILinkTreeView.tsx          # 📋 Tree container placeholder
+└── App.tsx                          # 📋 Route integration
 ```
 
-### **Map View Features**
-- **Auto Map Type Detection**: Switch between Hagga Basin/Deep Desert
-- **Selectable POI Markers**: Click to select with visual indicators
-- **Filter Integration**: Real-time map updates based on filter changes
-- **Advanced Selection Tools**: Rectangle selection, bulk operations
-- **Empty State Handling**: Helpful messages for filtered scenarios
+#### **📋 Day 2 Success Criteria:**
+- ✅ Page accessible at `/poi-link-manager` route
+- ✅ Two-panel layout operational and responsive
+- ✅ Filters panel integrated with usePOILinks hook
+- ✅ Basic tree view shows POI-entity structure
+- ✅ Navigation from navbar dropdown working
+- ✅ Build compiles without errors
 
-### **Filter Behavior in Map Mode**
-- **Entry Behavior**: "both" → auto-select "hagga_basin"
-- **Exit Behavior**: Keep current selection (Option B)
-- **Restrictions**: Disable "both" option in map view
-- **Visual Indicators**: "Map View" badges, restriction messages
+### **📋 DAY 3-5 UPCOMING PHASES**
 
----
+#### **📋 Day 3: Tree View Components**
+- POITreeNode.tsx: Individual POI with expand/collapse
+- EntityTreeNode.tsx: Entity links under POIs
+- TreeViewHeader.tsx: Controls for expand all/collapse all
 
-## 🚧 **TECHNICAL DEBT & MAINTENANCE**
+#### **📋 Day 4: State Management & Actions**
+- useTreeSelection.ts: Cross-page selection state
+- Delete operations: Individual and bulk
+- SelectionBanner.tsx: Bulk action controls
 
-### **No Current Technical Debt** ✅
-- All phases completed with proper TypeScript compilation
-- Critical architecture issues resolved in Phase 2
-- Clean component structure established
-- Proper state management patterns implemented
-
-### **Future Maintenance Tasks**
-- [ ] Performance testing with large POI datasets (1000+)
-- [ ] Mobile/tablet responsive testing (after Phase 3)
-- [ ] Accessibility audit and keyboard navigation
-- [ ] Error boundary implementation for map components
-- [ ] Documentation updates after Phase 3 completion
+#### **📋 Day 5: Integration & Polish**
+- Edit workflow: Navigation to POI linking with preselection
+- ConfirmationModal integration for delete operations
+- Final testing and polish
 
 ---
 
-## 📈 **SUCCESS METRICS**
+## 🔄 **SECONDARY PROJECTS**
 
-### **Phase 3 Completion Criteria**
-- [ ] 🎯 View mode selector functional in POIs panel
-- [ ] 🎯 Map view loads in < 2 seconds
-- [ ] 🎯 Auto-collapse entities works smoothly
-- [ ] 🎯 Filter restrictions properly implemented
-- [ ] 🎯 POI selection works on map with visual feedback
-- [ ] 🎯 Empty state handling for all scenarios
-- [ ] 🎯 Panel transitions feel intuitive and responsive
+### **POI Entity Linking System - Map View Integration**
+**Status**: 📋 **ON HOLD** - Deprioritized for POI Link Manager  
+**Progress**: 33% Complete - Phases 1-2 complete, Phase 3 planned  
 
-### **Integration Success Indicators**
-- [ ] POI selection synced between map and list/grid views
-- [ ] Filter changes immediately update map display
-- [ ] Map performance acceptable with large datasets
-- [ ] Consistent Dune theming throughout
-- [ ] No TypeScript compilation errors
+**Completed:**
+- ✅ Phase 1: Enhanced data layer with comprehensive entity/POI filtering
+- ✅ Phase 2: UI/UX improvements with responsive design and component optimization
 
-### **User Experience Validation**
-- [ ] Map mode feels natural and intuitive
-- [ ] Auto-collapse doesn't disrupt workflow
-- [ ] Filter restrictions are clear and helpful
-- [ ] Map loading states provide good feedback
-- [ ] Selection workflow is efficient and clear
+**Remaining:**
+- 📋 Phase 3: Map view integration (4-panel layout with interactive POI/entity selection)
+
+**Timeline**: Will resume after POI Link Manager completion (estimated 3-4 additional days)
 
 ---
 
-## 🔄 **DEVELOPMENT WORKFLOW**
+## 📊 **OVERALL PROJECT STATUS**
 
-### **Daily Workflow Pattern**
-1. **Morning**: Review previous day's progress and current day's goals
-2. **Implementation**: Focus on specific day's deliverables
-3. **Testing**: Build verification and basic functionality testing
-4. **Documentation**: Update progress and identify any issues
-5. **Evening**: Prepare next day's implementation plan
+### **🎯 Core System Status: 100% Complete**
+| System | Status | Notes |
+|--------|--------|-------|
+| **Authentication** | ✅ 100% | Supabase auth, user management |
+| **Deep Desert Grid** | ✅ 100% | Screenshot upload, exploration tracking |
+| **Hagga Basin Map** | ✅ 100% | Interactive POI management, real-time updates |
+| **Admin Panel** | ✅ 100% | User management, database operations, settings |
+| **Items & Schematics** | ✅ 100% | Unified entities system, complete CRUD |
+| **POI-Entity Linking** | ✅ 100% | Core linking functionality operational |
+| **Comments System** | ✅ 100% | POI discussions with moderation |
+| **Dashboard** | ✅ 100% | Project statistics and overview |
 
-### **Phase Completion Workflow**
-1. **Comprehensive Testing**: All phase objectives met
-2. **Code Review**: TypeScript compilation, component structure
-3. **Documentation Update**: Memory files, progress tracking
-4. **User Testing**: Basic UX validation
-5. **Next Phase Planning**: Detailed implementation planning
+### **🚀 Active Development: POI Link Manager**
+- **Day 1**: ✅ Complete (Foundation)
+- **Day 2**: 📋 Next (Page Structure)
+- **Days 3-5**: 📋 Planned (Tree Components, Actions, Integration)
+- **Estimated Completion**: February 5, 2025
 
-### **Quality Assurance Standards**
-- **TypeScript**: 100% compilation success required
-- **Performance**: < 2s for map activation, smooth animations
-- **UX**: Intuitive interactions, clear visual feedback
-- **Integration**: Seamless with existing app components
-- **Documentation**: Accurate progress tracking and issue documentation
-
-**Next Review Date**: After Phase 3 Day 2 - Evaluate map view component progress and adjust timeline if needed.
+### **📈 Total Project Progress: 95% Complete**
+- **Core Features**: 100% operational
+- **Active Development**: POI Link Manager (5 days remaining)
+- **Future Enhancements**: POI Entity Linking Map View (3-4 days)
+- **Production Ready**: Core application fully deployable
 
 ---
 
-## ✅ **COMPLETED MAJOR SYSTEMS (BACKGROUND)**
+## 💡 **IMPLEMENTATION INSIGHTS**
 
-All core functionality is production-ready and fully operational:
+### **Day 1 Success Factors:**
+1. **Comprehensive Planning**: Detailed 5-day roadmap prevented scope creep
+2. **TypeScript First**: Complete interface definitions caught issues early
+3. **Hook Architecture**: Single comprehensive hook simplified state management
+4. **Testing Strategy**: Foundation validation component enabled immediate verification
 
-1. **✅ Authentication System** (100% Complete)
-   - Discord OAuth integration with avatar system
-   - User profile management with preference controls
-   - Admin/Editor/User role hierarchy
+### **Key Technical Patterns:**
+- **Database Queries**: Complex JOINs with proper relationship handling
+- **Data Transformation**: Efficient tree structure creation from flat results
+- **Import Strategy**: Relative imports more reliable than alias imports
+- **Build Verification**: Regular compilation checks prevent integration issues
 
-2. **✅ Deep Desert Grid System** (100% Complete)
-   - 81-grid interactive mapping interface
-   - Screenshot upload with advanced cropping tools
-   - Exploration progress tracking and statistics
-
-3. **✅ Hagga Basin Interactive Map** (100% Complete)
-   - Full POI management with custom types
-   - Interactive map with zoom/pan controls
-   - Real-time updates and collaborative features
-
-4. **✅ Items & Schematics System** (100% Complete)
-   - **934 entities** (711 Items + 223 Schematics) fully operational
-   - Database normalization from 15-table to unified 4-table architecture
-   - Complete CRUD operations with EntityWithRelations interface
-
-5. **✅ Admin Panel & Database Management** (100% Complete)
-   - User management with comprehensive controls
-   - Database operations and backup/restore
-   - System settings and configuration
-
-6. **✅ Dashboard & Analytics** (100% Complete)
-   - Community statistics and metrics
-   - Regional exploration progress
-   - Professional data visualization
+### **User Requirements Alignment:**
+- ✅ Cross-page selection capability built into foundation
+- ✅ Bulk operations support for POIs and individual links
+- ✅ Edit workflow preselection parameters planned
+- ✅ Tree structure with expand/collapse states managed

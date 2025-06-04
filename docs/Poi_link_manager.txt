@@ -1,0 +1,393 @@
+POI Link Manager - Implementation Plan
+📋 Phase 1: Foundation Setup (Day 1)
+Step 1.1: Database & Hooks
+
+// New hook: src/hooks/usePOILinks.ts
+interface UsePOILinksReturn {
+  poiLinks: POILinkTreeNode[];
+  loading: boolean;
+  pagination: PaginationState;
+  sorting: SortingState;
+  totalCount: number;
+  
+  // Actions
+  deleteLink: (linkId: string) => Promise<void>;
+  bulkDeleteLinks: (linkIds: string[]) => Promise<void>;
+  refreshData: () => void;
+}
+
+// Query structure
+const fetchPOILinksQuery = `
+  SELECT 
+    poi_item_links.*,
+    pois.id as poi_id, pois.title, pois.created_at as poi_created_at,
+    entities.id as entity_id, entities.name as entity_name, entities.icon
+  FROM poi_item_links
+  JOIN pois ON poi_item_links.poi_id = pois.id  
+  JOIN entities ON poi_item_links.entity_id = entities.id
+  ORDER BY pois.created_at DESC
+`;
+
+ Phase 2: Main Page Structure (Day 2)
+Step 2.1: Page Layout
+// src/pages/POILinkManagerPage.tsx
+const POILinkManagerPage = () => {
+  return (
+    <div className="flex h-screen" style={{ height: 'calc(100vh - 4rem)' }}>
+      {/* Left Panel - Filters (reuse existing) */}
+      <POILinkFiltersPanel />
+      
+      {/* Right Panel - Tree View */}
+      <POILinkTreePanel />
+    </div>
+  );
+};
+
+Step 2.2: Filters Panel
+// src/components/poi-link-manager/POILinkFiltersPanel.tsx
+// Reuse existing FiltersPanel logic but adapt for link-specific filtering
+interface POILinkFilters {
+  search: string;
+  mapType: 'hagga_basin' | 'deep_desert' | 'both';
+  poiCategories: string[];
+  entityTypes: string[];
+  dateRange: [Date, Date] | null;
+  createdBy: string[];
+}
+
+Phase 3: Tree View Components (Day 3):
+Step 3.1: Tree Container
+// src/components/poi-link-manager/POILinkTreeView.tsx
+const POILinkTreeView = () => {
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+  const [expandedPOIs, setExpandedPOIs] = useState<Set<string>>(new Set());
+  
+  return (
+    <div className="flex-1 flex flex-col">
+      {/* Header with controls */}
+      <TreeViewHeader 
+        selectionMode={selectionMode}
+        onToggleSelectionMode={() => setSelectionMode(!selectionMode)}
+        onExpandAll={() => setExpandedPOIs(new Set(allPOIIds))}
+        onCollapseAll={() => setExpandedPOIs(new Set())}
+      />
+      
+      {/* Selection Banner */}
+      {selectedItems.size > 0 && (
+        <SelectionBanner 
+          count={selectedItems.size}
+          onClearAll={() => setSelectedItems(new Set())}
+          onBulkDelete={handleBulkDelete}
+        />
+      )}
+      
+      {/* Tree Content */}
+      <div className="flex-1 overflow-y-auto">
+        {poiLinks.map(poiLink => (
+          <POITreeNode 
+            key={poiLink.poi.id}
+            poiLink={poiLink}
+            expanded={expandedPOIs.has(poiLink.poi.id)}
+            selectionMode={selectionMode}
+            selectedItems={selectedItems}
+            onToggleExpand={handleToggleExpand}
+            onToggleSelection={handleToggleSelection}
+          />
+        ))}
+      </div>
+      
+      {/* Pagination */}
+      <PaginationControls {...paginationProps} />
+    </div>
+  );
+};
+
+Step 3.3: Entity Tree Node
+// src/components/poi-link-manager/EntityTreeNode.tsx
+const EntityTreeNode = ({ entityLink, poiId, selectionMode, ... }) => {
+  const isSelected = selectedItems.has(`link:${entityLink.linkId}`);
+  
+  return (
+    <div className="flex items-center p-2 pl-4 hover:bg-slate-800/30">
+      {selectionMode && (
+        <input
+          type="checkbox"
+          checked={isSelected}
+          onChange={() => onToggleSelection(`link:${entityLink.linkId}`)}
+          className="mr-3"
+        />
+      )}
+      
+      <div className="flex items-center space-x-2 flex-1">
+        <span className="text-sm">{entityLink.entity.icon}</span>
+        <span className="text-slate-300">{entityLink.entity.name}</span>
+        {entityLink.quantity && (
+          <span className="text-xs text-amber-400">Qty: {entityLink.quantity}</span>
+        )}
+      </div>
+      
+      {!selectionMode && (
+        <div className="flex space-x-1">
+          <button 
+            onClick={() => handleEditLink(poiId, entityLink.entity.id)}
+            className="dune-button-secondary text-xs p-1"
+          >
+            ✏️
+          </button>
+          <button 
+            onClick={() => handleDeleteLink(entityLink.linkId)}
+            className="dune-button-secondary text-xs p-1 text-red-400"
+          >
+            🗑️
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+Phase 4: State Management & Actions (Day 4)
+Step 4.1: Selection State Management
+// src/hooks/useTreeSelection.ts
+interface TreeSelectionState {
+  selectedItems: Set<string>; // "poi:123" or "link:456"
+  selectionMode: boolean;
+  
+  togglePOI: (poiId: string, entityIds: string[]) => void;
+  toggleLink: (linkId: string) => void;
+  clearAll: () => void;
+  getSelectedPOIs: () => string[];
+  getSelectedLinks: () => string[];
+}
+
+Step 4.2: Edit Navigation
+// Navigate to POI linking page with preselection
+const handleEditPOI = (poiLink: POILinkTreeNode) => {
+  const entityIds = poiLink.entities.map(e => e.entity.id);
+  navigate(`/poi-linking?poi=${poiLink.poi.id}&entities=${entityIds.join(',')}`);
+};
+
+const handleEditLink = (poiId: string, entityId: string) => {
+  navigate(`/poi-linking?poi=${poiId}&entities=${entityId}`);
+};
+
+Step 4.3: Delete Operations
+// Individual delete
+const handleDeleteLink = async (linkId: string) => {
+  setConfirmation({
+    isOpen: true,
+    title: "Delete Link",
+    message: "Are you sure you want to delete this POI-Entity link?",
+    onConfirm: () => deletePOILink(linkId)
+  });
+};
+
+// Bulk delete
+const handleBulkDelete = async () => {
+  const summary = generateDeleteSummary(selectedItems);
+  setConfirmation({
+    isOpen: true,
+    title: "Bulk Delete Links",
+    message: `Delete ${summary.totalLinks} links across ${summary.poisAffected} POIs?`,
+    onConfirm: () => bulkDeleteLinks(selectedItems)
+  });
+};
+
+Phase 5: Integration & Polish (Day 5)
+Step 5.1: Preselection in POI Linking Page
+// Update src/pages/POIEntityLinkingPage.tsx
+const POIEntityLinkingPage = () => {
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  
+  useEffect(() => {
+    const preselectedPOI = searchParams.get('poi');
+    const preselectedEntities = searchParams.get('entities')?.split(',');
+    
+    if (preselectedPOI && preselectedEntities) {
+      // Preselect items in filter state
+      filterState.preselectItems(preselectedPOI, preselectedEntities);
+    }
+  }, [location.search]);
+  
+  // ... rest of component
+};
+
+
+Step 5.2: Confirmation Modal Integration
+// Reuse existing ConfirmationModal component
+<ConfirmationModal
+  isOpen={confirmation.isOpen}
+  title={confirmation.title}
+  message={confirmation.message}
+  onConfirm={confirmation.onConfirm}
+  onCancel={() => setConfirmation({ ...confirmation, isOpen: false })}
+  confirmText="Delete"
+  confirmClassName="bg-red-600 hover:bg-red-700"
+/>
+
+File Structure:
+src/
+├── pages/
+│   └── POILinkManagerPage.tsx
+├── components/poi-link-manager/
+│   ├── POILinkFiltersPanel.tsx
+│   ├── POILinkTreeView.tsx
+│   ├── POITreeNode.tsx
+│   ├── EntityTreeNode.tsx
+│   └── SelectionBanner.tsx
+├── hooks/
+│   ├── usePOILinks.ts
+│   └── useTreeSelection.ts
+└── types/
+    └── poi-link-manager.ts
+	
+	
+Previous Discussion:
+Agent Reply:
+Excellent plan! This is actually much cleaner and more intuitive than my complex multi-panel approach. I really like this design because:
+✅ Smart reuse of existing filter system and layout patterns
+✅ Tree view is perfect for parent-child relationships
+✅ Edit workflow leverages existing functionality elegantly
+✅ Simpler scope - focused on essential operations
+🤔 Clarifying Questions:
+1. Tree View Structure
+
+📍 POI: Abandoned Facility A-7
+├── 🔫 Assault Rifle (Qty: 2)
+├── 🛡️ Combat Armor (Qty: 1)  
+└── 💊 Medical Kit (Qty: 5)
+
+📍 POI: Military Outpost B-3
+├── 🔫 Pistol (Qty: 3)
+└── 📦 Ammo Crate (Qty: 8)
+
+Expandable/Collapsible: Should POIs be collapsible to hide/show their entities?
+Visual Hierarchy: Indentation, icons, connecting lines?
+2. Edit Workflow Details
+When user clicks "Edit" on a POI-Entity link:
+Option A: Preselect the POI + that specific entity only
+Option B: Preselect the POI + all its currently linked entities
+Navigation: Open in new tab or same page?
+3. Sorting & Organization
+POI Order: Alphabetical, by creation date, by link count, by map type?
+Entity Order: Within each POI, how should entities be sorted?
+Grouping: Any grouping by map type, category, etc.?
+4. Operations Details
+Delete: Individual "🗑️" button per entity link?
+Confirmation: Simple confirm dialog or our styled ConfirmationModal?
+Bulk Delete: Select multiple entities under one POI for deletion?
+5. Performance Considerations
+Pagination: Tree view with virtual scrolling or traditional pagination?
+Loading: Show skeleton tree structure while loading?
+Large POIs: POIs with 50+ linked entities - any special handling?
+
+💡 Suggestions:
+Enhanced Tree Actions
+// Per-POI actions
+<POITreeNode>
+  <POIHeader>📍 Facility A-7 (3 items)</POIHeader>
+  <POIActions>
+    <EditAllButton />    // Edit all links for this POI
+    <DeleteAllButton />  // Delete all links for this POI  
+    <AddItemButton />    // Quick-add item to this POI
+  </POIActions>
+</POITreeNode>
+
+// Per-Entity actions  
+<EntityTreeNode>
+  <EntityInfo>🔫 Assault Rifle (Qty: 2)</EntityInfo>
+  <EntityActions>
+    <EditButton />    // Edit this specific link
+    <DeleteButton />  // Delete this specific link
+  </EntityActions>
+</EntityTreeNode>
+
+Filter Integration
+Should the left panel filters affect:
+Just POIs: Filter which POIs appear in tree
+POIs + Entities: Filter POIs AND which entities show under each POI
+Smart Filtering: If entity filter is active, only show POIs that have those entities
+Overall: Love the direction! This will be much more maintainable and user-friendly than my over-engineered approach.
+Which aspects should we clarify first before starting implementation?
+
+User Reply:
+1. yes we wamt POIs to be collapsible and a button to collapse and uncollapse all and for visual hierarcy we want both indentation and icons
+
+2. It should preselect the POI + all currenty linked entities, edits should happen around POIs as the basis. The edit should lead to the same page but load our poi linking page
+
+3. the POI linking order should be possible by all of these and by default by POI link creation date (latest first)
+Enttites within POIs can be sorted alphabetically.
+We don't need specific grouping, our filters and sorting should cover that
+
+4. yes individual delete icons per link but we also want a "bulk delete" mode where we can select multipl POIs (with all their entities) or many entities over different POIs (or a combination of both)
+We want our styled confirmation modal as well as a summary of what gets deleted.
+
+5. we will use traditiona pagination like we did on our linking page, by default we can show 50 links at once. We do need to make sure that we build our system with the ability in mind to select and delete POIs over multiple pages and that the view then properly updates (this also needs to keep the interaction with filters in mind)
+We don't need any special handling for POIs with many entities as that as not really something we need to worry about (they usually won't have more than 2-3).
+
+Any other questions based on my feedback?
+
+
+Agent Reply:
+Perfect! Your feedback is very comprehensive and clear. I have just a few implementation details to confirm:
+🔧 Technical Implementation Questions:
+1. Cross-Page Selection Mechanics
+For bulk delete across multiple pages:
+Selection State: Store selected POI/entity IDs in component state that persists during pagination?
+Visual Indicator: Show "X items selected across Y pages" banner at top?
+Filter Interaction: When filters change, clear selections or keep only valid ones?
+2. Tree State Persistence
+Expand/Collapse: Should POI expand/collapse states persist when user navigates between pages or applies filters?
+Default State: Should POIs start expanded or collapsed by default?
+3. URL Structure & Navigation
+Route: /poi-link-manager or /database/poi-links?
+Navbar Integration: Under "Database" dropdown menu as "POI Link Manager"?
+Edit Navigation: Should edit link be /poi-linking?poi=123&entities=456,789 with query params for preselection?
+4. Data Structure for Tree View
+interface POILinkTreeNode {
+  poi: POI;
+  entities: Array<{
+    entity: Entity;
+    linkId: string;
+    quantity?: number;
+    notes?: string;
+    created_at: string;
+  }>;
+  expanded: boolean;
+  totalLinks: number;
+}
+5. Bulk Delete Selection UI
+Selection Mode Toggle: "Select Mode" button like we have in current panels?
+Selection Types:
+☑️ Select entire POI (all its entities)
+☑️ Select individual entity links
+☑️ Mixed selection
+Bulk Actions Bar: Appears when items selected, shows count + delete button?
+💡 Implementation Approach:
+I'm thinking we:
+Create new page: src/pages/POILinkManagerPage.tsx
+Reuse components: FiltersPanel, pagination, confirmation modal
+New components:
+POILinkTreeView.tsx (main tree container)
+POITreeNode.tsx (individual POI with children)
+EntityTreeNode.tsx (individual entity under POI)
+Enhanced routing: Add preselection params to POI linking page
+Does this approach sound right? Any preferences on the specific implementation details above?
+
+User Reply:
+
+1. yes we need to storethe selected state and make it persistent between pagionation and yes we want a visual indicator. When the filter changes we want to keep valid ones.
+
+2. expand/collapse should persists between navigation yes
+POIs should be expanded by default
+
+3. /poi-lin-manager
+And "POI Link Manager" is good for the dropdown menu
+the query param for preselection is a good idea
+
+5. yes a select mode button would be good with all the seelction types you mentioned as well as the bulk action bar
+
+your implementation approach sounds good lets do that.
+
