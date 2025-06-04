@@ -23,6 +23,7 @@ export interface EntityLinkNode {
 export interface POILinkFilters {
   search: string;
   mapType: 'hagga_basin' | 'deep_desert' | 'both';
+  privacyLevels: string[]; // 'global', 'private', 'shared'
   poiCategories: string[];
   entityTypes: string[];
   entityCategories: string[];

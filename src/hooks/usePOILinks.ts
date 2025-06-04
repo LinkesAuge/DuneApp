@@ -41,6 +41,7 @@ export const usePOILinks = (): UsePOILinksReturn => {
   const defaultFilters: POILinkFilters = {
     search: '',
     mapType: 'both',
+    privacyLevels: ['global', 'private', 'shared'], // All privacy levels by default
     poiCategories: [],
     entityCategories: [],
     entityTypes: [],
@@ -91,6 +92,7 @@ export const usePOILinks = (): UsePOILinksReturn => {
       // Initialize filters with all options selected
       setFiltersState(prev => ({
         ...prev,
+        privacyLevels: ['global', 'private', 'shared'], // All privacy levels selected by default
         poiCategories: [...new Set(poiTypesData?.map(pt => pt.category) || [])],
         entityCategories: [...categories],
         entityTypes: [...types],
@@ -199,26 +201,43 @@ export const usePOILinks = (): UsePOILinksReturn => {
         if (filters.mapType === 'deep_desert' && poi.map_type !== 'deep_desert') return false;
       }
 
+      // Privacy level filter
+      if (filters.privacyLevels.length > 0) {
+        if (!filters.privacyLevels.includes(poi.privacy_level)) return false;
+      }
+
       // POI category filter
-      if (filters.poiCategories.length > 0) {
+      if (filters.poiCategories.length === 0) {
+        // Empty array means hide all POIs
+        return false;
+      } else {
         const poiCategory = poi.poi_types?.category;
         if (!poiCategory || !filters.poiCategories.includes(poiCategory)) return false;
       }
 
       // Entity category filter
-      if (filters.entityCategories.length > 0) {
+      if (filters.entityCategories.length === 0) {
+        // Empty array means hide all entities
+        return false;
+      } else {
         const entityCategory = entity.categories?.name;
         if (!entityCategory || !filters.entityCategories.includes(entityCategory)) return false;
       }
 
       // Entity type filter
-      if (filters.entityTypes.length > 0) {
+      if (filters.entityTypes.length === 0) {
+        // Empty array means hide all entity types
+        return false;
+      } else {
         const entityType = entity.types?.name;
         if (!entityType || !filters.entityTypes.includes(entityType)) return false;
       }
 
       // Entity tier filter
-      if (filters.entityTiers.length > 0) {
+      if (filters.entityTiers.length === 0) {
+        // Empty array means hide all entity tiers
+        return false;
+      } else {
         const tierNumber = entity.tier_number?.toString();
         if (!filters.entityTiers.includes(tierNumber)) return false;
       }

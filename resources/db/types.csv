@@ -1,0 +1,35 @@
+﻿id;name;category_id;icon;sort_order
+310;Variant;30;NULL;310
+320;Swatch;30;NULL;320
+330;Building;30;NULL;330
+410;Light Armor;40;NULL;410
+420;Heavy Armor;40;NULL;420
+430;Stillsuits;40;NULL;430
+440;Social;40;NULL;440
+450;Utility;40;NULL;450
+510;Components;50;NULL;510
+520;Fuel;50;NULL;520
+530;Raw Resources;50;NULL;530
+540;Refined Resources;50;NULL;540
+550;Solaris;50;NULL;550
+610;Cartography Tools;60;NULL;610
+620;Hydration Tools;60;NULL;620
+630;Utility Tools;60;NULL;630
+640;Gathering Tools;60;NULL;640
+650;Building Tools;60;NULL;650
+660;Consumables;60;NULL;660
+710;Scout Ornithopter;70;NULL;710
+720;Assault Ornithopter;70;NULL;720
+730;Buggy;70;NULL;730
+740;Carry-all;70;NULL;740
+750;Sandcrawler;70;NULL;750
+760;Sandbike;70;NULL;760
+810;Sidearms;80;NULL;810
+820;Scatterguns;80;NULL;820
+830;Short Blades;80;NULL;830
+840;Rifles;80;NULL;840
+850;Long Blades;80;NULL;850
+860;Heavy Weapons;80;NULL;860
+870;Ammunition;80;NULL;870
+9999;None;50;NULL;9999
+6666;Undefined;50;NULL;6666

@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
 import { getDisplayName } from '../../lib/utils';
 import UserAvatar from './UserAvatar';
-import { Menu, X, User, LogOut, Shield, LayoutDashboard, Mountain, MapPin, Pyramid, Database, ChevronDown, Link as LinkIcon } from 'lucide-react';
+import { Menu, X, User, LogOut, Shield, LayoutDashboard, Mountain, MapPin, Pyramid, Database, ChevronDown, Link as LinkIcon, Network } from 'lucide-react';
 
 const Navbar: React.FC = () => {
   const { user, signOut } = useAuth();
@@ -223,7 +223,7 @@ const Navbar: React.FC = () => {
               onClick={() => setIsDatabaseDropdownOpen(false)}
               className="group relative flex items-center px-4 py-3 hover:bg-violet-600/20 transition-all duration-200"
             >
-              <Database size={14} strokeWidth={1.5} className="mr-3 text-amber-300 group-hover:text-amber-100" />
+              <Network size={14} strokeWidth={1.5} className="mr-3 text-amber-300 group-hover:text-amber-100" />
               <span className="text-amber-200 group-hover:text-amber-50 font-light text-sm">POI Link Manager</span>
             </Link>
 

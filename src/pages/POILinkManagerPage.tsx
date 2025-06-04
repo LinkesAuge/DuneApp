@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Database, List, Eye, ChevronDown, ChevronUp } from 'lucide-react';
+import { Database, List, Eye, ChevronDown, ChevronUp, Lock, Users, Grid3X3, Menu, Edit, Trash2, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 // Import the hook
@@ -10,11 +10,14 @@ import PaginationControls from '../components/shared/PaginationControls';
 import { ImagePreview } from '../components/shared/ImagePreview';
 import POILinkFiltersPanel from '../components/POILinkFiltersPanel';
 import { ConfirmationModal } from '../components/shared/ConfirmationModal';
+import { useAuth } from '../components/auth/AuthProvider';
+import { supabase } from '../lib/supabase';
 
 const POILinkManagerPage: React.FC = () => {
   // Initialize POI links hook
   const poiLinksState = usePOILinks();
   const navigate = useNavigate();
+  const { user } = useAuth();
   
   // Panel state management (only filters panel is collapsible)
   const [filtersOpen, setFiltersOpen] = useState(true);
@@ -41,6 +44,12 @@ const POILinkManagerPage: React.FC = () => {
   // Expansion state management for POI tree nodes
   const [expandedPOIs, setExpandedPOIs] = useState<Set<string>>(new Set());
   
+  // Shared POIs state for permission checking
+  const [sharedPOIs, setSharedPOIs] = useState<Set<string>>(new Set());
+  
+  // View mode state - grid is default as requested
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  
   // Extract filter state from the hook
   const { filters, setFilters, filterOptions } = poiLinksState;
 
@@ -48,6 +57,67 @@ const POILinkManagerPage: React.FC = () => {
   const filtersData = {
     filters,
     setFilters
+  };
+
+  // Fetch shared POIs for the current user
+  useEffect(() => {
+    const fetchSharedPOIs = async () => {
+      // Only members need to check shared POIs, admins/editors have full access
+      if (!user || user.role !== 'member') {
+        setSharedPOIs(new Set());
+        return;
+      }
+
+      try {
+        // Query poi_shares table to find POIs shared with this user
+        const { data: sharedPOIData, error } = await supabase
+          .from('poi_shares')
+          .select('poi_id')
+          .eq('shared_with_user_id', user.id);
+
+        if (error) {
+          console.error('Error fetching shared POIs:', error);
+          return;
+        }
+
+        // Convert to Set for O(1) lookup performance in canModifyPOI
+        const sharedPOIIds = new Set(sharedPOIData?.map(share => share.poi_id) || []);
+        setSharedPOIs(sharedPOIIds);
+      } catch (error) {
+        console.error('Error fetching shared POIs:', error);
+      }
+    };
+
+    fetchSharedPOIs();
+  }, [user]);
+
+  // Permission checking function
+  const canModifyPOI = (poi: any) => {
+    if (!user) return false;
+    
+    // Admins and editors can modify all POI links
+    if (user.role === 'admin' || user.role === 'editor') {
+      return true;
+    }
+    
+    // Members can only modify their own POIs or POIs shared with them
+    if (user.role === 'member') {
+      // Can modify their own POIs regardless of privacy level
+      if (poi.created_by === user.id) {
+        return true;
+      }
+      
+      // For shared POIs, check if the POI is shared with this user
+      // sharedPOIs Set is populated from poi_shares table in useEffect
+      if (poi.privacy_level === 'shared') {
+        return sharedPOIs.has(poi.id);
+      }
+      
+      // Private POIs not owned by the user are not accessible
+      // Public POIs are accessible for viewing but not modification (based on project rules)
+    }
+    
+    return false;
   };
 
   // Selection handlers
@@ -205,23 +275,26 @@ const POILinkManagerPage: React.FC = () => {
       )}
 
       {/* Right Panel - Tree View (always visible) */}
-      <POILinkTreePanel 
-        poiLinksState={poiLinksState}
-        selectionMode={selectionMode}
-        selectedItems={selectedItems}
-        onToggleSelectionMode={toggleSelectionMode}
-        onToggleItemSelection={toggleItemSelection}
-        onTogglePOISelection={togglePOISelection}
-        onClearAllSelections={clearAllSelections}
-        expandedPOIs={expandedPOIs}
-        onToggleExpanded={handleToggleExpanded}
-        onExpandAll={expandAll}
-        onCollapseAll={collapseAll}
-        onBulkDelete={handleBulkDelete}
-        onDeleteLink={handleDeleteLink}
-        onEditPOI={handleEditPOI}
-        onEditLink={handleEditLink}
-      />
+              <POILinkTreePanel 
+          poiLinksState={poiLinksState}
+          selectionMode={selectionMode}
+          selectedItems={selectedItems}
+          onToggleSelectionMode={toggleSelectionMode}
+          onToggleItemSelection={toggleItemSelection}
+          onTogglePOISelection={togglePOISelection}
+          onClearAllSelections={clearAllSelections}
+          expandedPOIs={expandedPOIs}
+          onToggleExpanded={handleToggleExpanded}
+          onExpandAll={expandAll}
+          onCollapseAll={collapseAll}
+          onBulkDelete={handleBulkDelete}
+          onDeleteLink={handleDeleteLink}
+          onEditPOI={handleEditPOI}
+          onEditLink={handleEditLink}
+          canModifyPOI={canModifyPOI}
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
+        />
 
       {/* Confirmation Modal */}
       <ConfirmationModal
@@ -255,6 +328,9 @@ interface POILinkTreePanelProps {
   onDeleteLink: (linkId: string) => void;
   onEditPOI: (poiId: string, entityIds: string[]) => void;
   onEditLink: (poiId: string, entityId: string) => void;
+  canModifyPOI: (poi: any) => boolean;
+  viewMode: 'grid' | 'list';
+  onViewModeChange: (mode: 'grid' | 'list') => void;
 }
 
 const POILinkTreePanel: React.FC<POILinkTreePanelProps> = ({ 
@@ -272,7 +348,10 @@ const POILinkTreePanel: React.FC<POILinkTreePanelProps> = ({
   onBulkDelete,
   onDeleteLink,
   onEditPOI,
-  onEditLink
+  onEditLink,
+  canModifyPOI,
+  viewMode,
+  onViewModeChange
 }) => {
   // Get data from props
 
@@ -371,14 +450,53 @@ const POILinkTreePanel: React.FC<POILinkTreePanelProps> = ({
       {/* Header with controls */}
       <div className="p-4 border-b border-slate-600">
         <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-semibold text-amber-200 flex items-center"
-              style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-            <List size={16} className="mr-2" />
-            POI Links
-            <span className="ml-2 text-sm text-slate-400">({getDisplayCount()})</span>
-          </h3>
+          <div className="flex items-center">
+            <h3 className="text-lg font-semibold text-amber-200 flex items-center"
+                style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+              <List size={16} className="mr-2" />
+              POI Links
+              <span className="ml-2 text-sm text-slate-400">({getDisplayCount()})</span>
+            </h3>
+            
+            <button
+              onClick={toggleSelectionModeLocal}
+              className={`ml-4 text-xs px-3 py-1 ${
+                selectionMode ? 'dune-button-primary' : 'dune-button-secondary'
+              }`}
+            >
+              {selectionMode ? 'Exit Selection' : 'Select Mode'}
+            </button>
+          </div>
           
           <div className="flex space-x-2">
+            {/* View Mode Toggle */}
+            <div className="flex bg-slate-800/50 rounded-lg p-1 border border-slate-600/50">
+              <button
+                onClick={() => onViewModeChange('grid')}
+                className={`px-2 py-1 text-xs rounded transition-all duration-200 flex items-center gap-1 ${
+                  viewMode === 'grid'
+                    ? 'bg-amber-500/20 text-amber-200 border border-amber-400/30'
+                    : 'text-amber-200/70 hover:text-amber-200 hover:bg-slate-700/50'
+                }`}
+                title="Grid View"
+              >
+                <Grid3X3 size={12} />
+                Grid
+              </button>
+              <button
+                onClick={() => onViewModeChange('list')}
+                className={`px-2 py-1 text-xs rounded transition-all duration-200 flex items-center gap-1 ${
+                  viewMode === 'list'
+                    ? 'bg-amber-500/20 text-amber-200 border border-amber-400/30'
+                    : 'text-amber-200/70 hover:text-amber-200 hover:bg-slate-700/50'
+                }`}
+                title="List View"
+              >
+                <Menu size={12} />
+                List
+              </button>
+            </div>
+            
             <button
               onClick={onExpandAll}
               className="dune-button-secondary text-xs px-3 py-1"
@@ -390,14 +508,6 @@ const POILinkTreePanel: React.FC<POILinkTreePanelProps> = ({
               className="dune-button-secondary text-xs px-3 py-1"
             >
               Collapse All
-            </button>
-            <button
-              onClick={toggleSelectionModeLocal}
-              className={`text-xs px-3 py-1 ${
-                selectionMode ? 'dune-button-primary' : 'dune-button-secondary'
-              }`}
-            >
-              {selectionMode ? 'Exit Selection' : 'Select Mode'}
             </button>
           </div>
         </div>
@@ -426,11 +536,32 @@ const POILinkTreePanel: React.FC<POILinkTreePanelProps> = ({
         )}
       </div>
 
-      {/* Tree Content */}
+      {/* Content - Grid or List View */}
       <div className="flex-1 overflow-y-auto">
         {poiLinks.length === 0 ? (
           <div className="p-8 text-center text-slate-400">
             No POI links found
+          </div>
+        ) : viewMode === 'grid' ? (
+          <div className="p-4">
+            <div className="grid grid-cols-3 gap-4">
+              {poiLinks.map((poiLink: any) => (
+                <POIGridCard
+                  key={poiLink.poi.id}
+                  poiLink={poiLink}
+                  selectionMode={selectionMode}
+                  selectedItems={selectedItems}
+                  expanded={expandedPOIs.has(poiLink.poi.id)}
+                  onToggleExpanded={() => togglePOIExpansion(poiLink.poi.id)}
+                  onToggleItemSelection={onToggleItemSelection}
+                  onTogglePOISelection={onTogglePOISelection}
+                  onDeleteLink={onDeleteLink}
+                  onEditPOI={onEditPOI}
+                  onEditLink={onEditLink}
+                  canModifyPOI={canModifyPOI}
+                />
+              ))}
+            </div>
           </div>
         ) : (
           <div className="p-4 space-y-2">
@@ -447,6 +578,7 @@ const POILinkTreePanel: React.FC<POILinkTreePanelProps> = ({
                 onDeleteLink={onDeleteLink}
                 onEditPOI={onEditPOI}
                 onEditLink={onEditLink}
+                canModifyPOI={canModifyPOI}
               />
             ))}
           </div>
@@ -481,6 +613,7 @@ interface POITreeNodeProps {
   onDeleteLink: (linkId: string) => void;
   onEditPOI: (poiId: string, entityIds: string[]) => void;
   onEditLink: (poiId: string, entityId: string) => void;
+  canModifyPOI: (poi: any) => boolean;
 }
 
 const POITreeNode: React.FC<POITreeNodeProps> = ({
@@ -493,7 +626,8 @@ const POITreeNode: React.FC<POITreeNodeProps> = ({
   onTogglePOISelection,
   onDeleteLink,
   onEditPOI,
-  onEditLink
+  onEditLink,
+  canModifyPOI
 }) => {
   const poi = poiLink.poi;
   const entities = poiLink.entities || [];
@@ -523,12 +657,18 @@ const POITreeNode: React.FC<POITreeNodeProps> = ({
         
         <div className="flex items-center space-x-2 flex-1">
           <span className="text-amber-200 font-medium">{poi.title}</span>
+          
+          {/* Privacy Icon */}
+          {poi.privacy_level === 'global' && <Eye className="w-4 h-4 text-green-400" title="Public POI" />}
+          {poi.privacy_level === 'private' && <Lock className="w-4 h-4 text-red-400" title="Private POI" />}
+          {poi.privacy_level === 'shared' && <Users className="w-4 h-4 text-blue-400" title="Shared POI" />}
+          
           <span className="text-xs text-slate-400">
             ({entities.length} item{entities.length === 1 ? '' : 's'})
           </span>
         </div>
         
-        {!selectionMode && (
+        {!selectionMode && canModifyPOI(poi) && (
           <div className="flex space-x-1">
             <button 
               onClick={() => onEditPOI(poi.id, entities.map(e => e.entity.id))}
@@ -548,12 +688,14 @@ const POITreeNode: React.FC<POITreeNodeProps> = ({
             <EntityTreeNode
               key={entityLink.linkId || `${poi.id}|${entityLink.entity.id}`}
               entityLink={entityLink}
+              poi={poi}
               poiId={poi.id}
               selectionMode={selectionMode}
               isSelected={selectedItems.has(`link:${entityLink.linkId || `${poi.id}|${entityLink.entity.id}`}`)}
               onToggleSelection={() => onToggleItemSelection(`link:${entityLink.linkId || `${poi.id}|${entityLink.entity.id}`}`)}
               onDeleteLink={onDeleteLink}
               onEditLink={onEditLink}
+              canModifyPOI={canModifyPOI}
             />
           ))}
         </div>
@@ -565,22 +707,26 @@ const POITreeNode: React.FC<POITreeNodeProps> = ({
 // Entity Tree Node Component
 interface EntityTreeNodeProps {
   entityLink: any;
+  poi: any;
   poiId: string;
   selectionMode: boolean;
   isSelected: boolean;
   onToggleSelection: () => void;
   onDeleteLink: (linkId: string) => void;
   onEditLink: (poiId: string, entityId: string) => void;
+  canModifyPOI: (poi: any) => boolean;
 }
 
 const EntityTreeNode: React.FC<EntityTreeNodeProps> = ({
   entityLink,
+  poi,
   poiId,
   selectionMode,
   isSelected,
   onToggleSelection,
   onDeleteLink,
-  onEditLink
+  onEditLink,
+  canModifyPOI
 }) => {
   const entity = entityLink.entity;
 
@@ -610,22 +756,191 @@ const EntityTreeNode: React.FC<EntityTreeNodeProps> = ({
         )}
       </div>
       
-      {!selectionMode && (
-        <div className="flex space-x-1">
+      {!selectionMode && canModifyPOI(poi) && (
+        <div className="flex items-center gap-1">
           <button 
             onClick={() => onEditLink(poiId, entity.id)}
-            className="dune-button-secondary text-xs p-1"
+            className="p-1 hover:bg-slate-700/50 rounded text-amber-400/70 hover:text-amber-300 transition-colors"
             title="Edit this link"
           >
-            ✏️
+            <Edit className="w-3 h-3" />
           </button>
           <button 
             onClick={() => onDeleteLink(entityLink.linkId || `${poiId}|${entity.id}`)}
-            className="dune-button-secondary text-xs p-1 text-red-400"
+            className="p-1 hover:bg-slate-700/50 rounded text-red-400/70 hover:text-red-300 transition-colors"
             title="Delete this link"
           >
-            🗑️
+            <Trash2 className="w-3 h-3" />
           </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// POI Grid Card Component for grid view
+interface POIGridCardProps {
+  poiLink: any;
+  selectionMode: boolean;
+  selectedItems: Set<string>;
+  expanded: boolean;
+  onToggleExpanded: () => void;
+  onToggleItemSelection: (itemId: string) => void;
+  onTogglePOISelection: (poiId: string, entityIds: string[]) => void;
+  onDeleteLink: (linkId: string) => void;
+  onEditPOI: (poiId: string, entityIds: string[]) => void;
+  onEditLink: (poiId: string, entityId: string) => void;
+  canModifyPOI: (poi: any) => boolean;
+}
+
+const POIGridCard: React.FC<POIGridCardProps> = ({
+  poiLink,
+  selectionMode,
+  selectedItems,
+  expanded,
+  onToggleExpanded,
+  onToggleItemSelection,
+  onTogglePOISelection,
+  onDeleteLink,
+  onEditPOI,
+  onEditLink,
+  canModifyPOI
+}) => {
+  const poi = poiLink.poi;
+  const entities = poiLink.entities || [];
+  const entityLinkIds = entities.map((e: any) => e.linkId || `${poi.id}|${e.entity.id}`);
+  
+  const isSelected = selectedItems.has(`poi:${poi.id}`);
+  const canModify = canModifyPOI(poi);
+
+  const getPrivacyIcon = (privacy: string) => {
+    switch (privacy) {
+      case 'global': return <Eye className="w-3 h-3 text-green-400" />;
+      case 'private': return <Lock className="w-3 h-3 text-red-400" />;
+      case 'shared': return <Users className="w-3 h-3 text-blue-400" />;
+      default: return <Eye className="w-3 h-3 text-gray-400" />;
+    }
+  };
+
+  return (
+    <div className="dune-panel-secondary border border-slate-600/50 rounded-lg hover:border-amber-400/30 transition-all duration-200">
+      {/* Card Header */}
+      <div className="p-4 border-b border-slate-600/50">
+        <div className="flex items-start justify-between mb-2">
+          <div className="flex items-center gap-2 flex-1">
+            {selectionMode && (
+              <input
+                type="checkbox"
+                checked={isSelected}
+                onChange={() => onTogglePOISelection(poi.id, entityLinkIds)}
+                className="mr-2"
+              />
+            )}
+            <button
+              onClick={onToggleExpanded}
+              className="flex-shrink-0 p-1 hover:bg-slate-700/50 rounded"
+            >
+              {expanded ? (
+                <ChevronDown className="w-3 h-3 text-slate-400" />
+              ) : (
+                <ChevronRight className="w-3 h-3 text-slate-400" />
+              )}
+            </button>
+            <h3 className="text-amber-200 font-medium text-sm line-clamp-2"
+                style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+              {poi.title}
+            </h3>
+          </div>
+          <div className="flex items-center gap-2">
+            {getPrivacyIcon(poi.privacy_level)}
+            {canModify && (
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => onEditPOI(poi.id, entities.map((e: any) => e.entity.id))}
+                  className="p-1 hover:bg-slate-700/50 rounded text-amber-400/70 hover:text-amber-300 transition-colors"
+                  title="Edit POI links"
+                >
+                  <Edit className="w-3 h-3" />
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+        
+        <div className="flex items-center justify-between text-xs text-slate-400">
+          <span>{poi.map_type === 'hagga_basin' ? 'Hagga Basin' : 'Deep Desert'}</span>
+          <span>{entities.length} item{entities.length === 1 ? '' : 's'}</span>
+        </div>
+        
+        {poi.coordinates && (
+          <div className="text-xs text-slate-500 mt-1">
+            {poi.coordinates.x}, {poi.coordinates.y}
+          </div>
+        )}
+      </div>
+
+      {/* Entities List - Collapsible */}
+      {expanded && (
+        <div className="p-4">
+          {entities.length === 0 ? (
+            <p className="text-slate-500 text-xs text-center py-2">No linked items</p>
+          ) : (
+            <div className="space-y-2">
+              {entities.map((entityLink: any, index: number) => {
+                const linkId = entityLink.linkId || `${poi.id}|${entityLink.entity.id}`;
+                const isEntitySelected = selectedItems.has(`link:${linkId}`);
+                
+                return (
+                  <div key={linkId} className="flex items-center justify-between p-2 bg-slate-800/30 rounded text-xs">
+                    <div className="flex items-center gap-2 flex-1">
+                      {selectionMode && (
+                        <input
+                          type="checkbox"
+                          checked={isEntitySelected}
+                          onChange={() => onToggleItemSelection(`link:${linkId}`)}
+                          className="mr-1"
+                        />
+                      )}
+                      <div className="w-4 h-4 flex items-center justify-center flex-shrink-0">
+                        <ImagePreview
+                          iconImageId={entityLink.entity.icon_image_id}
+                          iconFallback={entityLink.entity.icon || '📦'}
+                          size="xs"
+                          className="w-full h-full"
+                        />
+                      </div>
+                      <span className="text-amber-200/80 truncate">
+                        {entityLink.entity.name}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="text-slate-400 text-xs">
+                        T{entityLink.entity.tier_number}
+                      </span>
+                      {canModify && !selectionMode && (
+                        <div className="flex items-center gap-1 ml-2">
+                          <button
+                            onClick={() => onEditLink(poi.id, entityLink.entity.id)}
+                            className="p-1 hover:bg-slate-700/50 rounded text-amber-400/70 hover:text-amber-300 transition-colors"
+                            title="Edit this link"
+                          >
+                            <Edit className="w-3 h-3" />
+                          </button>
+                          <button
+                            onClick={() => onDeleteLink(linkId)}
+                            className="p-1 hover:bg-slate-700/50 rounded text-red-400/70 hover:text-red-300 transition-colors"
+                            title="Delete this link"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
     </div>

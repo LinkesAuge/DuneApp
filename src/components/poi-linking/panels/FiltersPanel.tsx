@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { Database, Search, X, Eye, ChevronRight } from 'lucide-react';
+import { Database, Search, X, Eye, ChevronRight, Lock, Users } from 'lucide-react';
 
 interface FiltersPanelProps {
   onTogglePanel: () => void;
@@ -702,7 +702,7 @@ const FiltersPanel: React.FC<FiltersPanelProps> = ({ onTogglePanel, filterState 
             </button>
           </div>
           <div className="mt-2 text-xs text-amber-300/70">
-            Icons show privacy levels on map POIs: <Eye className="w-3 h-3 inline text-green-400" /> Public, 🔒 Private, 👥 Shared
+            Icons show privacy levels on map POIs: <Eye className="w-3 h-3 inline text-green-400" /> Public, <Lock className="w-3 h-3 inline text-red-400" /> Private, <Users className="w-3 h-3 inline text-blue-400" /> Shared
           </div>
         </div>
       </div>

@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { Database, Search, X, Eye, ChevronRight } from 'lucide-react';
+import { Database, Search, X, Eye, ChevronRight, Lock, Users } from 'lucide-react';
 import { isIconUrl } from '../lib/helpers';
 
 interface POILinkFiltersPanelProps {
@@ -54,11 +54,27 @@ const POILinkFiltersPanel: React.FC<POILinkFiltersPanelProps> = ({
 
   // Filter update handlers
   const handleSearchChange = (value: string) => {
-    setFilters({ search: value });
+    setFilters({ ...filters, search: value });
   };
 
   const handleMapTypeChange = (mapType: 'both' | 'hagga_basin' | 'deep_desert') => {
-    setFilters({ mapType });
+    setFilters({ ...filters, mapType });
+  };
+
+  const togglePrivacyLevel = (privacyLevel: string) => {
+    const currentLevels = filters.privacyLevels || [];
+    const newLevels = currentLevels.includes(privacyLevel)
+      ? currentLevels.filter((l: string) => l !== privacyLevel)
+      : [...currentLevels, privacyLevel];
+    setFilters({ ...filters, privacyLevels: newLevels });
+  };
+
+  const showAllPrivacyLevels = () => {
+    setFilters({ ...filters, privacyLevels: ['global', 'private', 'shared'] });
+  };
+
+  const hideAllPrivacyLevels = () => {
+    setFilters({ ...filters, privacyLevels: [] });
   };
 
   const togglePOICategory = (category: string) => {
@@ -66,7 +82,7 @@ const POILinkFiltersPanel: React.FC<POILinkFiltersPanelProps> = ({
     const newCategories = currentCategories.includes(category)
       ? currentCategories.filter((c: string) => c !== category)
       : [...currentCategories, category];
-    setFilters({ poiCategories: newCategories });
+    setFilters({ ...filters, poiCategories: newCategories });
   };
 
   const toggleEntityCategory = (category: string) => {
@@ -74,7 +90,7 @@ const POILinkFiltersPanel: React.FC<POILinkFiltersPanelProps> = ({
     const newCategories = currentCategories.includes(category)
       ? currentCategories.filter((c: string) => c !== category)
       : [...currentCategories, category];
-    setFilters({ entityCategories: newCategories });
+    setFilters({ ...filters, entityCategories: newCategories });
   };
 
   const toggleEntityType = (type: string) => {
@@ -82,7 +98,7 @@ const POILinkFiltersPanel: React.FC<POILinkFiltersPanelProps> = ({
     const newTypes = currentTypes.includes(type)
       ? currentTypes.filter((t: string) => t !== type)
       : [...currentTypes, type];
-    setFilters({ entityTypes: newTypes });
+    setFilters({ ...filters, entityTypes: newTypes });
   };
 
   const toggleEntityTier = (tierId: string) => {
@@ -90,40 +106,40 @@ const POILinkFiltersPanel: React.FC<POILinkFiltersPanelProps> = ({
     const newTiers = currentTiers.includes(tierId)
       ? currentTiers.filter((t: string) => t !== tierId)
       : [...currentTiers, tierId];
-    setFilters({ entityTiers: newTiers });
+    setFilters({ ...filters, entityTiers: newTiers });
   };
 
   const showAllPOICategories = () => {
     const allCategories = [...new Set(filterOptions.poiTypes.map(pt => pt.category))];
-    setFilters({ poiCategories: allCategories });
+    setFilters({ ...filters, poiCategories: allCategories });
   };
 
   const hideAllPOICategories = () => {
-    setFilters({ poiCategories: [] });
+    setFilters({ ...filters, poiCategories: [] });
   };
 
   const showAllEntityCategories = () => {
-    setFilters({ entityCategories: [...filterOptions.entityCategories] });
+    setFilters({ ...filters, entityCategories: [...filterOptions.entityCategories] });
   };
 
   const hideAllEntityCategories = () => {
-    setFilters({ entityCategories: [] });
+    setFilters({ ...filters, entityCategories: [] });
   };
 
   const showAllEntityTypes = () => {
-    setFilters({ entityTypes: [...filterOptions.entityTypes] });
+    setFilters({ ...filters, entityTypes: [...filterOptions.entityTypes] });
   };
 
   const hideAllEntityTypes = () => {
-    setFilters({ entityTypes: [] });
+    setFilters({ ...filters, entityTypes: [] });
   };
 
   const showAllEntityTiers = () => {
-    setFilters({ entityTiers: filterOptions.tiers.map(t => t.id.toString()) });
+    setFilters({ ...filters, entityTiers: filterOptions.tiers.map(t => t.id.toString()) });
   };
 
   const hideAllEntityTiers = () => {
-    setFilters({ entityTiers: [] });
+    setFilters({ ...filters, entityTiers: [] });
   };
 
   // Get POI categories from POI types
@@ -263,31 +279,112 @@ const POILinkFiltersPanel: React.FC<POILinkFiltersPanelProps> = ({
 
   const POIFiltersTab = () => (
     <div className="space-y-4">
-      {/* POI Categories */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-medium text-amber-300"
-              style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-            POI Categories
-          </h3>
-          <div className="flex gap-2">
-            <button 
-              onClick={showAllPOICategories}
-              className="text-xs text-amber-400/70 hover:text-amber-300 transition-colors"
-            >
-              Show All
-            </button>
-            <button 
-              onClick={hideAllPOICategories}
-              className="text-xs text-amber-400/70 hover:text-amber-300 transition-colors"
-            >
-              Hide All
-            </button>
-          </div>
+      {/* Show/Hide All Toggle */}
+      <div className="flex justify-between items-center mb-4">
+        <label className="block text-sm font-light text-amber-200 tracking-wide" style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+          Points of Interest
+        </label>
+        <div className="flex gap-2">
+          <button
+            onClick={() => {
+              const allCategories = poiCategories;
+              const currentCategories = filters.poiCategories || [];
+              const allSelected = allCategories.length > 0 && allCategories.every(cat => currentCategories.includes(cat));
+              if (allSelected) {
+                setFilters({ ...filters, poiCategories: [] });
+              } else {
+                setFilters({ ...filters, poiCategories: [...allCategories] });
+              }
+            }}
+            className="text-xs text-amber-300 hover:text-amber-100 font-light transition-all duration-300 px-2 py-1 rounded border border-amber-400/20 hover:border-amber-400/40 hover:bg-amber-400/10"
+            title="Toggle All POIs"
+            style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
+          >
+            {(() => {
+              const allCategories = poiCategories;
+              const currentCategories = filters.poiCategories || [];
+              const allSelected = allCategories.length > 0 && allCategories.every(cat => currentCategories.includes(cat));
+              return allSelected ? 'Hide All' : 'Show All';
+            })()}
+          </button>
+        </div>
+      </div>
+
+      {/* POI Categories in Two Columns */}
+      <div className="grid grid-cols-2 gap-3 mb-4">
+        {/* Left Column */}
+        <div className="space-y-1">
+          {poiCategories
+            .filter((_, index) => index % 2 === 0)
+            .map(category => renderPOICategorySection(category))}
         </div>
         
-        <div className="space-y-2">
-          {poiCategories.map(category => renderPOICategorySection(category))}
+        {/* Right Column */}
+        <div className="space-y-1">
+          {poiCategories
+            .filter((_, index) => index % 2 === 1)
+            .map(category => renderPOICategorySection(category))}
+        </div>
+      </div>
+
+      {/* Privacy Level - moved to bottom */}
+      <div className="border-t border-slate-700/50 pt-4">
+        <h4 className="text-sm font-medium text-amber-200 mb-3">Additional Filters</h4>
+        
+        {/* Privacy Level Quick Filters */}
+        <div>
+          <label className="block text-sm font-medium text-amber-200/80 mb-2">
+            Quick Visibility Filters
+          </label>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => setFilters({ ...filters, privacyLevels: ['global'] })}
+              className={`px-3 py-2 text-xs rounded border flex items-center justify-center gap-1 transition-all ${
+                filters.privacyLevels?.length === 1 && filters.privacyLevels.includes('global')
+                  ? 'bg-amber-600/20 border-amber-500/50 text-amber-200'
+                  : 'bg-slate-800/50 border-slate-600/50 text-amber-300/70 hover:bg-slate-700/50 hover:text-amber-200'
+              }`}
+            >
+              <Eye className="w-3 h-3 text-green-400" />
+              Public Only
+            </button>
+            <button
+              onClick={() => setFilters({ ...filters, privacyLevels: ['private'] })}
+              className={`px-3 py-2 text-xs rounded border flex items-center justify-center gap-1 transition-all ${
+                filters.privacyLevels?.length === 1 && filters.privacyLevels.includes('private')
+                  ? 'bg-amber-600/20 border-amber-500/50 text-amber-200'
+                  : 'bg-slate-800/50 border-slate-600/50 text-amber-300/70 hover:bg-slate-700/50 hover:text-amber-200'
+              }`}
+            >
+              <Lock className="w-3 h-3 text-red-400" />
+              Private Only
+            </button>
+            <button
+              onClick={() => setFilters({ ...filters, privacyLevels: ['shared'] })}
+              className={`px-3 py-2 text-xs rounded border flex items-center justify-center gap-1 transition-all ${
+                filters.privacyLevels?.length === 1 && filters.privacyLevels.includes('shared')
+                  ? 'bg-amber-600/20 border-amber-500/50 text-amber-200'
+                  : 'bg-slate-800/50 border-slate-600/50 text-amber-300/70 hover:bg-slate-700/50 hover:text-amber-200'
+              }`}
+            >
+              <Users className="w-3 h-3 text-blue-400" />
+              Shared Only
+            </button>
+            <button
+              onClick={() => setFilters({ ...filters, privacyLevels: ['global', 'private', 'shared'] })}
+              className={`px-3 py-2 text-xs rounded border flex items-center justify-center gap-1 transition-all ${
+                filters.privacyLevels?.length === 3
+                  ? 'bg-amber-600/20 border-amber-500/50 text-amber-200'
+                  : 'bg-slate-800/50 border-slate-600/50 text-amber-300/70 hover:bg-slate-700/50 hover:text-amber-200'
+              }`}
+            >
+              <Eye className="w-3 h-3 text-amber-300" />
+              Show All
+            </button>
+          </div>
+          <div className="mt-2 text-xs text-amber-300/70">
+            Icons show privacy levels on map POIs: <Eye className="w-3 h-3 inline text-green-400" /> Public, <Lock className="w-3 h-3 inline text-red-400" /> Private, <Users className="w-3 h-3 inline text-blue-400" /> Shared
+          </div>
         </div>
       </div>
     </div>
@@ -295,118 +392,136 @@ const POILinkFiltersPanel: React.FC<POILinkFiltersPanelProps> = ({
 
   const EntityFiltersTab = () => (
     <div className="space-y-4">
-      {/* Entity Categories */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-medium text-amber-300"
-              style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-            Entity Categories
-          </h3>
-          <div className="flex gap-2">
-            <button 
-              onClick={showAllEntityCategories}
-              className="text-xs text-amber-400/70 hover:text-amber-300 transition-colors"
-            >
-              Show All
-            </button>
-            <button 
-              onClick={hideAllEntityCategories}
-              className="text-xs text-amber-400/70 hover:text-amber-300 transition-colors"
-            >
-              Hide All
-            </button>
-          </div>
-        </div>
-        
-        <div className="space-y-2">
-          {filterOptions.entityCategories.map(category => renderEntityCategorySection(category))}
-        </div>
-      </div>
-
-      {/* Entity Types */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-medium text-amber-300"
-              style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-            Entity Types
-          </h3>
-          <div className="flex gap-2">
-            <button 
-              onClick={showAllEntityTypes}
-              className="text-xs text-amber-400/70 hover:text-amber-300 transition-colors"
-            >
-              Show All
-            </button>
-            <button 
-              onClick={hideAllEntityTypes}
-              className="text-xs text-amber-400/70 hover:text-amber-300 transition-colors"
-            >
-              Hide All
-            </button>
-          </div>
-        </div>
-        
-        <div className="grid grid-cols-1 gap-1">
-          {filterOptions.entityTypes.map(type => {
-            const isSelected = filters.entityTypes?.includes(type);
-            return (
-              <button
-                key={type}
-                onClick={() => toggleEntityType(type)}
-                className={`flex items-center justify-between p-2 rounded-lg transition-all duration-200 text-left ${
-                  isSelected
-                    ? 'bg-amber-500/20 border border-amber-400/50 text-amber-200'
-                    : 'bg-slate-800/40 border border-slate-600/50 text-amber-200/70 hover:border-amber-400/30'
-                }`}
-              >
-                <span className="text-sm">📦 {type}</span>
-              </button>
-            );
-          })}
+      {/* Show All / Hide All Button for Entities */}
+      <div className="flex justify-between items-center mb-4">
+        <label className="block text-sm font-light text-amber-200 tracking-wide" style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+          Items & Schematics
+        </label>
+        <div className="flex gap-2">
+          <button
+            onClick={() => {
+              const allCategories = filterOptions.entityCategories;
+              const allTypes = filterOptions.entityTypes;
+              const allTiers = filterOptions.tiers.map(t => t.id.toString());
+              
+              const currentCategories = filters.entityCategories || [];
+              const currentTypes = filters.entityTypes || [];
+              const currentTiers = filters.entityTiers || [];
+              
+              const allCategoriesSelected = allCategories.length > 0 && allCategories.every(cat => currentCategories.includes(cat));
+              const allTypesSelected = allTypes.length > 0 && allTypes.every(type => currentTypes.includes(type));
+              const allTiersSelected = allTiers.length > 0 && allTiers.every(tier => currentTiers.includes(tier));
+              
+                             if (allCategoriesSelected && allTypesSelected && allTiersSelected) {
+                 setFilters({ 
+                   ...filters,
+                   entityCategories: [], 
+                   entityTypes: [], 
+                   entityTiers: [] 
+                 });
+               } else {
+                 setFilters({ 
+                   ...filters,
+                   entityCategories: [...allCategories], 
+                   entityTypes: [...allTypes], 
+                   entityTiers: [...allTiers] 
+                 });
+               }
+            }}
+            className="text-xs text-amber-300 hover:text-amber-100 font-light transition-all duration-300 px-2 py-1 rounded border border-amber-400/20 hover:border-amber-400/40 hover:bg-amber-400/10"
+            title="Toggle All Entities"
+            style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
+          >
+            {(() => {
+              const allCategories = filterOptions.entityCategories;
+              const allTypes = filterOptions.entityTypes;
+              const allTiers = filterOptions.tiers.map(t => t.id.toString());
+              
+              const currentCategories = filters.entityCategories || [];
+              const currentTypes = filters.entityTypes || [];
+              const currentTiers = filters.entityTiers || [];
+              
+              const allCategoriesSelected = allCategories.length > 0 && allCategories.every(cat => currentCategories.includes(cat));
+              const allTypesSelected = allTypes.length > 0 && allTypes.every(type => currentTypes.includes(type));
+              const allTiersSelected = allTiers.length > 0 && allTiers.every(tier => currentTiers.includes(tier));
+              
+              return (allCategoriesSelected && allTypesSelected && allTiersSelected) ? 'Hide All' : 'Show All';
+            })()}
+          </button>
         </div>
       </div>
 
-      {/* Entity Tiers */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-medium text-amber-300"
-              style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+      {/* Entity Categories in Two Columns */}
+      <div className="grid grid-cols-2 gap-3 mb-4">
+        {/* Left Column */}
+        <div className="space-y-1">
+          {filterOptions.entityCategories
+            .filter((_, index) => index % 2 === 0)
+            .map((category) => renderEntityCategorySection(category))}
+        </div>
+        
+        {/* Right Column */}
+        <div className="space-y-1">
+          {filterOptions.entityCategories
+            .filter((_, index) => index % 2 === 1)
+            .map((category) => renderEntityCategorySection(category))}
+        </div>
+      </div>
+
+      {/* Additional Filters */}
+      <div className="border-t border-slate-700/50 pt-4">
+        <h4 className="text-sm font-medium text-amber-200 mb-3">Additional Filters</h4>
+        
+        {/* Entity Tiers Section */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-amber-200/80 mb-2">
             Entity Tiers
-          </h3>
-          <div className="flex gap-2">
-            <button 
-              onClick={showAllEntityTiers}
-              className="text-xs text-amber-400/70 hover:text-amber-300 transition-colors"
-            >
-              Show All
-            </button>
-            <button 
-              onClick={hideAllEntityTiers}
-              className="text-xs text-amber-400/70 hover:text-amber-300 transition-colors"
-            >
-              Hide All
-            </button>
+          </label>
+          <div className="grid grid-cols-2 gap-2">
+            {filterOptions.tiers.slice(0, 6).map(tier => {
+              const tierKey = tier.id.toString();
+              const isSelected = filters.entityTiers?.includes(tierKey);
+              
+              return (
+                <button
+                  key={tier.id}
+                  onClick={() => toggleEntityTier(tierKey)}
+                  className={`px-3 py-2 text-xs rounded border flex items-center justify-center gap-1 transition-all ${
+                    isSelected
+                      ? 'bg-amber-600/20 border-amber-500/50 text-amber-200'
+                      : 'bg-slate-800/50 border-slate-600/50 text-amber-300/70 hover:bg-slate-700/50 hover:text-amber-200'
+                  }`}
+                >
+                  {tier.name}
+                </button>
+              );
+            })}
           </div>
         </div>
-        
-        <div className="grid grid-cols-2 gap-2">
-          {filterOptions.tiers.map(tier => {
-            const isSelected = filters.entityTiers?.includes(tier.id.toString());
-            return (
-              <button
-                key={tier.id}
-                onClick={() => toggleEntityTier(tier.id.toString())}
-                className={`flex items-center justify-between p-2 rounded-lg transition-all duration-200 ${
-                  isSelected
-                    ? 'bg-amber-500/20 border border-amber-400/50 text-amber-200'
-                    : 'bg-slate-800/40 border border-slate-600/50 text-amber-200/70 hover:border-amber-400/30'
-                }`}
-              >
-                <span className="text-sm">{tier.name}</span>
-                <span className="text-xs text-slate-400">T{tier.id}</span>
-              </button>
-            );
-          })}
+
+        {/* Entity Types Section */}
+        <div>
+          <label className="block text-sm font-medium text-amber-200/80 mb-2">
+            Entity Types
+          </label>
+          <div className="grid grid-cols-2 gap-2">
+            {filterOptions.entityTypes.slice(0, 4).map(type => {
+              const isSelected = filters.entityTypes?.includes(type);
+              return (
+                <button
+                  key={type}
+                  onClick={() => toggleEntityType(type)}
+                  className={`px-3 py-2 text-xs rounded border flex items-center justify-center gap-1 transition-all ${
+                    isSelected
+                      ? 'bg-amber-600/20 border-amber-500/50 text-amber-200'
+                      : 'bg-slate-800/50 border-slate-600/50 text-amber-300/70 hover:bg-slate-700/50 hover:text-amber-200'
+                  }`}
+                >
+                  📦 {type}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>
@@ -416,6 +531,7 @@ const POILinkFiltersPanel: React.FC<POILinkFiltersPanelProps> = ({
     setFilters({
       search: '',
       mapType: 'both',
+      privacyLevels: ['global', 'private', 'shared'],
       poiCategories: [...new Set(filterOptions.poiTypes.map(pt => pt.category))],
       entityCategories: [...filterOptions.entityCategories],
       entityTypes: [...filterOptions.entityTypes],
@@ -426,7 +542,7 @@ const POILinkFiltersPanel: React.FC<POILinkFiltersPanelProps> = ({
   };
 
   return (
-    <div className="w-80 dune-panel border-r overflow-hidden flex flex-col">
+    <div className="w-[30rem] dune-panel border-r overflow-hidden flex flex-col">
       {/* Header */}
       <div className="p-4 border-b border-slate-600">
         <div className="flex items-center justify-between mb-3">
