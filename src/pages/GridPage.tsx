@@ -27,10 +27,9 @@ import POIPanel from '../components/common/POIPanel';
 import { uploadImageWithConversion } from '../lib/imageUpload';
 import { formatConversionStats } from '../lib/imageUtils';
   import { deletePOIWithCleanup } from '../lib/api/pois';
-  import { usePOIManager } from '../hooks/usePOIManager';
-  import { usePOIOperations } from '../hooks/usePOIOperations';
-
-
+import { usePOIManager } from '../hooks/usePOIManager';
+import { usePOIOperations } from '../hooks/usePOIOperations';
+import { usePOIModals } from '../hooks/usePOIModals';
 // Grid validation: A1-I9 pattern
 const VALID_GRID_PATTERN = /^[A-I][1-9]$/;
 const GRID_ROWS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'];
@@ -88,6 +87,12 @@ const GridPage: React.FC = () => {
       removePOI(poiId); // Update POI manager state
     }
   });
+
+  // Unified modal management
+  const modals = usePOIModals({ 
+    mapType: 'deep_desert',
+    onRefreshData: refreshPOIs
+  });
   
   const [poiTypes, setPoiTypes] = useState<PoiType[]>([]);
 
@@ -124,29 +129,15 @@ const GridPage: React.FC = () => {
   const [placementMode, setPlacementMode] = useState(false);
   const [placementCoordinates, setPlacementCoordinates] = useState<{ x: number; y: number } | null>(null);
 
-  // POI interaction state (same as Hagga Basin)
+  // POI interaction state (non-modal)
   const [selectedPoi, setSelectedPoi] = useState<Poi | null>(null);
   const [selectedPoiId, setSelectedPoiId] = useState<string | null>(null);
-  const [editingPoi, setEditingPoi] = useState<Poi | null>(null);
-
-  // Modal state - Same as Hagga Basin
-  const [showSharePoiModal, setShowSharePoiModal] = useState(false);
-  const [selectedPoiForShare, setSelectedPoiForShare] = useState<Poi | null>(null);
-
-  // Gallery state
-  const [showGallery, setShowGallery] = useState(false);
-  const [galleryPoi, setGalleryPoi] = useState<Poi | null>(null);
-  const [galleryIndex, setGalleryIndex] = useState(0);
 
   // Help tooltip state
   const [showHelpTooltip, setShowHelpTooltip] = useState(false);
 
   // Highlighted POI state for navigation focus
   const [highlightedPoiId, setHighlightedPoiId] = useState<string | null>(null);
-  
-  // Confirmation modal state for POI deletion
-  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
-  const [poiToDelete, setPoiToDelete] = useState<Poi | null>(null);
   
   // Set highlighted POI from URL parameter
   useEffect(() => {
@@ -442,19 +433,16 @@ const GridPage: React.FC = () => {
 
   // Handle POI sharing - Same as Hagga Basin
   const handlePoiShare = (poi: Poi) => {
-    setSelectedPoiForShare(poi);
-    setShowSharePoiModal(true);
+    modals.openShareModal(poi);
     setSelectedPoi(null);
   };
 
   // Handle POI gallery opening - Same as Hagga Basin
   const handlePoiGalleryOpen = useCallback((poi: Poi) => {
     if (poi.screenshots && poi.screenshots.length > 0) {
-      setGalleryPoi(poi);
-      setGalleryIndex(0);
-      setShowGallery(true);
+      modals.openGallery(poi, 0);
     }
-  }, []);
+  }, [modals]);
 
   // Create or get grid square for modal
   const ensureGridSquareExists = async (): Promise<GridSquare | null> => {
@@ -613,7 +601,7 @@ const GridPage: React.FC = () => {
 
   // Handle POI editing
   const handlePoiEdit = (poi: Poi) => {
-    setEditingPoi(poi);
+    modals.openEditModal(poi);
     setSelectedPoi(null);
   };
 
@@ -641,17 +629,16 @@ const GridPage: React.FC = () => {
         return;
       }
 
-    setPoiToDelete(poi);
-    setShowDeleteConfirmation(true);
+    modals.requestDeletion(poi);
   };
 
   // Perform actual POI deletion after confirmation
   const performPoiDeletion = async () => {
-    if (!poiToDelete) return;
+    if (!modals.poiToDelete) return;
     
     try {
       // Use comprehensive deletion API that handles all cleanup
-      const result = await deletePOIWithCleanup(poiToDelete.id);
+      const result = await deletePOIWithCleanup(modals.poiToDelete.id);
 
       if (!result.success) {
         console.error('Error deleting POI:', result.error);
@@ -666,21 +653,20 @@ const GridPage: React.FC = () => {
       }
 
       // Update unified state to remove the deleted POI
-      removePOI(poiToDelete.id);
+      removePOI(modals.poiToDelete.id);
       
       // Clear any highlighted POI if it was the deleted one
-      if (selectedPoiId === poiToDelete.id) {
+      if (selectedPoiId === modals.poiToDelete.id) {
         setSelectedPoiId(null);
       }
 
       // Close any open POI modal if it was the deleted POI
-      if (selectedPoi?.id === poiToDelete.id) {
+      if (selectedPoi?.id === modals.poiToDelete.id) {
         setSelectedPoi(null);
       }
 
       // Close confirmation modal
-      setShowDeleteConfirmation(false);
-      setPoiToDelete(null);
+      modals.cancelDeletion();
     } catch (error) {
       console.error('Error in POI deletion:', error);
       setError('Failed to delete POI');
@@ -730,7 +716,7 @@ const GridPage: React.FC = () => {
   // Handle POI updating
   const handlePoiUpdated = (updatedPoi: Poi) => {
     updatePOI(updatedPoi);
-    setEditingPoi(null);
+    modals.closeEditModal();
   };
 
   const handlePoiSuccessfullyAdded = (newPoi: Poi) => {
@@ -1846,7 +1832,7 @@ const GridPage: React.FC = () => {
             isOpen={true}
             onClose={() => setSelectedPoiId(null)}
             onEdit={() => {
-              setEditingPoi(selectedPoiFromPanel);
+              modals.openEditModal(selectedPoiFromPanel);
               setSelectedPoiId(null);
             }}
             onDelete={() => {
@@ -1863,9 +1849,9 @@ const GridPage: React.FC = () => {
       })()}
 
       {/* POI Edit Modal */}
-      {editingPoi && (
+      {modals.editingPoi && (
         <POIEditModal
-          poi={editingPoi}
+          poi={modals.editingPoi}
           poiTypes={poiTypes}
           onPoiUpdated={handlePoiUpdated}
           onPoiDataChanged={(updatedPoi) => {
@@ -1875,10 +1861,10 @@ const GridPage: React.FC = () => {
               ...updatedPoi,
               _lastUpdated: Date.now() // Force React to detect changes
             };
-            setPois(prev => prev.map(p => p.id === refreshedPoi.id ? refreshedPoi : p));
-            // DO NOT call setEditingPoi(null) here
+            updatePOI(refreshedPoi);
+            // DO NOT call modals.closeEditModal() here
           }}
-          onClose={() => setEditingPoi(null)}
+          onClose={() => modals.closeEditModal()}
           onPositionChange={(poi) => {
             // TODO: Implement position change for Deep Desert if needed
       
@@ -1889,35 +1875,28 @@ const GridPage: React.FC = () => {
 
 
       {/* Share POI Modal - Same as Hagga Basin */}
-      {showSharePoiModal && selectedPoiForShare && (
+      {modals.showShareModal && modals.selectedPoiForShare && (
         <SharePoiModal
-          poi={selectedPoiForShare}
-          isOpen={showSharePoiModal}
+          poi={modals.selectedPoiForShare}
+          isOpen={modals.showShareModal}
           onClose={async () => {
-            setShowSharePoiModal(false);
-            setSelectedPoiForShare(null);
-            // Refresh POIs after sharing changes to ensure all users see updates
-            const gridData = await fetchGridData();
-            if (gridData) {
-              // fetchGridData already updates the POIs state
-            }
+            await modals.closeShareModal();
           }}
         />
       )}
 
       {/* Gallery Modal - Fixed to show POI screenshots instead of grid screenshots */}
-      {showGallery && galleryPoi && galleryPoi.screenshots && galleryPoi.screenshots.length > 0 && (
+      {modals.showGallery && modals.galleryPoi && modals.galleryPoi.screenshots && modals.galleryPoi.screenshots.length > 0 && (
         <GridGallery
-          initialImageUrl={galleryPoi.screenshots[galleryIndex]?.url || galleryPoi.screenshots[0].url}
-          allImages={galleryPoi.screenshots.map(s => ({
+          initialImageUrl={modals.galleryPoi.screenshots[modals.galleryIndex]?.url || modals.galleryPoi.screenshots[0].url}
+          allImages={modals.galleryPoi.screenshots.map(s => ({
             url: s.url,
             source: 'poi' as const,
-            poi: galleryPoi,
-            poiType: poiTypes.find(type => type.id === galleryPoi.poi_type_id)
+            poi: modals.galleryPoi,
+            poiType: poiTypes.find(type => type.id === modals.galleryPoi.poi_type_id)
           }))}
           onClose={() => {
-            setShowGallery(false);
-            setGalleryPoi(null);
+            modals.closeGallery();
           }}
         />
       )}
@@ -1947,16 +1926,13 @@ const GridPage: React.FC = () => {
       )}
 
       {/* POI Deletion Confirmation Modal */}
-      {showDeleteConfirmation && poiToDelete && (
+      {modals.showDeleteConfirmation && modals.poiToDelete && (
         <ConfirmationModal
-          isOpen={showDeleteConfirmation}
-          onClose={() => {
-            setShowDeleteConfirmation(false);
-            setPoiToDelete(null);
-          }}
+          isOpen={modals.showDeleteConfirmation}
+          onClose={() => modals.cancelDeletion()}
           onConfirm={performPoiDeletion}
           title="Delete POI"
-          message={`Are you sure you want to delete "${poiToDelete.title}"? This action cannot be undone and will delete all associated screenshots, comments, and entity links.`}
+          message={`Are you sure you want to delete "${modals.poiToDelete.title}"? This action cannot be undone and will delete all associated screenshots, comments, and entity links.`}
           confirmButtonText="Delete POI"
           cancelButtonText="Cancel"
           variant="danger"

@@ -83,6 +83,7 @@ const POICard: React.FC<POICardProps> = ({
   const [loadingUserInfo, setLoadingUserInfo] = useState(true);
   const [commentCount, setCommentCount] = useState(0);
   const [showLinkingModal, setShowLinkingModal] = useState(false);
+  const [entityLinksRefreshTrigger, setEntityLinksRefreshTrigger] = useState(0);
   
   const imageUrl = getDisplayImageUrl(poi, poiType);
   const PrivacyIcon = privacyIcons[poi.privacy_level];
@@ -490,6 +491,7 @@ const POICard: React.FC<POICardProps> = ({
             <LinkedItemsSection 
               poiId={poi.id}
               showLinkButton={false}
+              refreshTrigger={entityLinksRefreshTrigger}
             />
           </div>
 
@@ -514,8 +516,8 @@ const POICard: React.FC<POICardProps> = ({
           poiId={poi.id}
           poiTitle={poi.title}
           onLinksUpdated={() => {
-            // Optionally refresh the LinkedItemsSection
-            // Could trigger a refresh here if needed
+            console.log('[POICard] 🔄 Entity links updated, refreshing LinkedItemsSection...');
+            setEntityLinksRefreshTrigger(prev => prev + 1);
           }}
         />
       )}

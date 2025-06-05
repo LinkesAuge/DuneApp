@@ -184,8 +184,6 @@ const ImageCropModal: React.FC<ImageCropModalProps> = ({
   };
 
   const handleConfirmCrop = async () => {
-
-
     let finalPixelCrop: PixelCrop | undefined;
     let isFullImageUpload = false;
 
@@ -196,7 +194,6 @@ const ImageCropModal: React.FC<ImageCropModalProps> = ({
     }
     const { naturalWidth, naturalHeight } = imgRef.current;
     
-
     if (isFullImageRequestedByUser) {
       finalPixelCrop = { unit: 'px', x: 0, y: 0, width: naturalWidth, height: naturalHeight };
       isFullImageUpload = true;
@@ -218,8 +215,6 @@ const ImageCropModal: React.FC<ImageCropModalProps> = ({
       }
     }
 
-
-
     if (!finalPixelCrop || finalPixelCrop.width === 0 || finalPixelCrop.height === 0) {
        setError("Cannot confirm with an empty or invalid crop area. This shouldn't happen after defaulting logic.");
        console.error('[ImageCropModal] finalPixelCrop is STILL invalid before processing. Logic error somewhere!');
@@ -232,8 +227,6 @@ const ImageCropModal: React.FC<ImageCropModalProps> = ({
       const { naturalWidth, naturalHeight, width: displayWidth, height: displayHeight } = imgRef.current;
       
       if (displayWidth > 0 && displayHeight > 0) {
-
-        
         cropForProcessing.x = (cropForProcessing.x / displayWidth) * naturalWidth;
         cropForProcessing.y = (cropForProcessing.y / displayHeight) * naturalHeight;
         cropForProcessing.width = (cropForProcessing.width / displayWidth) * naturalWidth;
@@ -243,8 +236,6 @@ const ImageCropModal: React.FC<ImageCropModalProps> = ({
         cropForProcessing.y = Math.round(cropForProcessing.y);
         cropForProcessing.width = Math.round(cropForProcessing.width);
         cropForProcessing.height = Math.round(cropForProcessing.height);
-
-
       } else {
         console.warn('[ImageCropModal] Display dimensions are zero, cannot scale crop. Using unscaled crop data.');
       }
@@ -255,8 +246,14 @@ const ImageCropModal: React.FC<ImageCropModalProps> = ({
     try {
       const croppedBlob = await getCroppedImg(imgRef.current!, cropForProcessing, 'cropped-image.jpeg');
       
+      console.log('[ImageCropModal] 📋 Calling onCropComplete with:', {
+        finalPixelCrop,
+        isFullImageUpload,
+        isFullImageRequestedByUser,
+        cropForProcessing
+      });
+      
       await onCropComplete(croppedBlob, finalPixelCrop, isFullImageUpload);
-      handleInternalOnClose(); 
     } catch (e: any) {
       console.error("Cropping failed in ImageCropModal. Details:", e);
       if (e && typeof e === 'object' && 'message' in e) {

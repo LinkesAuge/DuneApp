@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { X, Package, FileText, Save, AlertCircle, Upload, Image as ImageIcon } from 'lucide-react';
 import { useItemsSchematics } from '../../hooks/useItemsSchematics';
 import { useAuth } from '../auth/AuthProvider';
+import { ItemSchematicImageManager } from './ItemSchematicImageManager';
 import type { AppliesTo, ResolvedField, FieldType } from '../../types';
 import type { EntityWithRelations } from '../../types/unified-entities';
 
@@ -864,7 +865,7 @@ const CreateEditItemSchematicModal: React.FC<CreateEditItemSchematicModalProps> 
                   </div>
                 </div>
 
-                {/* Right Column - Dynamic Fields */}
+                {/* Right Column - Dynamic Fields and Images */}
                 <div className="space-y-6">
                   <DynamicFieldsSection
                     fields={resolvedFields}
@@ -873,6 +874,24 @@ const CreateEditItemSchematicModal: React.FC<CreateEditItemSchematicModalProps> 
                     errors={validationErrors}
                     loading={fieldsLoading}
                   />
+
+                  {/* Image Management - Only for edit mode */}
+                  {mode === 'edit' && entity && (
+                    <div className="space-y-4">
+                      <h3 className="font-light text-amber-200 border-b border-amber-400/20 pb-2 tracking-wide flex items-center space-x-2"
+                          style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                        <ImageIcon className="w-5 h-5" />
+                        <span>Screenshots & Images</span>
+                      </h3>
+                      
+                      <ItemSchematicImageManager
+                        entity={entity}
+                        compact={true}
+                        maxImages={10}
+                        className="bg-slate-800/30 border border-slate-700/50 rounded-lg p-4"
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
             )}

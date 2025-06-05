@@ -22,6 +22,8 @@ import { ConfirmationModal } from '../components/shared/ConfirmationModal';
 import { useAuth } from '../components/auth/AuthProvider';
 import { deletePOIWithCleanup } from '../lib/api/pois';
 import { usePOIManager } from '../hooks/usePOIManager';
+import { usePOIModals } from '../hooks/usePOIModals';
+
 
 const HaggaBasinPage: React.FC = () => {
   // Authentication and user state
@@ -38,6 +40,12 @@ const HaggaBasinPage: React.FC = () => {
     updatePOI, 
     removePOI 
   } = usePOIManager({ mapType: 'hagga_basin' });
+
+  // Unified modal management
+  const modals = usePOIModals({ 
+    mapType: 'hagga_basin',
+    onRefreshData: refreshPOIs
+  });
 
   // Other data state
   const [poiTypes, setPoiTypes] = useState<PoiType[]>([]);
@@ -69,28 +77,11 @@ const HaggaBasinPage: React.FC = () => {
   const [activeBaseMap, setActiveBaseMap] = useState<HaggaBasinBaseMap | null>(null);
   const [placementMode, setPlacementMode] = useState(false);
   
-  // Modal state
-
-  const [showSharePoiModal, setShowSharePoiModal] = useState(false);
-  const [selectedPoiForShare, setSelectedPoiForShare] = useState<Poi | null>(null);
-
-  const [editingPoi, setEditingPoi] = useState<Poi | null>(null);
-
-  // Gallery state
-  const [showGallery, setShowGallery] = useState(false);
-  const [galleryPoi, setGalleryPoi] = useState<Poi | null>(null);
-  const [galleryIndex, setGalleryIndex] = useState(0);
-
   // Help tooltip state
   const [showHelpTooltip, setShowHelpTooltip] = useState(false);
 
-  // Highlighted POI state for navigation focus
+  // Highlighted POI state for navigation focus  
   const [highlightedPoiId, setHighlightedPoiId] = useState<string | null>(null);
-  const [selectedPoiId, setSelectedPoiId] = useState<string | null>(null);
-  
-  // Confirmation modal state for POI deletion
-  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
-  const [poiToDelete, setPoiToDelete] = useState<Poi | null>(null);
   
   // Get highlight parameter for POI highlighting
   const highlightPoiId = searchParams.get('highlight');
@@ -110,6 +101,9 @@ const HaggaBasinPage: React.FC = () => {
 
   // State to track if initial filter setup has been done
   const [initialFilterSetup, setInitialFilterSetup] = useState(false);
+  
+  // Global refresh trigger for entity links (forces refresh of POI data when entity links change)
+  const [entityLinksGlobalRefreshTrigger, setEntityLinksGlobalRefreshTrigger] = useState(0);
 
   // Initialize filter state when POI types are loaded (only on initial setup)
   useEffect(() => {
@@ -134,6 +128,29 @@ const HaggaBasinPage: React.FC = () => {
       window.removeEventListener('adminDataUpdated', handleAdminDataUpdate);
     };
   }, []);
+
+  // Listen for global entity links updates
+  useEffect(() => {
+    const handleEntityLinksUpdate = () => {
+      console.log('[HaggaBasinPage] 🔄 Global entity links updated, refreshing POI data...');
+      setEntityLinksGlobalRefreshTrigger(prev => prev + 1);
+    };
+
+    // Listen for custom events from POI entity linking
+    window.addEventListener('entityLinksUpdated', handleEntityLinksUpdate);
+
+    return () => {
+      window.removeEventListener('entityLinksUpdated', handleEntityLinksUpdate);
+    };
+  }, []);
+
+  // Refresh POI data when entity links change globally
+  useEffect(() => {
+    if (entityLinksGlobalRefreshTrigger > 0) {
+      console.log('[HaggaBasinPage] 🔄 Refreshing POI data due to entity links change...');
+      fetchHaggaBasinPOIs();
+    }
+  }, [entityLinksGlobalRefreshTrigger]);
 
   const initializeData = async () => {
     setLoading(true);
@@ -398,8 +415,7 @@ const HaggaBasinPage: React.FC = () => {
 
   // Handle sharing POI
   const handleSharePoi = (poi: Poi) => {
-    setSelectedPoiForShare(poi);
-    setShowSharePoiModal(true);
+    modals.openShareModal(poi);
   };
 
   // Handle POI privacy level changes from sharing modal
@@ -422,10 +438,7 @@ const HaggaBasinPage: React.FC = () => {
 
   // Handle share modal close with refresh
   const handleShareModalClose = async () => {
-    setShowSharePoiModal(false);
-    setSelectedPoiForShare(null);
-    // Refresh POIs after sharing changes to ensure all users see updates
-    await refreshPOIs();
+    await modals.closeShareModal();
   };
 
   // Handle POI editing
@@ -443,17 +456,16 @@ const HaggaBasinPage: React.FC = () => {
       return;
     }
     
-    setPoiToDelete(poi);
-    setShowDeleteConfirmation(true);
+    modals.requestDeletion(poi);
   };
 
   // Perform actual POI deletion after confirmation
   const performPoiDeletion = async () => {
-    if (!poiToDelete) return;
+    if (!modals.poiToDelete) return;
     
     try {
-      // Use comprehensive deletion API that handles all cleanup
-      const result = await deletePOIWithCleanup(poiToDelete.id);
+      // Use UNIFIED comprehensive deletion API that handles all cleanup
+      const result = await deletePOIWithCleanup(modals.poiToDelete.id);
 
       if (!result.success) {
         console.error('Error deleting POI:', result.error);
@@ -468,19 +480,15 @@ const HaggaBasinPage: React.FC = () => {
       }
 
       // Update unified state
-      removePOI(poiToDelete.id);
+      removePOI(modals.poiToDelete.id);
 
       // Clear any highlighted POI if it was the deleted one
-      if (highlightedPoiId === poiToDelete.id) {
+      if (highlightedPoiId === modals.poiToDelete.id) {
         setHighlightedPoiId(null);
-      }
-      if (selectedPoiId === poiToDelete.id) {
-        setSelectedPoiId(null);
       }
 
       // Close confirmation modal
-      setShowDeleteConfirmation(false);
-      setPoiToDelete(null);
+      modals.cancelDeletion();
     } catch (error) {
       console.error('Error deleting POI:', error);
       setError('Failed to delete POI');
@@ -492,11 +500,9 @@ const HaggaBasinPage: React.FC = () => {
   // Handle POI gallery opening
   const handlePoiGalleryOpen = useCallback((poi: Poi) => {
     if (poi.screenshots && poi.screenshots.length > 0) {
-      setGalleryPoi(poi);
-      setGalleryIndex(0);
-      setShowGallery(true);
+      modals.openGallery(poi, 0);
     }
-  }, []);
+  }, [modals]);
 
   // Handle POI click for detail view
   const handlePoiClick = useCallback((poi: Poi) => {
@@ -539,7 +545,7 @@ const HaggaBasinPage: React.FC = () => {
 
   // Handle POI editing
   const handlePoiEdit = (poi: Poi) => {
-    setEditingPoi(poi);
+    modals.openEditModal(poi);
   };
 
   if (isLoading) {
@@ -737,20 +743,20 @@ const HaggaBasinPage: React.FC = () => {
 
       {/* Share POI Modal */}
       <SharePoiModal
-        isOpen={showSharePoiModal}
+        isOpen={modals.showShareModal}
         onClose={handleShareModalClose}
-        poi={selectedPoiForShare}
+        poi={modals.selectedPoiForShare}
         onPrivacyLevelChanged={handlePoiPrivacyLevelChanged}
       />
 
       {/* POI Edit Modal */}
-      {editingPoi && (
+      {modals.editingPoi && (
         <POIEditModal
-          poi={editingPoi}
+          poi={modals.editingPoi}
           poiTypes={poiTypes}
           onPoiUpdated={(updatedPoi) => {
             handlePoiUpdated(updatedPoi);
-            setEditingPoi(null);
+            modals.closeEditModal();
           }}
           onPoiDataChanged={(updatedPoi) => {
             // Update POI data without closing the modal (for entity link changes)
@@ -760,15 +766,15 @@ const HaggaBasinPage: React.FC = () => {
               _lastUpdated: Date.now() // Force React to detect changes
             };
             handlePoiUpdated(refreshedPoi);
-            // DO NOT call setEditingPoi(null) here
+            // DO NOT call modals.closeEditModal() here
           }}
-          onClose={() => setEditingPoi(null)}
+          onClose={() => modals.closeEditModal()}
         />
       )}
 
       {/* POI Card Modal */}
-      {selectedPoiId && (() => {
-        const selectedPoi = filteredPois.find(poi => poi.id === selectedPoiId);
+      {modals.selectedPoiId && (() => {
+        const selectedPoi = filteredPois.find(poi => poi.id === modals.selectedPoiId);
         const selectedPoiType = selectedPoi ? poiTypes.find(type => type.id === selectedPoi.poi_type_id) : null;
         if (!selectedPoi || !selectedPoiType) return null;
         
@@ -777,60 +783,52 @@ const HaggaBasinPage: React.FC = () => {
             poi={selectedPoi}
             poiType={selectedPoiType}
             isOpen={true}
-            onClose={() => setSelectedPoiId(null)}
+            onClose={() => modals.setSelectedPoiId(null)}
             onEdit={() => {
-              setEditingPoi(selectedPoi);
-              setSelectedPoiId(null);
+              modals.openEditModal(selectedPoi);
             }}
             onDelete={() => {
               handlePoiDeleted(selectedPoi.id);
-              setSelectedPoiId(null);
             }}
             onShare={() => {
               handleSharePoi(selectedPoi);
-              setSelectedPoiId(null);
             }}
             onImageClick={() => {
               handlePoiGalleryOpen(selectedPoi);
-              setSelectedPoiId(null);
             }}
           />
         );
       })()}
 
       {/* Gallery Modal */}
-      {showGallery && galleryPoi?.screenshots && (
+      {modals.showGallery && modals.galleryPoi?.screenshots && (
         <GridGallery
-          initialImageUrl={galleryPoi.screenshots[galleryIndex]?.url || galleryPoi.screenshots[0]?.url}
-          allImages={galleryPoi.screenshots.map(s => ({
+          initialImageUrl={modals.galleryPoi.screenshots[modals.galleryIndex]?.url || modals.galleryPoi.screenshots[0]?.url}
+          allImages={modals.galleryPoi.screenshots.map(s => ({
             url: s.url,
             source: 'poi' as const,
-            poi: galleryPoi,
-            poiType: poiTypes.find(pt => pt.id === galleryPoi.poi_type_id)
+            poi: modals.galleryPoi!,
+            poiType: poiTypes.find(pt => pt.id === modals.galleryPoi!.poi_type_id)
           }))}
-          onClose={() => {
-            setShowGallery(false);
-            setGalleryPoi(null);
-          }}
+          onClose={() => modals.closeGallery()}
         />
       )}
 
       {/* POI Deletion Confirmation Modal */}
-      {showDeleteConfirmation && poiToDelete && (
+      {modals.showDeleteConfirmation && modals.poiToDelete && (
         <ConfirmationModal
-          isOpen={showDeleteConfirmation}
-          onClose={() => {
-            setShowDeleteConfirmation(false);
-            setPoiToDelete(null);
-          }}
+          isOpen={modals.showDeleteConfirmation}
+          onClose={() => modals.cancelDeletion()}
           onConfirm={performPoiDeletion}
           title="Delete POI"
-          message={`Are you sure you want to delete "${poiToDelete.title}"? This action cannot be undone and will delete all associated screenshots, comments, and entity links.`}
+          message={`Are you sure you want to delete "${modals.poiToDelete.title}"? This action cannot be undone and will delete all associated screenshots, comments, and entity links.`}
           confirmButtonText="Delete POI"
           cancelButtonText="Cancel"
           variant="danger"
         />
       )}
+
+
     </div>
   );
 };

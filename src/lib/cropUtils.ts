@@ -47,14 +47,14 @@ export const getScreenshotLabel = (isNew: boolean, cropDetails: PixelCrop | null
   
   if (!isNew && isCropped) {
     return {
-      text: "Original (Cropped)", 
+      text: "Cropped", 
       className: "bg-blue-600 text-white text-xs px-1 rounded"
     };
   }
   
   // !isNew && !isCropped
   return {
-    text: "Original (Full)",
+    text: "Original",
     className: "bg-blue-600 text-white text-xs px-1 rounded"
   };
 }; 

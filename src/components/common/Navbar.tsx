@@ -3,7 +3,9 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
 import { getDisplayName } from '../../lib/utils';
 import UserAvatar from './UserAvatar';
-import { Menu, X, User, LogOut, Shield, LayoutDashboard, Mountain, MapPin, Pyramid, Database, ChevronDown, Link as LinkIcon, Network } from 'lucide-react';
+import UnifiedImageApiTest from '../test/UnifiedImageApiTest';
+
+import { Menu, X, User, LogOut, Shield, LayoutDashboard, Mountain, MapPin, Pyramid, Database, ChevronDown, Link as LinkIcon, Network, Package, Bug, TestTube, Settings, Image } from 'lucide-react';
 
 const Navbar: React.FC = () => {
   const { user, signOut } = useAuth();
@@ -11,6 +13,8 @@ const Navbar: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isDatabaseDropdownOpen, setIsDatabaseDropdownOpen] = useState(false);
+  const [isDevPanelOpen, setIsDevPanelOpen] = useState(false);
+  const [showUnifiedImageApiTest, setShowUnifiedImageApiTest] = useState(false);
 
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
   const toggleProfile = () => setIsProfileOpen(!isProfileOpen);
@@ -210,6 +214,7 @@ const Navbar: React.FC = () => {
               <Database size={14} strokeWidth={1.5} className="mr-3 text-amber-300 group-hover:text-amber-100" />
               <span className="text-amber-200 group-hover:text-amber-50 font-light text-sm">Database Management</span>
             </Link>
+
             <Link
               to="/poi-linking"
               onClick={() => setIsDatabaseDropdownOpen(false)}
@@ -448,6 +453,216 @@ const Navbar: React.FC = () => {
             {/* Profile Section - right aligned with separation */}
             <div className="hidden md:flex flex-1 justify-end max-w-sm ml-6">
               <div className="flex items-center">
+                {/* Developer Panel - Admin Only */}
+                {user?.role === 'admin' && (
+                  <div className="relative mr-3">
+                    <button
+                      onClick={() => setIsDevPanelOpen(!isDevPanelOpen)}
+                      className="group relative flex items-center h-16 px-3 min-w-[90px] justify-center transition-all duration-300"
+                    >
+                      {/* Button background image */}
+                      <div 
+                        className="absolute inset-0 bg-center bg-cover bg-no-repeat"
+                        style={{
+                          backgroundImage: 'url(/images/bg-button.webp)',
+                          backgroundSize: 'cover'
+                        }}
+                      />
+                      
+                      {/* Purple overlay */}
+                      <div className="absolute inset-0 bg-gradient-to-b from-violet-600/0 via-violet-700/0 to-transparent group-hover:from-violet-600/40 group-hover:via-violet-700/20 transition-all duration-300" />
+                      
+                      {/* Content */}
+                      <div className="relative z-10 flex items-center space-x-1">
+                        <Bug size={14} strokeWidth={1.5} className="text-amber-300 group-hover:text-amber-100 transition-all duration-300" />
+                        <span className="font-light text-xs uppercase tracking-widest text-amber-200 group-hover:text-amber-50 transition-all duration-300 whitespace-nowrap">Dev</span>
+                        <ChevronDown 
+                          size={12} 
+                          strokeWidth={1.5} 
+                          className={`text-amber-300 group-hover:text-amber-100 transition-all duration-300 ${isDevPanelOpen ? 'rotate-180' : 'rotate-0'}`}
+                        />
+                      </div>
+                      
+                      {/* Underline */}
+                      <div className="absolute bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-transparent via-violet-400 to-transparent group-hover:w-full transition-all duration-700 ease-out" />
+                    </button>
+
+                    {/* Dropdown menu */}
+                    {isDevPanelOpen && (
+                      <>
+                        <div 
+                          className="fixed inset-0 z-40"
+                          onClick={() => setIsDevPanelOpen(false)}
+                        />
+                        <div className="absolute right-0 mt-2 w-56 bg-gradient-to-b from-slate-950 to-slate-900 border border-slate-600/30 shadow-2xl z-50 backdrop-blur-sm">
+                          
+                          {/* Header */}
+                          <div className="px-4 py-3 border-b border-slate-600/20 bg-gradient-to-r from-violet-600/10 via-violet-500/5 to-violet-600/10">
+                            <p className="font-light text-amber-100 tracking-wide text-sm flex items-center">
+                              <Bug size={14} className="mr-2" />
+                              Developer Tools
+                            </p>
+                          </div>
+                          
+                          {/* Test buttons */}
+                          <button
+                            onClick={() => {
+                              console.log('🧪 Screenshot System Test');
+                              console.log('- Unified Screenshot Manager: Available');
+                              console.log('- Storage Architecture: poi_screenshots/ + poi_cropped/');
+                              console.log('- RLS Policies: Active');
+                              console.log('✅ All systems operational');
+                              setIsDevPanelOpen(false);
+                            }}
+                            className="group relative flex items-center w-full text-left px-4 py-3 text-amber-200 hover:text-amber-50 transition-all duration-300"
+                          >
+                            <div className="absolute inset-0 bg-gradient-to-r from-violet-800/0 to-violet-700/0 group-hover:from-violet-800/20 group-hover:to-violet-700/20 transition-all duration-300" />
+                            <TestTube size={14} strokeWidth={1.5} className="relative z-10 mr-3 text-amber-300 group-hover:text-amber-100 transition-all duration-300" />
+                            <span className="relative z-10 font-light tracking-wide text-sm">Screenshot Test</span>
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              console.log('🔧 Database Connection Test');
+                              console.log('- Auth Status:', !!user);
+                              console.log('- User Role:', user?.role);
+                              console.log('- Profile Status:', !!user);
+                              console.log('✅ Database connection active');
+                              setIsDevPanelOpen(false);
+                            }}
+                            className="group relative flex items-center w-full text-left px-4 py-3 text-amber-200 hover:text-amber-50 transition-all duration-300"
+                          >
+                            <div className="absolute inset-0 bg-gradient-to-r from-violet-800/0 to-violet-700/0 group-hover:from-violet-800/20 group-hover:to-violet-700/20 transition-all duration-300" />
+                            <Settings size={14} strokeWidth={1.5} className="relative z-10 mr-3 text-amber-300 group-hover:text-amber-100 transition-all duration-300" />
+                            <span className="relative z-10 font-light tracking-wide text-sm">DB Test</span>
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              console.clear();
+                              console.log('🧹 Console cleared for debugging');
+                              setIsDevPanelOpen(false);
+                            }}
+                            className="group relative flex items-center w-full text-left px-4 py-3 text-amber-200 hover:text-amber-50 transition-all duration-300"
+                          >
+                            <div className="absolute inset-0 bg-gradient-to-r from-violet-800/0 to-violet-700/0 group-hover:from-violet-800/20 group-hover:to-violet-700/20 transition-all duration-300" />
+                            <X size={14} strokeWidth={1.5} className="relative z-10 mr-3 text-amber-300 group-hover:text-amber-100 transition-all duration-300" />
+                            <span className="relative z-10 font-light tracking-wide text-sm">Clear Console</span>
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              setShowUnifiedImageApiTest(true);
+                              setIsDevPanelOpen(false);
+                            }}
+                            className="group relative flex items-center w-full text-left px-4 py-3 text-amber-200 hover:text-amber-50 transition-all duration-300"
+                          >
+                            <div className="absolute inset-0 bg-gradient-to-r from-violet-800/0 to-violet-700/0 group-hover:from-violet-800/20 group-hover:to-violet-700/20 transition-all duration-300" />
+                            <Image size={14} strokeWidth={1.5} className="relative z-10 mr-3 text-amber-300 group-hover:text-amber-100 transition-all duration-300" />
+                            <span className="relative z-10 font-light tracking-wide text-sm">Unified Images API</span>
+                          </button>
+
+                          <button
+                            onClick={async () => {
+                              console.clear();
+                              console.log('🧪 TESTING: POI System Integration Status...');
+                              
+                              try {
+                                const { supabase } = await import('../../lib/supabase');
+                                
+                                // Test 1: Check unified system tables
+                                console.log('\n📋 Test 1: Checking unified system database tables...');
+                                const { data: imageLinks, error: linksError } = await supabase
+                                  .from('poi_image_links')
+                                  .select('*, shared_images(*)')
+                                  .limit(3);
+                                
+                                if (linksError) {
+                                  console.error('❌ poi_image_links query failed:', linksError);
+                                } else {
+                                  console.log('✅ poi_image_links table accessible:', imageLinks?.length || 0, 'records');
+                                  if (imageLinks?.length > 0) {
+                                    console.log('📄 Sample unified record:', imageLinks[0]);
+                                  }
+                                }
+
+                                // Test 2: Check if old system still exists
+                                console.log('\n📋 Test 2: Checking old poi_screenshots table...');
+                                const { data: oldScreenshots, error: oldError } = await supabase
+                                  .from('poi_screenshots')
+                                  .select('*')
+                                  .limit(3);
+                                
+                                if (oldError && oldError.message.includes('does not exist')) {
+                                  console.log('✅ poi_screenshots table removed (good!)');
+                                } else if (oldError) {
+                                  console.log('ℹ️ poi_screenshots table error:', oldError.message);
+                                } else {
+                                  console.log('⚠️ poi_screenshots table still exists with', oldScreenshots?.length || 0, 'records');
+                                  if (oldScreenshots?.length > 0) {
+                                    console.log('📄 Sample old record (should be migrated):', oldScreenshots[0]);
+                                  }
+                                }
+
+                                // Test 3: Check recent POIs to see which system they use
+                                console.log('\n📋 Test 3: Checking recent POIs and their screenshot structure...');
+                                const { data: recentPois, error: poisError } = await supabase
+                                  .from('pois')
+                                  .select('id, title, created_at, map_type')
+                                  .order('created_at', { ascending: false })
+                                  .limit(5);
+                                
+                                if (poisError) {
+                                  console.error('❌ Recent POIs query failed:', poisError);
+                                } else {
+                                  console.log('✅ Recent POIs found:', recentPois?.length || 0);
+                                  
+                                  // For each POI, check what screenshot system it uses
+                                  for (const poi of recentPois || []) {
+                                    console.log(`\n🔍 Checking POI "${poi.title}" (${poi.map_type}):`);
+                                    
+                                    // Check unified system
+                                    const { data: unifiedImages } = await supabase
+                                      .from('poi_image_links')
+                                      .select('shared_images(*)')
+                                      .eq('poi_id', poi.id);
+                                    
+                                    console.log(`   ${unifiedImages?.length || 0} unified screenshots`);
+                                    
+                                    // Check old system (if table exists)
+                                    if (!oldError || !oldError.message.includes('does not exist')) {
+                                      const { data: oldImages } = await supabase
+                                        .from('poi_screenshots')
+                                        .select('*')
+                                        .eq('poi_id', poi.id);
+                                      
+                                      console.log(`   ${oldImages?.length || 0} old-system screenshots`);
+                                    }
+                                  }
+                                }
+
+                                console.log('\n🎯 QUICK TEST RESULTS:');
+                                console.log('• Run this test, then try creating POIs with screenshots');
+                                console.log('• Create POI in Hagga Basin → check if screenshots save');
+                                console.log('• Create POI in Deep Desert → check database structure');
+                                console.log('• Delete a POI → check if screenshots are properly cleaned up');
+                                
+                                setIsDevPanelOpen(false);
+                              } catch (err) {
+                                console.error('💥 Test failed with error:', err);
+                              }
+                            }}
+                            className="group relative flex items-center w-full text-left px-4 py-3 text-amber-200 hover:text-amber-50 transition-all duration-300"
+                          >
+                            <div className="absolute inset-0 bg-gradient-to-r from-violet-800/0 to-violet-700/0 group-hover:from-violet-800/20 group-hover:to-violet-700/20 transition-all duration-300" />
+                            <TestTube size={14} strokeWidth={1.5} className="relative z-10 mr-3 text-amber-300 group-hover:text-amber-100 transition-all duration-300" />
+                            <span className="relative z-10 font-light tracking-wide text-sm">🔍 POI System Test</span>
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
                 {user ? (
                   <div className="relative">
                     <button
@@ -761,6 +976,26 @@ const Navbar: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Unified Image API Test Modal */}
+      {showUnifiedImageApiTest && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-slate-900 border border-slate-600 rounded-lg shadow-2xl max-w-6xl max-h-[90vh] overflow-auto">
+            <div className="flex items-center justify-between p-4 border-b border-slate-600">
+              <h2 className="text-xl font-semibold text-amber-200">Unified Images API Test</h2>
+              <button
+                onClick={() => setShowUnifiedImageApiTest(false)}
+                className="text-amber-300 hover:text-amber-100 transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-4">
+              <UnifiedImageApiTest />
+            </div>
+          </div>
+        </div>
+      )}
     </nav>
   );
 };

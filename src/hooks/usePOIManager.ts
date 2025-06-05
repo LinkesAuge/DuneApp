@@ -36,7 +36,17 @@ export const usePOIManager = (config: POIManagerConfig): POIManagerReturn => {
         .select(`
           *,
           poi_types (*),
-          profiles!pois_created_by_fkey (username)
+          profiles!pois_created_by_fkey (username),
+          poi_image_links (
+            managed_images (
+              id,
+              original_url,
+              processed_url,
+              crop_details,
+              uploaded_by,
+              created_at
+            )
+          )
         `)
         .eq('map_type', mapType)
         .order('created_at', { ascending: false });
@@ -50,18 +60,33 @@ export const usePOIManager = (config: POIManagerConfig): POIManagerReturn => {
 
       if (fetchError) throw fetchError;
 
-      // Transform screenshots for compatibility
-      const transformedPOIs = (data || []).map(poi => ({
-        ...poi,
-        screenshots: Array.isArray(poi.screenshots) 
-          ? poi.screenshots.map((screenshot: any, index: number) => ({
-              id: screenshot.id || `${poi.id}_${index}`,
-              url: screenshot.url || screenshot,
-              uploaded_by: screenshot.uploaded_by || poi.created_by,
-              upload_date: screenshot.upload_date || poi.created_at
-            }))
-          : []
-      }));
+      // Transform POI data to include screenshots from unified system
+      const transformedPOIs = (data || []).map(poi => {
+        // Extract screenshots from unified system
+        const screenshots = poi.poi_image_links?.map(link => {
+          const image = link.managed_images;
+          if (!image) return null;
+          
+          return {
+            id: image.id,
+            poi_id: poi.id,
+            url: image.processed_url || image.original_url, // Use processed if available, otherwise original
+            original_url: image.original_url,
+            crop_details: image.crop_details,
+            uploaded_by: image.uploaded_by,
+            upload_date: image.created_at,
+            created_at: image.created_at
+          };
+        }).filter(screenshot => screenshot !== null) || [];
+
+        return {
+          ...poi,
+          screenshots: screenshots
+        };
+      });
+
+      console.log(`[usePOIManager] Fetched ${transformedPOIs.length} POIs for ${mapType}${gridSquareId ? ` grid ${gridSquareId}` : ''}`);
+      console.log(`[usePOIManager] Screenshot counts:`, transformedPOIs.map(p => ({ id: p.id, title: p.title, screenshots: p.screenshots.length })));
 
       setPois(transformedPOIs);
     } catch (err) {
@@ -92,16 +117,73 @@ export const usePOIManager = (config: POIManagerConfig): POIManagerReturn => {
 
   // Manual POI management functions for external use
   const addPOI = useCallback((poi: Poi) => {
+    console.log(`[usePOIManager] 📥 addPOI called for POI ${poi.id} (${poi.title})`);
+    console.log(`[usePOIManager] 🖼️ POI screenshots:`, poi.screenshots?.length || 0, 'screenshots');
+    console.log(`[usePOIManager] 🔗 POI image links:`, poi.poi_image_links?.length || 0, 'links');
+    
+    // Transform poi_image_links to screenshots if needed (same as real-time subscription)
+    const transformedPoi = {
+      ...poi,
+      screenshots: poi.screenshots || (poi.poi_image_links?.map(link => {
+        const image = link.managed_images;
+        if (!image) return null;
+        
+        return {
+          id: image.id,
+          poi_id: poi.id,
+          url: image.processed_url || image.original_url,
+          original_url: image.original_url,
+          crop_details: image.crop_details,
+          uploaded_by: image.uploaded_by,
+          upload_date: image.created_at,
+          created_at: image.created_at
+        };
+      }).filter(screenshot => screenshot !== null) || [])
+    };
+    
+    console.log(`[usePOIManager] 🔄 Transformed POI screenshots:`, transformedPoi.screenshots?.length || 0, 'screenshots');
+    
     setPois(prev => {
-      // Check for duplicates
-      const exists = prev.some(p => p.id === poi.id);
-      if (exists) return prev;
-      return [poi, ...prev];
+      const existingIndex = prev.findIndex(p => p.id === poi.id);
+      if (existingIndex !== -1) {
+        console.log(`[usePOIManager] 🔄 POI ${poi.id} already exists, updating with new data`);
+        // Update existing POI with new data (like screenshots)
+        const updatedPois = [...prev];
+        updatedPois[existingIndex] = transformedPoi;
+        return updatedPois;
+      }
+      console.log(`[usePOIManager] ✅ Adding new POI ${poi.id} to state`);
+      return [transformedPoi, ...prev];
     });
   }, []);
 
   const updatePOI = useCallback((poi: Poi) => {
-    setPois(prev => prev.map(p => p.id === poi.id ? poi : p));
+    // Transform POI data to handle unified system screenshots (same as addPOI)
+    const screenshots = poi.poi_image_links?.map(link => {
+      const image = link.managed_images;
+      if (!image) return null;
+      
+      return {
+        id: image.id,
+        poi_id: poi.id,
+        url: image.processed_url || image.original_url, // Use processed if available, otherwise original
+        original_url: image.original_url,
+        processed_url: image.processed_url, // Preserve for deletion logic
+        crop_details: image.crop_details,
+        uploaded_by: image.uploaded_by,
+        upload_date: image.created_at,
+        created_at: image.created_at
+      };
+    }).filter(screenshot => screenshot !== null) || [];
+
+    const transformedPoi = {
+      ...poi,
+      screenshots: screenshots
+    };
+
+    console.log(`[usePOIManager] Updating POI ${transformedPoi.id}: ${screenshots.length} screenshots`);
+    
+    setPois(prev => prev.map(p => p.id === poi.id ? transformedPoi : p));
   }, []);
 
   const removePOI = useCallback((poiId: string) => {
@@ -149,24 +231,46 @@ export const usePOIManager = (config: POIManagerConfig): POIManagerReturn => {
                 .select(`
                   *,
                   poi_types (*),
-                  profiles!pois_created_by_fkey (username)
+                  profiles!pois_created_by_fkey (username),
+                  poi_image_links (
+                    managed_images (
+                      id,
+                      original_url,
+                      processed_url,
+                      crop_details,
+                      uploaded_by,
+                      created_at
+                    )
+                  )
                 `)
                 .eq('id', poiData.id)
                 .maybeSingle();
 
               if (!error && completeData) {
-                // Transform screenshots for compatibility
+                // Transform POI data to include screenshots from unified system
+                const screenshots = completeData.poi_image_links?.map(link => {
+                  const image = link.managed_images;
+                  if (!image) return null;
+                  
+                  return {
+                    id: image.id,
+                    poi_id: completeData.id,
+                    url: image.processed_url || image.original_url, // Use processed if available, otherwise original
+                    original_url: image.original_url,
+                    processed_url: image.processed_url, // Preserve for deletion logic
+                    crop_details: image.crop_details,
+                    uploaded_by: image.uploaded_by,
+                    upload_date: image.created_at,
+                    created_at: image.created_at
+                  };
+                }).filter(screenshot => screenshot !== null) || [];
+
                 const transformedPoi = {
                   ...completeData,
-                  screenshots: Array.isArray(completeData.screenshots) 
-                    ? completeData.screenshots.map((screenshot: any, index: number) => ({
-                        id: screenshot.id || `${completeData.id}_${index}`,
-                        url: screenshot.url || screenshot,
-                        uploaded_by: screenshot.uploaded_by || completeData.created_by,
-                        upload_date: screenshot.upload_date || completeData.created_at
-                      }))
-                    : []
+                  screenshots: screenshots
                 };
+
+                console.log(`[usePOIManager] Real-time update for POI ${transformedPoi.id} (${transformedPoi.title}): ${screenshots.length} screenshots`);
 
                 updatePOISafely(transformedPoi);
               }

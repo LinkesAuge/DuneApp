@@ -133,7 +133,8 @@ export const uploadMultipleImagesWithConversion = async (
 };
 
 /**
- * Upload POI screenshot (original version) with optimized settings
+ * Upload POI screenshot (original version) - always stored in poi_screenshots
+ * This is the source of truth for the original, uncropped image
  */
 export const uploadPoiScreenshotOriginal = async (
   file: File,
@@ -141,7 +142,7 @@ export const uploadPoiScreenshotOriginal = async (
 ): Promise<UploadResult> => {
   return uploadImageWithConversion(file, fileName, {
     bucket: 'screenshots',
-    folder: 'poi_screenshots_original',
+    folder: 'poi_screenshots', // Changed: no duplication, originals go here
     quality: 'high', // Keep originals at high quality
     maxWidth: 2048,
     maxHeight: 2048
@@ -149,7 +150,8 @@ export const uploadPoiScreenshotOriginal = async (
 };
 
 /**
- * Upload POI screenshot (cropped/display version) with optimized settings
+ * Upload POI screenshot (cropped/display version) - stored in poi_cropped
+ * Only used when cropping is applied to the original
  */
 export const uploadPoiScreenshotCropped = async (
   file: File,
@@ -157,44 +159,14 @@ export const uploadPoiScreenshotCropped = async (
 ): Promise<UploadResult> => {
   return uploadImageWithConversion(file, fileName, {
     bucket: 'screenshots',
-    folder: 'poi_screenshots_cropped',
+    folder: 'poi_cropped', // Changed: dedicated folder for cropped versions
     quality: 'standard',
     maxWidth: 1920,
     maxHeight: 1920
   });
 };
 
-/**
- * Upload comment screenshot (original version) with optimized settings
- */
-export const uploadCommentScreenshotOriginal = async (
-  file: File,
-  fileName: string
-): Promise<UploadResult> => {
-  return uploadImageWithConversion(file, fileName, {
-    bucket: 'screenshots',
-    folder: 'comment_screenshots_original',
-    quality: 'high', // Keep originals at high quality
-    maxWidth: 2048,
-    maxHeight: 2048
-  });
-};
-
-/**
- * Upload comment screenshot (cropped/display version) with optimized settings
- */
-export const uploadCommentScreenshotCropped = async (
-  file: File,
-  fileName: string
-): Promise<UploadResult> => {
-  return uploadImageWithConversion(file, fileName, {
-    bucket: 'screenshots',
-    folder: 'comment_screenshots_cropped',
-    quality: 'standard',
-    maxWidth: 1920,
-    maxHeight: 1920
-  });
-};
+// Comment screenshot upload functions removed - use unified image system instead
 
 // Legacy function for backward compatibility - now with WebP conversion
 export const uploadImageToSupabase = async (
@@ -245,22 +217,7 @@ export const uploadAvatar = async (
   });
 };
 
-/**
- * Upload comment screenshot with standard quality settings
- * @deprecated Use uploadCommentScreenshotOriginal or uploadCommentScreenshotCropped instead
- */
-export const uploadCommentScreenshot = async (
-  file: File,
-  fileName: string
-): Promise<UploadResult> => {
-  return uploadImageWithConversion(file, fileName, {
-    bucket: 'screenshots',
-    folder: 'comment-screenshots',
-    quality: 'standard',
-    maxWidth: 1920,
-    maxHeight: 1920
-  });
-};
+// Comment screenshot upload function removed - use unified image system instead
 
 export const deleteImage = async (bucket: string, path: string): Promise<void> => {
   const { error } = await supabase.storage
@@ -269,6 +226,40 @@ export const deleteImage = async (bucket: string, path: string): Promise<void> =
 
   if (error) {
     throw new Error('Failed to delete image');
+  }
+};
+
+/**
+ * Delete old cropped version before uploading new one
+ * Prevents accumulation of cropped versions when re-cropping
+ */
+export const deleteOldCroppedVersion = async (
+  originalUrl: string
+): Promise<void> => {
+  try {
+    // Extract the original filename to generate the cropped filename
+    const originalPath = extractPathFromUrl(originalUrl, 'screenshots');
+    const filename = originalPath.split('/').pop();
+    
+    if (!filename) {
+      console.warn('Could not extract filename from original URL:', originalUrl);
+      return;
+    }
+    
+    // Generate the expected cropped file path
+    const croppedPath = `poi_cropped/${filename}`;
+    
+    // Try to delete the old cropped version (ignore errors if file doesn't exist)
+    try {
+      await deleteImage('screenshots', croppedPath);
+      console.log('Deleted old cropped version:', croppedPath);
+    } catch (error) {
+      // Ignore errors - file might not exist if this is the first crop
+      console.log('No old cropped version to delete or deletion failed:', croppedPath);
+    }
+  } catch (error) {
+    console.error('Error in deleteOldCroppedVersion:', error);
+    // Don't throw - this is cleanup, shouldn't block the upload
   }
 };
 

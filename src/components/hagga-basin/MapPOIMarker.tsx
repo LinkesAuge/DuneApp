@@ -22,6 +22,8 @@ interface MapPOIMarkerProps {
   selectionMode?: boolean;
   isSelected?: boolean;
   user?: { id: string };
+  // Entity links refresh trigger
+  entityLinksRefreshTrigger?: number;
 }
 
 // Helper function to determine if an icon is a URL or emoji
@@ -56,7 +58,7 @@ const privacyColors = {
 const MapPOIMarker: React.FC<MapPOIMarkerProps> = ({ 
   poi, 
   poiType, 
- 
+
   zoom = 1, 
   mapSettings,
   onEdit,
@@ -66,7 +68,8 @@ const MapPOIMarker: React.FC<MapPOIMarkerProps> = ({
   isHighlighted,
   selectionMode = false,
   isSelected = false,
-  user
+  user,
+  entityLinksRefreshTrigger
 }) => {
   const { user: authUser } = useAuth();
   
@@ -124,7 +127,7 @@ const MapPOIMarker: React.FC<MapPOIMarkerProps> = ({
   // Check for linked schematics for indicator (runs immediately)
   useEffect(() => {
     const checkLinkedSchematics = async () => {
-      console.log(`[MapPOIMarker] Checking linked schematics for POI ${poi.id} (${poi.title})`);
+      console.log(`[MapPOIMarker] Checking linked schematics for POI ${poi.id} (${poi.title}) - Trigger: ${entityLinksRefreshTrigger}`);
       try {
         const { data: links, error } = await supabase
           .from('poi_entity_links')
@@ -151,7 +154,7 @@ const MapPOIMarker: React.FC<MapPOIMarkerProps> = ({
     };
 
     checkLinkedSchematics();
-  }, [poi.id, poi]);
+  }, [poi.id, poi, entityLinksRefreshTrigger]);
 
   // Fetch linked items for tooltip
   useEffect(() => {

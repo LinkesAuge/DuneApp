@@ -1,29 +1,34 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
-import { X, MapPin, Lock, Users, Eye, Image, Upload, Plus, Search, UserPlus, Link2 } from 'lucide-react';
+import { 
+  X, 
+  MapPin, 
+  Camera, 
+  Globe, 
+  Users, 
+  Lock, 
+  UserPlus, 
+  Search, 
+  Link2,
+  Upload,
+  Eye,
+  Plus
+} from 'lucide-react';
 import type { 
   PixelCoordinates, 
   PoiType, 
- 
   Poi, 
   PrivacyLevel,
-  PercentageCoordinates
+  PoiScreenshot 
 } from '../../types';
 import { formatCoordinates } from '../../lib/coordinates';
-import { useAuth } from '../auth/AuthProvider';
-
-// Remove old crop modal import
-// import ImageCropModal from '../grid/ImageCropModal';
-import { PixelCrop } from 'react-image-crop';
-import { v4 as uuidv4 } from 'uuid';
-import { getScreenshotLabel } from '../../lib/cropUtils';
-import UserAvatar from '../common/UserAvatar';
-import { uploadPoiScreenshot } from '../../lib/imageUpload';
-import { formatConversionStats } from '../../lib/imageUtils';
-// Add unified system imports  
+import { useAuth } from '../../components/auth/AuthProvider';
+import { validateUsername } from '../../lib/auth';
+import { uploadImageToStorage, uploadPoiScreenshotOriginal, uploadPoiScreenshotCropped } from '../../lib/imageUpload';
+import { extractStorageFilePath } from '../../lib/utils';
 import { useScreenshotManager } from '../../hooks/useScreenshotManager';
-import ScreenshotUploader from '../shared/ScreenshotUploader';
 import CropProcessor from '../shared/CropProcessor';
+import UserAvatar from '../common/UserAvatar';
 
 interface POIPlacementModalProps {
   coordinates: PixelCoordinates;
@@ -76,15 +81,6 @@ const getDisplayImageUrl = (icon: string): string | null => {
   return null;
 };
 
-// Remove old screenshot interface - using unified system now
-// interface ScreenshotFile {
-//   id: string;
-//   file: File;
-//   cropDetails: PixelCrop | null;
-//   isNew: boolean;
-//   previewUrl: string;
-// }
-
 const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
   coordinates,
   poiTypes,
@@ -102,8 +98,6 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
   const [description, setDescription] = useState('');
   const [selectedPoiTypeId, setSelectedPoiTypeId] = useState('');
   const [privacyLevel, setPrivacyLevel] = useState<PrivacyLevel>('global');
-  // Remove old screenshots state - using unified system now
-  // const [screenshots, setScreenshots] = useState<ScreenshotFile[]>([]);
   
   // UI state
   const [showDetailedPoiSelection, setShowDetailedPoiSelection] = useState(false);
@@ -118,15 +112,6 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
     maxFileSize: 5,
     enableCropping: true
   });
-  
-  // Also track files from ScreenshotUploader for display count
-  const [uploaderFiles, setUploaderFiles] = useState<any[]>([]);
-
-  // Remove old screenshot cropping state - handled by unified system now
-  // const [showCropModal, setShowCropModal] = useState(false);
-  // const [tempImageFile, setTempImageFile] = useState<File | null>(null);
-  // const [tempImageUrl, setTempImageUrl] = useState<string | null>(null);
-  // const [pendingFiles, setPendingFiles] = useState<File[]>([]);
 
   // Sharing state
   const [availableUsers, setAvailableUsers] = useState<any[]>([]);
@@ -148,8 +133,6 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
       }
     }
   }, [selectedPoiTypeId, poiTypes]);
-
-
 
   // Load available users
   useEffect(() => {
@@ -221,61 +204,153 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
     return matchesSearch && notAlreadySelected;
   });
 
+  // Upload processed screenshots for POI creation (simplified version from POIEditModal)
+  const uploadProcessedScreenshots = async (poiId: string): Promise<void> => {
+    console.log('[POIPlacement] 🚀 Starting uploadProcessedScreenshots for POI:', poiId);
+    
+    const processedFiles = screenshotManager.filesToProcess.filter(f => f.isProcessed);
+    console.log('[POIPlacement] 📊 All files to process:', screenshotManager.filesToProcess.length);
+    console.log('[POIPlacement] ✅ Processed files found:', processedFiles.length);
+    console.log('[POIPlacement] 📋 Processed files details:', processedFiles.map(f => ({
+      id: f.id,
+      name: f.originalFile.name,
+      isProcessed: f.isProcessed,
+      hasCropData: !!f.cropData,
+      originalFileSize: f.originalFile.size,
+      displayFileSize: f.displayFile.size
+    })));
+    
+    if (processedFiles.length === 0) {
+      console.log('[POIPlacement] ⚠️ No processed files found, skipping screenshot upload');
+      return;
+    }
 
+    const newScreenshots: PoiScreenshot[] = [];
 
-  // Remove old file handling methods - replaced by unified system
-  // const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => { ... }
-  // const handleCloseCropModal = () => { ... }
-  // const processNextFile = () => { ... }
-  // const handleCropComplete = async (croppedImageBlob: Blob, cropData: PixelCrop, isFullImage: boolean) => { ... }
-  // const removeScreenshot = (idToRemove: string) => { ... }
-
-  const savePoi = async () => {
-    // ... (validation logic for name, type, etc.)
-    setIsSubmitting(true);
-    // ... (existing user ID check)
-
-    const uploadedScreenshotPaths: { url: string; crop_details: PixelCrop | null; original_name: string; }[] = [];
-
-    for (const screenshot of screenshots) {
-      if (screenshot.isNew) { // Only upload new files
-        const fileName = `${user.id}/${uuidv4()}-${screenshot.file.name}`;
-        const filePath = `poi-screenshots/${fileName}`;
+    for (const file of processedFiles) {
+      console.log('[POIPlacement] 🔄 Processing file:', file.originalFile.name);
+      
+      try {
+        const timestamp = Date.now();
+        const fileExt = file.originalFile.name.split('.').pop() || 'jpg';
+        const baseFileName = `${poiId}_${timestamp}.${fileExt}`;
+        console.log('[POIPlacement] 📝 Generated base filename:', baseFileName);
         
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('screenshots')
-          .upload(filePath, screenshot.file, { upsert: false });
-
-        if (uploadError) {
-          // ... (error handling)
-          setIsSubmitting(false);
-          return;
+        // Step 1: Upload original version to poi_screenshots/
+        console.log('[POIPlacement] ⬆️ Step 1: Uploading original file...');
+        const originalUpload = await uploadPoiScreenshotOriginal(file.originalFile, baseFileName);
+        let originalUrl = originalUpload.url;
+        let displayUrl = originalUrl; // Default to original
+        console.log('[POIPlacement] ✅ Original upload complete:', originalUrl);
+        
+        // Step 2: Check if actual cropping was performed (using better approach)
+        const wasActuallyCropped = file.wasActuallyCropped;
+          
+        if (wasActuallyCropped) {
+          console.log('[POIPlacement] ✂️ Step 2: Actual cropping detected, uploading cropped version...');
+          console.log('[POIPlacement] 📐 Crop data:', file.cropData);
+          console.log('[POIPlacement] 🎯 Cropping analysis: wasActuallyCropped =', wasActuallyCropped);
+          
+          // Upload cropped version
+          const croppedUpload = await uploadPoiScreenshotCropped(file.displayFile, baseFileName);
+          console.log('[POIPlacement] ✅ Cropped upload complete:', croppedUpload);
+          
+          // Create screenshot record with cropped version as primary URL
+          newScreenshots.push({
+            id: `new_${Date.now()}_${Math.random()}`,
+            poi_id: poiId,
+            url: croppedUpload.url,
+            original_url: originalUrl,
+            crop_details: file.cropData || null,
+            uploaded_by: user?.id || null,
+            created_at: new Date().toISOString(),
+          });
+        } else {
+          console.log('[POIPlacement] 📏 Step 2: No cropping performed, using original as display version...');
+          console.log('[POIPlacement] 🎯 Cropping analysis: wasActuallyCropped =', wasActuallyCropped);
+          
+          // Create screenshot record with original as both URLs (no cropping performed)
+          newScreenshots.push({
+            id: `new_${Date.now()}_${Math.random()}`,
+            poi_id: poiId,
+            url: originalUrl, // Use original as display URL
+            original_url: originalUrl,
+            crop_details: null, // No crop details since no cropping
+            uploaded_by: user?.id || null,
+            created_at: new Date().toISOString(),
+          });
         }
-        
-        const publicURL = supabase.storage.from('screenshots').getPublicUrl(filePath).data.publicUrl;
-        uploadedScreenshotPaths.push({ 
-          url: publicURL, 
-          crop_details: screenshot.cropDetails, // This now correctly reflects full/cropped
-          original_name: screenshot.file.name 
-        });
+      } catch (error) {
+        console.error('[POIPlacement] ❌ Error uploading screenshot:', error);
+        throw new Error(`Failed to upload screenshot: ${file.originalFile.name}`);
       }
     }
 
-    const poiDataToInsert = {
-      // ... (other POI fields)
-      screenshots: uploadedScreenshotPaths.length > 0 ? uploadedScreenshotPaths : null,
-      // ...
-    };
+    console.log('[POIPlacement] 💾 Saving to unified system - newScreenshots count:', newScreenshots.length);
 
-    // ... (Supabase insert logic)
-    // ... (rest of the function, success/error handling, reset state)
-    setScreenshots([]); // Clear screenshots after successful save
-    // ...
+    // Save images to unified system using managed_images and poi_image_links tables
+    if (newScreenshots.length > 0) {
+      for (let index = 0; index < newScreenshots.length; index++) {
+        const screenshot = newScreenshots[index];
+        console.log('[POIPlacement] 🗄️ Step 1: Inserting into managed_images...', {
+          original_url: screenshot.original_url,
+          processed_url: screenshot.url !== screenshot.original_url ? screenshot.url : null,
+          crop_details: screenshot.crop_details,
+          image_type: 'poi_screenshot',
+          uploaded_by: user?.id
+        });
+        
+        // Step 1: Insert into managed_images table
+        const { data: managedImage, error: imageError } = await supabase
+          .from('managed_images')
+          .insert({
+            original_url: screenshot.original_url,
+            processed_url: screenshot.url !== screenshot.original_url ? screenshot.url : null,
+            crop_details: screenshot.crop_details,
+            image_type: 'poi_screenshot',
+            uploaded_by: user?.id
+          })
+          .select()
+          .single();
+
+        if (imageError) {
+          console.error('[POIPlacement] ❌ Error saving managed image:', imageError);
+          throw new Error('Failed to save image to database');
+        }
+
+        console.log('[POIPlacement] ✅ Managed image saved:', managedImage);
+
+        // Step 2: Link image to POI in poi_image_links table
+        console.log('[POIPlacement] 🔗 Step 2: Linking image to POI...', {
+          poi_id: poiId,
+          image_id: managedImage.id,
+          display_order: index
+        });
+        
+        const { error: linkError } = await supabase
+          .from('poi_image_links')
+          .insert({
+            poi_id: poiId,
+            image_id: managedImage.id,
+            display_order: index
+          });
+
+        if (linkError) {
+          console.error('[POIPlacement] ❌ Error linking image to POI:', linkError);
+          throw new Error('Failed to link image to POI');
+        }
+
+        console.log('[POIPlacement] ✅ Image linked to POI successfully');
+      }
+      
+      console.log('[POIPlacement] 🎉 All screenshots processed and saved successfully!');
+    }
   };
 
   // Handle form submission
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+    console.log('[POIPlacement] 🚀 Starting POI creation form submission');
     
     if (!user) {
       setError('You must be logged in to create POIs');
@@ -305,6 +380,8 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
     setError(null);
 
     try {
+      console.log('[POIPlacement] 📝 Creating POI record...');
+      
       // Create the POI record
       const poiData = {
         title: title.trim(),
@@ -318,75 +395,106 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
         grid_square_id: mapType === 'deep_desert' ? gridSquareId : null
       };
 
+      console.log('[POIPlacement] 📋 POI data to insert:', poiData);
+
       const { data: poi, error: poiError } = await supabase
         .from('pois')
         .insert([poiData])
         .select(`
           *,
           poi_types (*),
-          profiles!pois_created_by_fkey (username)
+          profiles!pois_created_by_fkey (username),
+          poi_image_links (
+            managed_images (
+              id,
+              original_url,
+              processed_url,
+              crop_details,
+              uploaded_by,
+              created_at
+            )
+          )
         `)
         .single();
 
       if (poiError) {
-        console.error('Error creating POI:', poiError);
+        console.error('[POIPlacement] ❌ Error creating POI:', poiError);
         throw new Error('Failed to create POI');
       }
 
-      // Upload screenshots if any and update POI
-      let finalScreenshots: any[] = [];
-      
-      // Combine screenshots from both managers (screenshotManager has priority for processed files)
+      console.log('[POIPlacement] ✅ POI created successfully:', poi);
+
+      // Process screenshots through unified image system
       const processedFiles = screenshotManager.filesToProcess.filter(f => f.isProcessed);
-      const uploaderProcessedFiles = uploaderFiles.filter(f => f.isProcessed || f.displayFile);
+      console.log('[POIPlacement] 🔍 Checking for screenshots to process...', {
+        totalFiles: screenshotManager.filesToProcess.length,
+        processedFiles: processedFiles.length,
+        allFiles: screenshotManager.filesToProcess.map(f => ({
+          id: f.id,
+          name: f.originalFile.name,
+          isProcessed: f.isProcessed
+        }))
+      });
       
-      // Use screenshotManager files if available, otherwise use uploader files
-      const allProcessedFiles = processedFiles.length > 0 ? processedFiles : uploaderProcessedFiles;
-      const totalScreenshots = allProcessedFiles.length;
-      
-      if (totalScreenshots > 0) {
+      if (processedFiles.length > 0) {
+        console.log(`[POIPlacement] 📸 Processing ${processedFiles.length} screenshots for POI ${poi.id}`);
+        
+        console.log('[POIPlacement] 🎯 Step 4: Uploading processed screenshots...');
+        
         try {
-          // Upload screenshots using unified system
-          for (const processedFile of allProcessedFiles) {
-            const fileName = `${user.id}/${uuidv4()}-${(processedFile.originalFile || processedFile.file)?.name}`;
-            
-            // Upload with WebP conversion
-            const uploadResult = await uploadPoiScreenshot(processedFile.displayFile || processedFile.file, fileName);
-            
-            // Show conversion feedback for the first upload
-            if (finalScreenshots.length === 0 && uploadResult.compressionRatio) {
-              const stats = formatConversionStats(uploadResult);
-              setConversionStats(stats);
-            }
-            
-            finalScreenshots.push({
-              id: `${poi.id}_${Date.now()}_${finalScreenshots.length}`,
-              url: uploadResult.url,
-              uploaded_by: user.id,
-              upload_date: new Date().toISOString()
-            });
-          }
-
-          // Update the POI with screenshots in JSONB[] format
-          const { error: screenshotError } = await supabase
+          await uploadProcessedScreenshots(poi.id);
+          console.log('[POIPlacement] ✅ Step 4 complete: All screenshots uploaded successfully');
+          
+          // Step 5: Fetch updated POI data with screenshots and pass to callback
+          console.log('[POIPlacement] 🔄 Step 5: Fetching updated POI data with screenshots...');
+          
+          const { data: updatedPoi, error: fetchError } = await supabase
             .from('pois')
-            .update({ screenshots: finalScreenshots })
-            .eq('id', poi.id);
+            .select(`
+              *,
+              poi_types (*),
+              profiles!pois_created_by_fkey (username),
+              poi_image_links (
+                managed_images (
+                  id,
+                  original_url,
+                  processed_url,
+                  crop_details,
+                  uploaded_by,
+                  created_at
+                )
+              )
+            `)
+            .eq('id', poi.id)
+            .single();
 
-          if (screenshotError) {
-            console.error('Error saving screenshot records:', screenshotError);
-            // Don't fail the POI creation for this
+          if (fetchError) {
+            console.error('[POIPlacement] ❌ Error fetching updated POI:', fetchError);
+            // Continue with original POI data
+            console.log('[POIPlacement] 📤 Calling onPoiCreated with original POI data (no screenshots)');
+            onPoiCreated(poi);
+          } else {
+            console.log('[POIPlacement] ✅ Updated POI data fetched:', updatedPoi);
+            console.log('[POIPlacement] 🖼️ POI image links:', updatedPoi.poi_image_links);
+            // Use the simple approach like GridPage - just pass the POI data
+            // Let usePOIManager real-time subscriptions handle the UI updates automatically
+            console.log('[POIPlacement] 📤 Calling onPoiCreated with updated POI data (includes screenshot relations)');
+            onPoiCreated(updatedPoi);
           }
-        } catch (screenshotUploadError) {
-          console.error('Error uploading screenshots:', screenshotUploadError);
-          // Don't fail the POI creation for screenshot upload failures
-          setError('POI created successfully, but some screenshots failed to upload');
+          
+        } catch (error) {
+          console.error('[POIPlacement] ❌ Error processing screenshots:', error);
+          // Continue with POI creation even if screenshots fail
+          onPoiCreated(poi);
         }
+      } else {
+        console.log('[POIPlacement] ⚠️ No screenshots to process');
+        onPoiCreated(poi);
       }
 
       // Handle sharing if privacy level is shared
       if (privacyLevel === 'shared' && selectedUsers.length > 0) {
-  
+        console.log('[POIPlacement] 👥 Setting up POI sharing...');
         
         const newShares = selectedUsers.map(u => ({
           poi_id: poi.id,
@@ -394,6 +502,7 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
           shared_by_user_id: user?.id
         }));
         
+        console.log('[POIPlacement] 📤 Sharing data to insert:', newShares);
 
         
         const { data: shareData, error: shareError } = await supabase
@@ -402,21 +511,16 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
           .select();
           
         if (shareError) {
-          console.error('Error saving POI shares:', shareError);
+          console.error('[POIPlacement] ❌ Error saving POI shares:', shareError);
           throw new Error('Failed to save POI sharing settings');
         }
         
+        console.log('[POIPlacement] ✅ POI sharing configured successfully');
       }
 
-      // Add screenshots to the POI object for immediate display
-      const poiWithScreenshots = {
-        ...poi,
-        screenshots: finalScreenshots
-      };
-
-      onPoiCreated(poiWithScreenshots as Poi);
+      console.log('[POIPlacement] 🎉 POI creation complete!');
     } catch (err) {
-      console.error('Error in POI creation:', err);
+      console.error('[POIPlacement] ❌ Error in POI creation:', err);
       setError(err instanceof Error ? err.message : 'An unexpected error occurred');
     } finally {
       setIsSubmitting(false);
@@ -765,13 +869,78 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
           {/* Screenshots - Unified System */}
           <div>
             <label className="block text-sm font-medium text-amber-200 mb-3">
-              Screenshots ({Math.max(screenshotManager.filesToProcess.filter(f => f.isProcessed).length, uploaderFiles.length)}/5)
+              Screenshots ({screenshotManager.filesToProcess.filter(f => f.isProcessed).length}/5)
             </label>
-            <ScreenshotUploader
-              screenshotManager={screenshotManager}
-              maxDisplayFiles={5}
-              onProcessingComplete={(files) => setUploaderFiles(files)}
-            />
+            
+            <div className="space-y-3">
+              {/* Screenshots Grid */}
+              <div className="flex flex-wrap gap-2">
+                {/* New Screenshots from Unified System */}
+                {screenshotManager.filesToProcess.map((file) => (
+                  <div 
+                    key={file.id}
+                    className={`w-20 h-20 relative rounded overflow-hidden border ${
+                      file.isProcessed ? 'border-green-300' : 'border-slate-600'
+                    }`}
+                  >
+                    <img 
+                      src={file.preview} 
+                      alt="New Screenshot" 
+                      className="w-full h-full object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => screenshotManager.removeFile(file.id)}
+                      className="absolute top-0 right-0 bg-red-600 text-white w-5 h-5 flex items-center justify-center rounded-bl-md hover:bg-red-700 transition-colors"
+                      title="Remove screenshot"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                    <div className="absolute bottom-1 left-1">
+                      <span className={`text-white text-xs px-1 rounded ${
+                        file.isProcessed 
+                          ? file.wasActuallyCropped 
+                            ? 'bg-green-600' 
+                            : 'bg-blue-600'
+                          : 'bg-orange-600'
+                      }`}>
+                        {(() => {
+                          if (!file.isProcessed) {
+                            return 'Processing...';
+                          }
+                          return file.wasActuallyCropped ? 'New (Cropped)' : 'New (Full)';
+                        })()}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+                
+                {/* Upload Button */}
+                {screenshotManager.filesToProcess.length < 5 && (
+                  <label className="w-20 h-20 border-2 border-dashed border-slate-600 rounded flex flex-col items-center justify-center text-slate-400 hover:text-amber-300 hover:border-amber-500 cursor-pointer transition-colors">
+                    <Upload className="w-5 h-5" />
+                    <span className="text-xs mt-1">Add</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files.length > 0) {
+                          screenshotManager.uploadFiles(e.target.files);
+                          // Clear the input so same files can be selected again
+                          e.target.value = '';
+                        }
+                      }}
+                      multiple
+                      className="hidden"
+                    />
+                  </label>
+                )}
+              </div>
+              
+              <p className="text-xs text-slate-400">
+                Upload up to 5 screenshots total. Each image must be under 5MB. PNG, JPG formats supported.
+              </p>
+            </div>
           </div>
 
           {/* Entity Linking Note */}

@@ -38,7 +38,10 @@ const ScreenshotUploader: React.FC<ScreenshotUploaderProps> = ({
   // Handle file selection
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
+    console.log('[ScreenshotUploader] 📁 File selection event:', files?.length, 'files');
+    
     if (files && files.length > 0) {
+      console.log('[ScreenshotUploader] 📤 Uploading files:', Array.from(files).map(f => ({ name: f.name, size: f.size })));
       uploadFiles(files);
       // Clear the input so the same files can be selected again if needed
       if (fileInputRef.current) {
@@ -51,7 +54,10 @@ const ScreenshotUploader: React.FC<ScreenshotUploaderProps> = ({
   const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     const files = event.dataTransfer.files;
+    console.log('[ScreenshotUploader] 🎯 Drag & drop event:', files?.length, 'files');
+    
     if (files && files.length > 0) {
+      console.log('[ScreenshotUploader] 📤 Uploading dropped files:', Array.from(files).map(f => ({ name: f.name, size: f.size })));
       uploadFiles(files);
     }
   };
@@ -62,7 +68,14 @@ const ScreenshotUploader: React.FC<ScreenshotUploaderProps> = ({
 
   // Handle processing completion
   React.useEffect(() => {
+    console.log('[ScreenshotUploader] 🔄 Processing status changed:', {
+      processingComplete,
+      filesToProcessLength: filesToProcess.length,
+      processedCount: filesToProcess.filter(f => f.isProcessed).length
+    });
+    
     if (processingComplete && filesToProcess.length > 0) {
+      console.log('[ScreenshotUploader] ✅ Processing complete, calling onProcessingComplete with:', filesToProcess.length, 'files');
       onProcessingComplete?.(filesToProcess);
     }
   }, [processingComplete, filesToProcess, onProcessingComplete]);
@@ -70,17 +83,26 @@ const ScreenshotUploader: React.FC<ScreenshotUploaderProps> = ({
   // Handle errors
   React.useEffect(() => {
     if (error) {
+      console.log('[ScreenshotUploader] ❌ Error occurred:', error);
       onError?.(error);
     }
   }, [error, onError]);
 
   // Start processing when files are added
   React.useEffect(() => {
+    console.log('[ScreenshotUploader] 🔄 Files changed, checking if processing needed:', {
+      filesToProcessLength: filesToProcess.length,
+      isUploading,
+      hasUnprocessed: filesToProcess.some(f => !f.isProcessed)
+    });
+    
     if (filesToProcess.length > 0 && !isUploading) {
       const hasUnprocessed = filesToProcess.some(f => !f.isProcessed);
       if (hasUnprocessed) {
+        console.log('[ScreenshotUploader] ⏰ Starting processing with delay...');
         // Small delay to ensure state is settled
         setTimeout(() => {
+          console.log('[ScreenshotUploader] 🚀 Calling processNextFile...');
           processNextFile();
         }, 100);
       }

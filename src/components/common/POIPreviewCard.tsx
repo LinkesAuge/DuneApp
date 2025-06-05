@@ -115,6 +115,7 @@ const POIPreviewCard: React.FC<POIPreviewCardProps> = ({
   const [loadingUserInfo, setLoadingUserInfo] = useState(true);
   const [commentCount, setCommentCount] = useState(0);
   const [showLinkingModal, setShowLinkingModal] = useState(false);
+  const [entityLinksRefreshTrigger, setEntityLinksRefreshTrigger] = useState(0);
 
   const [expanded, setExpanded] = useState(false);
   
@@ -531,6 +532,7 @@ const POIPreviewCard: React.FC<POIPreviewCardProps> = ({
               <LinkedItemsSection 
                 poiId={poi.id}
                 showLinkButton={false}
+                refreshTrigger={entityLinksRefreshTrigger}
               />
             </div>
 
@@ -757,6 +759,7 @@ const POIPreviewCard: React.FC<POIPreviewCardProps> = ({
           <LinkedItemsSection 
             poiId={poi.id}
             showLinkButton={false}
+            refreshTrigger={entityLinksRefreshTrigger}
           />
         </div>
 
@@ -780,8 +783,8 @@ const POIPreviewCard: React.FC<POIPreviewCardProps> = ({
           poiId={poi.id}
           poiTitle={poi.title}
           onLinksUpdated={() => {
-            // Optionally refresh the LinkedItemsSection
-            // Could trigger a refresh here if needed
+            console.log('[POIPreviewCard] 🔄 Entity links updated, refreshing LinkedItemsSection...');
+            setEntityLinksRefreshTrigger(prev => prev + 1);
           }}
         />
       )}

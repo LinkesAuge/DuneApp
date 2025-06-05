@@ -21,7 +21,7 @@ const CropProcessor: React.FC<CropProcessorProps> = ({
     currentCropFile,
     completeCrop,
     skipCrop,
-    closeCropModal,
+    cancelCrop,
     processingComplete,
     getProcessingStatus,
   } = screenshotManager;
@@ -54,7 +54,7 @@ const CropProcessor: React.FC<CropProcessorProps> = ({
     <div className={className}>
       <ImageCropModal
         isOpen={showCropModal}
-        onClose={closeCropModal}
+        onClose={cancelCrop}
         imageUrl={currentCropFile.preview}
         onCropComplete={handleCropComplete}
         onSkip={handleCropSkip}

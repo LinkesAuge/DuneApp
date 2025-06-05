@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Package, FileText, Eye, Edit, Trash, PanelLeftOpen, PanelLeftClose, PanelRightOpen, PanelRightClose, CheckSquare, Square, Edit2, Link2, Cube, DocumentText, Search, Grid3X3, List, TreePine, SortAsc, SortDesc, Filter, ArrowUp, ArrowDown, MapPin } from 'lucide-react';
+import { Package, FileText, Eye, Edit, Trash, PanelLeftOpen, PanelLeftClose, PanelRightOpen, PanelRightClose, CheckSquare, Square, Edit2, Link2, Cube, DocumentText, Search, Grid3X3, List, TreePine, SortAsc, SortDesc, Filter, ArrowUp, ArrowDown, MapPin, Image as ImageIcon } from 'lucide-react';
 import { useActiveViewData } from '../../hooks/useItemsSchematicsData';
 import { useItemsSchematics } from '../../hooks/useItemsSchematics';
 import { useTiers } from '../../hooks/useTiers';
+import { useUnifiedImages } from '../../hooks/useUnifiedImages';
 import CreateEditItemSchematicModal from './CreateEditItemSchematicModal';
 import BulkOperationsModal from './BulkOperationsModal';
 
@@ -90,6 +91,52 @@ const EmptyState: React.FC<{ activeView: ActiveView }> = ({ activeView }) => (
   </div>
 );
 
+const EntityImagePreview: React.FC<{ entity: EntityWithRelations }> = ({ entity }) => {
+  // Determine the entity type for image fetching
+  const displayType = entity.entityType || 'items';
+  const imageType = displayType === 'items' ? 'item_screenshot' : 'schematic_screenshot';
+  
+  // Get images for this entity
+  const { images, loading } = useUnifiedImages(entity.id, imageType);
+  
+  // Don't show anything if no images
+  if (loading || !images || images.length === 0) {
+    return null;
+  }
+
+  // Show first 3 images
+  const displayImages = images.slice(0, 3);
+  const hasMore = images.length > 3;
+
+  return (
+    <div className="mb-3">
+      <div className="flex items-center space-x-1 mb-2">
+        <ImageIcon className="w-3 h-3 text-amber-400/70" />
+        <span className="text-xs text-amber-400/70 font-light"
+              style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+          {images.length} image{images.length !== 1 ? 's' : ''}
+        </span>
+      </div>
+      <div className="flex space-x-1">
+        {displayImages.map((image, index) => (
+          <div key={image.id} className="w-12 h-12 rounded overflow-hidden border border-slate-600">
+            <img
+              src={image.processed_url || image.original_url}
+              alt={`${entity.name} screenshot ${index + 1}`}
+              className="w-full h-full object-cover"
+            />
+          </div>
+        ))}
+        {hasMore && (
+          <div className="w-12 h-12 rounded bg-slate-700 border border-slate-600 flex items-center justify-center">
+            <span className="text-xs text-amber-400/70 font-light">+{images.length - 3}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const EntityCard: React.FC<{
   entity: EntityWithRelations;
   type: ActiveView;
@@ -121,6 +168,11 @@ const EntityCard: React.FC<{
 
   // Determine the entity type for display (use entityType when available, fallback to type prop)
   const displayType = entity.entityType || (type === 'all' ? 'items' : type);
+  
+  // Get images for this entity
+  const imageType = displayType === 'items' ? 'item_screenshot' : 'schematic_screenshot';
+  const { images, loading: imagesLoading } = useUnifiedImages(entity.id, imageType);
+  const hasImages = images && images.length > 0;
 
   return (
     <div 
@@ -214,6 +266,9 @@ const EntityCard: React.FC<{
             {entity.description}
           </p>
         )}
+
+        {/* Image Preview - Simple hook usage for now */}
+        <EntityImagePreview entity={entity} displayType={displayType} />
 
         {/* Action Buttons */}
         <div className="flex items-center justify-between">

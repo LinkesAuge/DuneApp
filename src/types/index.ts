@@ -69,6 +69,7 @@ export interface PoiScreenshot {
   id: string;
   url: string;
   original_url?: string | null; // URL of original image before cropping
+  processed_url?: string | null; // URL of processed/cropped image in storage
   crop_details?: PixelCrop | null; // Crop information from react-image-crop
   uploaded_by: string;
   upload_date: string;
@@ -87,7 +88,7 @@ export interface Poi {
   created_at: string;
   updated_at: string; // When the POI was last updated
   updated_by: string | null; // Who last updated/edited this POI
-  screenshots: PoiScreenshot[];
+  screenshots?: PoiScreenshot[]; // Temporary: keeping for backward compatibility during unified system migration
   // NEW fields for Hagga Basin support
   map_type: MapType;
   coordinates_x: number | null; // pixel coordinates for Hagga Basin
@@ -165,35 +166,8 @@ export interface LayerZIndex {
   uiControls: number;
 }
 
-// Comment related types
-export interface CommentScreenshot {
-  id: string;
-  url: string;
-  uploaded_by: string;
-  upload_date: string;
-  updated_by?: string | null; // Who last edited this screenshot
-  updated_at?: string; // When this screenshot was last updated
-  file_size?: number;
-  file_name?: string;
-}
-
-export interface Comment {
-  id: string;
-  content: string;
-  created_at: string;
-  updated_at: string;
-  created_by: string;
-  updated_by?: string | null; // Who last edited this comment
-  poi_id?: string;
-  grid_square_id?: string;
-  screenshots?: CommentScreenshot[];
-}
-
-export interface CommentWithUser extends Comment {
-  user?: {
-    username: string;
-  };
-}
+// Comment related types moved to unified-images.ts
+// Use CommentWithImages from unified-images.ts instead
 
 // Like related types
 export interface Like {

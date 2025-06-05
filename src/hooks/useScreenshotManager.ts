@@ -12,6 +12,7 @@ export interface PendingScreenshotFile {
   needsCropping: boolean;
   isProcessed: boolean;
   cropData?: PixelCrop;
+  wasActuallyCropped?: boolean; // Track if actual cropping was performed (better approach)
   uploadedUrl?: string;
   originalUrl?: string;
   error?: string;
@@ -47,6 +48,7 @@ export interface ScreenshotManagerReturn {
   completeCrop: (croppedBlob: Blob, cropData: PixelCrop, isFullImage?: boolean) => Promise<void>;
   skipCrop: () => Promise<void>;
   closeCropModal: () => void;
+  cancelCrop: () => void;
   
   // Upload to Storage
   uploadToStorage: (file: PendingScreenshotFile) => Promise<{ url: string; originalUrl?: string }>;
@@ -126,20 +128,32 @@ export const useScreenshotManager = (config: ScreenshotManagerConfig): Screensho
 
   // Upload files to processing queue
   const uploadFiles = useCallback((files: FileList | File[]) => {
+    console.log('[useScreenshotManager] 📥 uploadFiles called with:', files.length, 'files');
+    
     const fileArray = Array.from(files);
     const newFiles: PendingScreenshotFile[] = [];
     
     setError(null);
     
     for (const file of fileArray) {
+      console.log('[useScreenshotManager] 🔍 Validating file:', file.name, file.size);
+      
       const validationError = validateFile(file);
       if (validationError) {
+        console.log('[useScreenshotManager] ❌ Validation failed:', validationError);
         setError(validationError);
         continue;
       }
       
       const fileId = generateFileId();
       const preview = createPreviewUrl(file);
+      
+      console.log('[useScreenshotManager] ✅ File validated, creating pending file:', {
+        id: fileId,
+        name: file.name,
+        size: file.size,
+        needsCropping: fullConfig.enableCropping
+      });
       
       const pendingFile: PendingScreenshotFile = {
         file,
@@ -155,13 +169,22 @@ export const useScreenshotManager = (config: ScreenshotManagerConfig): Screensho
     }
     
     if (newFiles.length > 0) {
-      setFilesToProcess(prev => [...prev, ...newFiles]);
+      console.log('[useScreenshotManager] 📦 Adding', newFiles.length, 'new files to processing queue');
+      
+      setFilesToProcess(prev => {
+        const updated = [...prev, ...newFiles];
+        console.log('[useScreenshotManager] 📋 Updated queue length:', updated.length);
+        return updated;
+      });
       
       // CRITICAL: Start processing after adding files
       setTimeout(() => {
+        console.log('[useScreenshotManager] ⏰ Starting delayed processing trigger...');
         // Trigger processing via useEffect by changing state
         setCurrentFileIndex(0);
       }, 100);
+    } else {
+      console.log('[useScreenshotManager] ⚠️ No valid files to add to queue');
     }
   }, [fullConfig.allowedTypes, fullConfig.maxFileSize, fullConfig.enableCropping]);
 
@@ -180,8 +203,16 @@ export const useScreenshotManager = (config: ScreenshotManagerConfig): Screensho
 
   // Process file without cropping
   const markFileAsProcessed = useCallback((fileId: string) => {
+    console.log('[useScreenshotManager] ✅ markFileAsProcessed called for:', fileId);
+    
     setFilesToProcess(prev => 
-      prev.map(f => f.id === fileId ? { ...f, needsCropping: false, isProcessed: true } : f)
+      prev.map(f => {
+        if (f.id === fileId) {
+          console.log('[useScreenshotManager] 📝 Marking file as processed:', f.originalFile.name);
+          return { ...f, needsCropping: false, isProcessed: true };
+        }
+        return f;
+      })
     );
   }, []);
 
@@ -206,7 +237,7 @@ export const useScreenshotManager = (config: ScreenshotManagerConfig): Screensho
   }, [filesToProcess, fullConfig.enableCropping, markFileAsProcessed]);
 
   // Complete crop operation
-  const completeCrop = useCallback(async (croppedBlob: Blob, cropData: PixelCrop, isFullImage = false) => {
+  const completeCrop = useCallback(async (croppedBlob: Blob, cropData: PixelCrop, isFullImageUpload = false) => {
     if (!currentCropFile) return;
     
     try {
@@ -220,11 +251,29 @@ export const useScreenshotManager = (config: ScreenshotManagerConfig): Screensho
         type: currentCropFile.originalFile.type,
       });
       
+      // Better approach: Check if actual cropping was performed
+      // If crop area doesn't cover the entire image, it was actually cropped
+      const imageElement = document.querySelector('img[src="' + currentCropFile.preview + '"]') as HTMLImageElement;
+      const wasActuallyCropped = imageElement ? (
+        cropData.x > 0 || 
+        cropData.y > 0 || 
+        cropData.width < imageElement.naturalWidth ||
+        cropData.height < imageElement.naturalHeight
+      ) : false;
+      
+      console.log('[useScreenshotManager] 🎯 Crop analysis:', {
+        cropData,
+        imageNaturalSize: imageElement ? { width: imageElement.naturalWidth, height: imageElement.naturalHeight } : 'unknown',
+        wasActuallyCropped,
+        isFullImageUpload
+      });
+      
       // Update file in queue
       const updatedFile: PendingScreenshotFile = {
         ...currentCropFile,
         displayFile: croppedFile,
         cropData,
+        wasActuallyCropped, // Use the better detection approach
         needsCropping: false,
         isProcessed: true,
       };
@@ -251,7 +300,12 @@ export const useScreenshotManager = (config: ScreenshotManagerConfig): Screensho
 
   // Skip cropping for current file
   const skipCrop = useCallback(async () => {
-    if (!currentCropFile) return;
+    if (!currentCropFile) {
+      console.log('[useScreenshotManager] ⚠️ skipCrop called but no currentCropFile');
+      return;
+    }
+    
+    console.log('[useScreenshotManager] ⏭️ skipCrop called for:', currentCropFile.originalFile.name);
     
     try {
       processingRef.current = true;
@@ -264,7 +318,10 @@ export const useScreenshotManager = (config: ScreenshotManagerConfig): Screensho
         ...currentCropFile,
         needsCropping: false,
         isProcessed: true,
+        wasActuallyCropped: false, // No cropping was performed
       };
+      
+      console.log('[useScreenshotManager] 🔄 Updating file to processed state:', updatedFile.originalFile.name);
       
       setFilesToProcess(prev => 
         prev.map(f => f.id === currentCropFile.id ? updatedFile : f)
@@ -274,11 +331,13 @@ export const useScreenshotManager = (config: ScreenshotManagerConfig): Screensho
       setShowCropModal(false);
       setCurrentFileProgress(100);
       
+      console.log('[useScreenshotManager] ✅ skipCrop completed for:', currentCropFile.originalFile.name);
+      
       // Auto-advance to next file - let useEffect handle this
       processingRef.current = false;
       
     } catch (error) {
-      console.error('Error skipping crop:', error);
+      console.error('[useScreenshotManager] ❌ Error skipping crop:', error);
       setError(`Failed to skip cropping: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsUploading(false);
@@ -428,6 +487,28 @@ export const useScreenshotManager = (config: ScreenshotManagerConfig): Screensho
     setShowCropModal(false);
   }, []);
 
+  // Cancel crop - handle user canceling the crop modal
+  const cancelCrop = useCallback((fileId?: string) => {
+    const targetFile = fileId ? filesToProcess.find(f => f.id === fileId) : currentCropFile;
+    
+    if (targetFile) {
+      console.log('[useScreenshotManager] 🚫 User canceled crop for:', targetFile.originalFile.name);
+      
+      // Remove the file from queue
+      removeFileFromQueue(targetFile.id);
+      
+      // Close modal if this was the current crop file
+      if (targetFile.id === currentCropFile?.id) {
+        setShowCropModal(false);
+      }
+      
+      console.log('[useScreenshotManager] ✅ File removed from queue due to cancel');
+    } else {
+      // Just close modal if no file found
+      setShowCropModal(false);
+    }
+  }, [currentCropFile, filesToProcess, removeFileFromQueue]);
+
   // Clear error
   const clearError = useCallback(() => {
     setError(null);
@@ -482,32 +563,75 @@ export const useScreenshotManager = (config: ScreenshotManagerConfig): Screensho
 
   // Effect to continue processing when files are marked as processed
   useEffect(() => {
+    console.log('[useScreenshotManager] 🔄 Auto-processing useEffect triggered:', {
+      processingRefCurrent: processingRef.current,
+      filesToProcessLength: filesToProcess.length,
+      filesToProcessIds: filesToProcess.map(f => ({ id: f.id, name: f.originalFile.name, isProcessed: f.isProcessed }))
+    });
+    
     if (!processingRef.current && filesToProcess.length > 0) {
       const hasUnprocessed = filesToProcess.some(f => !f.isProcessed);
+      console.log('[useScreenshotManager] 🔍 Checking for unprocessed files:', {
+        hasUnprocessed,
+        unprocessedFiles: filesToProcess.filter(f => !f.isProcessed).map(f => ({ id: f.id, name: f.originalFile.name }))
+      });
+      
       if (hasUnprocessed) {
+        console.log('[useScreenshotManager] ⏰ Setting timer for auto-processing...');
+        
         const timer = setTimeout(() => {
+          console.log('[useScreenshotManager] 🚀 Timer triggered, starting auto-processing...');
+          
           // Call processNextFile directly since we're inside useEffect
-          if (processingRef.current) return;
+          if (processingRef.current) {
+            console.log('[useScreenshotManager] ⚠️ Processing already in progress, skipping');
+            return;
+          }
           
           const unprocessedIndex = filesToProcess.findIndex(f => !f.isProcessed);
+          console.log('[useScreenshotManager] 🔍 Found unprocessed file at index:', unprocessedIndex);
+          
           if (unprocessedIndex >= 0) {
             const file = filesToProcess[unprocessedIndex];
+            console.log('[useScreenshotManager] 📄 Processing file:', file.originalFile.name, {
+              needsCropping: file.needsCropping,
+              enableCropping: fullConfig.enableCropping
+            });
+            
             setCurrentFileIndex(unprocessedIndex);
             
             if (fullConfig.enableCropping && file.needsCropping) {
+              console.log('[useScreenshotManager] ✂️ File needs cropping, showing crop modal...');
               setShowCropModal(true);
             } else {
+              console.log('[useScreenshotManager] ⏭️ File does not need cropping, marking as processed...');
               // Mark as processed directly without cropping
               setFilesToProcess(prev => 
-                prev.map(f => f.id === file.id ? { ...f, needsCropping: false, isProcessed: true } : f)
+                prev.map(f => {
+                  if (f.id === file.id) {
+                    console.log('[useScreenshotManager] ✅ Auto-marking file as processed:', f.originalFile.name);
+                    return { ...f, needsCropping: false, isProcessed: true };
+                  }
+                  return f;
+                })
               );
             }
           } else {
+            console.log('[useScreenshotManager] ✅ No unprocessed files found, setting currentFileIndex to -1');
             setCurrentFileIndex(-1);
           }
         }, 100);
-        return () => clearTimeout(timer);
+        return () => {
+          console.log('[useScreenshotManager] 🧹 Cleaning up auto-processing timer');
+          clearTimeout(timer);
+        };
+      } else {
+        console.log('[useScreenshotManager] ✅ All files processed!');
       }
+    } else {
+      console.log('[useScreenshotManager] ⚠️ Auto-processing skipped:', {
+        reason: processingRef.current ? 'Processing in progress' : 'No files to process'
+      });
     }
   }, [filesToProcess, fullConfig.enableCropping]);
 
@@ -533,6 +657,7 @@ export const useScreenshotManager = (config: ScreenshotManagerConfig): Screensho
     completeCrop,
     skipCrop,
     closeCropModal,
+    cancelCrop,
     
     // Upload to Storage
     uploadToStorage,

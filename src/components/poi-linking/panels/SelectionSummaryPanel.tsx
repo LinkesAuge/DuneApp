@@ -170,6 +170,10 @@ const SelectionSummaryPanel: React.FC<SelectionSummaryPanelProps> = ({
         // Refresh POI data to update link counts
         refreshData();
         
+        // Dispatch global event to refresh all POI displays (maps, cards, etc.)
+        console.log('[SelectionSummaryPanel] 📡 Dispatching global entityLinksUpdated event...');
+        window.dispatchEvent(new CustomEvent('entityLinksUpdated'));
+        
         // Clear selections after successful creation
         setTimeout(() => {
           clearAllSelections();

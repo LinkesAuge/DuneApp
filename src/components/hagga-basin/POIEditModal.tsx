@@ -10,13 +10,13 @@ import type {
 } from '../../types';
 import { formatCoordinates } from '../../lib/coordinates';
 import { useAuth } from '../auth/AuthProvider';
-// Remove old crop modal import
-// import ImageCropModal from '../grid/ImageCropModal';
+// Import ImageCropModal for unified system
+import ImageCropModal from '../grid/ImageCropModal';
 import { PixelCrop, Crop } from 'react-image-crop';
 import CommentsList from '../comments/CommentsList';
 import { getScreenshotLabel } from '../../lib/cropUtils';
 import UserAvatar from '../common/UserAvatar';
-import { uploadPoiScreenshotOriginal, uploadPoiScreenshotCropped } from '../../lib/imageUpload';
+import { uploadPoiScreenshotOriginal, uploadPoiScreenshotCropped, deleteOldCroppedVersion, deleteImage } from '../../lib/imageUpload';
 import { formatConversionStats } from '../../lib/imageUtils';
 import LinkedEntitiesSection from '../poi-linking/LinkedEntitiesSection';
 // Add unified system imports
@@ -82,14 +82,15 @@ const extractStorageFilePathFromUrl = (url: string): string | null => {
   try {
     // Handle both full URLs and relative paths
     const patterns = [
-      // New structure
+      // New simplified structure (current)
+      '/storage/v1/object/public/screenshots/poi_screenshots/',
+      '/storage/v1/object/public/screenshots/poi_cropped/',
+      // Legacy structures (for backward compatibility)
       '/storage/v1/object/public/screenshots/poi_screenshots_original/',
       '/storage/v1/object/public/screenshots/poi_screenshots_cropped/',
+      '/storage/v1/object/public/screenshots/poi_originals/',
       '/storage/v1/object/public/screenshots/comment_screenshots_original/',
       '/storage/v1/object/public/screenshots/comment_screenshots_cropped/',
-      // Legacy structure
-      '/storage/v1/object/public/screenshots/poi_originals/',
-      '/storage/v1/object/public/screenshots/poi_screenshots/',
       '/storage/v1/object/public/screenshots/comment-screenshots/',
       // Generic screenshots
       '/storage/v1/object/public/screenshots/'
@@ -99,21 +100,32 @@ const extractStorageFilePathFromUrl = (url: string): string | null => {
       if (url.includes(pattern)) {
         const parts = url.split(pattern);
         if (parts.length > 1) {
-          // Get the folder name from the pattern and combine with the file path
-          const folderName = pattern.split('/').pop() || '';
-          return folderName ? `${folderName}${parts[1]}` : parts[1];
+          // Get everything after '/screenshots/' from the pattern
+          const afterScreenshots = pattern.split('/screenshots/')[1];
+          if (afterScreenshots) {
+            // Remove trailing slash and return folder + filename
+            const folderName = afterScreenshots.replace(/\/$/, '');
+            console.log(`[extractStorageFilePath] 🎯 Pattern matched: ${pattern} → After screenshots: ${afterScreenshots} → Result: ${folderName}/${parts[1]}`);
+            return `${folderName}/${parts[1]}`;
+          } else {
+            console.log(`[extractStorageFilePath] 🎯 Direct match: ${pattern} → Result: ${parts[1]}`);
+            return parts[1];
+          }
         }
       }
     }
 
     // Handle relative paths
     const relativePatterns = [
+      // New simplified structure (current)
+      '/screenshots/poi_screenshots/',
+      '/screenshots/poi_cropped/',
+      // Legacy structures (for backward compatibility)
       '/screenshots/poi_screenshots_original/',
       '/screenshots/poi_screenshots_cropped/',
+      '/screenshots/poi_originals/',
       '/screenshots/comment_screenshots_original/',
       '/screenshots/comment_screenshots_cropped/',
-      '/screenshots/poi_originals/',
-      '/screenshots/poi_screenshots/',
       '/screenshots/comment-screenshots/',
       '/screenshots/'
     ];
@@ -159,28 +171,23 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
   const [coordinatesX, setCoordinatesX] = useState(poi.coordinates_x || 0);
   const [coordinatesY, setCoordinatesY] = useState(poi.coordinates_y || 0);
   
-  // Replace complex screenshot state with unified system
+  // Unified screenshot system for new uploads
   const screenshotManager = useScreenshotManager({
     context: 'poi',
-    maxFiles: 5,
-    userId: user?.id || '',
-    gridSquareId: poi.grid_square_id || undefined,
-    existingScreenshots: poi.screenshots || []
+    entityId: poi.id,
+    maxFileSize: 5,
+    allowedTypes: ['image/jpeg', 'image/png', 'image/webp'],
+    enableCropping: true
   });
   
   // Keep track of existing screenshots for deletion
   const [existingScreenshots, setExistingScreenshots] = useState<PoiScreenshot[]>(
     poi.screenshots || [] 
   );
-  const [screenshotsToDelete, setScreenshotsToDelete] = useState<string[]>([]);
+
+  const [screenshotsBeingEdited, setScreenshotsBeingEdited] = useState<Map<string, PoiScreenshot>>(new Map());
   
-  // Remove old screenshot state - handled by unified system now
-  // const [additionalScreenshots, setAdditionalScreenshots] = useState<File[]>([]);
-  // const [showCropModal, setShowCropModal] = useState(false);
-  // const [tempImageFile, setTempImageFile] = useState<File | null>(null);
-  // const [tempImageUrl, setTempImageUrl] = useState<string | null>(null);
-  // const [pendingCroppedFiles, setPendingCroppedFiles] = useState<PendingScreenshotFile[]>([]);
-  // const [editingScreenshot, setEditingScreenshot] = useState<PoiScreenshot | null>(null);
+  // No additional screenshot state needed - using unified screenshotManager
   
   // UI state
   const [showDetailedPoiSelection, setShowDetailedPoiSelection] = useState(false);
@@ -344,203 +351,348 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
   });
 
   // Handle existing screenshot deletion
-  const handleDeleteExistingScreenshot = (screenshotId: string) => {
-    setExistingScreenshots(prev => prev.filter(s => s.id !== screenshotId));
-    setScreenshotsToDelete(prev => [...prev, screenshotId]);
-  };
-
-  // Remove old screenshot handling methods - replaced by unified system
-  // const totalScreenshotCount = existingScreenshots.length + additionalScreenshots.length + pendingCroppedFiles.length;
-  // const handleScreenshotUpload = (event: React.ChangeEvent<HTMLInputElement>) => { ... }
-  // const [filesToProcess, setFilesToProcess] = useState<File[]>([]);
-  // const processFilesForCropping = (files: File[]) => { ... }
-
-  // Handle crop completion for NEWLY UPLOADED files
-  const handleCropComplete = async (croppedImageBlob: Blob, cropData: PixelCrop, isFullImage: boolean) => {
-    if (!tempImageFile) return;
+  const handleDeleteExistingScreenshot = async (screenshotId: string) => {
+    const screenshotToDelete = existingScreenshots.find(s => s.id === screenshotId);
+    if (!screenshotToDelete) {
+      setError('Screenshot not found for deletion.');
+      return;
+    }
 
     try {
-      const processedFile = new File([croppedImageBlob], tempImageFile.name, {
-        type: 'image/jpeg',
-        lastModified: Date.now(),
+      console.log('[POIEdit] 🗑️ Deleting screenshot immediately:', screenshotId);
+      console.log('[POIEdit] 🔍 Screenshot data:', {
+        id: screenshotToDelete.id,
+        url: screenshotToDelete.url,
+        original_url: screenshotToDelete.original_url,
+        processed_url: (screenshotToDelete as any).processed_url,
+        crop_details: screenshotToDelete.crop_details
+      });
+      
+      // Delete from storage first (both original and processed if they exist)
+      if (screenshotToDelete.original_url) {
+        const originalPath = extractStorageFilePathFromUrl(screenshotToDelete.original_url);
+        if (originalPath) {
+          await deleteImage('screenshots', originalPath);
+          console.log('[POIEdit] ✅ Deleted original file from storage:', originalPath);
+        }
+      }
+      
+      // Check for processed version (cropped file)
+      // Use processed_url if available, otherwise use url if it's different from original_url
+      const processedUrl = screenshotToDelete.processed_url || 
+                          (screenshotToDelete.url !== screenshotToDelete.original_url ? screenshotToDelete.url : null);
+      
+      if (processedUrl && processedUrl !== screenshotToDelete.original_url) {
+        const processedPath = extractStorageFilePathFromUrl(processedUrl);
+        if (processedPath) {
+          await deleteImage('screenshots', processedPath);
+          console.log('[POIEdit] ✅ Deleted processed file from storage:', processedPath);
+        }
+      }
+      
+      // Delete from database tables
+      // First delete from poi_image_links
+      const { error: linkError } = await supabase
+        .from('poi_image_links')
+        .delete()
+        .eq('image_id', screenshotId);
+      
+      if (linkError) {
+        console.error('[POIEdit] ❌ Error deleting poi_image_links:', linkError);
+        throw new Error('Failed to remove image link');
+      }
+      
+      // Then delete from managed_images (this will cascade)
+      const { error: imageError } = await supabase
+        .from('managed_images')
+        .delete()
+        .eq('id', screenshotId);
+      
+      if (imageError) {
+        console.error('[POIEdit] ❌ Error deleting managed_images:', imageError);
+        throw new Error('Failed to delete image record');
+      }
+      
+      // Remove from UI
+      setExistingScreenshots(prev => prev.filter(s => s.id !== screenshotId));
+      console.log('[POIEdit] ✅ Screenshot deleted successfully:', screenshotId);
+      
+    } catch (error: any) {
+      console.error('[POIEdit] ❌ Error deleting screenshot:', error);
+      setError(error.message || 'Failed to delete screenshot. Please try again.');
+    }
+  };
+
+  // Handle screenshot upload using unified system
+  const handleScreenshotUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    // Use unified system for file processing
+    screenshotManager.uploadFiles(files);
+
+    // Clear the input value to allow re-upload of the same file
+    event.target.value = '';
+  };
+
+  // Calculate total screenshot count using unified system
+  const processedNewScreenshots = screenshotManager.filesToProcess.filter(f => f.isProcessed);
+  const totalScreenshotCount = existingScreenshots.length + processedNewScreenshots.length;
+
+  // Helper function to download existing screenshot and convert to File for editing
+  const downloadScreenshotAsFile = async (screenshot: PoiScreenshot): Promise<File> => {
+    const imageUrl = screenshot.original_url || screenshot.url;
+    if (!imageUrl) {
+      throw new Error('No image URL available for this screenshot.');
+    }
+
+    try {
+      // Download the image
+      const response = await fetch(imageUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to download image: ${response.status} ${response.statusText}`);
+      }
+
+      const blob = await response.blob();
+      
+      // Create a File object with proper naming
+      const fileName = `existing_screenshot_${screenshot.id}_${Date.now()}.jpg`;
+      const file = new File([blob], fileName, { 
+        type: blob.type || 'image/jpeg',
+        lastModified: Date.now() 
       });
 
-      const newPendingFile: PendingScreenshotFile = {
-        id: Date.now().toString(), // Simple unique ID for list key
-        originalFile: tempImageFile, // Preserve the original uploaded file
-        displayFile: processedFile, // Use the cropped version for display
-        cropDetails: isFullImage ? null : cropData,
-        previewUrl: URL.createObjectURL(processedFile)
-      };
-
-      setPendingCroppedFiles(prev => [...prev, newPendingFile]);
-      
-      // Clean up current temp state
-      setShowCropModal(false);
-      setTempImageFile(null);
-      if (tempImageUrl) {
-        URL.revokeObjectURL(tempImageUrl);
-        setTempImageUrl(null);
-      }
-
-      // Process remaining files if any
-      console.log(`[POIEditModal] Crop complete. ${filesToProcess.length} files remaining in queue`);
-      if (filesToProcess.length > 0) {
-        setTimeout(() => {
-          console.log(`[POIEditModal] Processing remaining files from queue:`, filesToProcess.map(f => f.name));
-          processFilesForCropping(filesToProcess);
-          setFilesToProcess([]); // Clear the queue
-        }, 100);
-      }
+      return file;
     } catch (error) {
-      console.error('Error processing cropped image:', error);
-      setError('Failed to process cropped image. Please try again.');
+      console.error('Error downloading screenshot:', error);
+      throw new Error('Failed to download screenshot for editing. Please try again.');
     }
   };
 
-  // Handle skipping crop for a file (use original) - for NEWLY UPLOADED files
-  const handleSkipCrop = () => {
-    if (!tempImageFile) return;
-
-    // Add original file as a pending file with null cropDetails
-    const newPendingFile: PendingScreenshotFile = {
-      id: Date.now().toString(),
-      originalFile: tempImageFile, // Original file
-      displayFile: tempImageFile, // Same as original since no crop
-      cropDetails: null,
-      previewUrl: URL.createObjectURL(tempImageFile)
-    };
-    setPendingCroppedFiles(prev => [...prev, newPendingFile]);
-    
-    // Clean up current temp state
-    setShowCropModal(false);
-    setTempImageFile(null);
-    if (tempImageUrl) {
-      URL.revokeObjectURL(tempImageUrl);
-      setTempImageUrl(null);
-    }
-
-    // Process remaining files if any
-    if (filesToProcess.length > 0) {
-      setTimeout(() => {
-        processFilesForCropping(filesToProcess);
-        setFilesToProcess([]); // Clear the queue
-      }, 100);
-    }
-  };
-
-  // Handle closing crop modal
-  const handleCloseCropModal = () => {
-    setShowCropModal(false);
-    setTempImageFile(null);
-    if (tempImageUrl) {
-      URL.revokeObjectURL(tempImageUrl);
-      setTempImageUrl(null);
-    }
-    setEditingScreenshot(null);
-    setFilesToProcess([]); // Clear any remaining files in queue
-  };
-
-  // Handle editing existing screenshot
-  const handleEditExistingScreenshot = (screenshotId: string) => {
+  // Handle editing existing screenshot using unified system
+  const handleEditExistingScreenshot = async (screenshotId: string) => {
     const screenshotToEdit = existingScreenshots.find(s => s.id === screenshotId);
     if (!screenshotToEdit) {
       setError('Screenshot not found for editing.');
       return;
     }
 
-
-    
-    const imageUrlForCropper = screenshotToEdit.original_url || screenshotToEdit.url;
-    if (!imageUrlForCropper) {
-      setError('No image URL available for cropping this screenshot.');
-      console.error('[POIEditModal] No original_url or url found for screenshot:', screenshotToEdit);
-      return;
+    try {
+      setError(null);
+      
+      // Download and convert existing screenshot to File
+      const file = await downloadScreenshotAsFile(screenshotToEdit);
+      
+      // Add editing metadata to the file object
+      (file as any).isEdit = true;
+      (file as any).editingScreenshotId = screenshotId;
+      (file as any).managedImageId = screenshotId; // In unified system, screenshot ID is managed_images.id
+      (file as any).originalScreenshotUrl = screenshotToEdit.original_url || screenshotToEdit.url; // Use original_url for re-cropping
+      (file as any).originalCropDetails = screenshotToEdit.crop_details;
+      
+      // Track that this screenshot is being edited (for restoration if cancelled)
+      setScreenshotsBeingEdited(prev => new Map(prev.set(screenshotId, screenshotToEdit)));
+      
+      // Add to unified system for processing - this will trigger crop modal
+      screenshotManager.uploadFiles([file]);
+      
+      // Remove from existing screenshots temporarily (will be restored if user cancels)
+      setExistingScreenshots(prev => prev.filter(s => s.id !== screenshotId));
+      
+    } catch (error: any) {
+      console.error('Error starting screenshot edit:', error);
+      setError(error.message || 'Failed to start editing screenshot. Please try again.');
     }
-
-    setEditingScreenshot(screenshotToEdit);
-    setTempImageUrl(imageUrlForCropper);
-    setShowCropModal(true);
-    // initialCrop for the modal will be set in the modal's props directly
   };
 
-  // Handle crop completion for an EXISTING screenshot being EDITED
-  const handleEditCropComplete = async (croppedImageBlob: Blob, cropData: PixelCrop, isFullImage: boolean) => {
-    if (!editingScreenshot) {
-      setError('No screenshot selected for editing crop.');
-      return;
-    }
-
-
-    const processedFile = new File([croppedImageBlob], `poi_screenshot_edited_${editingScreenshot.id}_${Date.now()}.jpg`, {
-      type: 'image/jpeg',
-      lastModified: Date.now(),
-    });
-
-    // For editing existing screenshots, we don't have the original file locally,
-    // so we'll use the processedFile as both original and display for the pending structure
-    // The actual original_url will be preserved from the existing screenshot
-    const newPendingVersion: PendingScreenshotFile = {
-      id: `edited_${editingScreenshot.id}_${Date.now()}`, 
-      originalFile: processedFile, // We don't have access to the true original file
-      displayFile: processedFile, // The new cropped version
-      cropDetails: isFullImage ? null : cropData,
-      previewUrl: URL.createObjectURL(processedFile),
-      originalScreenshotId: editingScreenshot.id,
-      originalScreenshotUrl: editingScreenshot.original_url || editingScreenshot.url // Keep track of the source original
-    };
-
-    setPendingCroppedFiles(prev => [...prev, newPendingVersion]);
-    setExistingScreenshots(prev => prev.filter(s => s.id !== editingScreenshot.id));
-
-    setShowCropModal(false);
-    setTempImageFile(null); 
-    if (tempImageUrl) URL.revokeObjectURL(tempImageUrl); 
-    setTempImageUrl(null);
-    setEditingScreenshot(null);
+  // Remove new screenshot from unified system
+  const removeNewScreenshot = (fileId: string) => {
+    const fileToRemove = screenshotManager.filesToProcess.find(f => f.id === fileId);
     
-  };
-
-  // Remove additional screenshot
-  const removeAdditionalScreenshot = (index: number) => {
-    setAdditionalScreenshots(prev => prev.filter((_, i) => i !== index));
-  };
-
-  // Remove cropped screenshot
-  const removeCroppedScreenshot = (index: number) => {
-    setPendingCroppedFiles(prev => prev.filter((_, i) => i !== index));
-  };
-
-  // Upload additional screenshots to Supabase Storage
-  const uploadAdditionalScreenshots = async (poiId: string): Promise<string[]> => {
-    const allFiles = [...additionalScreenshots, ...pendingCroppedFiles.map(file => file.displayFile)];
-    if (allFiles.length === 0) return [];
-
-    const uploadedUrls: string[] = [];
-
-    for (const file of allFiles) {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${poiId}_${Date.now()}.${fileExt}`;
-      const filePath = `screenshots/${fileName}`;
-
-      const { data, error } = await supabase.storage
-        .from('screenshots')
-        .upload(filePath, file);
-
-      if (error) {
-        console.error('Error uploading screenshot:', error);
-        throw new Error(`Failed to upload screenshot: ${file.name}`);
+    // If this was an edit that's being cancelled, restore the original screenshot FIRST
+    if (fileToRemove) {
+      const fileWithMetadata = fileToRemove.originalFile as any;
+      if (fileWithMetadata?.isEdit && fileWithMetadata?.editingScreenshotId) {
+        console.log('[POIEdit] 🔄 Restoring original screenshot after cancel:', fileWithMetadata.editingScreenshotId);
+        const originalScreenshot = screenshotsBeingEdited.get(fileWithMetadata.editingScreenshotId);
+        if (originalScreenshot) {
+          // Restore the original screenshot
+          setExistingScreenshots(prev => {
+            // Make sure we don't duplicate
+            const filtered = prev.filter(s => s.id !== originalScreenshot.id);
+            return [...filtered, originalScreenshot];
+          });
+          setScreenshotsBeingEdited(prev => {
+            const newMap = new Map(prev);
+            newMap.delete(fileWithMetadata.editingScreenshotId);
+            return newMap;
+          });
+          console.log('[POIEdit] ✅ Original screenshot restored successfully');
+        }
       }
+    }
+    
+    // Now cancel the crop (which removes from queue)
+    screenshotManager.cancelCrop(fileId);
+  };
 
-      // Get public URL
-      const { data: urlData } = supabase.storage
-        .from('screenshots')
-        .getPublicUrl(data.path);
-
-      uploadedUrls.push(urlData.publicUrl);
+  // Upload screenshots using unified system (handles both new and edited)
+  const uploadProcessedScreenshots = async (poiId: string): Promise<void> => {
+    console.log('[POIEdit] 🚀 Starting uploadProcessedScreenshots for POI:', poiId);
+    
+    const processedFiles = screenshotManager.filesToProcess.filter(f => f.isProcessed);
+    console.log('[POIEdit] 📊 Processed files found:', processedFiles.length);
+    
+    if (processedFiles.length === 0) {
+      console.log('[POIEdit] ⚠️ No processed files found, skipping screenshot upload');
+      return;
     }
 
-    return uploadedUrls;
+    for (let index = 0; index < processedFiles.length; index++) {
+      const file = processedFiles[index];
+      console.log('[POIEdit] 🔄 Processing file:', file.originalFile.name);
+      
+      try {
+        // Check if this is an edit of an existing screenshot
+        const fileWithMetadata = file.originalFile as any;
+        const isEdit = fileWithMetadata?.isEdit;
+        
+        if (isEdit) {
+          // EDITING EXISTING SCREENSHOT - Update managed_images record
+          console.log('[POIEdit] ✏️ Editing existing screenshot:', fileWithMetadata.editingScreenshotId);
+          
+          const wasActuallyCropped = file.wasActuallyCropped;
+          const existingOriginalUrl = fileWithMetadata.originalScreenshotUrl;
+          
+          let processedUrl: string | null = null;
+          
+          if (wasActuallyCropped) {
+            // User wants new crop - upload cropped version
+            const timestamp = Date.now();
+            const fileExt = file.originalFile.name.split('.').pop() || 'jpg';
+            const baseFileName = `${poiId}_${timestamp}.${fileExt}`;
+            
+            await deleteOldCroppedVersion(existingOriginalUrl);
+            const croppedUpload = await uploadPoiScreenshotCropped(file.displayFile, baseFileName);
+            processedUrl = croppedUpload.url;
+            console.log('[POIEdit] ✂️ Cropped upload complete:', croppedUpload);
+          } else {
+            // User wants full image - remove any existing cropped version
+            await deleteOldCroppedVersion(existingOriginalUrl);
+            processedUrl = null; // No processed version, use original
+            console.log('[POIEdit] 📏 Using full image, removed any existing crop');
+          }
+          
+          // Update the managed_images record
+          const { error: updateError } = await supabase
+            .from('managed_images')
+            .update({
+              processed_url: processedUrl,
+              crop_details: wasActuallyCropped ? (file.cropData || null) : null
+              // updated_at is automatically handled by database trigger
+            })
+            .eq('id', fileWithMetadata.managedImageId);
+
+          if (updateError) {
+            console.error('[POIEdit] ❌ Error updating managed image:', updateError);
+            throw new Error('Failed to update existing screenshot');
+          }
+          
+          console.log('[POIEdit] ✅ Existing screenshot updated successfully');
+          
+        } else {
+          // NEW SCREENSHOT UPLOAD - Same as POIPlacementModal
+          console.log('[POIEdit] 🆕 Adding new screenshot');
+          
+          const timestamp = Date.now();
+          const fileExt = file.originalFile.name.split('.').pop() || 'jpg';
+          const baseFileName = `${poiId}_${timestamp}.${fileExt}`;
+          
+          // Step 1: Upload original version to poi_screenshots/
+          console.log('[POIEdit] ⬆️ Step 1: Uploading original file...');
+          const originalUpload = await uploadPoiScreenshotOriginal(file.originalFile, baseFileName);
+          let originalUrl = originalUpload.url;
+          console.log('[POIEdit] ✅ Original upload complete:', originalUrl);
+          
+          // Step 2: Check if actual cropping was performed
+          const wasActuallyCropped = file.wasActuallyCropped;
+          let processedUrl: string | null = null;
+          
+          if (wasActuallyCropped) {
+            console.log('[POIEdit] ✂️ Step 2: Actual cropping detected, uploading cropped version...');
+            const croppedUpload = await uploadPoiScreenshotCropped(file.displayFile, baseFileName);
+            processedUrl = croppedUpload.url;
+            console.log('[POIEdit] ✅ Cropped upload complete:', croppedUpload);
+          } else {
+            console.log('[POIEdit] 📏 Step 2: No cropping performed, using original as display version...');
+          }
+          
+          // Step 3: Insert into managed_images table
+          console.log('[POIEdit] 🗄️ Step 3: Inserting into managed_images...', {
+            original_url: originalUrl,
+            processed_url: processedUrl,
+            crop_details: wasActuallyCropped ? (file.cropData || null) : null,
+            image_type: 'poi_screenshot',
+            uploaded_by: user?.id
+          });
+          
+          const { data: managedImage, error: imageError } = await supabase
+            .from('managed_images')
+            .insert({
+              original_url: originalUrl,
+              processed_url: processedUrl,
+              crop_details: wasActuallyCropped ? (file.cropData || null) : null,
+              image_type: 'poi_screenshot',
+              uploaded_by: user?.id
+            })
+            .select()
+            .single();
+
+          if (imageError) {
+            console.error('[POIEdit] ❌ Error saving managed image:', imageError);
+            throw new Error('Failed to save image to database');
+          }
+
+          console.log('[POIEdit] ✅ Managed image saved:', managedImage);
+
+          // Step 4: Link image to POI in poi_image_links table
+          const existingLinksCount = await supabase
+            .from('poi_image_links')
+            .select('display_order')
+            .eq('poi_id', poiId)
+            .order('display_order', { ascending: false })
+            .limit(1);
+          
+          const nextDisplayOrder = (existingLinksCount.data?.[0]?.display_order ?? -1) + 1;
+          
+          console.log('[POIEdit] 🔗 Step 4: Linking image to POI...', {
+            poi_id: poiId,
+            image_id: managedImage.id,
+            display_order: nextDisplayOrder
+          });
+          
+          const { error: linkError } = await supabase
+            .from('poi_image_links')
+            .insert({
+              poi_id: poiId,
+              image_id: managedImage.id,
+              display_order: nextDisplayOrder
+            });
+
+          if (linkError) {
+            console.error('[POIEdit] ❌ Error linking image to POI:', linkError);
+            throw new Error('Failed to link image to POI');
+          }
+
+          console.log('[POIEdit] ✅ Image linked to POI successfully');
+        }
+      } catch (error) {
+        console.error('[POIEdit] ❌ Error uploading screenshot:', error);
+        throw new Error(`Failed to upload screenshot: ${file.originalFile.name}`);
+      }
+    }
+    
+    console.log('[POIEdit] 🎉 All screenshots processed and saved successfully!');
   };
 
   // Handle form submission
@@ -571,82 +723,11 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
     };
 
     try {
-      // 1. Upload NEW screenshots (those without originalScreenshotId)
-      const newUploadedScreenshotObjects: PoiScreenshot[] = [];
-      const filesToUploadActuallyNew = pendingCroppedFiles.filter(pf => !pf.originalScreenshotId);
-      
-      for (const pendingFile of filesToUploadActuallyNew) {
-        const newScreenshotId = crypto.randomUUID();
-        const fileExt = pendingFile.displayFile.name.split('.').pop() || 'jpg';
-        
-        // Upload original file with WebP conversion
-        const originalFileName = `${poi.id}/${newScreenshotId}_original.webp`;
-        const originalUploadResult = await uploadPoiScreenshotOriginal(pendingFile.originalFile, originalFileName);
+      // 1. Upload new/edited screenshots using unified system
+      console.log('[POIEdit] 📸 Processing screenshot uploads...');
+      await uploadProcessedScreenshots(poi.id);
 
-        // Upload display file (cropped or same as original) with WebP conversion
-        const displayFileName = `${poi.id}/${newScreenshotId}_display.webp`;
-        const displayUploadResult = await uploadPoiScreenshotCropped(pendingFile.displayFile, displayFileName);
-        
-        // Show conversion feedback for the first upload
-        if (filesToUploadActuallyNew[0] === pendingFile && displayUploadResult.compressionRatio) {
-          const stats = formatConversionStats(displayUploadResult);
-          setConversionStats(stats);
-        }
-
-        newUploadedScreenshotObjects.push({
-          id: newScreenshotId, 
-          url: displayUploadResult.url, // Display URL (cropped or original)
-          original_url: originalUploadResult.url, // Original URL
-          crop_details: pendingFile.cropDetails, // Store the crop data
-          uploaded_by: user!.id,
-          upload_date: new Date().toISOString(),
-        });
-      }
-
-      // 2. Handle EDITED screenshots (those with originalScreenshotId)
-      const editedScreenshotObjects: PoiScreenshot[] = [];
-      const urlsOfOldDisplayFilesToDelete: string[] = [];
-
-      const filesToUploadAsEdits = pendingCroppedFiles.filter(pf => pf.originalScreenshotId && pf.originalScreenshotUrl);
-      for (const pendingVersion of filesToUploadAsEdits) {
-        const displayFileName = `${poi.id}/edited_${pendingVersion.originalScreenshotId}_${Date.now()}.webp`;
-        
-        // Upload display file with WebP conversion
-        const displayUploadResult = await uploadPoiScreenshotCropped(pendingVersion.displayFile, displayFileName);
-        
-        editedScreenshotObjects.push({
-          id: pendingVersion.originalScreenshotId!, 
-          url: displayUploadResult.url, 
-          original_url: pendingVersion.originalScreenshotUrl, // Preserve the original source URL
-          crop_details: pendingVersion.cropDetails, // The new crop details
-          uploaded_by: user!.id, // Should be updated_by for edits
-          upload_date: poi.screenshots.find(s=>s.id === pendingVersion.originalScreenshotId!)?.upload_date || new Date().toISOString(),
-          updated_by: user!.id,
-          updated_at: new Date().toISOString(),
-        });
-        // The old DISPLAY URL of the screenshot that was re-cropped
-        const oldScreenshotInstance = poi.screenshots.find(s => s.id === pendingVersion.originalScreenshotId!)
-        if(oldScreenshotInstance && oldScreenshotInstance.url) {
-             urlsOfOldDisplayFilesToDelete.push(oldScreenshotInstance.url);
-        }
-      }
-
-      // 3. Construct the final poi.screenshots array
-      let finalScreenshotsArray: PoiScreenshot[] = poi.screenshots?.map(s => ({ ...s })) || [];
-      finalScreenshotsArray = finalScreenshotsArray.filter(s => !screenshotsToDelete.includes(s.id));
-
-      finalScreenshotsArray = finalScreenshotsArray.map(s => {
-        const editedVersion = editedScreenshotObjects.find(es => es.id === s.id);
-        if (editedVersion) {
-          return editedVersion; // Replace with the full new object including new url, crop_details, original_url
-        }
-        return s;
-      });
-
-      finalScreenshotsArray.push(...newUploadedScreenshotObjects);
-      updatedPoiData.screenshots = finalScreenshotsArray;
-
-      // 4. Update the POI record in the database
+      // 4. Update the POI record in the database (excluding screenshots)
       const { data: updatedPoi, error: updateError } = await supabase
         .from('pois')
         .update(updatedPoiData)
@@ -713,48 +794,43 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
         }
       }
 
-      // 6. Delete files from storage
-      // These are: 
-      //    - original URLs of screenshots explicitly marked for deletion (screenshotsToDelete translates to URLs)
-      //    - old CROPPED URLs of screenshots that were re-cropped (urlsOfOldCroppedFilesToDelete)
-      
-      const urlsOfExplicitlyDeletedScreenshots = screenshotsToDelete.map(idToDelete => {
-        // Find the screenshot in the *original* poi.screenshots to get its URL for deletion
-        const originalPoiScreenshot = poi.screenshots?.find(s => s.id === idToDelete);
-        // We need to decide if we delete the original_url or the display url, or both.
-        // For now, deleting the display url. If original_url is different and also needs deletion, that's more complex.
-        return originalPoiScreenshot?.url; 
-      }).filter(url => !!url) as string[];
+      // 3. Fetch updated POI data with screenshots from unified system
+      console.log('[POIEdit] 🔄 Fetching updated POI data...');
+      const { data: updatedPoiWithScreenshots, error: fetchError } = await supabase
+        .from('pois')
+        .select(`
+          *,
+          poi_types (*),
+          profiles!pois_created_by_fkey (username),
+          poi_image_links (
+            managed_images (
+              id,
+              original_url,
+              processed_url,
+              crop_details,
+              uploaded_by,
+              created_at
+            )
+          )
+        `)
+        .eq('id', poi.id)
+        .single();
 
-      const allUrlsToDeleteFromStorage = [
-        ...urlsOfExplicitlyDeletedScreenshots,
-        ...urlsOfOldDisplayFilesToDelete
-      ];
-
-      if (allUrlsToDeleteFromStorage.length > 0) {
-        // Extract path from full URL for Supabase delete using the enhanced path extraction
-        const pathsToDelete = allUrlsToDeleteFromStorage.map(url => {
-          try {
-            // Use the same extraction logic as in the API
-            return extractStorageFilePathFromUrl(url);
-          } catch (e) {
-            console.error(`Invalid URL for deletion: ${url}`, e);
-            return null;
-          }
-        }).filter(path => !!path) as string[];
-        
-        if (pathsToDelete.length > 0) {
-    
-          const { error: deleteError } = await supabase.storage.from('screenshots').remove(pathsToDelete);
-          if (deleteError) {
-            // Log delete error but don't necessarily throw, as POI update was successful
-            console.error('[POIEditModal] Error deleting files from storage:', deleteError);
-            setError(prevError => prevError ? `${prevError}. Some old screenshots might not have been deleted.` : 'POI updated, but some old screenshots might not have been deleted.')
-          }
-        }
+      if (fetchError) {
+        console.error('[POIEdit] ❌ Error fetching updated POI:', fetchError);
+        // Continue with basic updated POI data
       }
 
-      onPoiUpdated(updatedPoi);
+      // 3. Clear processing queues and notify parent
+      console.log('[POIEdit] 🧹 Clearing processing queues...');
+      screenshotManager.clearProcessingQueue();
+      setScreenshotsBeingEdited(new Map());
+      
+      // Use updated POI data with screenshots if available, otherwise use basic updated data
+      const finalPoiData = updatedPoiWithScreenshots || updatedPoi;
+      console.log('[POIEdit] 📤 Calling onPoiUpdated with:', finalPoiData);
+      
+      onPoiUpdated(finalPoiData);
       onClose();
     } catch (err: any) {
       console.error('Error submitting POI edits:', err);
@@ -1205,52 +1281,50 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
                     </div>
                   ))}
 
-                  {/* New Screenshots to Upload (Original) */}
-                  {additionalScreenshots.map((file, index) => (
+                  {/* New Screenshots from Unified System */}
+                  {screenshotManager.filesToProcess.map((file) => (
                     <div 
-                      key={`new-${index}`}
-                      className="w-20 h-20 relative rounded overflow-hidden border border-slate-600"
+                      key={file.id}
+                      className={`w-20 h-20 relative rounded overflow-hidden border ${
+                        file.isProcessed ? 'border-green-300' : 'border-slate-600'
+                      }`}
                     >
                       <img 
-                        src={URL.createObjectURL(file)} 
+                        src={file.preview} 
                         alt="New Screenshot" 
                         className="w-full h-full object-cover"
                       />
                       <button
                         type="button"
-                        onClick={() => removeAdditionalScreenshot(index)}
+                        onClick={() => removeNewScreenshot(file.id)}
                         className="absolute top-0 right-0 bg-red-600 text-white w-5 h-5 flex items-center justify-center rounded-bl-md hover:bg-red-700 transition-colors"
                         title="Remove screenshot"
                       >
                         <X className="w-3 h-3" />
                       </button>
                       <div className="absolute bottom-1 left-1">
-                        <span className="bg-green-600 text-white text-xs px-1 rounded">New (Full)</span>
-                      </div>
-                    </div>
-                  ))}
-
-                  {/* Cropped Screenshots to Upload */}
-                  {pendingCroppedFiles.map((file, index) => (
-                    <div 
-                      key={`cropped-${index}`}
-                      className="w-20 h-20 relative rounded overflow-hidden border border-green-300"
-                    >
-                      <img 
-                        src={file.previewUrl} 
-                        alt="Cropped Screenshot" 
-                        className="w-full h-full object-cover"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => removeCroppedScreenshot(index)}
-                        className="absolute top-0 right-0 bg-red-600 text-white w-5 h-5 flex items-center justify-center rounded-bl-md hover:bg-red-700 transition-colors"
-                        title="Remove cropped screenshot"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                      <div className="absolute bottom-1 left-1">
-                        <span className="bg-green-600 text-white text-xs px-1 rounded">New (Cropped)</span>
+                        <span className={`text-white text-xs px-1 rounded ${
+                          file.isProcessed 
+                            ? file.wasActuallyCropped 
+                              ? 'bg-green-600' 
+                              : 'bg-blue-600'
+                            : 'bg-orange-600'
+                        }`}>
+                          {(() => {
+                            const fileWithMetadata = file.originalFile as any;
+                            const isEdit = fileWithMetadata?.isEdit;
+                            
+                            if (!file.isProcessed) {
+                              return 'Processing...';
+                            }
+                            
+                            if (isEdit) {
+                              return file.wasActuallyCropped ? 'Edit (Cropped)' : 'Edit (Full)';
+                            }
+                            
+                            return file.wasActuallyCropped ? 'New (Cropped)' : 'New (Full)';
+                          })()}
+                        </span>
                       </div>
                     </div>
                   ))}
@@ -1361,18 +1435,15 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
         </div>
       </div>
 
-      {/* Image Crop Modal */}
-      {showCropModal && tempImageUrl && (
+      {/* Image Crop Modal - Unified System */}
+      {screenshotManager.showCropModal && screenshotManager.currentCropFile && (
         <ImageCropModal
-          imageUrl={tempImageUrl}
-          onCropComplete={editingScreenshot ? handleEditCropComplete : handleCropComplete}
-          onClose={handleCloseCropModal}
-          title={editingScreenshot ? "Edit POI Screenshot" : "Crop New POI Screenshot"}
+          imageUrl={screenshotManager.currentCropFile.preview}
+          onCropComplete={screenshotManager.completeCrop}
+          onSkip={screenshotManager.skipCrop}
+                        onClose={screenshotManager.cancelCrop}
+          title="Crop POI Screenshot"
           defaultToSquare={false}
-          initialCrop={editingScreenshot && editingScreenshot.crop_details 
-            ? { ...editingScreenshot.crop_details, unit: 'px' } 
-            : undefined
-          }
         />
       )}
     </div>

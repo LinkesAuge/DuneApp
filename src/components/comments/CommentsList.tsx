@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { CommentWithUser } from '../../types';
+import { CommentWithImages } from '../../types/unified-images';
 import { MessageSquare, ChevronDown, ChevronUp } from 'lucide-react';
 import CommentItem from './CommentItem';
 import CommentForm from './CommentForm';
@@ -27,7 +27,7 @@ const CommentsList: React.FC<CommentsListProps> = ({
   likeTargetId,
   onShouldNavigate
 }) => {
-  const [comments, setComments] = useState<CommentWithUser[]>([]);
+  const [comments, setComments] = useState<CommentWithImages[]>([]);
   const [commentCount, setCommentCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -68,17 +68,19 @@ const CommentsList: React.FC<CommentsListProps> = ({
         .select(`
           *,
           user:profiles(username),
-          screenshots:comment_screenshots(
-            id,
-            url,
-            original_url,
-            crop_details,
-            uploaded_by,
-            upload_date,
-            updated_by,
-            updated_at,
-            file_size,
-            file_name
+          images:comment_image_links(
+            managed_images(
+              id,
+              original_url,
+              processed_url,
+              crop_details,
+              uploaded_by,
+              created_at,
+              updated_at,
+              file_size,
+              dimensions,
+              mime_type
+            )
           )
         `)
         .order('created_at', { ascending: true });

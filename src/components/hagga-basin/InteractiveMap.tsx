@@ -40,6 +40,8 @@ interface InteractiveMapProps {
   onPoiClick?: (poi: Poi) => void;
   // Map type support
   mapType?: 'hagga_basin' | 'deep_desert';
+  // Entity links refresh trigger
+  entityLinksRefreshTrigger?: number;
 }
 
 // Map configuration for zoom/pan (initialScale will be set dynamically)
@@ -88,7 +90,8 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
   selectionMode = false,
   selectedPoiIds = new Set(),
   onPoiClick,
-  mapType = 'hagga_basin'
+  mapType = 'hagga_basin',
+  entityLinksRefreshTrigger
 }) => {
   const transformRef = useRef<ReactZoomPanPinchRef | null>(null);
   const mapElementRef = useRef<HTMLDivElement | null>(null);
@@ -392,6 +395,7 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
                     isHighlighted={highlightedPoiId === poi.id}
                     selectionMode={selectionMode}
                     isSelected={selectedPoiIds.has(poi.id)}
+                    entityLinksRefreshTrigger={entityLinksRefreshTrigger}
                   />
                 </div>
               );

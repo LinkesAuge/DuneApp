@@ -20,7 +20,9 @@ import { SharedImagesTest } from './pages/SharedImagesTest';
 import { AlertTriangle } from 'lucide-react';
 import ItemDetailPage from './pages/ItemDetailPage';
 import SchematicDetailPage from './pages/SchematicDetailPage';
+
 import { POILinksTest } from './components/test/POILinksTest';
+
 
 
 const PendingApprovalMessage: React.FC = () => (
@@ -145,6 +147,7 @@ const AppRoutes: React.FC = () => {
           </ProtectedRoute>
         } 
       />
+
       <Route 
         path="/poi-linking" 
         element={
@@ -229,6 +232,7 @@ function App() {
           <main className="flex-1">
             <AppRoutes />
           </main>
+
         </div>
       </Router>
     </AuthProvider>
