@@ -1,5 +1,5 @@
 import React, { ReactNode } from 'react';
-import { Filter, Plus, Settings, Eye, Lock, Users, Edit, ChevronRight, FolderOpen } from 'lucide-react';
+import { Filter, Plus, Settings, Eye, Lock, Users, Edit, ChevronRight, FolderOpen, Check } from 'lucide-react';
 import { Poi, PoiType } from '../../types';
 import { isIconUrl, getDisplayImageUrlFromIcon } from '../../lib/helpers';
 
@@ -229,70 +229,29 @@ const MapControlPanel: React.FC<MapControlPanelProps> = ({
 
         {showPanel && (
           <>
-            {/* Enhanced Tab Navigation with Navbar-style Effects */}
-            <div className="flex mt-4 space-x-1 px-4">
+            {/* Tab Navigation - matching poi-linking page style */}
+            <div className="flex border-b border-slate-600 mt-4">
               <button
                 onClick={() => onActiveTabChange('filters')}
-                className={`relative px-4 py-3 text-sm font-light transition-all duration-700 group overflow-hidden ${
-                  activeTab === 'filters' 
-                    ? 'text-amber-200' 
-                    : 'text-amber-300/70 hover:text-amber-200'
+                className={`flex-1 py-3 px-4 text-sm font-medium transition-all duration-200 ${
+                  activeTab === 'filters'
+                    ? 'tab-active bg-amber-600/20 text-amber-200 border-b-2 border-amber-400'
+                    : 'tab-inactive text-amber-300/80 hover:text-amber-200'
                 }`}
-                style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
               >
-                {/* Background layers for active state */}
-                {activeTab === 'filters' && (
-                  <>
-                    <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900" />
-                    <div className="absolute inset-0 bg-gradient-to-b from-slate-950/90 via-slate-900/80 to-slate-800/60" />
-                  </>
-                )}
-                
-                {/* Interactive purple overlay */}
-                <div className="absolute inset-0 bg-gradient-to-r from-violet-600/20 via-violet-500/10 to-violet-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                
-                <div className="relative z-10 flex items-center tracking-wide">
-                  <Filter className="w-4 h-4 inline mr-2" />
-                  Filters
-                </div>
-                
-                {/* Expanding underline */}
-                <div className={`absolute bottom-0 left-0 h-0.5 bg-gradient-to-r from-transparent via-amber-400 to-transparent transition-all duration-700 ${
-                  activeTab === 'filters' ? 'w-full' : 'w-0 group-hover:w-full'
-                }`} />
+                <Filter className="w-4 h-4 inline mr-2" />
+                Filters
               </button>
-              
-
-              
               <button
                 onClick={() => onActiveTabChange('layers')}
-                className={`relative px-4 py-3 text-sm font-light transition-all duration-700 group overflow-hidden ${
-                  activeTab === 'layers' 
-                    ? 'text-amber-200' 
-                    : 'text-amber-300/70 hover:text-amber-200'
+                className={`flex-1 py-3 px-4 text-sm font-medium transition-all duration-200 ${
+                  activeTab === 'layers'
+                    ? 'tab-active bg-amber-600/20 text-amber-200 border-b-2 border-amber-400'
+                    : 'tab-inactive text-amber-300/80 hover:text-amber-200'
                 }`}
-                style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
               >
-                {/* Background layers for active state */}
-                {activeTab === 'layers' && (
-                  <>
-                    <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900" />
-                    <div className="absolute inset-0 bg-gradient-to-b from-slate-950/90 via-slate-900/80 to-slate-800/60" />
-                  </>
-                )}
-                
-                {/* Interactive purple overlay */}
-                <div className="absolute inset-0 bg-gradient-to-r from-violet-600/20 via-violet-500/10 to-violet-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                
-                <div className="relative z-10 flex items-center tracking-wide">
-                  <Settings className="w-4 h-4 inline mr-2" />
-                  Layers
-                </div>
-                
-                {/* Expanding underline */}
-                <div className={`absolute bottom-0 left-0 h-0.5 bg-gradient-to-r from-transparent via-amber-400 to-transparent transition-all duration-700 ${
-                  activeTab === 'layers' ? 'w-full' : 'w-0 group-hover:w-full'
-                }`} />
+                <Settings className="w-4 h-4 inline mr-2" />
+                Layers
               </button>
             </div>
 
@@ -301,65 +260,14 @@ const MapControlPanel: React.FC<MapControlPanelProps> = ({
               {/* Filters Tab */}
               {activeTab === 'filters' && (
                 <div className="space-y-4">
-                  {/* Add POI Button - Elegant hexagonal style inspired by landing page */}
+                  {/* Create POI Button - matching poi-linking page style */}
                   <div className="flex justify-center mb-4">
                     <button
                       onClick={onAddPOI}
-                      className="group relative inline-flex items-center justify-center h-12 px-6 min-w-[140px] transition-all duration-300 overflow-hidden"
-                      style={{ 
-                        clipPath: "polygon(12px 0%, calc(100% - 12px) 0%, 100% 50%, calc(100% - 12px) 100%, 12px 100%, 0% 50%)",
-                        fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif"
-                      }}
-                      onMouseEnter={(e) => {
-                        const purpleOverlay = e.currentTarget.querySelector('.purple-overlay') as HTMLElement;
-                        if (purpleOverlay) {
-                          purpleOverlay.style.background = 'radial-gradient(ellipse at center top, rgba(139, 92, 246, 0.15) 0%, rgba(124, 58, 237, 0.08) 40%, transparent 70%)';
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        const purpleOverlay = e.currentTarget.querySelector('.purple-overlay') as HTMLElement;
-                        if (purpleOverlay) {
-                          purpleOverlay.style.background = 'radial-gradient(ellipse at center top, rgba(139, 92, 246, 0) 0%, rgba(124, 58, 237, 0) 40%, transparent 70%)';
-                        }
-                      }}
+                      className="flex items-center space-x-2 px-6 py-2.5 rounded-lg font-medium transition-all duration-200 bg-amber-600 hover:bg-amber-700 text-white shadow-lg hover:shadow-amber-600/25 transform hover:scale-[1.02]"
                     >
-                      {/* Dark background */}
-                      <div 
-                        className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950"
-                        style={{ clipPath: "polygon(12px 0%, calc(100% - 12px) 0%, 100% 50%, calc(100% - 12px) 100%, 12px 100%, 0% 50%)" }}
-                      />
-                      
-                      {/* Amber border */}
-                      <div 
-                        className="absolute inset-0 bg-gradient-to-r from-amber-400/70 via-amber-300/90 to-amber-400/70 group-hover:from-amber-300/90 group-hover:via-amber-200/100 group-hover:to-amber-300/90 transition-all duration-300"
-                        style={{
-                          clipPath: "polygon(12px 0%, calc(100% - 12px) 0%, 100% 50%, calc(100% - 12px) 100%, 12px 100%, 0% 50%)",
-                          padding: '1px'
-                        }}
-                      />
-                      
-                      {/* Inner background */}
-                      <div 
-                        className="absolute inset-0.5 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950"
-                        style={{ clipPath: "polygon(12px 0%, calc(100% - 12px) 0%, 100% 50%, calc(100% - 12px) 100%, 12px 100%, 0% 50%)" }}
-                      />
-                      
-                      {/* Purple hover overlay */}
-                      <div 
-                        className="absolute inset-0.5 transition-all duration-300 purple-overlay"
-                        style={{
-                          clipPath: "polygon(12px 0%, calc(100% - 12px) 0%, 100% 50%, calc(100% - 12px) 100%, 12px 100%, 0% 50%)",
-                          background: 'radial-gradient(ellipse at center top, rgba(139, 92, 246, 0) 0%, rgba(124, 58, 237, 0) 40%, transparent 70%)'
-                        }}
-                      />
-                      
-                      {/* Content */}
-                      <div className="relative z-10 flex items-center space-x-2">
-                        <Plus className="w-4 h-4 text-amber-300 group-hover:text-amber-100 transition-all duration-300" />
-                        <span className="text-sm font-light uppercase tracking-wide text-amber-200 group-hover:text-amber-50 transition-all duration-300">
-                          Add POI
-                        </span>
-                      </div>
+                      <Check className="w-4 h-4" />
+                      <span>Create POI</span>
                     </button>
                   </div>
 

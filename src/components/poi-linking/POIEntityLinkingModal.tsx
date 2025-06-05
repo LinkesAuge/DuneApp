@@ -4,6 +4,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { Search, Plus, Package, FileText, X, LinkIcon, Loader2, Check } from 'lucide-react';
+import FeedbackModal from '../shared/FeedbackModal';
 import { EntityWithRelations } from '../../types/unified-entities';
 import { useTiers } from '../../hooks/useTiers';
 import { usePagination } from '../../hooks/usePagination';
@@ -51,6 +52,12 @@ const POIEntityLinkingModal: React.FC<POIEntityLinkingModalProps> = ({
   // Entity link data
   const [entityLinks, setEntityLinks] = useState<Map<string, EntityLinkData>>(new Map());
   
+  // Feedback modal state
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [feedbackType, setFeedbackType] = useState<'success' | 'error'>('success');
+  const [feedbackTitle, setFeedbackTitle] = useState('');
+  const [feedbackMessage, setFeedbackMessage] = useState('');
+  
   // Derived data
   const categories = useMemo(() => {
     const cats = Array.from(new Set(entities.map(e => e.category?.name).filter(Boolean))).sort();
@@ -72,10 +79,7 @@ const POIEntityLinkingModal: React.FC<POIEntityLinkingModalProps> = ({
     }
   }, [isOpen]);
 
-  // Debug: Log when modal opens/closes
-  useEffect(() => {
-    console.log('POIEntityLinkingModal: isOpen changed to:', isOpen);
-  }, [isOpen]);
+
 
   // Reset filters when modal closes
   useEffect(() => {
@@ -192,15 +196,24 @@ const POIEntityLinkingModal: React.FC<POIEntityLinkingModalProps> = ({
         return poiEntityLinksAPI.linkEntityToPOI(createData, user?.id);
       });
 
-      await Promise.all(linkPromises);
+      const results = await Promise.all(linkPromises);
       
-      // Notify parent component of updates
-      onLinksUpdated?.();
+      // Show success feedback
+      const linkCount = entityLinks.size;
+      setFeedbackType('success');
+      setFeedbackTitle('Links Created Successfully!');
+      setFeedbackMessage(`Successfully linked ${linkCount} ${linkCount === 1 ? 'item' : 'items'} to "${poiTitle}".`);
+      setShowFeedback(true);
       
-      // Close modal
-      onClose();
+      // Don't call onLinksUpdated here - wait until modal closes to avoid race conditions
     } catch (error) {
       console.error('Failed to create entity links:', error);
+      
+      // Show error feedback
+      setFeedbackType('error');
+      setFeedbackTitle('Failed to Create Links');
+      setFeedbackMessage(`Failed to link items to "${poiTitle}". Please try again.`);
+      setShowFeedback(true);
     } finally {
       setSubmitting(false);
     }
@@ -289,7 +302,7 @@ const POIEntityLinkingModal: React.FC<POIEntityLinkingModalProps> = ({
               className="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-amber-100 text-sm focus:outline-none focus:border-amber-500"
               disabled={!selectedCategory}
             >
-              <option value="">All Subtypes</option>
+              <option value="">All Types</option>
               {types.map(type => (
                 <option key={type} value={type}>{type}</option>
               ))}
@@ -419,9 +432,7 @@ const POIEntityLinkingModal: React.FC<POIEntityLinkingModalProps> = ({
                       <div>
                         {typeof entity.category === 'object' ? entity.category?.name : entity.category || 'Unknown Category'} → {typeof entity.type === 'object' ? entity.type?.name : entity.type || 'Unknown Type'}
                       </div>
-                      {entity.subtype && (
-                        <div>Subtype: {typeof entity.subtype === 'object' ? entity.subtype?.name : entity.subtype}</div>
-                      )}
+
                     </div>
 
                     {/* Remove Button (if selected) */}
@@ -500,6 +511,24 @@ const POIEntityLinkingModal: React.FC<POIEntityLinkingModalProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Feedback Modal */}
+      <FeedbackModal
+        isOpen={showFeedback}
+        onClose={() => {
+          setShowFeedback(false);
+          // For successful operations, notify parent and close the main modal
+          if (feedbackType === 'success') {
+            // Call onLinksUpdated AFTER user confirms success to avoid race conditions
+            onLinksUpdated?.();
+            onClose();
+          }
+        }}
+        type={feedbackType}
+        title={feedbackTitle}
+        message={feedbackMessage}
+        autoCloseDelay={feedbackType === 'success' ? 2000 : 0}
+      />
     </div>,
     document.body
   );

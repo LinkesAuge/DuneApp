@@ -2,13 +2,12 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../components/auth/AuthProvider';
 import { entitiesAPI } from '../lib/api/entities';
 // Note: Legacy category hierarchy APIs not needed in unified system
-// import { categoryHierarchyAPI, categoriesAPI, typesAPI, subtypesAPI } from '../lib/api/categories';
+// import { categoryHierarchyAPI, categoriesAPI, typesAPI } from '../lib/api/categories';
 import type { 
   Entity, 
   EntityWithRelations,
   Category,
   Type,
-  Subtype,
   Tier, 
   EntityFilters
 } from '../types/unified-entities';
@@ -20,7 +19,6 @@ interface ItemsSchematicsState {
   tiers: Tier[];
   categories: Category[];
   types: Type[];
-  subtypes: Subtype[];
   
   // Derived data
   items: EntityWithRelations[];
@@ -32,7 +30,6 @@ interface ItemsSchematicsState {
     tiers: boolean;
     categories: boolean;
     types: boolean;
-    subtypes: boolean;
     items: boolean;
     schematics: boolean;
   };
@@ -43,7 +40,6 @@ interface ItemsSchematicsState {
     tiers: string | null;
     categories: string | null;
     types: string | null;
-    subtypes: string | null;
     items: string | null;
     schematics: string | null;
   };
@@ -61,7 +57,6 @@ interface UseItemsSchematicsReturn extends ItemsSchematicsState {
   refetchSchematics: () => Promise<void>;
   
   // Legacy compatibility functions
-  refetchSubtypes: (typeId: string) => Promise<void>;
   refetchFieldDefinitions: () => Promise<void>;
   refetchDropdownGroups: () => Promise<void>;
   
@@ -87,12 +82,11 @@ interface UseItemsSchematicsReturn extends ItemsSchematicsState {
   getSchematicById: (id: string) => Entity | undefined;
   getCategoryById: (id: string) => any | undefined;
   getTypeById: (id: string) => any | undefined;
-  getSubtypeById: (id: string) => any | undefined;
   getTierById: (id: string) => Tier | undefined;
   
   // Legacy compatibility functions
   getFieldsForEntity: (categoryId?: string, typeId?: string) => Promise<any>;
-  validateEntityHierarchy: (entityType: 'item' | 'schematic', categoryId: string, typeId?: string, subtypeId?: string) => Promise<any>;
+  validateEntityHierarchy: (entityType: 'item' | 'schematic', categoryId: string, typeId?: string) => Promise<any>;
   resolveFields: (params: any) => Promise<any[]>;
 }
 
@@ -103,7 +97,6 @@ export function useItemsSchematics(): UseItemsSchematicsReturn {
     tiers: [],
     categories: [],
     types: [],
-    subtypes: [],
     items: [],
     schematics: [],
     loading: {
@@ -111,7 +104,6 @@ export function useItemsSchematics(): UseItemsSchematicsReturn {
       tiers: false,
       categories: false,
       types: false,
-      subtypes: false,
       items: false,
       schematics: false,
     },
@@ -120,7 +112,6 @@ export function useItemsSchematics(): UseItemsSchematicsReturn {
       tiers: null,
       categories: null,
       types: null,
-      subtypes: null,
       items: null,
       schematics: null,
     },
@@ -221,22 +212,7 @@ export function useItemsSchematics(): UseItemsSchematicsReturn {
     await refetchTypes();
   }, [refetchTypes]);
 
-  const refetchSubtypes = useCallback(async (typeId: string) => {
-    setState(prev => ({ ...prev, loading: { ...prev.loading, subtypes: true }, errors: { ...prev.errors, subtypes: null } }));
-    try {
-      // In unified system, subtypes are derived from entities - for now return empty array
-      // TODO: Implement subtype extraction from entity field_values if needed
-      const subtypes: any[] = [];
-      setState(prev => ({ ...prev, subtypes, loading: { ...prev.loading, subtypes: false } }));
-    } catch (error) {
-      console.error('Error fetching subtypes:', error);
-      setState(prev => ({ 
-        ...prev, 
-        loading: { ...prev.loading, subtypes: false },
-        errors: { ...prev.errors, subtypes: 'Failed to fetch subtypes' }
-      }));
-    }
-  }, []);
+
 
   const refetchItems = useCallback(async () => {
     await refetchEntities();
@@ -432,10 +408,7 @@ export function useItemsSchematics(): UseItemsSchematicsReturn {
     return state.types.find(type => type.id === typeId);
   }, [state.types]);
 
-  const getSubtypeById = useCallback((id: string): Subtype | undefined => {
-    const subtypeId = parseInt(id, 10);
-    return state.subtypes.find(subtype => subtype.id === subtypeId);
-  }, [state.subtypes]);
+
 
   const getTierById = useCallback((id: string): Tier | undefined => {
     // Convert id to number since tier_number is the primary key
@@ -449,7 +422,7 @@ export function useItemsSchematics(): UseItemsSchematicsReturn {
     return {};
   }, []);
 
-  const validateEntityHierarchy = useCallback(async (entityType: 'item' | 'schematic', categoryId: string, typeId?: string, subtypeId?: string): Promise<any> => {
+  const validateEntityHierarchy = useCallback(async (entityType: 'item' | 'schematic', categoryId: string, typeId?: string): Promise<any> => {
     // Basic validation - in unified system, hierarchy is simpler
     return { isValid: true, errors: [] };
   }, []);
@@ -469,8 +442,7 @@ export function useItemsSchematics(): UseItemsSchematicsReturn {
     refetchTiers();
     refetchCategories();
     refetchTypes();
-    refetchSubtypes(''); // Fetch all subtypes initially
-  }, [refetchEntities, refetchTiers, refetchCategories, refetchTypes, refetchSubtypes]);
+  }, [refetchEntities, refetchTiers, refetchCategories, refetchTypes]);
 
   return {
     ...state,
@@ -481,7 +453,6 @@ export function useItemsSchematics(): UseItemsSchematicsReturn {
     refetchAllTypes,
     refetchItems,
     refetchSchematics,
-    refetchSubtypes,
     refetchFieldDefinitions,
     refetchDropdownGroups,
     createItem,
@@ -501,7 +472,6 @@ export function useItemsSchematics(): UseItemsSchematicsReturn {
     getSchematicById,
     getCategoryById,
     getTypeById,
-    getSubtypeById,
     getTierById,
     getFieldsForEntity,
     validateEntityHierarchy,

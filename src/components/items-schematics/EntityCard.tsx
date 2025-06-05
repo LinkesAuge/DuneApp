@@ -134,12 +134,7 @@ const EntityCard: React.FC<EntityCardProps> = ({
               <span className="text-amber-200/60 font-light">Type:</span>
               <span className="text-amber-200 font-medium">{entity.type?.name || 'Unknown'}</span>
             </div>
-            {entity.subtype && (
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-amber-200/60 font-light">Subtype:</span>
-                <span className="text-amber-200 font-medium">{entity.subtype.name}</span>
-              </div>
-            )}
+
             <div className="flex items-center justify-between text-sm">
               <span className="text-amber-200/60 font-light">Tier:</span>
               <span className="text-amber-300 font-medium">{tierName}</span>

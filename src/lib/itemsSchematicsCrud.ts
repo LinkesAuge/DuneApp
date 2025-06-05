@@ -19,7 +19,7 @@ import type {
   Tier,
   Category,
   Type,
-  SubType,
+
   FieldDefinition,
   DropdownGroup,
   DropdownOption,
@@ -986,11 +986,7 @@ export async function getTypeDependencies(
       };
     }
 
-    // Count subtypes
-    const { count: subtypesCount } = await supabase
-      .from('subtypes')
-      .select('*', { count: 'exact', head: true })
-      .eq('type_id', typeId);
+
 
     // Count items
     const { count: itemsCount } = await supabase
@@ -1005,10 +1001,9 @@ export async function getTypeDependencies(
       .eq('type_id', typeId);
 
     const dependencies: TypeDependencies = {
-      subtypes_count: subtypesCount || 0,
       items_count: itemsCount || 0,
       schematics_count: schematicsCount || 0,
-      total_count: (subtypesCount || 0) + (itemsCount || 0) + (schematicsCount || 0)
+      total_count: (itemsCount || 0) + (schematicsCount || 0)
     };
 
     return {
@@ -1041,22 +1036,7 @@ export async function migrateTypeContent(
     let migrated = 0;
     const errors: string[] = [];
 
-    // Migrate subtypes
-    try {
-      const { count: subtypesMigrated } = await supabase
-        .from('subtypes')
-        .update({ 
-          type_id: toTypeId,
-          updated_by: user!.id,
-          updated_at: new Date().toISOString()
-        })
-        .eq('type_id', fromTypeId)
-        .select('*', { count: 'exact' });
-      
-      migrated += subtypesMigrated || 0;
-    } catch (error) {
-      errors.push(`Failed to migrate subtypes: ${error}`);
-    }
+
 
     // Migrate items
     try {
@@ -1125,8 +1105,7 @@ export async function createItem(
     // Validate hierarchy
     const hierarchyValidation = await validateItemHierarchy({
       category_id: itemData.category_id,
-      type_id: itemData.type_id,
-      subtype_id: itemData.subtype_id
+      type_id: itemData.type_id
     });
 
     if (!hierarchyValidation.is_valid) {
@@ -1195,7 +1174,6 @@ export async function fetchItems(
         *,
         category:categories(*),
         type:types(*),
-        subtype:subtypes(*),
         tier:tiers(*),
         screenshots:item_screenshots(*)
       `)
@@ -1253,8 +1231,7 @@ export async function createSchematic(
     // Validate hierarchy
     const hierarchyValidation = await validateSchematicHierarchy({
       category_id: schematicData.category_id,
-      type_id: schematicData.type_id,
-      subtype_id: schematicData.subtype_id
+      type_id: schematicData.type_id
     });
 
     if (!hierarchyValidation.is_valid) {
@@ -1324,7 +1301,6 @@ export async function fetchSchematics(
         *,
         category:categories(*),
         type:types(*),
-        subtype:subtypes(*),
         tier:tiers(*),
         screenshots:schematic_screenshots(*)
       `)
@@ -2432,13 +2408,12 @@ export async function getFieldsForEntity(
 export async function validateEntityHierarchy(
   entityType: 'item' | 'schematic',
   categoryId: string,
-  typeId?: string,
-  subtypeId?: string
+  typeId?: string
 ): Promise<CrudResult<boolean>> {
   try {
     const validationResult = entityType === 'item' 
-      ? await validateItemHierarchy({ category_id: categoryId, type_id: typeId, subtype_id: subtypeId })
-      : await validateSchematicHierarchy({ category_id: categoryId, type_id: typeId, subtype_id: subtypeId });
+      ? await validateItemHierarchy({ category_id: categoryId, type_id: typeId })
+      : await validateSchematicHierarchy({ category_id: categoryId, type_id: typeId });
 
     if (!validationResult.is_valid) {
       return {

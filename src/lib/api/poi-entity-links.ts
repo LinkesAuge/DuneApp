@@ -197,7 +197,6 @@ export const poiEntityLinksAPI = {
             icon_fallback,
             category_id,
             type_id,
-            subtype_id,
             tier_number,
             is_schematic,
             is_global
@@ -280,7 +279,6 @@ export const poiEntityLinksAPI = {
             icon_fallback,
             category_id,
             type_id,
-            subtype_id,
             tier_number,
             is_schematic,
             is_global
@@ -544,7 +542,6 @@ export async function getPoiWithEntities(poiId: string): Promise<any> {
         icon_url: null, // Will be handled by ImagePreview component
         category: { name: link.entity.category?.name || 'Unknown' },
         type: { name: link.entity.type?.name || 'Unknown' },
-        subtype: link.entity.subtype ? { name: link.entity.subtype.name } : null,
         tier: link.entity.tier_number > 0 ? getTierInfo(link.entity.tier_number) : null,
         field_values: {} // No custom fields in unified system yet
       })) || [];
@@ -557,7 +554,6 @@ export async function getPoiWithEntities(poiId: string): Promise<any> {
         icon_url: null, // Will be handled by ImagePreview component
         category: { name: link.entity.category?.name || 'Unknown' },
         type: { name: link.entity.type?.name || 'Unknown' },
-        subtype: link.entity.subtype ? { name: link.entity.subtype.name } : null,
         tier: link.entity.tier_number > 0 ? getTierInfo(link.entity.tier_number) : null,
         field_values: {} // No custom fields in unified system yet
       })) || [];

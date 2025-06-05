@@ -26,6 +26,10 @@ import MapControlPanel from '../components/common/MapControlPanel';
 import POIPanel from '../components/common/POIPanel';
 import { uploadImageWithConversion } from '../lib/imageUpload';
 import { formatConversionStats } from '../lib/imageUtils';
+  import { deletePOIWithCleanup } from '../lib/api/pois';
+  import { usePOIManager } from '../hooks/usePOIManager';
+  import { usePOIOperations } from '../hooks/usePOIOperations';
+
 
 // Grid validation: A1-I9 pattern
 const VALID_GRID_PATTERN = /^[A-I][1-9]$/;
@@ -52,12 +56,48 @@ const GridPage: React.FC = () => {
 
   const [gridSquare, setGridSquare] = useState<GridSquare | null>(null);
   const [allGridSquares, setAllGridSquares] = useState<GridSquare[]>([]); // NEW: All grid squares for minimap
-  const [pois, setPois] = useState<Poi[]>([]);
+  
+  // Unified POI management for this specific grid square
+  const { 
+    pois, 
+    loading: poisLoading, 
+    error: poisError, 
+    refreshPOIs, 
+    addPOI, 
+    updatePOI, 
+    removePOI 
+  } = usePOIManager({ 
+    mapType: 'deep_desert', 
+    gridSquareId: gridSquare?.id || null 
+  });
+  
+  // 🚀 PHASE 2: Unified POI Operations (testing integration)
+  const poiOps = usePOIOperations({
+    mapType: 'deep_desert',
+    gridSquareId: gridSquare?.id,
+    onPoiCreated: (newPoi) => {
+      console.log('[UNIFIED] POI created:', newPoi);
+      addPOI(newPoi); // Update POI manager state
+    },
+    onPoiUpdated: (updatedPoi) => {
+      console.log('[UNIFIED] POI updated:', updatedPoi);
+      updatePOI(updatedPoi); // Update POI manager state
+    },
+    onPoiDeleted: (poiId) => {
+      console.log('[UNIFIED] POI deleted:', poiId);
+      removePOI(poiId); // Update POI manager state
+    }
+  });
+  
   const [poiTypes, setPoiTypes] = useState<PoiType[]>([]);
 
   const [userInfo, setUserInfo] = useState<{ [key: string]: { username: string; display_name?: string | null; custom_avatar_url?: string | null; discord_avatar_url?: string | null; use_discord_avatar?: boolean } }>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Combined loading and error state
+  const isLoading = loading || poisLoading;
+  const combinedError = error || poisError;
 
   // Panel visibility state
   const [showLeftPanel, setShowLeftPanel] = useState(true);
@@ -610,45 +650,23 @@ const GridPage: React.FC = () => {
     if (!poiToDelete) return;
     
     try {
-      // Collect screenshot files that need to be deleted
-      const filesToDelete: string[] = [];
-      if (poiToDelete.screenshots && Array.isArray(poiToDelete.screenshots)) {
-        for (const screenshot of poiToDelete.screenshots) {
-          if (screenshot.url) {
-            const filePath = extractStorageFilePath(screenshot.url);
-            if (filePath) {
-              filesToDelete.push(filePath);
-            }
-          }
-        }
-      }
+      // Use comprehensive deletion API that handles all cleanup
+      const result = await deletePOIWithCleanup(poiToDelete.id);
 
-      // Delete screenshot files from storage first
-      if (filesToDelete.length > 0) {
-        const { error: storageError } = await supabase.storage
-          .from('screenshots')
-          .remove(filesToDelete);
-        
-        if (storageError) {
-          console.error('Error deleting POI screenshots from storage:', storageError);
-          // Continue with POI deletion even if storage cleanup fails
-        }
-      }
-
-      // Then delete the POI from the database
-      const { error } = await supabase
-        .from('pois')
-        .delete()
-        .eq('id', poiToDelete.id);
-
-      if (error) {
-        console.error('Error deleting POI:', error);
-        setError('Failed to delete POI');
+      if (!result.success) {
+        console.error('Error deleting POI:', result.error);
+        setError(`Failed to delete POI: ${result.error}`);
         return;
       }
 
-      // Update local state to remove the deleted POI
-      setPois(prev => prev.filter(p => p.id !== poiToDelete.id));
+      // Show warnings for non-critical errors (e.g., some files couldn't be deleted)
+      if (result.errors && result.errors.length > 0) {
+        console.warn('POI deleted with some cleanup warnings:', result.errors);
+        setError(`POI deleted successfully, but some cleanup warnings: ${result.errors.join(', ')}`);
+      }
+
+      // Update unified state to remove the deleted POI
+      removePOI(poiToDelete.id);
       
       // Clear any highlighted POI if it was the deleted one
       if (selectedPoiId === poiToDelete.id) {
@@ -660,8 +678,6 @@ const GridPage: React.FC = () => {
         setSelectedPoi(null);
       }
 
-      
-      
       // Close confirmation modal
       setShowDeleteConfirmation(false);
       setPoiToDelete(null);
@@ -713,38 +729,13 @@ const GridPage: React.FC = () => {
 
   // Handle POI updating
   const handlePoiUpdated = (updatedPoi: Poi) => {
-    setPois(prev => prev.map(p => p.id === updatedPoi.id ? updatedPoi : p));
+    updatePOI(updatedPoi);
     setEditingPoi(null);
   };
 
   const handlePoiSuccessfullyAdded = (newPoi: Poi) => {
-    // Add the new POI to the local state
-    setPois(prev => [newPoi, ...prev]);
-    
-    // Refresh POI data from database as well to ensure consistency
-    if (gridSquare && gridSquare.id) {
-      supabase
-        .from('pois')
-        .select(`
-          *,
-          grid_squares (
-            id,
-            coordinate
-          )
-        `)
-        .eq('grid_square_id', gridSquare.id)
-        .order('created_at', { ascending: false })
-        .then(({ data, error }) => {
-          if (!error && data) {
-            // Transform the data to match PoiWithGridSquare interface
-            const poisWithGridSquares = data.map(poi => ({
-              ...poi,
-              grid_square: poi.grid_squares
-            }));
-            setPois(poisWithGridSquares);
-          }
-        });
-    }
+    // Add the new POI via unified hook
+    addPOI(newPoi);
     
     // Close the modal after successful POI creation
     setShowPoiModal(false);
@@ -802,31 +793,7 @@ const GridPage: React.FC = () => {
           setGridSquare(gridData);
         }
 
-        // Fetch POIs for this grid (only if grid square exists in database)
-        // Uses RLS policies for privacy filtering - same as Hagga Basin
-        let poisData = [];
-        if (gridSquareData.id) {
-          const { data, error: poisError } = await supabase
-            .from('pois')
-            .select(`
-              *,
-              grid_squares (
-                id,
-                coordinate
-              )
-            `)
-            .eq('grid_square_id', gridSquareData.id)
-            .order('created_at', { ascending: false });
-
-          if (poisError) throw poisError;
-          
-          // Transform the data to match PoiWithGridSquare interface
-          poisData = (data || []).map(poi => ({
-            ...poi,
-            grid_square: poi.grid_squares
-          }));
-        }
-        setPois(poisData);
+        // POI fetching is now handled by usePOIManager hook
 
         // Fetch POI types
         const { data: typesData, error: typesError } = await supabase
@@ -840,8 +807,7 @@ const GridPage: React.FC = () => {
 
 
 
-        // Fetch user info for POI creators
-        await fetchUserInfo(poisData);
+        // User info fetching will be handled when POIs are loaded
 
       } catch (err) {
         console.error('Error fetching grid data:', err);
@@ -854,116 +820,7 @@ const GridPage: React.FC = () => {
     fetchGridData();
   }, [gridId, user]);
 
-  // Set up real-time subscriptions for POI changes - same as Hagga Basin
-  useEffect(() => {
-    
-    // Subscribe to POI table changes for this specific grid
-    const poiSubscription = supabase
-      .channel(`deep-desert-grid-${gridId}-pois`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
-          schema: 'public',
-          table: 'pois',
-          filter: `map_type=eq.deep_desert${gridSquare?.id ? `.and.grid_square_id=eq.${gridSquare.id}` : ''}` // Only this grid's POIs
-        },
-        async (payload) => {
-          
-          if (payload.eventType === 'INSERT') {
-            const newPoi = payload.new as Poi;
-            
-            // Only add if it belongs to this grid
-            if (newPoi.grid_square_id === gridSquare?.id) {
-              // Fetch complete POI data with relations
-              const { data: completePoiData, error } = await supabase
-                .from('pois')
-                .select(`
-                  *,
-                  poi_types (*),
-                  profiles!pois_created_by_fkey (username)
-                `)
-                .eq('id', newPoi.id)
-                .single();
-              
-              if (!error && completePoiData) {
-                // Transform screenshots for compatibility
-                const transformedPoi = {
-                  ...completePoiData,
-                  screenshots: Array.isArray(completePoiData.screenshots) 
-                    ? completePoiData.screenshots.map((screenshot: any, index: number) => ({
-                        id: screenshot.id || `${completePoiData.id}_${index}`,
-                        url: screenshot.url || screenshot,
-                        uploaded_by: screenshot.uploaded_by || completePoiData.created_by,
-                        upload_date: screenshot.upload_date || completePoiData.created_at
-                      }))
-                    : []
-                };
-                
-                setPois(prev => {
-                  // Check if POI already exists (to avoid duplicates)
-                  const exists = prev.some(p => p.id === transformedPoi.id);
-                  if (exists) {
-                    return prev;
-                  }
-                  return [transformedPoi, ...prev];
-                });
-              }
-            }
-          } 
-          else if (payload.eventType === 'UPDATE') {
-            const updatedPoi = payload.new as Poi;
-            
-            // Fetch complete updated POI data with relations
-            const { data: completePoiData, error } = await supabase
-              .from('pois')
-              .select(`
-                *,
-                poi_types (*),
-                profiles!pois_created_by_fkey (username)
-              `)
-              .eq('id', updatedPoi.id)
-              .single();
-            
-            if (!error && completePoiData) {
-              // Transform screenshots for compatibility
-              const transformedPoi = {
-                ...completePoiData,
-                screenshots: Array.isArray(completePoiData.screenshots) 
-                  ? completePoiData.screenshots.map((screenshot: any, index: number) => ({
-                      id: screenshot.id || `${completePoiData.id}_${index}`,
-                      url: screenshot.url || screenshot,
-                      uploaded_by: screenshot.uploaded_by || completePoiData.created_by,
-                      upload_date: screenshot.upload_date || completePoiData.created_at
-                    }))
-                  : []
-              };
-              
-              setPois(prev => {
-                // Check if POI belongs to this grid
-                if (transformedPoi.grid_square_id === gridSquare?.id) {
-                  return prev.map(p => p.id === transformedPoi.id ? transformedPoi : p);
-                } else {
-                  // POI was moved to another grid, remove it
-                  return prev.filter(p => p.id !== transformedPoi.id);
-                }
-              });
-            }
-          }
-          else if (payload.eventType === 'DELETE') {
-            const deletedPoi = payload.old as Poi;
-            
-            setPois(prev => prev.filter(p => p.id !== deletedPoi.id));
-          }
-        }
-      )
-      .subscribe();
 
-    // Cleanup subscription when component unmounts or grid changes
-    return () => {
-      poiSubscription.unsubscribe();
-    };
-  }, [gridSquare?.id]); // Re-subscribe when grid square changes
 
   // Navigation handlers
   const handleBackToOverview = () => {
@@ -1394,7 +1251,7 @@ const GridPage: React.FC = () => {
   }, [highlightedPoiId, pois]);
 
   // Loading state
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center relative">
         {/* Main background image */}
@@ -1416,7 +1273,7 @@ const GridPage: React.FC = () => {
   }
 
   // Error state
-  if (error) {
+  if (combinedError) {
     return (
       <div className="min-h-screen flex items-center justify-center relative">
         {/* Main background image */}
@@ -1428,7 +1285,7 @@ const GridPage: React.FC = () => {
         />
         
         <div className="relative text-center">
-          <div className="text-red-400 mb-4 font-light">{error}</div>
+          <div className="text-red-400 mb-4 font-light">{combinedError}</div>
           <button 
             onClick={handleBackToOverview}
             className="bg-amber-600 hover:bg-amber-500 text-slate-900 font-medium py-2 px-4 rounded-lg transition-colors"
@@ -1941,6 +1798,10 @@ const GridPage: React.FC = () => {
         </div>
       )}
 
+
+
+
+
       {/* POI Placement Modal */}
       {showPoiModal && gridSquare && gridSquare.id && placementCoordinates && (
         <POIPlacementModal
@@ -2007,6 +1868,16 @@ const GridPage: React.FC = () => {
           poi={editingPoi}
           poiTypes={poiTypes}
           onPoiUpdated={handlePoiUpdated}
+          onPoiDataChanged={(updatedPoi) => {
+            // Update POI data without closing the modal (for entity link changes)
+            // Force a complete re-render by creating a new POI object with a timestamp
+            const refreshedPoi = {
+              ...updatedPoi,
+              _lastUpdated: Date.now() // Force React to detect changes
+            };
+            setPois(prev => prev.map(p => p.id === refreshedPoi.id ? refreshedPoi : p));
+            // DO NOT call setEditingPoi(null) here
+          }}
           onClose={() => setEditingPoi(null)}
           onPositionChange={(poi) => {
             // TODO: Implement position change for Deep Desert if needed
@@ -2037,32 +1908,16 @@ const GridPage: React.FC = () => {
       {/* Gallery Modal - Fixed to show POI screenshots instead of grid screenshots */}
       {showGallery && galleryPoi && galleryPoi.screenshots && galleryPoi.screenshots.length > 0 && (
         <GridGallery
-          initialIndex={galleryIndex}
-          squares={galleryPoi.screenshots.map(s => ({
-            id: s.id,
-            coordinate: galleryPoi.title || 'POI',
-            screenshot_url: s.url,
-            original_screenshot_url: s.url, // Use same URL for original
-            is_explored: false,
-            uploaded_by: s.uploaded_by,
-            upload_date: s.upload_date,
-            created_at: s.upload_date,
-            updated_by: s.uploaded_by, // Use same as uploaded_by for POI screenshots
-            crop_x: 0, // Default crop values for POI screenshots
-            crop_y: 0,
-            crop_width: 2000, // Default dimensions
-            crop_height: 2000,
-            crop_created_at: s.upload_date, // Use upload date for crop creation
+          initialImageUrl={galleryPoi.screenshots[galleryIndex]?.url || galleryPoi.screenshots[0].url}
+          allImages={galleryPoi.screenshots.map(s => ({
+            url: s.url,
+            source: 'poi' as const,
+            poi: galleryPoi,
+            poiType: poiTypes.find(type => type.id === galleryPoi.poi_type_id)
           }))}
           onClose={() => {
             setShowGallery(false);
             setGalleryPoi(null);
-          }}
-          poiInfo={{
-            title: galleryPoi.title,
-            description: galleryPoi.description,
-            created_at: galleryPoi.created_at,
-            created_by: galleryPoi.created_by,
           }}
         />
       )}
@@ -2101,7 +1956,21 @@ const GridPage: React.FC = () => {
           }}
           onConfirm={performPoiDeletion}
           title="Delete POI"
-          message={`Are you sure you want to delete "${poiToDelete.title}"? This action cannot be undone and will also delete all associated screenshots.`}
+          message={`Are you sure you want to delete "${poiToDelete.title}"? This action cannot be undone and will delete all associated screenshots, comments, and entity links.`}
+          confirmButtonText="Delete POI"
+          cancelButtonText="Cancel"
+          variant="danger"
+        />
+      )}
+
+      {/* Unified POI Operations Deletion Modal */}
+      {poiOps.showDeleteConfirmation && poiOps.poiToDelete && (
+        <ConfirmationModal
+          isOpen={poiOps.showDeleteConfirmation}
+          onClose={poiOps.cancelPOIDeletion}
+          onConfirm={poiOps.confirmPOIDeletion}
+          title="Delete POI"
+          message={`Are you sure you want to delete "${poiOps.poiToDelete.title}"? This action cannot be undone and will delete all associated screenshots, comments, and entity links.`}
           confirmButtonText="Delete POI"
           cancelButtonText="Cancel"
           variant="danger"

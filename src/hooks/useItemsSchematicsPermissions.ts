@@ -24,7 +24,6 @@ import type {
   Tier,
   Category,
   Type,
-  SubType,
   FieldDefinition,
   DropdownGroup,
   Item,
@@ -65,7 +64,7 @@ interface UseItemsSchematicsPermissionsReturn {
   canManageTier: (tier?: Tier, action?: PermissionAction) => PermissionCheckResult;
   canManageCategory: (category?: Category, action?: PermissionAction) => PermissionCheckResult;
   canManageType: (type?: Type, action?: PermissionAction) => PermissionCheckResult;
-  canManageSubType: (subtype?: SubType, action?: PermissionAction) => PermissionCheckResult;
+
   canManageFieldDefinition: (fieldDef?: FieldDefinition, action?: PermissionAction) => PermissionCheckResult;
   canManageDropdownGroup: (group?: DropdownGroup, action?: PermissionAction) => PermissionCheckResult;
   canManageItem: (item?: Item, action?: PermissionAction, scope?: ContentScope) => PermissionCheckResult;
@@ -168,18 +167,7 @@ export function useItemsSchematicsPermissions(): UseItemsSchematicsPermissionsRe
     });
   }, [user, checkPermissionWithUser]);
   
-  const canManageSubType = useCallback((subtype?: SubType, action: PermissionAction = 'manage'): PermissionCheckResult => {
-    return checkPermissionWithUser({
-      user,
-      entity: subtype ? {
-        type: 'subtype',
-        id: subtype.id,
-        created_by: subtype.created_by,
-        is_global: subtype.is_global
-      } : undefined,
-      action
-    });
-  }, [user, checkPermissionWithUser]);
+
   
   const canManageFieldDefinition = useCallback((fieldDef?: FieldDefinition, action: PermissionAction = 'manage'): PermissionCheckResult => {
     return checkPermissionWithUser({
@@ -286,7 +274,6 @@ export function useItemsSchematicsPermissions(): UseItemsSchematicsPermissionsRe
     canManageTier,
     canManageCategory,
     canManageType,
-    canManageSubType,
     canManageFieldDefinition,
     canManageDropdownGroup,
     canManageItem,

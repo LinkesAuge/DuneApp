@@ -296,6 +296,7 @@ const POILinkManagerPage: React.FC = () => {
           canModifyPOI={canModifyPOI}
           viewMode={viewMode}
           onViewModeChange={setViewMode}
+          getTierName={getTierName}
         />
 
       {/* Confirmation Modal */}
@@ -333,6 +334,7 @@ interface POILinkTreePanelProps {
   canModifyPOI: (poi: any) => boolean;
   viewMode: 'grid' | 'list';
   onViewModeChange: (mode: 'grid' | 'list') => void;
+  getTierName: (tierNumber: number | null | undefined) => string;
 }
 
 const POILinkTreePanel: React.FC<POILinkTreePanelProps> = ({ 
@@ -353,7 +355,8 @@ const POILinkTreePanel: React.FC<POILinkTreePanelProps> = ({
   onEditLink,
   canModifyPOI,
   viewMode,
-  onViewModeChange
+  onViewModeChange,
+  getTierName
 }) => {
   // Get data from props
 
@@ -561,6 +564,7 @@ const POILinkTreePanel: React.FC<POILinkTreePanelProps> = ({
                   onEditPOI={onEditPOI}
                   onEditLink={onEditLink}
                   canModifyPOI={canModifyPOI}
+                  getTierName={getTierName}
                 />
               ))}
             </div>
@@ -793,6 +797,7 @@ interface POIGridCardProps {
   onEditPOI: (poiId: string, entityIds: string[]) => void;
   onEditLink: (poiId: string, entityId: string) => void;
   canModifyPOI: (poi: any) => boolean;
+  getTierName: (tierNumber: number | null | undefined) => string;
 }
 
 const POIGridCard: React.FC<POIGridCardProps> = ({
@@ -806,7 +811,8 @@ const POIGridCard: React.FC<POIGridCardProps> = ({
   onDeleteLink,
   onEditPOI,
   onEditLink,
-  canModifyPOI
+  canModifyPOI,
+  getTierName
 }) => {
   const poi = poiLink.poi;
   const entities = poiLink.entities || [];

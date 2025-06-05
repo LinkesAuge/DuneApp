@@ -24,7 +24,7 @@ const SystemBuilderLayout: React.FC<SystemBuilderLayoutProps> = ({
     },
     { 
       id: 'types' as const, 
-      label: 'Types & SubTypes', 
+      label: 'Types', 
       icon: <Layers size={16} strokeWidth={1.5} />,
       description: 'Organize hierarchical type structures'
     },

@@ -147,14 +147,7 @@ const EntitiesPanel: React.FC<EntitiesPanelProps> = ({ onTogglePanel, filterStat
                   </span>
                 </>
               )}
-              {entity.subtype?.name && entity.subtype.name.toLowerCase() !== 'none' && (
-                <>
-                  <span className="text-slate-500">•</span>
-                  <span className="text-xs text-slate-400 capitalize">
-                    {entity.subtype.name}
-                  </span>
-                </>
-              )}
+
             </div>
             {entity.description && typeof entity.description === 'string' && (
               <p className="text-xs text-slate-500 mt-1 line-clamp-2">

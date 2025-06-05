@@ -239,7 +239,6 @@ export interface AppState {
   tiers: Tier[];
   categories: Category[];
   types: Type[];
-  subtypes: SubType[];
   items: Item[];
   schematics: Schematic[];
   fieldDefinitions: FieldDefinition[];
@@ -387,22 +386,10 @@ export interface Type {
   updated_at: string;
 }
 
-// SubType system interface
-export interface SubType {
-  id: string;
-  name: string;
-  type_id: string;
-  description: string | null;
-  created_by: string | null;
-  updated_by: string | null; // Who last updated this subtype
-  is_global: boolean;
-  created_at: string;
-  updated_at: string;
-}
+
 
 // NEW: Type management interfaces
 export interface TypeDependencies {
-  subtypes_count: number;
   items_count: number;
   schematics_count: number;
   total_count: number;
@@ -482,7 +469,6 @@ export interface Item {
   description: string | null;
   category_id: string;
   type_id: string | null;
-  subtype_id: string | null;
   tier_id: string | null;
   icon_url: string | null;
   field_values: FieldValues;
@@ -500,7 +486,6 @@ export interface Schematic {
   description: string | null;
   category_id: string;
   type_id: string | null;
-  subtype_id: string | null;
   tier_id: string | null;
   icon_url: string | null;
   field_values: FieldValues;
@@ -558,7 +543,6 @@ export interface ResolvedField {
 export interface ItemWithRelations extends Item {
   category?: Category;
   type?: Type;
-  subtype?: SubType;
   tier?: Tier;
   screenshots?: ItemScreenshot[];
 }
@@ -566,7 +550,6 @@ export interface ItemWithRelations extends Item {
 export interface SchematicWithRelations extends Schematic {
   category?: Category;
   type?: Type;
-  subtype?: SubType;
   tier?: Tier;
   screenshots?: SchematicScreenshot[];
 }
@@ -575,10 +558,7 @@ export interface CategoryWithTypes extends Category {
   types?: Type[];
 }
 
-export interface TypeWithSubTypes extends Type {
-  subtypes?: SubType[];
-  category?: Category;
-}
+
 
 export interface FieldDefinitionWithGroup extends FieldDefinition {
   dropdown_group?: DropdownGroup;
@@ -623,7 +603,7 @@ export type PermissionAction = 'create' | 'read' | 'update' | 'delete' | 'manage
 export type ContentScope = 'global' | 'own' | 'all';
 
 // Entity permission types
-export type EntityType = 'tier' | 'category' | 'type' | 'subtype' | 'field_definition' | 'dropdown_group' | 'item' | 'schematic';
+export type EntityType = 'tier' | 'category' | 'type' | 'field_definition' | 'dropdown_group' | 'item' | 'schematic';
 
 // Permission check result
 export interface PermissionCheckResult {
@@ -638,7 +618,6 @@ export interface ItemsSchematicsCapabilities {
   canManageTiers: boolean;
   canManageCategories: boolean;
   canManageTypes: boolean;
-  canManageSubTypes: boolean;
   canManageFieldDefinitions: boolean;
   canManageDropdownGroups: boolean;
   

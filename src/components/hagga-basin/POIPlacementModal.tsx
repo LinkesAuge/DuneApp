@@ -12,13 +12,18 @@ import type {
 import { formatCoordinates } from '../../lib/coordinates';
 import { useAuth } from '../auth/AuthProvider';
 
-import ImageCropModal from '../grid/ImageCropModal';
+// Remove old crop modal import
+// import ImageCropModal from '../grid/ImageCropModal';
 import { PixelCrop } from 'react-image-crop';
 import { v4 as uuidv4 } from 'uuid';
 import { getScreenshotLabel } from '../../lib/cropUtils';
 import UserAvatar from '../common/UserAvatar';
 import { uploadPoiScreenshot } from '../../lib/imageUpload';
 import { formatConversionStats } from '../../lib/imageUtils';
+// Add unified system imports  
+import { useScreenshotManager } from '../../hooks/useScreenshotManager';
+import ScreenshotUploader from '../shared/ScreenshotUploader';
+import CropProcessor from '../shared/CropProcessor';
 
 interface POIPlacementModalProps {
   coordinates: PixelCoordinates;
@@ -71,14 +76,14 @@ const getDisplayImageUrl = (icon: string): string | null => {
   return null;
 };
 
-// Define a type for our screenshot objects
-interface ScreenshotFile {
-  id: string;
-  file: File;
-  cropDetails: PixelCrop | null; // Store crop data or null if it's a full image
-  isNew: boolean; // To differentiate between newly added and existing (if ever needed)
-  previewUrl: string; // For displaying the image
-}
+// Remove old screenshot interface - using unified system now
+// interface ScreenshotFile {
+//   id: string;
+//   file: File;
+//   cropDetails: PixelCrop | null;
+//   isNew: boolean;
+//   previewUrl: string;
+// }
 
 const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
   coordinates,
@@ -97,7 +102,8 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
   const [description, setDescription] = useState('');
   const [selectedPoiTypeId, setSelectedPoiTypeId] = useState('');
   const [privacyLevel, setPrivacyLevel] = useState<PrivacyLevel>('global');
-  const [screenshots, setScreenshots] = useState<ScreenshotFile[]>([]);
+  // Remove old screenshots state - using unified system now
+  // const [screenshots, setScreenshots] = useState<ScreenshotFile[]>([]);
   
   // UI state
   const [showDetailedPoiSelection, setShowDetailedPoiSelection] = useState(false);
@@ -105,13 +111,22 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [conversionStats, setConversionStats] = useState<string | null>(null);
 
+  // Screenshot management - need manager for CropProcessor
+  const screenshotManager = useScreenshotManager({
+    context: 'poi',
+    entityId: '',
+    maxFileSize: 5,
+    enableCropping: true
+  });
+  
+  // Also track files from ScreenshotUploader for display count
+  const [uploaderFiles, setUploaderFiles] = useState<any[]>([]);
 
-
-  // Screenshot cropping state
-  const [showCropModal, setShowCropModal] = useState(false);
-  const [tempImageFile, setTempImageFile] = useState<File | null>(null);
-  const [tempImageUrl, setTempImageUrl] = useState<string | null>(null);
-  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  // Remove old screenshot cropping state - handled by unified system now
+  // const [showCropModal, setShowCropModal] = useState(false);
+  // const [tempImageFile, setTempImageFile] = useState<File | null>(null);
+  // const [tempImageUrl, setTempImageUrl] = useState<string | null>(null);
+  // const [pendingFiles, setPendingFiles] = useState<File[]>([]);
 
   // Sharing state
   const [availableUsers, setAvailableUsers] = useState<any[]>([]);
@@ -208,128 +223,12 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
 
 
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files || []);
-    if (files.length === 0) return;
-
-    // Check total limit
-    if (screenshots.length + pendingFiles.length + files.length > 5) {
-      setError(`Cannot add ${files.length} file(s). Maximum 5 screenshots total. Currently have ${screenshots.length + pendingFiles.length}.`);
-      event.target.value = '';
-      return;
-    }
-
-    // Validate all files first
-    for (const file of files) {
-      if (file.size > 10 * 1024 * 1024) {
-        setError(`File "${file.name}" is too large. Maximum 10MB allowed.`);
-        event.target.value = '';
-        return;
-      }
-      
-      if (!file.type.startsWith('image/')) {
-        setError(`File "${file.name}" is not an image. Please select image files only.`);
-        event.target.value = '';
-        return;
-      }
-    }
-
-    // Add files to pending queue
-    const newPendingFiles = [...pendingFiles, ...files];
-    setPendingFiles(newPendingFiles);
-    
-    // Start processing the first file if not already processing
-    if (pendingFiles.length === 0 && !showCropModal) {
-      const firstFile = newPendingFiles[0];
-      setTempImageFile(firstFile);
-      setTempImageUrl(URL.createObjectURL(firstFile));
-      setShowCropModal(true);
-    }
-    
-    event.target.value = '';
-  };
-
-  const handleCloseCropModal = () => {
-    if (tempImageUrl) URL.revokeObjectURL(tempImageUrl);
-    setTempImageFile(null);
-    setTempImageUrl(null);
-    setShowCropModal(false);
-    
-    // Remove the current file from pending queue since it was canceled
-    setPendingFiles(prevPending => {
-      const remainingFiles = prevPending.slice(1);
-      
-      // Process next file if any (with slight delay to ensure state is updated)
-      if (remainingFiles.length > 0) {
-        setTimeout(() => {
-          const nextFile = remainingFiles[0];
-          setTempImageFile(nextFile);
-          setTempImageUrl(URL.createObjectURL(nextFile));
-          setShowCropModal(true);
-        }, 100);
-      }
-      
-      return remainingFiles;
-    });
-  };
-
-  const processNextFile = () => {
-    if (pendingFiles.length === 0) return;
-    
-    const nextFile = pendingFiles[0];
-    setTempImageFile(nextFile);
-    setTempImageUrl(URL.createObjectURL(nextFile));
-    setShowCropModal(true);
-  };
-
-  const handleCropComplete = async (croppedImageBlob: Blob, cropData: PixelCrop, isFullImage: boolean) => {
-    if (!tempImageFile) return;
-
-    const processedFile = new File([croppedImageBlob], tempImageFile.name, {
-      type: 'image/jpeg',
-      lastModified: Date.now(),
-    });
-
-    const newScreenshot: ScreenshotFile = {
-      id: uuidv4(),
-      file: processedFile,
-      cropDetails: isFullImage ? null : cropData,
-      isNew: true,
-      previewUrl: URL.createObjectURL(processedFile),
-    };
-
-    setScreenshots(prev => [...prev, newScreenshot]);
-    
-    // Remove processed file from pending queue
-    setPendingFiles(prevPending => {
-      const remainingFiles = prevPending.slice(1);
-      
-      // Close current modal
-      handleCloseCropModal();
-      
-      // Process next file if any (with slight delay to ensure state is updated)
-      if (remainingFiles.length > 0) {
-        setTimeout(() => {
-          const nextFile = remainingFiles[0];
-          setTempImageFile(nextFile);
-          setTempImageUrl(URL.createObjectURL(nextFile));
-          setShowCropModal(true);
-        }, 100);
-      }
-      
-      return remainingFiles;
-    });
-  };
-
-  const removeScreenshot = (idToRemove: string) => {
-    setScreenshots(prev => prev.filter(s => {
-      if (s.id === idToRemove) {
-        URL.revokeObjectURL(s.previewUrl); // Clean up object URL
-        return false;
-      }
-      return true;
-    }));
-  };
+  // Remove old file handling methods - replaced by unified system
+  // const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => { ... }
+  // const handleCloseCropModal = () => { ... }
+  // const processNextFile = () => { ... }
+  // const handleCropComplete = async (croppedImageBlob: Blob, cropData: PixelCrop, isFullImage: boolean) => { ... }
+  // const removeScreenshot = (idToRemove: string) => { ... }
 
   const savePoi = async () => {
     // ... (validation logic for name, type, etc.)
@@ -436,31 +335,36 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
 
       // Upload screenshots if any and update POI
       let finalScreenshots: any[] = [];
-      const totalScreenshots = screenshots.length;
+      
+      // Combine screenshots from both managers (screenshotManager has priority for processed files)
+      const processedFiles = screenshotManager.filesToProcess.filter(f => f.isProcessed);
+      const uploaderProcessedFiles = uploaderFiles.filter(f => f.isProcessed || f.displayFile);
+      
+      // Use screenshotManager files if available, otherwise use uploader files
+      const allProcessedFiles = processedFiles.length > 0 ? processedFiles : uploaderProcessedFiles;
+      const totalScreenshots = allProcessedFiles.length;
       
       if (totalScreenshots > 0) {
         try {
-          // Upload screenshots one by one with WebP conversion
-          for (const screenshot of screenshots) {
-            if (screenshot.isNew) { // Only upload new files
-              const fileName = `${user.id}/${uuidv4()}-${screenshot.file.name}`;
-              
-              // Upload with WebP conversion
-              const uploadResult = await uploadPoiScreenshot(screenshot.file, fileName);
-              
-              // Show conversion feedback for the first upload
-              if (finalScreenshots.length === 0 && uploadResult.compressionRatio) {
-                const stats = formatConversionStats(uploadResult);
-                setConversionStats(stats);
-              }
-              
-              finalScreenshots.push({
-                id: `${poi.id}_${Date.now()}_${finalScreenshots.length}`,
-                url: uploadResult.url,
-                uploaded_by: user.id,
-                upload_date: new Date().toISOString()
-              });
+          // Upload screenshots using unified system
+          for (const processedFile of allProcessedFiles) {
+            const fileName = `${user.id}/${uuidv4()}-${(processedFile.originalFile || processedFile.file)?.name}`;
+            
+            // Upload with WebP conversion
+            const uploadResult = await uploadPoiScreenshot(processedFile.displayFile || processedFile.file, fileName);
+            
+            // Show conversion feedback for the first upload
+            if (finalScreenshots.length === 0 && uploadResult.compressionRatio) {
+              const stats = formatConversionStats(uploadResult);
+              setConversionStats(stats);
             }
+            
+            finalScreenshots.push({
+              id: `${poi.id}_${Date.now()}_${finalScreenshots.length}`,
+              url: uploadResult.url,
+              uploaded_by: user.id,
+              upload_date: new Date().toISOString()
+            });
           }
 
           // Update the POI with screenshots in JSONB[] format
@@ -858,65 +762,16 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
             </div>
           )}
 
-          {/* Screenshots - Matching Edit Modal Style */}
+          {/* Screenshots - Unified System */}
           <div>
             <label className="block text-sm font-medium text-amber-200 mb-3">
-              Screenshots ({screenshots.length + pendingFiles.length}/5)
+              Screenshots ({Math.max(screenshotManager.filesToProcess.filter(f => f.isProcessed).length, uploaderFiles.length)}/5)
             </label>
-            <div className="space-y-3">
-              {/* Screenshots Grid - Matching POI Edit Modal */}
-              <div className="flex flex-wrap gap-2">
-                {/* Uploaded Screenshots */}
-                {screenshots.map((sFile) => (
-                  <div 
-                    key={sFile.id}
-                    className="w-20 h-20 relative rounded overflow-hidden border border-slate-600"
-                  >
-                    <img 
-                      src={sFile.previewUrl} 
-                      alt="POI Screenshot" 
-                      className="w-full h-full object-cover"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeScreenshot(sFile.id)}
-                      className="absolute top-0 right-0 bg-red-600 text-white w-5 h-5 flex items-center justify-center hover:bg-red-700 transition-colors"
-                      title="Remove screenshot"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                    {/* Screenshot label */}
-                    <div className="absolute bottom-1 left-1">
-                      {(() => {
-                        const label = getScreenshotLabel(true, sFile.cropDetails);
-                        return (
-                          <span className={label.className}>{label.text}</span>
-                        );
-                      })()}
-                    </div>
-                  </div>
-                ))}
-
-                {/* Upload Button - Matching Edit Modal */}
-                {(screenshots.length + pendingFiles.length) < 5 && (
-                  <label className="w-20 h-20 border-2 border-dashed border-slate-600 rounded flex flex-col items-center justify-center text-slate-400 hover:text-amber-300 hover:border-amber-500 cursor-pointer transition-colors">
-                    <Upload className="w-5 h-5" />
-                    <span className="text-xs mt-1">Add</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleFileChange}
-                      multiple
-                      className="hidden"
-                    />
-                  </label>
-                )}
-              </div>
-              
-              <p className="text-xs text-slate-400">
-                Upload up to 5 screenshots total. Each image must be under 10MB. PNG, JPG formats supported.
-              </p>
-            </div>
+            <ScreenshotUploader
+              screenshotManager={screenshotManager}
+              maxDisplayFiles={5}
+              onProcessingComplete={(files) => setUploaderFiles(files)}
+            />
           </div>
 
           {/* Entity Linking Note */}
@@ -972,18 +827,10 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
         </form>
       </div>
 
-
-
-      {/* Image Crop Modal */}
-      {showCropModal && tempImageUrl && tempImageFile && (
-        <ImageCropModal
-          imageUrl={tempImageUrl}
-          onCropComplete={handleCropComplete}
-          onClose={handleCloseCropModal}
-          title={`Crop POI Screenshot (${screenshots.length + 1}/${screenshots.length + pendingFiles.length + 1})`}
-          defaultToSquare={false}
-        />
-      )}
+      {/* Unified Crop Processor */}
+      <CropProcessor
+        screenshotManager={screenshotManager}
+      />
     </div>
   );
 };

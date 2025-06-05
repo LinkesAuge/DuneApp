@@ -15,7 +15,7 @@ export interface Entity {
   // NORMALIZED FOREIGN KEY STRUCTURE
   category_id: number;         // integer, NOT NULL - references categories.id
   type_id: number;             // integer, NOT NULL - references types.id
-  subtype_id?: number | null;  // integer, NULLABLE - references subtypes.id
+
   
   tier_number: number;         // integer, 0-7 - tier level
   is_global: boolean;          // boolean - global availability
@@ -47,22 +47,12 @@ export interface Type {
   updated_at?: string;         // timestamp - last update time
 }
 
-// Subtype interface matching the subtypes table
-export interface Subtype {
-  id: number;                  // integer, PRIMARY KEY
-  name: string;                // text, NOT NULL - subtype name
-  type_id: number;             // integer, NOT NULL - references types.id
-  icon?: string;               // text - optional icon
-  sort_order: number;          // integer - display order
-  created_at?: string;         // timestamp - creation time
-  updated_at?: string;         // timestamp - last update time
-}
+
 
 // Extended entity with resolved relationships for display
 export interface EntityWithRelations extends Entity {
   category?: Category;         // Resolved category data
   type?: Type;                 // Resolved type data
-  subtype?: Subtype;           // Resolved subtype data (if applicable)
 }
 
 // Tier system interface matching the tiers table
@@ -118,10 +108,8 @@ export interface EntityFilters {
   search?: string;             // Search across name and entity description only
   category_id?: number;        // Filter by category ID
   type_id?: number;            // Filter by type ID
-  subtype_id?: number;         // Filter by subtype ID
   category_ids?: number[];     // Filter by multiple category IDs
   type_ids?: number[];         // Filter by multiple type IDs
-  subtype_ids?: number[];      // Filter by multiple subtype IDs
   tier_number?: number;        // Filter by tier
   tier_numbers?: number[];     // Filter by multiple tiers
   is_schematic?: boolean;      // Filter items vs schematics
@@ -192,7 +180,7 @@ export const ENTITY_CONSTRAINTS = {
   MAX_DESCRIPTION_LENGTH: 1000,
   MAX_CATEGORY_LENGTH: 100,
   MAX_TYPE_LENGTH: 100,
-  MAX_SUBTYPE_LENGTH: 100,
+
   MAX_NOTES_LENGTH: 500
 } as const;
 

@@ -10,20 +10,26 @@ import type {
 } from '../../types';
 import { formatCoordinates } from '../../lib/coordinates';
 import { useAuth } from '../auth/AuthProvider';
-import ImageCropModal from '../grid/ImageCropModal';
+// Remove old crop modal import
+// import ImageCropModal from '../grid/ImageCropModal';
 import { PixelCrop, Crop } from 'react-image-crop';
 import CommentsList from '../comments/CommentsList';
 import { getScreenshotLabel } from '../../lib/cropUtils';
 import UserAvatar from '../common/UserAvatar';
-import { uploadPoiScreenshot } from '../../lib/imageUpload';
+import { uploadPoiScreenshotOriginal, uploadPoiScreenshotCropped } from '../../lib/imageUpload';
 import { formatConversionStats } from '../../lib/imageUtils';
 import LinkedEntitiesSection from '../poi-linking/LinkedEntitiesSection';
+// Add unified system imports
+import { useScreenshotManager } from '../../hooks/useScreenshotManager';
+import ScreenshotUploader from '../shared/ScreenshotUploader';
+
 
 interface POIEditModalProps {
   poi: Poi;
   poiTypes: PoiType[];
 
   onPoiUpdated: (poi: Poi) => void;
+  onPoiDataChanged?: (poi: Poi) => void; // For updates that shouldn't close modal
   onClose: () => void;
   onPositionChange?: (poi: Poi) => void;
 }
@@ -68,11 +74,78 @@ const getDisplayImageUrl = (icon: string): string | null => {
   return null;
 };
 
+/**
+ * Extract storage file path from a Supabase storage URL
+ * Updated to handle multiple folder structures for proper file deletion
+ */
+const extractStorageFilePathFromUrl = (url: string): string | null => {
+  try {
+    // Handle both full URLs and relative paths
+    const patterns = [
+      // New structure
+      '/storage/v1/object/public/screenshots/poi_screenshots_original/',
+      '/storage/v1/object/public/screenshots/poi_screenshots_cropped/',
+      '/storage/v1/object/public/screenshots/comment_screenshots_original/',
+      '/storage/v1/object/public/screenshots/comment_screenshots_cropped/',
+      // Legacy structure
+      '/storage/v1/object/public/screenshots/poi_originals/',
+      '/storage/v1/object/public/screenshots/poi_screenshots/',
+      '/storage/v1/object/public/screenshots/comment-screenshots/',
+      // Generic screenshots
+      '/storage/v1/object/public/screenshots/'
+    ];
+
+    for (const pattern of patterns) {
+      if (url.includes(pattern)) {
+        const parts = url.split(pattern);
+        if (parts.length > 1) {
+          // Get the folder name from the pattern and combine with the file path
+          const folderName = pattern.split('/').pop() || '';
+          return folderName ? `${folderName}${parts[1]}` : parts[1];
+        }
+      }
+    }
+
+    // Handle relative paths
+    const relativePatterns = [
+      '/screenshots/poi_screenshots_original/',
+      '/screenshots/poi_screenshots_cropped/',
+      '/screenshots/comment_screenshots_original/',
+      '/screenshots/comment_screenshots_cropped/',
+      '/screenshots/poi_originals/',
+      '/screenshots/poi_screenshots/',
+      '/screenshots/comment-screenshots/',
+      '/screenshots/'
+    ];
+
+    for (const pattern of relativePatterns) {
+      if (url.includes(pattern)) {
+        const parts = url.split(pattern);
+        if (parts.length > 1) {
+          const folderName = pattern.split('/').filter(p => p).pop() || '';
+          return folderName ? `${folderName}/${parts[1]}` : parts[1];
+        }
+      }
+    }
+
+    // Just filename
+    if (!url.includes('/') && !url.includes('http')) {
+      return url;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error extracting storage file path:', error);
+    return null;
+  }
+};
+
 const POIEditModal: React.FC<POIEditModalProps> = ({
   poi,
   poiTypes,
 
   onPoiUpdated,
+  onPoiDataChanged,
   onClose,
   onPositionChange
 }) => {
@@ -86,30 +159,28 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
   const [coordinatesX, setCoordinatesX] = useState(poi.coordinates_x || 0);
   const [coordinatesY, setCoordinatesY] = useState(poi.coordinates_y || 0);
   
-  // Screenshot management - work with existing screenshots from POI
+  // Replace complex screenshot state with unified system
+  const screenshotManager = useScreenshotManager({
+    context: 'poi',
+    maxFiles: 5,
+    userId: user?.id || '',
+    gridSquareId: poi.grid_square_id || undefined,
+    existingScreenshots: poi.screenshots || []
+  });
+  
+  // Keep track of existing screenshots for deletion
   const [existingScreenshots, setExistingScreenshots] = useState<PoiScreenshot[]>(
     poi.screenshots || [] 
   );
   const [screenshotsToDelete, setScreenshotsToDelete] = useState<string[]>([]);
-  const [additionalScreenshots, setAdditionalScreenshots] = useState<File[]>([]);
   
-  // Screenshot cropping state
-  const [showCropModal, setShowCropModal] = useState(false);
-  const [tempImageFile, setTempImageFile] = useState<File | null>(null);
-  const [tempImageUrl, setTempImageUrl] = useState<string | null>(null);
-  
-  interface PendingScreenshotFile {
-    id: string; 
-    originalFile: File; // The original uploaded file (always preserved)
-    displayFile: File; // The file to be shown (cropped or same as original)
-    cropDetails: PixelCrop | null;
-    previewUrl: string; // Preview URL for the display file
-    originalScreenshotId?: string; // For editing existing screenshots
-    originalScreenshotUrl?: string; // URL of the original file for existing screenshots
-  }
-  const [pendingCroppedFiles, setPendingCroppedFiles] = useState<PendingScreenshotFile[]>([]);
-  
-  const [editingScreenshot, setEditingScreenshot] = useState<PoiScreenshot | null>(null);
+  // Remove old screenshot state - handled by unified system now
+  // const [additionalScreenshots, setAdditionalScreenshots] = useState<File[]>([]);
+  // const [showCropModal, setShowCropModal] = useState(false);
+  // const [tempImageFile, setTempImageFile] = useState<File | null>(null);
+  // const [tempImageUrl, setTempImageUrl] = useState<string | null>(null);
+  // const [pendingCroppedFiles, setPendingCroppedFiles] = useState<PendingScreenshotFile[]>([]);
+  // const [editingScreenshot, setEditingScreenshot] = useState<PoiScreenshot | null>(null);
   
   // UI state
   const [showDetailedPoiSelection, setShowDetailedPoiSelection] = useState(false);
@@ -278,61 +349,11 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
     setScreenshotsToDelete(prev => [...prev, screenshotId]);
   };
 
-  // Calculate total screenshot count
-  const totalScreenshotCount = existingScreenshots.length + additionalScreenshots.length + pendingCroppedFiles.length;
-
-  // Handle additional screenshot upload - now with cropping
-  const handleScreenshotUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files || []);
-    
-    if (files.length === 0) return;
-    
-    const validFiles = files.filter(file => 
-      file.type.startsWith('image/') && file.size <= 10 * 1024 * 1024 // 10MB limit
-    );
-    
-    if (validFiles.length !== files.length) {
-      setError('Some files were invalid. Only images under 10MB are allowed.');
-      return;
-    }
-
-    // Check total screenshot limit
-    const maxNew = 5 - totalScreenshotCount;
-    if (maxNew <= 0) {
-      setError('Maximum 5 screenshots allowed per POI');
-      return;
-    }
-    
-    const filesToAdd = validFiles.slice(0, maxNew);
-    if (filesToAdd.length < validFiles.length) {
-      setError(`Only ${filesToAdd.length} screenshot(s) can be added (5 total limit)`);
-    }
-    
-    // Process files one by one through cropping
-    processFilesForCropping(filesToAdd);
-  };
-
-  // Process files through cropping workflow
-  const processFilesForCropping = (files: File[]) => {
-    if (files.length === 0) return;
-    
-    const [firstFile, ...remainingFiles] = files;
-    
-    // Set up for cropping the first file
-    setTempImageFile(firstFile);
-    setTempImageUrl(URL.createObjectURL(firstFile));
-    setShowCropModal(true);
-    
-    // Store remaining files to process after current crop is complete
-    if (remainingFiles.length > 0) {
-      // We'll handle remaining files after crop completion
-      setTempImageFile(prev => {
-        // Store remaining files in a way we can access them
-        (firstFile as any).remainingFiles = remainingFiles;
-        return firstFile;
-      });
-    }
-  };
+  // Remove old screenshot handling methods - replaced by unified system
+  // const totalScreenshotCount = existingScreenshots.length + additionalScreenshots.length + pendingCroppedFiles.length;
+  // const handleScreenshotUpload = (event: React.ChangeEvent<HTMLInputElement>) => { ... }
+  // const [filesToProcess, setFilesToProcess] = useState<File[]>([]);
+  // const processFilesForCropping = (files: File[]) => { ... }
 
   // Handle crop completion for NEWLY UPLOADED files
   const handleCropComplete = async (croppedImageBlob: Blob, cropData: PixelCrop, isFullImage: boolean) => {
@@ -353,8 +374,6 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
       };
 
       setPendingCroppedFiles(prev => [...prev, newPendingFile]);
-
-      const remainingFiles = (tempImageFile as any).remainingFiles as File[] || [];
       
       // Clean up current temp state
       setShowCropModal(false);
@@ -365,8 +384,13 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
       }
 
       // Process remaining files if any
-      if (remainingFiles.length > 0) {
-        setTimeout(() => processFilesForCropping(remainingFiles), 100);
+      console.log(`[POIEditModal] Crop complete. ${filesToProcess.length} files remaining in queue`);
+      if (filesToProcess.length > 0) {
+        setTimeout(() => {
+          console.log(`[POIEditModal] Processing remaining files from queue:`, filesToProcess.map(f => f.name));
+          processFilesForCropping(filesToProcess);
+          setFilesToProcess([]); // Clear the queue
+        }, 100);
       }
     } catch (error) {
       console.error('Error processing cropped image:', error);
@@ -387,8 +411,6 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
       previewUrl: URL.createObjectURL(tempImageFile)
     };
     setPendingCroppedFiles(prev => [...prev, newPendingFile]);
-
-    const remainingFiles = (tempImageFile as any).remainingFiles as File[] || [];
     
     // Clean up current temp state
     setShowCropModal(false);
@@ -399,8 +421,11 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
     }
 
     // Process remaining files if any
-    if (remainingFiles.length > 0) {
-      setTimeout(() => processFilesForCropping(remainingFiles), 100);
+    if (filesToProcess.length > 0) {
+      setTimeout(() => {
+        processFilesForCropping(filesToProcess);
+        setFilesToProcess([]); // Clear the queue
+      }, 100);
     }
   };
 
@@ -413,6 +438,7 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
       setTempImageUrl(null);
     }
     setEditingScreenshot(null);
+    setFilesToProcess([]); // Clear any remaining files in queue
   };
 
   // Handle editing existing screenshot
@@ -554,12 +580,12 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
         const fileExt = pendingFile.displayFile.name.split('.').pop() || 'jpg';
         
         // Upload original file with WebP conversion
-        const originalFileName = `poi_originals/${poi.id}/${newScreenshotId}_original`;
-        const originalUploadResult = await uploadPoiScreenshot(pendingFile.originalFile, originalFileName);
+        const originalFileName = `${poi.id}/${newScreenshotId}_original.webp`;
+        const originalUploadResult = await uploadPoiScreenshotOriginal(pendingFile.originalFile, originalFileName);
 
         // Upload display file (cropped or same as original) with WebP conversion
-        const displayFileName = `poi_screenshots/${poi.id}/${newScreenshotId}_display`;
-        const displayUploadResult = await uploadPoiScreenshot(pendingFile.displayFile, displayFileName);
+        const displayFileName = `${poi.id}/${newScreenshotId}_display.webp`;
+        const displayUploadResult = await uploadPoiScreenshotCropped(pendingFile.displayFile, displayFileName);
         
         // Show conversion feedback for the first upload
         if (filesToUploadActuallyNew[0] === pendingFile && displayUploadResult.compressionRatio) {
@@ -583,10 +609,10 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
 
       const filesToUploadAsEdits = pendingCroppedFiles.filter(pf => pf.originalScreenshotId && pf.originalScreenshotUrl);
       for (const pendingVersion of filesToUploadAsEdits) {
-        const displayFileName = `poi_screenshots/${poi.id}/edited_${pendingVersion.originalScreenshotId}_${Date.now()}`;
+        const displayFileName = `${poi.id}/edited_${pendingVersion.originalScreenshotId}_${Date.now()}.webp`;
         
         // Upload display file with WebP conversion
-        const displayUploadResult = await uploadPoiScreenshot(pendingVersion.displayFile, displayFileName);
+        const displayUploadResult = await uploadPoiScreenshotCropped(pendingVersion.displayFile, displayFileName);
         
         editedScreenshotObjects.push({
           id: pendingVersion.originalScreenshotId!, 
@@ -706,10 +732,11 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
       ];
 
       if (allUrlsToDeleteFromStorage.length > 0) {
-        // Extract path from full URL for Supabase delete
+        // Extract path from full URL for Supabase delete using the enhanced path extraction
         const pathsToDelete = allUrlsToDeleteFromStorage.map(url => {
           try {
-            return new URL(url).pathname.split('/storage/v1/object/public/screenshots/')[1];
+            // Use the same extraction logic as in the API
+            return extractStorageFilePathFromUrl(url);
           } catch (e) {
             console.error(`Invalid URL for deletion: ${url}`, e);
             return null;
@@ -1257,9 +1284,56 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
               className="mt-6"
               showLinkButton={canEdit}
               canEdit={canEdit}
-              onLinksChanged={() => {
-                // Could trigger a refresh of POI data if needed
-                // For now, the section handles its own data refresh
+              onLinksChanged={async () => {
+                console.log('[POIEditModal] POI entity links changed, refreshing POI data for map...');
+                
+                // For entity link changes, we don't want to close the modal
+                // So we'll update the POI data directly without calling onPoiUpdated
+                try {
+                  // Add a small delay to ensure database transaction is committed
+                  await new Promise(resolve => setTimeout(resolve, 200));
+                  
+                  // Fetch updated POI data with all related information
+                  const { data: updatedPoiData, error } = await supabase
+                    .from('pois')
+                    .select(`
+                      *,
+                      poi_types (*),
+                      profiles!pois_created_by_fkey (username)
+                    `)
+                    .eq('id', poi.id)
+                    .single();
+
+                  if (!error && updatedPoiData) {
+                    // Transform screenshots for compatibility (same as in HaggaBasinPage.tsx)
+                    const transformedPoi = {
+                      ...updatedPoiData,
+                      screenshots: Array.isArray(updatedPoiData.screenshots) 
+                        ? updatedPoiData.screenshots.map((screenshot: any, index: number) => ({
+                            id: screenshot.id || `${updatedPoiData.id}_${index}`,
+                            url: screenshot.url || screenshot,
+                            uploaded_by: screenshot.uploaded_by || updatedPoiData.created_by,
+                            upload_date: screenshot.upload_date || updatedPoiData.created_at
+                          }))
+                        : []
+                    };
+                    
+                    console.log('[POIEditModal] Updating POI data directly without closing modal...');
+                    console.log('[POIEditModal] Updated POI object:', transformedPoi);
+                    
+                    // Update the parent component's POI list without closing the modal
+                    // Use onPoiDataChanged instead of onPoiUpdated to prevent modal closure
+                    if (onPoiDataChanged) {
+                      onPoiDataChanged(transformedPoi);
+                    } else {
+                      console.log('[POIEditModal] No onPoiDataChanged callback provided, skipping parent update');
+                    }
+                  } else {
+                    console.error('[POIEditModal] Failed to fetch updated POI data:', error);
+                  }
+                } catch (error) {
+                  console.error('[POIEditModal] Error refreshing POI data after link change:', error);
+                }
               }}
             />
           </div>

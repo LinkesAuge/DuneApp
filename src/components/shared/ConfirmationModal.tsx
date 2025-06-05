@@ -89,7 +89,8 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
               <button
                 onClick={() => {
                   onConfirm();
-                  onClose();
+                  // Note: onClose() is intentionally NOT called here anymore
+                  // The onConfirm function should handle modal closure if needed
                 }}
                 className={`px-4 py-2 rounded-lg transition-colors font-light ${
                   variant === 'danger' 

@@ -10,7 +10,7 @@ const FiltersPanel: React.FC<FiltersPanelProps> = ({ onTogglePanel, filterState 
   const [activeTab, setActiveTab] = React.useState<'poi' | 'entity'>('poi');
   const [collapsedPOICategories, setCollapsedPOICategories] = React.useState<Set<string>>(new Set());
   const [collapsedEntityCategories, setCollapsedEntityCategories] = React.useState<Set<string>>(new Set());
-  const [collapsedSubtypes, setCollapsedSubtypes] = React.useState<Set<string>>(new Set());
+
   const poiSearchRef = useRef<HTMLInputElement>(null);
   const entitySearchRef = useRef<HTMLInputElement>(null);
   
@@ -32,7 +32,7 @@ const FiltersPanel: React.FC<FiltersPanelProps> = ({ onTogglePanel, filterState 
     toggleAllPOIs,
     toggleEntityCategory,
     toggleEntityType,
-    toggleEntitySubtype,
+
     toggleEntityTier,
     toggleAllEntities,
     poiTypes,
@@ -57,19 +57,7 @@ const FiltersPanel: React.FC<FiltersPanelProps> = ({ onTogglePanel, filterState 
     }
   }, [allEntities]);
 
-  // Initialize all subtypes as collapsed by default - AFTER entities is available
-  React.useEffect(() => {
-    if (allEntitiesRef.current.length > 0) {
-      const subtypeKeys = new Set<string>();
-      allEntitiesRef.current.forEach(entity => {
-        if (entity.category?.name && entity.type?.name && entity.subtype?.name) {
-          const subtypeKey = `${entity.category.name}-${entity.type.name}`;
-          subtypeKeys.add(subtypeKey);
-        }
-      });
-      setCollapsedSubtypes(subtypeKeys);
-    }
-  }, [allEntitiesRef.current]);
+
 
   // Memoize category calculations to prevent unnecessary re-renders
   const poiCategories = React.useMemo(() => 
@@ -113,7 +101,7 @@ const FiltersPanel: React.FC<FiltersPanelProps> = ({ onTogglePanel, filterState 
     [validTiers, tiers]
   );
 
-  // Render entity category section exactly like POI filters but with subtype support
+  // Render entity category section exactly like POI filters
   const renderEntityCategorySection = (category: string, columnIndex?: number) => {
     const categoryVisible = entityFilters.categories[category] !== false;
     const isCollapsed = collapsedEntityCategories.has(category);
@@ -160,7 +148,7 @@ const FiltersPanel: React.FC<FiltersPanelProps> = ({ onTogglePanel, filterState 
           </div>
         </div>
 
-        {/* Category Types - exact match to POI filters with subtype support */}
+        {/* Category Types - exact match to POI filters */}
         {!isCollapsed && (
           <div className="space-y-1 ml-2">
             {categoryTypes.map(type => {
@@ -169,23 +157,7 @@ const FiltersPanel: React.FC<FiltersPanelProps> = ({ onTogglePanel, filterState 
                 entity.category?.name === category && entity.type?.name === type
               ).length;
               
-              // Get subtypes for this type - only show if there are meaningful subtypes (not just "None")
-              const allTypeSubtypes = Array.from(new Set(
-                allEntitiesRef.current
-                  .filter(entity => 
-                    entity.category?.name === category && 
-                    entity.type?.name === type && 
-                    entity.subtype?.name
-                  )
-                  .map(entity => entity.subtype!.name)
-              )).sort();
-              
-              // Only show subtypes if there are meaningful ones (more than just "None" or has real subtypes alongside "None")
-              const meaningfulSubtypes = allTypeSubtypes.filter(subtype => subtype.toLowerCase() !== 'none');
-              const typeSubtypes = meaningfulSubtypes.length > 0 ? allTypeSubtypes : [];
 
-              const subtypeKey = `${category}-${type}`;
-              const subtypesCollapsed = collapsedSubtypes.has(subtypeKey);
               
               return (
                 <div key={`entity-type-${category}-${type}`} className="space-y-1">
@@ -219,67 +191,10 @@ const FiltersPanel: React.FC<FiltersPanelProps> = ({ onTogglePanel, filterState 
                         <Eye className="w-3 h-3" />
                       </button>
                       
-                      {/* Subtype Collapse Toggle - only show if subtypes exist */}
-                      {typeSubtypes.length > 0 && (
-                        <button
-                          onClick={() => {
-                            setCollapsedSubtypes(prev => {
-                              const newSet = new Set(prev);
-                              if (newSet.has(subtypeKey)) {
-                                newSet.delete(subtypeKey);
-                              } else {
-                                newSet.add(subtypeKey);
-                              }
-                              return newSet;
-                            });
-                          }}
-                          className="p-1 text-amber-400/70 hover:text-amber-300 hover:bg-amber-500/10 rounded transition-all duration-200"
-                          title={subtypesCollapsed ? 'Show subtypes' : 'Hide subtypes'}
-                        >
-                          <ChevronRight className={`w-3 h-3 transition-transform duration-200 ${subtypesCollapsed ? '' : 'rotate-90'}`} />
-                        </button>
-                      )}
                     </div>
                   </div>
 
-                  {/* Subtypes - collapsible, collapsed by default */}
-                  {typeSubtypes.length > 0 && !subtypesCollapsed && (
-                    <div className="ml-6 space-y-1 relative">
-                      {typeSubtypes.map((subtype) => {
-                        const subtypeEntityCount = allEntitiesRef.current.filter(entity => 
-                          entity.category?.name === category && 
-                          entity.type?.name === type && 
-                          entity.subtype?.name === subtype
-                        ).length;
 
-                        const subtypeVisible = entityFilters.subtypes?.[subtype] !== false;
-                        
-                        return (
-                          <button
-                            key={`entity-subtype-${category}-${type}-${subtype}`}
-                            onClick={() => toggleEntitySubtype(subtype, !subtypeVisible)}
-                            className={`w-full flex items-center gap-2 px-2 py-1 text-xs rounded transition-all duration-200 text-left ${
-                              subtypeVisible
-                                ? 'text-amber-200/90 bg-slate-800/40 border border-amber-400/30'
-                                : 'text-amber-200/50 bg-slate-800/20 hover:bg-slate-800/30 hover:text-amber-200/70'
-                            }`}
-                          >
-                            {/* Subtype Icon */}
-                            <div className="w-4 h-4 flex items-center justify-center flex-shrink-0">
-                              <span className="text-xs text-amber-300/50">
-                                ·
-                              </span>
-                            </div>
-                            
-                            {/* Subtype Name with Count */}
-                            <span className="font-light tracking-wide flex-1">
-                              {subtype} ({subtypeEntityCount})
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
                 </div>
               );
             })}
@@ -607,7 +522,13 @@ const FiltersPanel: React.FC<FiltersPanelProps> = ({ onTogglePanel, filterState 
         </label>
         <div className="flex gap-2">
           <button
-            onClick={toggleAllPOIs}
+            onClick={() => {
+              const allTypeIds = poiTypes.map(type => type.id);
+              const allTypesSelected = allTypeIds.length > 0 && allTypeIds.every(id => poiFilters.selectedPoiTypes.includes(id));
+              console.log('POI Hide/Show All clicked. Current selectedPoiTypes:', poiFilters.selectedPoiTypes);
+              console.log('All types selected?', allTypesSelected, 'Will call toggleAllPOIs with:', !allTypesSelected);
+              toggleAllPOIs(!allTypesSelected);
+            }}
             className="text-xs text-amber-300 hover:text-amber-100 font-light transition-all duration-300 px-2 py-1 rounded border border-amber-400/20 hover:border-amber-400/40 hover:bg-amber-400/10"
             title="Toggle All POIs"
             style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
@@ -766,7 +687,19 @@ const FiltersPanel: React.FC<FiltersPanelProps> = ({ onTogglePanel, filterState 
             Schematics
           </button>
           <button
-            onClick={toggleAllEntities}
+            onClick={() => {
+              const allCategories = Object.keys(entityFilters.categories);
+              const allTypes = Object.keys(entityFilters.types);
+              const allTiers = Object.keys(entityFilters.tiers);
+              
+              const allCategoriesSelected = allCategories.every(cat => entityFilters.categories[cat] === true);
+              const allTypesSelected = allTypes.every(type => entityFilters.types[type] === true);
+              const allTiersSelected = allTiers.every(tier => entityFilters.tiers[tier] === true);
+              
+              const allSelected = allCategoriesSelected && allTypesSelected && allTiersSelected;
+              console.log('Entity Hide/Show All clicked. All selected?', allSelected, 'Will call toggleAllEntities with:', !allSelected);
+              toggleAllEntities(!allSelected);
+            }}
             className="text-xs text-amber-300 hover:text-amber-100 font-light transition-all duration-300 px-2 py-1 rounded border border-amber-400/20 hover:border-amber-400/40 hover:bg-amber-400/10"
             title="Toggle All Entities"
             style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}

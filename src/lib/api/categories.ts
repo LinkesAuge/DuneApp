@@ -2,7 +2,7 @@ import { supabase } from '../supabase';
 
 /**
  * Categories API - Database-driven category management
- * Provides CRUD operations for the normalized category/type/subtype structure
+ * Provides CRUD operations for the normalized category/type structure
  */
 
 // TypeScript interfaces for the normalized structure
@@ -27,29 +27,14 @@ export interface Type {
   updated_at?: string;
 }
 
-export interface Subtype {
-  id: number;
-  name: string;
-  type_id: number;
-  description?: string;
-  icon?: string;
-  sort_order: number;
-  created_at?: string;
-  updated_at?: string;
-}
+
 
 // Enhanced interfaces with relationships
 export interface CategoryWithTypes extends Category {
   types?: Type[];
 }
 
-export interface TypeWithSubtypes extends Type {
-  subtypes?: Subtype[];
-  category?: Category;
-}
-
-export interface SubtypeWithParents extends Subtype {
-  type?: Type;
+export interface TypeWithCategory extends Type {
   category?: Category;
 }
 
@@ -77,14 +62,14 @@ function handleSupabaseError(error: any, operation: string): never {
 // Categories API
 export const categoriesAPI = {
   /**
-   * Get all categories with optional type/subtype loading
+   * Get all categories with optional type loading
    */
   async getAll(includeTypes = false): Promise<CategoryWithTypes[]> {
     try {
       let query = supabase
         .from('categories')
         .select(includeTypes 
-          ? '*, types(*, subtypes(*))' 
+          ? '*, types(*)' 
           : '*'
         )
         .order('sort_order', { ascending: true });
@@ -193,16 +178,13 @@ export const categoriesAPI = {
 // Types API
 export const typesAPI = {
   /**
-   * Get all types with optional category/subtype loading
+   * Get all types with category loading
    */
-  async getAll(categoryId?: number, includeSubtypes = false): Promise<TypeWithSubtypes[]> {
+  async getAll(categoryId?: number): Promise<TypeWithCategory[]> {
     try {
       let query = supabase
         .from('types')
-        .select(includeSubtypes 
-          ? '*, category:categories(*), subtypes(*)' 
-          : '*, category:categories(*)'
-        )
+        .select('*, category:categories(*)')
         .order('sort_order', { ascending: true });
 
       if (categoryId) {
@@ -225,11 +207,11 @@ export const typesAPI = {
   /**
    * Get type by ID
    */
-  async getById(id: number): Promise<TypeWithSubtypes | null> {
+  async getById(id: number): Promise<TypeWithCategory | null> {
     try {
       const { data, error } = await supabase
         .from('types')
-        .select('*, category:categories(*), subtypes(*)')
+        .select('*, category:categories(*)')
         .eq('id', id)
         .single();
 
@@ -310,122 +292,7 @@ export const typesAPI = {
   }
 };
 
-// Subtypes API
-export const subtypesAPI = {
-  /**
-   * Get all subtypes with optional parent loading
-   */
-  async getAll(typeId?: number): Promise<SubtypeWithParents[]> {
-    try {
-      let query = supabase
-        .from('subtypes')
-        .select('*, type:types(*, category:categories(*))')
-        .order('sort_order', { ascending: true });
 
-      if (typeId) {
-        query = query.eq('type_id', typeId);
-      }
-
-      const { data, error } = await query;
-
-      if (error) {
-        handleSupabaseError(error, 'fetch subtypes');
-      }
-
-      return data || [];
-    } catch (error) {
-      if (error instanceof CategoryAPIError) throw error;
-      handleSupabaseError(error, 'fetch subtypes');
-    }
-  },
-
-  /**
-   * Get subtype by ID
-   */
-  async getById(id: number): Promise<SubtypeWithParents | null> {
-    try {
-      const { data, error } = await supabase
-        .from('subtypes')
-        .select('*, type:types(*, category:categories(*))')
-        .eq('id', id)
-        .single();
-
-      if (error) {
-        if (error.code === 'PGRST116') return null; // Not found
-        handleSupabaseError(error, 'fetch subtype by ID');
-      }
-
-      return data;
-    } catch (error) {
-      if (error instanceof CategoryAPIError) throw error;
-      handleSupabaseError(error, 'fetch subtype by ID');
-    }
-  },
-
-  /**
-   * Create new subtype
-   */
-  async create(subtype: Omit<Subtype, 'id' | 'created_at' | 'updated_at'>): Promise<Subtype> {
-    try {
-      const { data, error } = await supabase
-        .from('subtypes')
-        .insert(subtype)
-        .select()
-        .single();
-
-      if (error) {
-        handleSupabaseError(error, 'create subtype');
-      }
-
-      return data;
-    } catch (error) {
-      if (error instanceof CategoryAPIError) throw error;
-      handleSupabaseError(error, 'create subtype');
-    }
-  },
-
-  /**
-   * Update subtype
-   */
-  async update(id: number, updates: Partial<Omit<Subtype, 'id' | 'created_at' | 'updated_at'>>): Promise<Subtype> {
-    try {
-      const { data, error } = await supabase
-        .from('subtypes')
-        .update({ ...updates, updated_at: new Date().toISOString() })
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (error) {
-        handleSupabaseError(error, 'update subtype');
-      }
-
-      return data;
-    } catch (error) {
-      if (error instanceof CategoryAPIError) throw error;
-      handleSupabaseError(error, 'update subtype');
-    }
-  },
-
-  /**
-   * Delete subtype
-   */
-  async delete(id: number): Promise<void> {
-    try {
-      const { error } = await supabase
-        .from('subtypes')
-        .delete()
-        .eq('id', id);
-
-      if (error) {
-        handleSupabaseError(error, 'delete subtype');
-      }
-    } catch (error) {
-      if (error instanceof CategoryAPIError) throw error;
-      handleSupabaseError(error, 'delete subtype');
-    }
-  }
-};
 
 // Utility functions for working with the hierarchy
 export const categoryHierarchyAPI = {
@@ -437,18 +304,16 @@ export const categoryHierarchyAPI = {
   },
 
   /**
-   * Get hierarchy path for an entity (category -> type -> subtype)
+   * Get hierarchy path for an entity (category -> type)
    */
-  async getEntityHierarchy(categoryId: number, typeId: number, subtypeId?: number): Promise<{
+  async getEntityHierarchy(categoryId: number, typeId: number): Promise<{
     category: Category;
     type: Type;
-    subtype?: Subtype;
   }> {
     try {
-      const [category, type, subtype] = await Promise.all([
+      const [category, type] = await Promise.all([
         categoriesAPI.getById(categoryId),
-        typesAPI.getById(typeId),
-        subtypeId ? subtypesAPI.getById(subtypeId) : Promise.resolve(null)
+        typesAPI.getById(typeId)
       ]);
 
       if (!category || !type) {
@@ -457,8 +322,7 @@ export const categoryHierarchyAPI = {
 
       return {
         category,
-        type,
-        subtype: subtype || undefined
+        type
       };
     } catch (error) {
       if (error instanceof CategoryAPIError) throw error;

@@ -7,7 +7,6 @@ import type {
   EntityWithRelations,
   Category,
   Type,
-  Subtype,
   Tier, 
   Recipe,
   RecipeIngredient,
@@ -53,7 +52,6 @@ function buildSelectWithRelations() {
     *,
           category:categories(id, name, icon, sort_order),
       type:types(id, name, icon, sort_order, category_id),
-      subtype:subtypes(id, name, icon, sort_order, type_id),
     shared_image:shared_images(id, image_url)
   `;
 }
@@ -65,8 +63,7 @@ function formatEntityWithRelations(entity: any): EntityWithRelations {
   return {
     ...entity,
     category: entity.category || undefined,
-    type: entity.type || undefined,
-    subtype: entity.subtype || undefined
+    type: entity.type || undefined
   };
 }
 
@@ -105,13 +102,7 @@ export const entitiesAPI = {
         query = query.in('type_id', filters.type_ids);
       }
 
-      if (filters.subtype_id) {
-        query = query.eq('subtype_id', filters.subtype_id);
-      }
 
-      if (filters.subtype_ids?.length) {
-        query = query.in('subtype_id', filters.subtype_ids);
-      }
 
       if (filters.tier_number !== undefined) {
         query = query.eq('tier_number', filters.tier_number);

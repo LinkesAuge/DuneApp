@@ -177,7 +177,7 @@ export const SharedImagesTest: React.FC = () => {
                   <li>Update Category display to use ImagePreview components</li>
                   <li>Add usage tracking when images are selected</li>
                   <li>Create admin interface for managing shared image library</li>
-                  <li>Extend to Type, SubType, and Tier managers</li>
+                  <li>Extend to Type and Tier managers</li>
                 </ul>
               </div>
             </div>

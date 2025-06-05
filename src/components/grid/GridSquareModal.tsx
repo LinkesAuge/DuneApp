@@ -805,9 +805,31 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
     }
   };
 
-  const handleDeletePoi = (poiId: string) => {
-    setPois(prev => prev.filter(poi => poi.id !== poiId));
-    setSuccess('POI deleted successfully');
+  const handleDeletePoi = async (poiId: string) => {
+    try {
+      // Use comprehensive deletion API that handles all cleanup
+      const { deletePOIWithCleanup } = await import('../../lib/api/pois');
+      const result = await deletePOIWithCleanup(poiId);
+
+      if (!result.success) {
+        console.error('Error deleting POI:', result.error);
+        setError(`Failed to delete POI: ${result.error}`);
+        return;
+      }
+
+      // Show warnings for non-critical errors (e.g., some files couldn't be deleted)
+      if (result.errors && result.errors.length > 0) {
+        console.warn('POI deleted with some cleanup warnings:', result.errors);
+        setError(`POI deleted successfully, but some cleanup warnings: ${result.errors.join(', ')}`);
+      }
+
+      // Update local state
+      setPois(prev => prev.filter(poi => poi.id !== poiId));
+      setSuccess('POI deleted successfully');
+    } catch (error) {
+      console.error('Error deleting POI:', error);
+      setError('Failed to delete POI');
+    }
   };
 
   const handleUpdatePoi = (updatedPoi: Poi) => {

@@ -69,6 +69,11 @@ const MapPOIMarker: React.FC<MapPOIMarkerProps> = ({
   user
 }) => {
   const { user: authUser } = useAuth();
+  
+  // Debug POI object changes
+  useEffect(() => {
+    console.log(`[MapPOIMarker] POI object updated for ${poi.id} (${poi.title}):`, poi);
+  }, [poi]);
   const [showCard, setShowCard] = useState(false);
   const [hoverTimeout, setHoverTimeout] = useState<NodeJS.Timeout | null>(null);
   const [userInfo, setUserInfo] = useState<{ 
@@ -119,6 +124,7 @@ const MapPOIMarker: React.FC<MapPOIMarkerProps> = ({
   // Check for linked schematics for indicator (runs immediately)
   useEffect(() => {
     const checkLinkedSchematics = async () => {
+      console.log(`[MapPOIMarker] Checking linked schematics for POI ${poi.id} (${poi.title})`);
       try {
         const { data: links, error } = await supabase
           .from('poi_entity_links')
@@ -136,6 +142,8 @@ const MapPOIMarker: React.FC<MapPOIMarkerProps> = ({
 
         // Check if any linked entities are schematics
         const hasSchematic = links?.some(link => link.entities?.is_schematic) || false;
+        console.log(`[MapPOIMarker] POI ${poi.id}: Found ${links?.length || 0} links, has schematics: ${hasSchematic}`);
+        console.log(`[MapPOIMarker] POI ${poi.id}: Previous hasLinkedSchematics: ${hasLinkedSchematics}, New: ${hasSchematic}`);
         setHasLinkedSchematics(hasSchematic);
       } catch (error) {
         console.error('Error checking linked schematics:', error);
@@ -143,7 +151,7 @@ const MapPOIMarker: React.FC<MapPOIMarkerProps> = ({
     };
 
     checkLinkedSchematics();
-  }, [poi.id]);
+  }, [poi.id, poi]);
 
   // Fetch linked items for tooltip
   useEffect(() => {
@@ -187,7 +195,7 @@ const MapPOIMarker: React.FC<MapPOIMarkerProps> = ({
     };
 
     fetchLinkedItems();
-  }, [poi.id, showCard]);
+  }, [poi.id, showCard, poi]);
 
   // Note: Removed debug highlighting logs to reduce console noise
 

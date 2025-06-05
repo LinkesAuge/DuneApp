@@ -22,6 +22,8 @@ const POILinkFiltersPanel: React.FC<POILinkFiltersPanelProps> = ({
   filterOptions = { poiTypes: [], entityCategories: [], entityTypes: [], tiers: [] }
 }) => {
   const { filters, setFilters } = filterState;
+  
+  console.log('POILinkFiltersPanel rendered with filters:', filters);
   const [activeTab, setActiveTab] = React.useState<'poi' | 'entity'>('poi');
   const [collapsedPOICategories, setCollapsedPOICategories] = React.useState<Set<string>>(new Set());
   const [collapsedEntityCategories, setCollapsedEntityCategories] = React.useState<Set<string>>(new Set());
@@ -287,25 +289,24 @@ const POILinkFiltersPanel: React.FC<POILinkFiltersPanelProps> = ({
         <div className="flex gap-2">
           <button
             onClick={() => {
-              const allCategories = poiCategories;
               const currentCategories = filters.poiCategories || [];
-              const allSelected = allCategories.length > 0 && allCategories.every(cat => currentCategories.includes(cat));
-              if (allSelected) {
+              console.log('POI Hide/Show All clicked. Current categories:', currentCategories);
+              if (currentCategories.length > 0) {
+                // If any categories are selected, hide all
+                console.log('Setting POI categories to []');
                 setFilters({ ...filters, poiCategories: [] });
               } else {
-                setFilters({ ...filters, poiCategories: [...allCategories] });
+                // If no categories are selected, show all
+                const allCategories = [...new Set(filterOptions.poiTypes.map(pt => pt.category))];
+                console.log('Setting POI categories to all:', allCategories);
+                setFilters({ ...filters, poiCategories: allCategories });
               }
             }}
             className="text-xs text-amber-300 hover:text-amber-100 font-light transition-all duration-300 px-2 py-1 rounded border border-amber-400/20 hover:border-amber-400/40 hover:bg-amber-400/10"
             title="Toggle All POIs"
             style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
           >
-            {(() => {
-              const allCategories = poiCategories;
-              const currentCategories = filters.poiCategories || [];
-              const allSelected = allCategories.length > 0 && allCategories.every(cat => currentCategories.includes(cat));
-              return allSelected ? 'Hide All' : 'Show All';
-            })()}
+            {(filters.poiCategories || []).length > 0 ? 'Hide All' : 'Show All'}
           </button>
         </div>
       </div>
@@ -400,52 +401,42 @@ const POILinkFiltersPanel: React.FC<POILinkFiltersPanelProps> = ({
         <div className="flex gap-2">
           <button
             onClick={() => {
-              const allCategories = filterOptions.entityCategories;
-              const allTypes = filterOptions.entityTypes;
-              const allTiers = filterOptions.tiers.map(t => t.id.toString());
-              
               const currentCategories = filters.entityCategories || [];
               const currentTypes = filters.entityTypes || [];
               const currentTiers = filters.entityTiers || [];
               
-              const allCategoriesSelected = allCategories.length > 0 && allCategories.every(cat => currentCategories.includes(cat));
-              const allTypesSelected = allTypes.length > 0 && allTypes.every(type => currentTypes.includes(type));
-              const allTiersSelected = allTiers.length > 0 && allTiers.every(tier => currentTiers.includes(tier));
-              
-                             if (allCategoriesSelected && allTypesSelected && allTiersSelected) {
-                 setFilters({ 
-                   ...filters,
-                   entityCategories: [], 
-                   entityTypes: [], 
-                   entityTiers: [] 
-                 });
-               } else {
-                 setFilters({ 
-                   ...filters,
-                   entityCategories: [...allCategories], 
-                   entityTypes: [...allTypes], 
-                   entityTiers: [...allTiers] 
-                 });
-               }
+              // If any entity filters are selected, hide all
+              if (currentCategories.length > 0 || currentTypes.length > 0 || currentTiers.length > 0) {
+                setFilters({ 
+                  ...filters,
+                  entityCategories: [], 
+                  entityTypes: [], 
+                  entityTiers: [] 
+                });
+              } else {
+                // If no entity filters are selected, show all
+                const allCategories = filterOptions.entityCategories;
+                const allTypes = filterOptions.entityTypes;
+                const allTiers = filterOptions.tiers.map(t => t.id.toString());
+                
+                setFilters({ 
+                  ...filters,
+                  entityCategories: [...allCategories], 
+                  entityTypes: [...allTypes], 
+                  entityTiers: [...allTiers] 
+                });
+              }
             }}
             className="text-xs text-amber-300 hover:text-amber-100 font-light transition-all duration-300 px-2 py-1 rounded border border-amber-400/20 hover:border-amber-400/40 hover:bg-amber-400/10"
             title="Toggle All Entities"
             style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
           >
             {(() => {
-              const allCategories = filterOptions.entityCategories;
-              const allTypes = filterOptions.entityTypes;
-              const allTiers = filterOptions.tiers.map(t => t.id.toString());
-              
               const currentCategories = filters.entityCategories || [];
               const currentTypes = filters.entityTypes || [];
               const currentTiers = filters.entityTiers || [];
               
-              const allCategoriesSelected = allCategories.length > 0 && allCategories.every(cat => currentCategories.includes(cat));
-              const allTypesSelected = allTypes.length > 0 && allTypes.every(type => currentTypes.includes(type));
-              const allTiersSelected = allTiers.length > 0 && allTiers.every(tier => currentTiers.includes(tier));
-              
-              return (allCategoriesSelected && allTypesSelected && allTiersSelected) ? 'Hide All' : 'Show All';
+              return (currentCategories.length > 0 || currentTypes.length > 0 || currentTiers.length > 0) ? 'Hide All' : 'Show All';
             })()}
           </button>
         </div>

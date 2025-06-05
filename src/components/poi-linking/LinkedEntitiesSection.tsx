@@ -18,9 +18,12 @@ import {
 } from 'lucide-react';
 import { EntityWithRelations, POIEntityLinkWithDetails } from '../../types/unified-entities';
 import { useTiers } from '../../hooks/useTiers';
+import { useCategories } from '../../hooks/useCategories';
+import { useTypes } from '../../hooks/useTypes';
 import { poiEntityLinksAPI } from '../../lib/api/poi-entity-links';
 import { ImagePreview } from '../shared/ImagePreview';
 import { useAuth } from '../auth/AuthProvider';
+import { ConfirmationModal } from '../shared/ConfirmationModal';
 import POIEntityLinkingModal from './POIEntityLinkingModal';
 
 interface LinkedEntitiesSectionProps {
@@ -41,6 +44,8 @@ const LinkedEntitiesSection: React.FC<LinkedEntitiesSectionProps> = ({
   onLinksChanged
 }) => {
   const { getTierName } = useTiers();
+  const { getCategoryName } = useCategories();
+  const { getTypeName } = useTypes();
   const { user } = useAuth();
   
   // State management
@@ -49,6 +54,8 @@ const LinkedEntitiesSection: React.FC<LinkedEntitiesSectionProps> = ({
   const [itemsExpanded, setItemsExpanded] = useState(true);
   const [schematicsExpanded, setSchematicsExpanded] = useState(true);
   const [showLinkingModal, setShowLinkingModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [entityToDelete, setEntityToDelete] = useState<{ poiId: string; entityId: string; entityName: string } | null>(null);
   
   // Debug: Log modal state changes
   useEffect(() => {
@@ -62,7 +69,9 @@ const LinkedEntitiesSection: React.FC<LinkedEntitiesSectionProps> = ({
   const loadEntityLinks = async () => {
     try {
       setLoading(true);
+      console.log('LinkedEntitiesSection: Loading entity links for POI:', poiId);
       const links = await poiEntityLinksAPI.getPOIEntityLinks(poiId);
+      console.log('LinkedEntitiesSection: Loaded', links.length, 'entity links');
       setEntityLinks(links);
     } catch (error) {
       console.error('Failed to load entity links:', error);
@@ -74,7 +83,11 @@ const LinkedEntitiesSection: React.FC<LinkedEntitiesSectionProps> = ({
 
   // Handle links updated
   const handleLinksUpdated = () => {
-    loadEntityLinks();
+    console.log('LinkedEntitiesSection: handleLinksUpdated called, reloading entity links...');
+    // Add a small delay to ensure database has been updated
+    setTimeout(() => {
+      loadEntityLinks();
+    }, 100);
     onLinksChanged?.();
   };
 
@@ -84,17 +97,35 @@ const LinkedEntitiesSection: React.FC<LinkedEntitiesSectionProps> = ({
 
 
 
-  // Handle link deletion
-  const removeEntityLink = async (poiId: string, entityId: string) => {
-    if (!confirm('Are you sure you want to remove this entity link?')) return;
+  // Handle link deletion - show confirmation modal
+  const handleDeleteClick = (poiId: string, entityId: string, entityName: string, event: React.MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setEntityToDelete({ poiId, entityId, entityName });
+    setShowDeleteConfirm(true);
+  };
+
+  // Confirm link deletion
+  const confirmDeleteLink = async () => {
+    if (!entityToDelete) return;
     
     try {
-      await poiEntityLinksAPI.unlinkEntityFromPOI(poiId, entityId);
+      await poiEntityLinksAPI.unlinkEntityFromPOI(entityToDelete.poiId, entityToDelete.entityId);
       loadEntityLinks();
       onLinksChanged?.();
+      setShowDeleteConfirm(false);
+      setEntityToDelete(null);
     } catch (error) {
       console.error('Failed to remove entity link:', error);
+      setShowDeleteConfirm(false);
+      setEntityToDelete(null);
     }
+  };
+
+  // Cancel deletion
+  const cancelDelete = () => {
+    setShowDeleteConfirm(false);
+    setEntityToDelete(null);
   };
 
   // Navigate to unified entities page (filtered by entity)
@@ -154,11 +185,11 @@ const LinkedEntitiesSection: React.FC<LinkedEntitiesSectionProps> = ({
                 </span>
                 
                 <span className="text-xs px-1.5 py-0.5 bg-slate-600/50 text-amber-200/80 rounded border border-slate-600">
-                  {typeof entity.category === 'object' ? entity.category?.name : entity.category || 'Unknown Category'}
+                  {getCategoryName(entity.category_id) || 'Unknown Category'}
                 </span>
                 
                 <span className="text-xs px-1.5 py-0.5 bg-slate-600/50 text-amber-200/80 rounded border border-slate-600">
-                  {typeof entity.type === 'object' ? entity.type?.name : entity.type || 'Unknown Type'}
+                  {getTypeName(entity.type_id) || 'Unknown Type'}
                 </span>
                 
                 {entity.tier_number > 0 && (
@@ -187,7 +218,7 @@ const LinkedEntitiesSection: React.FC<LinkedEntitiesSectionProps> = ({
           {canEdit && (
             <div className="flex items-center gap-0.5 ml-2">
               <button
-                onClick={() => removeEntityLink(link.poi_id, link.entity_id)}
+                onClick={(e) => handleDeleteClick(link.poi_id, link.entity_id, entity.name, e)}
                 className="p-1 hover:bg-slate-700/50 rounded text-red-400/70 hover:text-red-400 transition-colors"
                 title="Remove link"
               >
@@ -320,6 +351,18 @@ const LinkedEntitiesSection: React.FC<LinkedEntitiesSectionProps> = ({
         poiTitle={poiTitle}
         existingEntityIds={entityLinks.map(link => link.entity_id)}
         onLinksUpdated={handleLinksUpdated}
+      />
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showDeleteConfirm}
+        onClose={cancelDelete}
+        onConfirm={confirmDeleteLink}
+        variant="danger"
+        title="Remove Entity Link"
+        message={entityToDelete ? `Are you sure you want to remove "${entityToDelete.entityName}" from this POI? This action cannot be undone.` : ''}
+        confirmButtonText="Remove Link"
+        cancelButtonText="Cancel"
       />
     </div>
   );

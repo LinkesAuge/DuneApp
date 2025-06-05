@@ -10,7 +10,7 @@ import {
 } from '../../types/unified-entities';
 
 /**
- * Entities API - Updated for normalized category/type/subtype structure
+ * Entities API - Updated for normalized category/type structure
  * Provides CRUD operations for unified entities with foreign key relationships
  */
   
@@ -28,8 +28,7 @@ import {
 export interface EntityWithHierarchy extends EntityNormalized {
   category_name?: string;
   type_name?: string;
-  subtype_name?: string;
-  hierarchy_path?: string; // "Category > Type > Subtype"
+  hierarchy_path?: string; // "Category > Type"
   tier_name?: string;
   shared_image?: {
     id: string;
@@ -42,7 +41,6 @@ export interface EntityFiltersNormalized {
   search?: string;
   category_ids?: number[];
   type_ids?: number[];
-  subtype_ids?: number[];
   tier_numbers?: number[];
   is_schematic?: boolean;
   is_global?: boolean;
@@ -51,7 +49,6 @@ export interface EntityFiltersNormalized {
   // Legacy support (DEPRECATED)
   categories?: string[];
   types?: string[];
-  subtypes?: string[];
 }
 
 // API Error handling
@@ -81,7 +78,6 @@ function buildSelectWithHierarchy() {
     *,
           category:categories(id, name, icon),
       type:types(id, name, icon),
-      subtype:subtypes(id, name, icon),
     tier:tiers(tier_number, tier_name),
     shared_image:shared_images(id, image_url)
   `;
@@ -95,18 +91,15 @@ function formatEntityWithHierarchy(entity: any): EntityWithHierarchy {
     ...entity,
     category_name: entity.category?.name,
     type_name: entity.type?.name,
-    subtype_name: entity.subtype?.name,
     tier_name: entity.tier?.tier_name,
     hierarchy_path: [
       entity.category?.name,
-      entity.type?.name,
-      entity.subtype?.name
+      entity.type?.name
     ].filter(Boolean).join(' > '),
     
     // Add legacy text fields for backwards compatibility
     category: entity.category?.name,
-    type: entity.type?.name,
-    subtype: entity.subtype?.name
+    type: entity.type?.name
   };
 }
 
@@ -135,9 +128,7 @@ export const entitiesNormalizedAPI = {
         query = query.in('type_id', filters.type_ids);
       }
 
-      if (filters.subtype_ids?.length) {
-        query = query.in('subtype_id', filters.subtype_ids);
-      }
+
 
       if (filters.tier_numbers?.length) {
         query = query.in('tier_number', filters.tier_numbers);
@@ -227,8 +218,7 @@ export const entitiesNormalizedAPI = {
       // Verify hierarchy exists
       await categoryHierarchyAPI.getEntityHierarchy(
         entity.category_id, 
-        entity.type_id, 
-        entity.subtype_id
+        entity.type_id
       );
 
       const { data, error } = await supabase
@@ -254,7 +244,7 @@ export const entitiesNormalizedAPI = {
   async update(id: string, updates: Partial<Omit<EntityNormalized, 'id' | 'created_at' | 'updated_at'>>): Promise<EntityWithHierarchy> {
     try {
       // If hierarchy fields are being updated, validate them
-      if (updates.category_id || updates.type_id || updates.subtype_id !== undefined) {
+      if (updates.category_id || updates.type_id) {
         // Get current entity to fill in missing hierarchy fields
         const currentEntity = await this.getById(id);
         if (!currentEntity) {
@@ -263,10 +253,9 @@ export const entitiesNormalizedAPI = {
 
         const categoryId = updates.category_id || currentEntity.category_id;
         const typeId = updates.type_id || currentEntity.type_id;
-        const subtypeId = updates.subtype_id !== undefined ? updates.subtype_id : currentEntity.subtype_id;
 
         // Verify hierarchy exists
-        await categoryHierarchyAPI.getEntityHierarchy(categoryId, typeId, subtypeId);
+        await categoryHierarchyAPI.getEntityHierarchy(categoryId, typeId);
       }
 
       const { data, error } = await supabase
@@ -349,12 +338,11 @@ export const entitiesNormalizedAPI = {
   },
 
   /**
-   * Get unique category/type/subtype combinations for filtering UI
+   * Get unique category/type combinations for filtering UI
    */
   async getFilterOptions(): Promise<{
     categories: Array<{id: number, name: string, count: number}>;
     types: Array<{id: number, name: string, category_id: number, count: number}>;
-    subtypes: Array<{id: number, name: string, type_id: number, count: number}>;
     tiers: Array<{tier_number: number, tier_name: string, count: number}>;
   }> {
     try {
@@ -378,15 +366,7 @@ export const entitiesNormalizedAPI = {
         handleSupabaseError(typeError, 'fetch type options');
       }
 
-      // Get subtype counts
-      const { data: subtypeData, error: subtypeError } = await supabase
-        .from('entities')
-        .select('subtype_id, type_id, subtype:subtypes(id, name, type_id)')
-        .not('subtype_id', 'is', null);
 
-      if (subtypeError) {
-        handleSupabaseError(subtypeError, 'fetch subtype options');
-      }
 
       // Get tier counts
       const { data: tierData, error: tierError } = await supabase
@@ -424,18 +404,7 @@ export const entitiesNormalizedAPI = {
         }
       });
 
-      const subtypeMap = new Map();
-      subtypeData?.forEach(item => {
-        if (item.subtype) {
-          const key = item.subtype.id;
-          subtypeMap.set(key, {
-            id: item.subtype.id,
-            name: item.subtype.name,
-            type_id: item.subtype.type_id,
-            count: (subtypeMap.get(key)?.count || 0) + 1
-          });
-        }
-      });
+
 
       const tierMap = new Map();
       tierData?.forEach(item => {
@@ -452,7 +421,6 @@ export const entitiesNormalizedAPI = {
       return {
         categories: Array.from(categoryMap.values()).sort((a, b) => a.name.localeCompare(b.name)),
         types: Array.from(typeMap.values()).sort((a, b) => a.name.localeCompare(b.name)),
-        subtypes: Array.from(subtypeMap.values()).sort((a, b) => a.name.localeCompare(b.name)),
         tiers: Array.from(tierMap.values()).sort((a, b) => a.tier_number - b.tier_number)
       };
     } catch (error) {

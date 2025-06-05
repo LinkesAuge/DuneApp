@@ -20,11 +20,7 @@ interface Type {
   category_id: string;
 }
 
-interface SubType {
-  id: string;
-  name: string;
-  type_id: string;
-}
+
 
 interface DropdownOption {
   id: string;
@@ -62,7 +58,6 @@ interface SchematicValidation {
 interface FieldResolutionParams {
   categoryId?: string;
   typeId?: string;
-  subtypeId?: string;
 }
 
 interface FieldResolutionResult {
@@ -248,29 +243,7 @@ export async function fetchTypesByCategory(categoryId: string): Promise<Type[]> 
   }
 }
 
-/**
- * Fetches subtypes for a specific type (derived from entities)
- */
-export async function fetchSubTypesByType(typeId: string): Promise<SubType[]> {
-  try {
-    const response = await entitiesAPI.getAll({ limit: 1000 });
-    const entities = response.data.filter(e => e.type === typeId && e.subtype);
-    
-    // Extract unique subtypes
-    const subtypes = Array.from(new Set(entities.map(e => e.subtype).filter(Boolean)))
-      .sort()
-      .map(name => ({
-        id: name!,
-        name: name!,
-        type_id: typeId
-      }));
-    
-    return subtypes;
-  } catch (error) {
-    console.error('Error fetching subtypes:', error);
-    return [];
-  }
-}
+
 
 /**
  * Legacy dropdown groups - simplified in unified system
@@ -337,12 +310,10 @@ export function getDropdownDisplayText(
 export function buildHierarchicalName(
   name: string,
   categoryName?: string,
-  typeName?: string,
-  subtypeName?: string
+  typeName?: string
 ): string {
   const parts = [name];
   if (categoryName) parts.unshift(categoryName);
   if (typeName) parts.unshift(typeName);
-  if (subtypeName) parts.unshift(subtypeName);
   return parts.join(' > ');
 } 

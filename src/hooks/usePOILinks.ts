@@ -58,6 +58,7 @@ export const usePOILinks = (): UsePOILinksReturn => {
   // Expansion state
   const [expandedPOIs, setExpandedPOIsState] = useState<Set<string>>(new Set());
   const [hasInitialized, setHasInitialized] = useState(false);
+  const [filtersInitialized, setFiltersInitialized] = useState(false); // Track if filters have been initialized
 
   // Fetch filter options data
   const fetchFilterOptions = useCallback(async () => {
@@ -89,20 +90,23 @@ export const usePOILinks = (): UsePOILinksReturn => {
       setEntityCategories(categories);
       setEntityTypes(types);
 
-      // Initialize filters with all options selected
-      setFiltersState(prev => ({
-        ...prev,
-        privacyLevels: ['global', 'private', 'shared'], // All privacy levels selected by default
-        poiCategories: [...new Set(poiTypesData?.map(pt => pt.category) || [])],
-        entityCategories: [...categories],
-        entityTypes: [...types],
-        entityTiers: tiers.map(t => t.tier_number.toString())
-      }));
+      // Only initialize filters on first load, not on every change
+      if (!filtersInitialized) {
+        setFiltersState(prev => ({
+          ...prev,
+          privacyLevels: ['global', 'private', 'shared'], // All privacy levels selected by default
+          poiCategories: [...new Set(poiTypesData?.map(pt => pt.category) || [])],
+          entityCategories: [...categories],
+          entityTypes: [...types],
+          entityTiers: tiers.map(t => t.tier_number.toString())
+        }));
+        setFiltersInitialized(true);
+      }
 
     } catch (error) {
       console.error('Error fetching filter options:', error);
     }
-  }, [tiers]);
+  }, [filtersInitialized]);
 
   // Fetch raw POI links data
   const fetchData = useCallback(async () => {
@@ -143,7 +147,6 @@ export const usePOILinks = (): UsePOILinksReturn => {
             name,
             category_id,
             type_id,
-            subtype_id,
             tier_number,
             icon,
             icon_image_id,
@@ -153,10 +156,6 @@ export const usePOILinks = (): UsePOILinksReturn => {
               name
             ),
             types (
-              id,
-              name
-            ),
-            subtypes (
               id,
               name
             ),
@@ -179,20 +178,40 @@ export const usePOILinks = (): UsePOILinksReturn => {
     }
   }, [user]);
 
-  // Apply filters to raw data
+  // Apply filters to raw data with two-stage filtering
   const filteredData = useMemo(() => {
     if (!rawData.length) return [];
 
-    return rawData.filter(link => {
-      const poi = link.pois;
-      const entity = link.entities;
+    console.log('Filtering with filters:', filters);
 
-      // Search filter
+    // Stage 1: Group data by POI and apply POI-level filters
+    const poiGroups = new Map<string, { poi: any; links: any[] }>();
+    
+    // Group all links by POI
+    rawData.forEach(link => {
+      const poiId = link.poi_id;
+      if (!poiGroups.has(poiId)) {
+        poiGroups.set(poiId, {
+          poi: link.pois,
+          links: []
+        });
+      }
+      poiGroups.get(poiId)!.links.push(link);
+    });
+
+    // Stage 2: Filter POIs based on POI criteria
+    const filteredPOIs = Array.from(poiGroups.values()).filter(({ poi }) => {
+      // Search filter (POI level)
       if (filters.search) {
         const searchTerm = filters.search.toLowerCase();
         const titleMatch = poi.title?.toLowerCase().includes(searchTerm);
-        const entityMatch = entity.name?.toLowerCase().includes(searchTerm);
-        if (!titleMatch && !entityMatch) return false;
+        if (!titleMatch) {
+          // Also check if any entity in this POI matches search
+          const entityMatch = poiGroups.get(poi.id)?.links.some(link => 
+            link.entities.name?.toLowerCase().includes(searchTerm)
+          );
+          if (!titleMatch && !entityMatch) return false;
+        }
       }
 
       // Map type filter
@@ -206,44 +225,64 @@ export const usePOILinks = (): UsePOILinksReturn => {
         if (!filters.privacyLevels.includes(poi.privacy_level)) return false;
       }
 
-      // POI category filter
+      // POI category filter - independent of entity filters
       if (filters.poiCategories.length === 0) {
         // Empty array means hide all POIs
+        console.log('POI category filter: hiding all POIs (empty filter array)');
         return false;
       } else {
         const poiCategory = poi.poi_types?.category;
-        if (!poiCategory || !filters.poiCategories.includes(poiCategory)) return false;
-      }
-
-      // Entity category filter
-      if (filters.entityCategories.length === 0) {
-        // Empty array means hide all entities
-        return false;
-      } else {
-        const entityCategory = entity.categories?.name;
-        if (!entityCategory || !filters.entityCategories.includes(entityCategory)) return false;
-      }
-
-      // Entity type filter
-      if (filters.entityTypes.length === 0) {
-        // Empty array means hide all entity types
-        return false;
-      } else {
-        const entityType = entity.types?.name;
-        if (!entityType || !filters.entityTypes.includes(entityType)) return false;
-      }
-
-      // Entity tier filter
-      if (filters.entityTiers.length === 0) {
-        // Empty array means hide all entity tiers
-        return false;
-      } else {
-        const tierNumber = entity.tier_number?.toString();
-        if (!filters.entityTiers.includes(tierNumber)) return false;
+        if (!poiCategory || !filters.poiCategories.includes(poiCategory)) {
+          console.log(`POI category filter: hiding POI "${poi.title}" with category "${poiCategory}" (not in filter list)`);
+          return false;
+        }
       }
 
       return true;
     });
+
+    // Stage 3: For each filtered POI, filter its entity links
+    const resultLinks: any[] = [];
+    
+    filteredPOIs.forEach(({ poi, links }) => {
+      // If entity filters are all empty, show POI with no entities (hide all entities)
+      if (filters.entityCategories.length === 0 && 
+          filters.entityTypes.length === 0 && 
+          filters.entityTiers.length === 0) {
+        // Don't add any entity links for this POI
+        return;
+      }
+
+      // Filter entity links for this POI
+      const filteredEntityLinks = links.filter(link => {
+        const entity = link.entities;
+
+        // Entity category filter
+        if (filters.entityCategories.length > 0) {
+          const entityCategory = entity.categories?.name;
+          if (!entityCategory || !filters.entityCategories.includes(entityCategory)) return false;
+        }
+
+        // Entity type filter  
+        if (filters.entityTypes.length > 0) {
+          const entityType = entity.types?.name;
+          if (!entityType || !filters.entityTypes.includes(entityType)) return false;
+        }
+
+        // Entity tier filter
+        if (filters.entityTiers.length > 0) {
+          const tierNumber = entity.tier_number?.toString();
+          if (!filters.entityTiers.includes(tierNumber)) return false;
+        }
+
+        return true;
+      });
+
+      // Add filtered entity links for this POI
+      resultLinks.push(...filteredEntityLinks);
+    });
+
+    return resultLinks;
   }, [rawData, filters]);
 
   // Transform data to tree structure

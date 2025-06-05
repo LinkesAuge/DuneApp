@@ -71,8 +71,12 @@ const CommentsList: React.FC<CommentsListProps> = ({
           screenshots:comment_screenshots(
             id,
             url,
+            original_url,
+            crop_details,
             uploaded_by,
             upload_date,
+            updated_by,
+            updated_at,
             file_size,
             file_name
           )

@@ -132,6 +132,70 @@ export const uploadMultipleImagesWithConversion = async (
   return results;
 };
 
+/**
+ * Upload POI screenshot (original version) with optimized settings
+ */
+export const uploadPoiScreenshotOriginal = async (
+  file: File,
+  fileName: string
+): Promise<UploadResult> => {
+  return uploadImageWithConversion(file, fileName, {
+    bucket: 'screenshots',
+    folder: 'poi_screenshots_original',
+    quality: 'high', // Keep originals at high quality
+    maxWidth: 2048,
+    maxHeight: 2048
+  });
+};
+
+/**
+ * Upload POI screenshot (cropped/display version) with optimized settings
+ */
+export const uploadPoiScreenshotCropped = async (
+  file: File,
+  fileName: string
+): Promise<UploadResult> => {
+  return uploadImageWithConversion(file, fileName, {
+    bucket: 'screenshots',
+    folder: 'poi_screenshots_cropped',
+    quality: 'standard',
+    maxWidth: 1920,
+    maxHeight: 1920
+  });
+};
+
+/**
+ * Upload comment screenshot (original version) with optimized settings
+ */
+export const uploadCommentScreenshotOriginal = async (
+  file: File,
+  fileName: string
+): Promise<UploadResult> => {
+  return uploadImageWithConversion(file, fileName, {
+    bucket: 'screenshots',
+    folder: 'comment_screenshots_original',
+    quality: 'high', // Keep originals at high quality
+    maxWidth: 2048,
+    maxHeight: 2048
+  });
+};
+
+/**
+ * Upload comment screenshot (cropped/display version) with optimized settings
+ */
+export const uploadCommentScreenshotCropped = async (
+  file: File,
+  fileName: string
+): Promise<UploadResult> => {
+  return uploadImageWithConversion(file, fileName, {
+    bucket: 'screenshots',
+    folder: 'comment_screenshots_cropped',
+    quality: 'standard',
+    maxWidth: 1920,
+    maxHeight: 1920
+  });
+};
+
 // Legacy function for backward compatibility - now with WebP conversion
 export const uploadImageToSupabase = async (
   file: File,
@@ -149,6 +213,7 @@ export const uploadImageToSupabase = async (
 
 /**
  * Upload POI screenshot with optimized settings
+ * @deprecated Use uploadPoiScreenshotOriginal or uploadPoiScreenshotCropped instead
  */
 export const uploadPoiScreenshot = async (
   file: File,
@@ -163,8 +228,6 @@ export const uploadPoiScreenshot = async (
     maxHeight: 1920
   });
 };
-
-
 
 /**
  * Upload avatar with high quality settings
@@ -184,6 +247,7 @@ export const uploadAvatar = async (
 
 /**
  * Upload comment screenshot with standard quality settings
+ * @deprecated Use uploadCommentScreenshotOriginal or uploadCommentScreenshotCropped instead
  */
 export const uploadCommentScreenshot = async (
   file: File,

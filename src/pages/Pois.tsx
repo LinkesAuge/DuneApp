@@ -12,6 +12,7 @@ import { useAuth } from '../components/auth/AuthProvider';
 import { useNavigate } from 'react-router-dom';
 import POIFilters from '../components/filters/POIFilters';
 import { ConfirmationModal } from '../components/shared/ConfirmationModal';
+import { deletePOIWithCleanup } from '../lib/api/pois';
 
 const isPoiTypeIconUrl = (iconValue: string | null | undefined): iconValue is string => 
   typeof iconValue === 'string' && (iconValue.startsWith('http://') || iconValue.startsWith('https://'));
@@ -350,12 +351,21 @@ const PoisPage: React.FC = () => {
     if (!poiToDelete) return;
     
     try {
-      const { error } = await supabase
-        .from('pois')
-        .delete()
-        .eq('id', poiToDelete.id);
+      // Use comprehensive deletion API that handles all cleanup
+      const result = await deletePOIWithCleanup(poiToDelete.id);
 
-      if (error) throw error;
+      if (!result.success) {
+        console.error('Error deleting POI:', result.error);
+        setError(`Failed to delete POI: ${result.error}`);
+        return;
+      }
+
+      // Show warnings for non-critical errors (e.g., some files couldn't be deleted)
+      if (result.errors && result.errors.length > 0) {
+        console.warn('POI deleted with some cleanup warnings:', result.errors);
+        setError(`POI deleted successfully, but some cleanup warnings: ${result.errors.join(', ')}`);
+      }
+
       setPois(prev => prev.filter(poi => poi.id !== poiToDelete.id));
 
       // Close confirmation modal
@@ -816,7 +826,7 @@ const PoisPage: React.FC = () => {
           }}
           onConfirm={performPoiDeletion}
           title="Delete POI"
-          message={`Are you sure you want to delete "${poiToDelete.title}"? This action cannot be undone and will also delete all associated screenshots.`}
+          message={`Are you sure you want to delete "${poiToDelete.title}"? This action cannot be undone and will delete all associated screenshots, comments, and entity links.`}
           confirmButtonText="Delete POI"
           cancelButtonText="Cancel"
           variant="danger"

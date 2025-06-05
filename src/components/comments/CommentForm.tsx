@@ -6,7 +6,7 @@ import EmojiTextArea from '../common/EmojiTextArea';
 import ImageCropModal from '../grid/ImageCropModal';
 import { PixelCrop } from 'react-image-crop';
 import { v4 as uuidv4 } from 'uuid';
-import { uploadCommentScreenshot } from '../../lib/imageUpload';
+import { uploadCommentScreenshotOriginal, uploadCommentScreenshotCropped } from '../../lib/imageUpload';
 import { formatConversionStats } from '../../lib/imageUtils';
 
 interface CommentFormProps {
@@ -20,9 +20,10 @@ interface CommentFormProps {
 // Simple screenshot file interface (based on POI pattern)
 interface ScreenshotFile {
   id: string;
-  file: File;
+  originalFile: File; // The original uploaded file (always preserved)
+  displayFile: File; // The file to be shown (cropped or same as original)
   cropDetails: PixelCrop | null;
-  previewUrl: string;
+  previewUrl: string; // Preview URL for the display file
 }
 
 const CommentForm: React.FC<CommentFormProps> = ({
@@ -117,7 +118,8 @@ const CommentForm: React.FC<CommentFormProps> = ({
 
     const newScreenshot: ScreenshotFile = {
       id: uuidv4(),
-      file: processedFile,
+      originalFile: tempImageFile, // Keep the original file
+      displayFile: processedFile, // Use the cropped file for display
       cropDetails: isFullImage ? null : cropData,
       previewUrl: URL.createObjectURL(processedFile),
     };
@@ -196,13 +198,19 @@ const CommentForm: React.FC<CommentFormProps> = ({
       // 2. Then upload screenshots and create screenshot records
       for (let i = 0; i < screenshots.length; i++) {
         const screenshot = screenshots[i];
-        const fileName = `${user.id}/${uuidv4()}-${screenshot.file.name.replace(/\.[^/.]+$/, '.webp')}`;
+        const screenshotId = uuidv4();
         
-        const uploadResult = await uploadCommentScreenshot(screenshot.file, fileName);
+        // Upload original file
+        const originalFileName = `${user.id}/${screenshotId}_original.webp`;
+        const originalUploadResult = await uploadCommentScreenshotOriginal(screenshot.originalFile, originalFileName);
+        
+        // Upload display file (cropped or same as original)
+        const displayFileName = `${user.id}/${screenshotId}_display.webp`;
+        const displayUploadResult = await uploadCommentScreenshotCropped(screenshot.displayFile, displayFileName);
 
         // Show conversion feedback for first upload
-        if (i === 0 && uploadResult.compressionRatio) {
-          const stats = formatConversionStats(uploadResult);
+        if (i === 0 && displayUploadResult.compressionRatio) {
+          const stats = formatConversionStats(displayUploadResult);
           setConversionStats(stats);
           
           // Clear stats after 5 seconds
@@ -214,10 +222,13 @@ const CommentForm: React.FC<CommentFormProps> = ({
           .from('comment_screenshots')
           .insert({
             comment_id: commentData.id,
-            url: uploadResult.url,
+            url: displayUploadResult.url, // Display URL (cropped or original)
+            original_url: originalUploadResult.url, // Original URL
+            crop_details: screenshot.cropDetails, // Store the crop data
             uploaded_by: user.id,
-            file_size: screenshot.file.size,
-            file_name: screenshot.file.name
+            file_size: screenshot.displayFile.size,
+            file_name: screenshot.displayFile.name,
+            upload_date: new Date().toISOString()
           });
 
         if (screenshotError) throw screenshotError;

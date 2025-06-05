@@ -11,7 +11,7 @@ import type {
   Tier,
   Category,
   Type,
-  SubType,
+
   FieldDefinition,
   DropdownGroup,
   Item,
@@ -482,8 +482,7 @@ export function checkPermission(context: PermissionContext): PermissionCheckResu
     case 'type':
       return checkTypePermission(user, action, entity as Type);
     
-    case 'subtype':
-      return checkTypePermission(user, action, entity as SubType);
+
     
     case 'field_definition':
       return checkFieldDefinitionPermission(user, action, entity as FieldDefinition);
@@ -515,7 +514,7 @@ export function calculateUserCapabilities(user: User | null): ItemsSchematicsCap
       canManageTiers: false,
       canManageCategories: false,
       canManageTypes: false,
-      canManageSubTypes: false,
+  
       canManageFieldDefinitions: false,
       canManageDropdownGroups: false,
       canCreateItems: false,
@@ -544,7 +543,7 @@ export function calculateUserCapabilities(user: User | null): ItemsSchematicsCap
     canManageTiers: userIsAdmin,
     canManageCategories: userIsEditor,
     canManageTypes: userIsEditor,
-    canManageSubTypes: userIsEditor,
+
     canManageFieldDefinitions: userIsAdmin,
     canManageDropdownGroups: userIsAdmin,
     

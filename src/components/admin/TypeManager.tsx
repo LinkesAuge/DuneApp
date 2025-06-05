@@ -312,7 +312,7 @@ export const TypeManager: React.FC<TypeManagerProps> = ({ className = '' }) => {
       return;
     }
     
-    const targetTypeId = prompt(`This type has ${dependencies.total_count} items/schematics/subtypes.\n\nChoose target type ID for migration:\n${availableTypes.map(t => `${t.id}: ${t.name}`).join('\n')}`);
+    const targetTypeId = prompt(`This type has ${dependencies.total_count} items/schematics.\n\nChoose target type ID for migration:\n${availableTypes.map(t => `${t.id}: ${t.name}`).join('\n')}`);
     
     if (!targetTypeId || !availableTypes.find(t => t.id === targetTypeId)) {
       return;

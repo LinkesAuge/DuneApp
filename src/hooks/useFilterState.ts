@@ -31,9 +31,6 @@ export interface EntityFilters {
   types: {
     [type: string]: boolean;
   };
-  subtypes: {
-    [subtype: string]: boolean;
-  };
   tiers: {
     [tier: string]: boolean;
   };
@@ -88,7 +85,6 @@ export const useFilterState = () => {
     },
     categories: {},
     types: {},
-    subtypes: {},
     tiers: {},
     scope: {
       global: true,
@@ -183,17 +179,13 @@ export const useFilterState = () => {
         .filter(t => t != null && typeof t === 'string' && t.trim() !== '');
       const types = [...new Set(typeValues)];
       
-      // Extract subtypes - keep "None" as it's a valid database value for types without specific subtypes
-      const subtypeValues = entitiesData
-        .map(e => e.subtype?.name)
-        .filter(s => s != null && typeof s === 'string' && s.trim() !== '');
-      const subtypes = [...new Set(subtypeValues)];
+
 
       
       setEntityCategories(categories);
       setEntityTypes(types);
       
-      // Initialize entity filters with all categories/types/subtypes/tiers selected
+      // Initialize entity filters with all categories/types/tiers selected
       const categoryFilters = categories.reduce((acc, category) => {
         acc[category] = true;
         return acc;
@@ -204,10 +196,7 @@ export const useFilterState = () => {
         return acc;
       }, {} as { [type: string]: boolean });
       
-      const subtypeFilters = subtypes.reduce((acc, subtype) => {
-        acc[subtype] = true;
-        return acc;
-      }, {} as { [subtype: string]: boolean });
+
       
       // Initialize tier filters (including all tiers, no longer excluding T69)
       const tierFilters = tiers.reduce((acc, tier) => {
@@ -219,7 +208,6 @@ export const useFilterState = () => {
         ...prev,
         categories: categoryFilters,
         types: typeFilters,
-        subtypes: subtypeFilters,
         tiers: tierFilters
       }));
       
@@ -318,35 +306,30 @@ export const useFilterState = () => {
         return false;
       }
 
-      // Category filter  
+      // Category filter - Fixed: handle undefined properly  
       if (entity.category?.name) {
         const categorySelected = entityFilters.categories[entity.category.name];
-        if (categorySelected === false) {
+        // If filters exist, category must be explicitly true to show
+        if (Object.keys(entityFilters.categories).length > 0 && categorySelected !== true) {
           return false;
         }
       }
 
-      // Type filter (new addition)
+      // Type filter - Fixed: handle undefined properly
       if (entity.type?.name) {
         const typeSelected = entityFilters.types[entity.type.name];
-        if (typeSelected === false) {
+        // If filters exist, type must be explicitly true to show
+        if (Object.keys(entityFilters.types).length > 0 && typeSelected !== true) {
           return false;
         }
       }
 
-      // Subtype filter
-      if (entity.subtype?.name) {
-        const subtypeSelected = entityFilters.subtypes[entity.subtype.name];
-        if (subtypeSelected === false) {
-          return false;
-        }
-      }
-
-      // Tier filter - removed T69 exclusion, now show all tiers
+      // Tier filter - Fixed: handle undefined properly
       if (entity.tier_number !== null && entity.tier_number !== undefined) {
         const tierKey = entity.tier_number.toString();
         const tierSelected = entityFilters.tiers[tierKey];
-        if (tierSelected === false) {
+        // If filters exist, tier must be explicitly true to show
+        if (Object.keys(entityFilters.tiers).length > 0 && tierSelected !== true) {
           return false;
         }
       }
@@ -512,11 +495,10 @@ export const useFilterState = () => {
   const toggleAllEntities = useCallback((showAll: boolean) => {
     const allCategories = Object.keys(entityFilters.categories);
     const allTypes = Object.keys(entityFilters.types);
-    const allSubtypes = Object.keys(entityFilters.subtypes);
     const allTiers = Object.keys(entityFilters.tiers);
 
     if (showAll) {
-      // Show all categories/types/subtypes/tiers
+      // Show all categories/types/tiers
       const showAllCategories = allCategories.reduce((acc, category) => {
         acc[category] = true;
         return acc;
@@ -527,11 +509,6 @@ export const useFilterState = () => {
         return acc;
       }, {} as { [type: string]: boolean });
 
-      const showAllSubtypes = allSubtypes.reduce((acc, subtype) => {
-        acc[subtype] = true;
-        return acc;
-      }, {} as { [subtype: string]: boolean });
-
       const showAllTiers = allTiers.reduce((acc, tier) => {
         acc[tier] = true;
         return acc;
@@ -541,11 +518,10 @@ export const useFilterState = () => {
         ...prev,
         categories: showAllCategories,
         types: showAllTypes,
-        subtypes: showAllSubtypes,
         tiers: showAllTiers
       }));
     } else {
-      // Hide all categories/types/subtypes/tiers
+      // Hide all categories/types/tiers
       const hideAllCategories = allCategories.reduce((acc, category) => {
         acc[category] = false;
         return acc;
@@ -556,11 +532,6 @@ export const useFilterState = () => {
         return acc;
       }, {} as { [type: string]: boolean });
 
-      const hideAllSubtypes = allSubtypes.reduce((acc, subtype) => {
-        acc[subtype] = false;
-        return acc;
-      }, {} as { [subtype: string]: boolean });
-
       const hideAllTiers = allTiers.reduce((acc, tier) => {
         acc[tier] = false;
         return acc;
@@ -570,24 +541,22 @@ export const useFilterState = () => {
         ...prev,
         categories: hideAllCategories,
         types: hideAllTypes,
-        subtypes: hideAllSubtypes,
         tiers: hideAllTiers
       }));
     }
     
     // Reset pagination when toggling all
     changePage('entities', 1);
-  }, [entityFilters.categories, entityFilters.types, entityFilters.subtypes, entityFilters.tiers, changePage]);
+  }, [entityFilters.categories, entityFilters.types, entityFilters.tiers, changePage]);
 
   // Auto-detection for Show All / Hide All states for entities
   useEffect(() => {
     const allCategoriesSelected = Object.values(entityFilters.categories).every(selected => selected);
     const allTypesSelected = Object.values(entityFilters.types).every(selected => selected);
-    const allSubtypesSelected = Object.values(entityFilters.subtypes).every(selected => selected);
     const allTiersSelected = Object.values(entityFilters.tiers).every(selected => selected);
 
     // If all filters are selected, maintain "show all" state  
-    if (allCategoriesSelected && allTypesSelected && allSubtypesSelected && allTiersSelected) {
+    if (allCategoriesSelected && allTypesSelected && allTiersSelected) {
       // Already showing all - no action needed
       return;
     }
@@ -595,53 +564,14 @@ export const useFilterState = () => {
     // If all filters are deselected, maintain "hide all" state
     const noCategoriesSelected = Object.values(entityFilters.categories).every(selected => !selected);
     const noTypesSelected = Object.values(entityFilters.types).every(selected => !selected);
-    const noSubtypesSelected = Object.values(entityFilters.subtypes).every(selected => !selected);
     const noTiersSelected = Object.values(entityFilters.tiers).every(selected => !selected);
 
-    if (noCategoriesSelected && noTypesSelected && noSubtypesSelected && noTiersSelected) {
+    if (noCategoriesSelected && noTypesSelected && noTiersSelected) {
       // Already hiding all - no action needed
       return;
     }
 
-    // If we have mixed states, we need to ensure all filters have values
-    // This prevents filters from getting "stuck" in empty states
-    if (Object.keys(entityFilters.categories).length === 0 || 
-        Object.keys(entityFilters.types).length === 0 || 
-        Object.keys(entityFilters.subtypes).length === 0 || 
-        Object.keys(entityFilters.tiers).length === 0) {
-      
-      // Initialize missing filter categories with "show all" default
-      const showAllCategories = entityCategories.reduce((acc, category) => {
-        acc[category] = entityFilters.categories[category] ?? true;
-        return acc;
-      }, {} as { [category: string]: boolean });
-
-      const showAllTypes = entityTypes.reduce((acc, type) => {
-        acc[type] = entityFilters.types[type] ?? true;
-        return acc;
-      }, {} as { [type: string]: boolean });
-
-      const allSubtypes = [...new Set(allEntities.map(e => e.subtype?.name).filter(s => s))];
-      const showAllSubtypes = allSubtypes.reduce((acc, subtype) => {
-        acc[subtype] = entityFilters.subtypes[subtype] ?? true;
-        return acc;
-      }, {} as { [subtype: string]: boolean });
-
-      const showAllTiers = tiers.reduce((acc, tier) => {
-        const tierKey = tier.tier_number.toString();
-        acc[tierKey] = entityFilters.tiers[tierKey] ?? true;
-        return acc;
-      }, {} as { [tier: string]: boolean });
-
-      setEntityFilters(prev => ({
-        ...prev,
-        categories: showAllCategories,
-        types: showAllTypes,
-        subtypes: showAllSubtypes,
-        tiers: showAllTiers
-      }));
-    }
-  }, [entityFilters.categories, entityFilters.types, entityFilters.subtypes, entityFilters.tiers, entityCategories, entityTypes, allEntities, tiers]);
+  }, [entityCategories, entityTypes, tiers]); // Fixed dependencies: only run when data changes, not when filters change
 
   // Real-time filter counts - now accurate with all data
   const filterCounts: FilterCounts = useMemo(() => ({
@@ -704,24 +634,7 @@ export const useFilterState = () => {
     });
   }, [changePage]);
 
-  // Entity subtype toggle
-  const toggleEntitySubtype = useCallback((subtype: string, checked: boolean) => {
-    setEntityFilters(prev => {
-      const newFilters = {
-        ...prev,
-        subtypes: {
-          ...prev.subtypes,
-          [subtype]: checked
-        }
-      };
-      
-      if (prev.subtypes[subtype] !== checked) {
-        setTimeout(() => changePage('entities', 1), 0);
-      }
-      
-      return newFilters;
-    });
-  }, [changePage]);
+
 
   // Entity tier toggle
   const toggleEntityTier = useCallback((tier: string, checked: boolean) => {
@@ -806,7 +719,7 @@ export const useFilterState = () => {
       const selectedIds = Array.from(selectedEntityIds);
       const { data, error } = await supabase
         .from('entities')
-        .select('*, categories(name), types(name), subtypes(name)')
+        .select('*, categories(name), types(name)')
         .in('id', selectedIds);
 
       if (error) {
@@ -850,10 +763,7 @@ export const useFilterState = () => {
       return acc;
     }, {} as { [type: string]: boolean });
 
-    const allEntitySubtypes = Object.keys(entityFilters.subtypes).reduce((acc, subtype) => {
-      acc[subtype] = true;
-      return acc;
-    }, {} as { [subtype: string]: boolean });
+
 
     const allEntityTiers = Object.keys(entityFilters.tiers).reduce((acc, tier) => {
       acc[tier] = true;
@@ -868,14 +778,13 @@ export const useFilterState = () => {
       },
       categories: allEntityCategories,
       types: allEntityTypes,
-      subtypes: allEntitySubtypes,
       tiers: allEntityTiers,
       scope: {
         global: true,
         custom: true
       }
     });
-  }, [poiTypes, entityFilters.categories, entityFilters.types, entityFilters.subtypes, entityFilters.tiers]);
+  }, [poiTypes, entityFilters.categories, entityFilters.types, entityFilters.tiers]);
 
   // Valid tiers (now including all tiers, no longer excluding T69)
   const validTiers = React.useMemo(() => 
@@ -918,7 +827,6 @@ export const useFilterState = () => {
     togglePOICategory,
     toggleEntityCategory,
     toggleEntityType,
-    toggleEntitySubtype,
     toggleEntityTier,
     clearAllFilters,
 
