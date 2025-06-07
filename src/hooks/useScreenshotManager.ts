@@ -254,18 +254,25 @@ export const useScreenshotManager = (config: ScreenshotManagerConfig): Screensho
       // Better approach: Check if actual cropping was performed
       // If crop area doesn't cover the entire image, it was actually cropped
       const imageElement = document.querySelector('img[src="' + currentCropFile.preview + '"]') as HTMLImageElement;
-      const wasActuallyCropped = imageElement ? (
-        cropData.x > 0 || 
-        cropData.y > 0 || 
-        cropData.width < imageElement.naturalWidth ||
-        cropData.height < imageElement.naturalHeight
-      ) : false;
+      
+      // If we can't find the image element, assume cropping occurred since the crop modal was used
+      let wasActuallyCropped = true; // Default to true if we can't determine
+      
+      if (imageElement && imageElement.naturalWidth && imageElement.naturalHeight) {
+        wasActuallyCropped = (
+          cropData.x > 0 || 
+          cropData.y > 0 || 
+          cropData.width < imageElement.naturalWidth ||
+          cropData.height < imageElement.naturalHeight
+        );
+      }
       
       console.log('[useScreenshotManager] 🎯 Crop analysis:', {
         cropData,
         imageNaturalSize: imageElement ? { width: imageElement.naturalWidth, height: imageElement.naturalHeight } : 'unknown',
         wasActuallyCropped,
-        isFullImageUpload
+        isFullImageUpload,
+        imageElementFound: !!imageElement
       });
       
       // Update file in queue
@@ -361,7 +368,7 @@ export const useScreenshotManager = (config: ScreenshotManagerConfig): Screensho
         break;
       case 'grid':
         basePath = 'grid_screenshots';
-        originalBasePath = 'grid_originals';
+        originalBasePath = 'grid_screenshots';
         break;
       case 'comment':
         basePath = 'comment_screenshots';
@@ -373,7 +380,7 @@ export const useScreenshotManager = (config: ScreenshotManagerConfig): Screensho
     }
     
     const displayPath = `${basePath}/${fullConfig.entityId || 'temp'}_${timestamp}.${fileExtension}`;
-    const originalPath = `${originalBasePath}/${fullConfig.entityId || 'temp'}_${timestamp}_original.${fileExtension}`;
+    const originalPath = `${originalBasePath}/${fullConfig.entityId || 'temp'}_original_${timestamp}.${fileExtension}`;
     
     try {
       // Upload display version (cropped or original)
@@ -393,8 +400,16 @@ export const useScreenshotManager = (config: ScreenshotManagerConfig): Screensho
       
       let originalUrl: string | undefined;
       
-      // Upload original version if different from display
-      if (file.cropData && file.originalFile !== file.displayFile) {
+      // Always upload original version separately unless explicitly no cropping occurred
+      console.log('[useScreenshotManager] 📁 Original file upload decision:', {
+        wasActuallyCropped: file.wasActuallyCropped,
+        shouldUploadOriginal: file.wasActuallyCropped !== false,
+        originalPath
+      });
+      
+      if (file.wasActuallyCropped !== false) { // Upload unless explicitly set to false
+        console.log('[useScreenshotManager] ⬆️ Uploading original file to:', originalPath);
+        
         const { data: originalData, error: originalError } = await supabase.storage
           .from('screenshots')
           .upload(originalPath, file.originalFile, {
@@ -403,13 +418,16 @@ export const useScreenshotManager = (config: ScreenshotManagerConfig): Screensho
           });
         
         if (originalError) {
-          console.warn('Failed to upload original file:', originalError);
+          console.warn('[useScreenshotManager] ❌ Failed to upload original file:', originalError);
         } else {
           const { data: originalUrlData } = supabase.storage
             .from('screenshots')
             .getPublicUrl(originalPath);
           originalUrl = originalUrlData.publicUrl;
+          console.log('[useScreenshotManager] ✅ Original file uploaded successfully:', originalUrl);
         }
+      } else {
+        console.log('[useScreenshotManager] ⏭️ Skipping original file upload (no actual cropping occurred)');
       }
       
       return {

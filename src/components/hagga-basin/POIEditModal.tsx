@@ -30,6 +30,7 @@ interface POIEditModalProps {
 
   onPoiUpdated: (poi: Poi) => void;
   onPoiDataChanged?: (poi: Poi) => void; // For updates that shouldn't close modal
+  onLinksUpdated?: () => void; // For entity links updates that should refresh map markers
   onClose: () => void;
   onPositionChange?: (poi: Poi) => void;
 }
@@ -105,7 +106,7 @@ const extractStorageFilePathFromUrl = (url: string): string | null => {
           if (afterScreenshots) {
             // Remove trailing slash and return folder + filename
             const folderName = afterScreenshots.replace(/\/$/, '');
-            console.log(`[extractStorageFilePath] 🎯 Pattern matched: ${pattern} → After screenshots: ${afterScreenshots} → Result: ${folderName}/${parts[1]}`);
+        
             return `${folderName}/${parts[1]}`;
           } else {
             console.log(`[extractStorageFilePath] 🎯 Direct match: ${pattern} → Result: ${parts[1]}`);
@@ -158,6 +159,7 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
 
   onPoiUpdated,
   onPoiDataChanged,
+  onLinksUpdated,
   onClose,
   onPositionChange
 }) => {
@@ -414,7 +416,7 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
       }
       
       // Remove from UI
-      setExistingScreenshots(prev => prev.filter(s => s.id !== screenshotId));
+    setExistingScreenshots(prev => prev.filter(s => s.id !== screenshotId));
       console.log('[POIEdit] ✅ Screenshot deleted successfully:', screenshotId);
       
     } catch (error: any) {
@@ -691,7 +693,7 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
         throw new Error(`Failed to upload screenshot: ${file.originalFile.name}`);
       }
     }
-    
+
     console.log('[POIEdit] 🎉 All screenshots processed and saved successfully!');
   };
 
@@ -1359,7 +1361,10 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
               showLinkButton={canEdit}
               canEdit={canEdit}
               onLinksChanged={async () => {
-                console.log('[POIEditModal] POI entity links changed, refreshing POI data for map...');
+                // Call onLinksUpdated to dispatch global event for map markers
+                if (onLinksUpdated) {
+                  onLinksUpdated();
+                }
                 
                 // For entity link changes, we don't want to close the modal
                 // So we'll update the POI data directly without calling onPoiUpdated
@@ -1392,15 +1397,10 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
                         : []
                     };
                     
-                    console.log('[POIEditModal] Updating POI data directly without closing modal...');
-                    console.log('[POIEditModal] Updated POI object:', transformedPoi);
-                    
                     // Update the parent component's POI list without closing the modal
                     // Use onPoiDataChanged instead of onPoiUpdated to prevent modal closure
                     if (onPoiDataChanged) {
                       onPoiDataChanged(transformedPoi);
-                    } else {
-                      console.log('[POIEditModal] No onPoiDataChanged callback provided, skipping parent update');
                     }
                   } else {
                     console.error('[POIEditModal] Failed to fetch updated POI data:', error);

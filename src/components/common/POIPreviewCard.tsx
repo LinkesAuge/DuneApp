@@ -26,6 +26,8 @@ interface POIPreviewCardProps {
   onShare?: () => void;
   onImageClick?: () => void;
   onHighlight?: () => void;
+  // Entity links refresh trigger
+  entityLinksRefreshTrigger?: number;
 }
 
 // Helper function to determine if an icon is a URL or emoji
@@ -75,7 +77,8 @@ const POIPreviewCard: React.FC<POIPreviewCardProps> = ({
   onDelete,
   onShare,
   onImageClick,
-  onHighlight
+  onHighlight,
+  entityLinksRefreshTrigger: externalRefreshTrigger
 }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -187,6 +190,13 @@ const POIPreviewCard: React.FC<POIPreviewCardProps> = ({
     
     fetchData();
   }, [poi.created_by, poi.updated_by, poi.id, poi.updated_at]); // Add updated_at to trigger refresh on edits
+
+  // Sync external refresh trigger with internal entity links refresh trigger
+  useEffect(() => {
+    if (externalRefreshTrigger !== undefined) {
+      setEntityLinksRefreshTrigger(externalRefreshTrigger);
+    }
+  }, [externalRefreshTrigger]);
 
   // Handle actions
   const handleEdit = (e: React.MouseEvent) => {
@@ -783,8 +793,10 @@ const POIPreviewCard: React.FC<POIPreviewCardProps> = ({
           poiId={poi.id}
           poiTitle={poi.title}
           onLinksUpdated={() => {
-            console.log('[POIPreviewCard] 🔄 Entity links updated, refreshing LinkedItemsSection...');
             setEntityLinksRefreshTrigger(prev => prev + 1);
+            
+            // Dispatch global event for map markers
+            window.dispatchEvent(new CustomEvent('entityLinksUpdated'));
           }}
         />
       )}

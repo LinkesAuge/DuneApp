@@ -26,6 +26,9 @@ interface POIPanelProps {
   emptyStateMessage?: string;
   emptyStateSubtitle?: string;
   className?: string;
+  
+  // Entity links refresh trigger
+  entityLinksRefreshTrigger?: number;
 }
 
 type ViewMode = 'grid' | 'list';
@@ -46,7 +49,8 @@ const POIPanel: React.FC<POIPanelProps> = ({
   onPoiShare,
   onPoiImageClick,
   emptyStateMessage = "No POIs found",
-  emptyStateSubtitle = "No additional information"
+  emptyStateSubtitle = "No additional information",
+  entityLinksRefreshTrigger
 }) => {
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc'); // Default desc for newest first
@@ -215,6 +219,7 @@ const POIPanel: React.FC<POIPanelProps> = ({
                         onDelete={onPoiDelete ? () => onPoiDelete(poi.id) : undefined}
                         onShare={onPoiShare ? () => onPoiShare(poi) : undefined}
                         onImageClick={onPoiImageClick ? () => onPoiImageClick(poi) : undefined}
+                        entityLinksRefreshTrigger={entityLinksRefreshTrigger}
                       />
                     ))}
                   </div>

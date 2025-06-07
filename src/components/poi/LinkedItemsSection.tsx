@@ -31,13 +31,8 @@ const LinkedItemsSection: React.FC<LinkedItemsSectionProps> = ({
     const fetchPoiItems = async () => {
       try {
         setLoading(true);
-        console.log('[LinkedItemsSection] 🔄 Fetching POI items for:', poiId);
         const data = await getPoiWithEntities(poiId);
         setPoiWithItems(data);
-        console.log('[LinkedItemsSection] ✅ POI items updated:', {
-          items: data.linked_items?.length || 0,
-          schematics: data.linked_schematics?.length || 0
-        });
       } catch (error) {
         console.error('Error fetching POI items:', error);
       } finally {
@@ -77,7 +72,6 @@ const LinkedItemsSection: React.FC<LinkedItemsSectionProps> = ({
   }
 
   if (!poiWithItems) {
-    console.log('[LinkedItemsSection] ❌ No poiWithItems data for POI:', poiId);
     return null;
   }
 
@@ -86,18 +80,8 @@ const LinkedItemsSection: React.FC<LinkedItemsSectionProps> = ({
   const hasLinkedItems = linkedItems.length > 0;
   const hasLinkedSchematics = linkedSchematics.length > 0;
 
-  console.log('[LinkedItemsSection] 📊 POI entity data for', poiId, ':', {
-    linkedItems: linkedItems.length,
-    linkedSchematics: linkedSchematics.length,
-    hasLinkedItems,
-    hasLinkedSchematics,
-    canShowLinkButton: canShowLinkButton(),
-    poiWithItems
-  });
-
   // Don't render anything if no items/schematics and no link button
   if (!hasLinkedItems && !hasLinkedSchematics && !canShowLinkButton()) {
-    console.log('[LinkedItemsSection] 🚫 No items/schematics and no link button - not rendering');
     return null;
   }
 

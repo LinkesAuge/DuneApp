@@ -80,7 +80,7 @@ export const usePOIManager = (config: POIManagerConfig): POIManagerReturn => {
         }).filter(screenshot => screenshot !== null) || [];
 
         return {
-          ...poi,
+        ...poi,
           screenshots: screenshots
         };
       });

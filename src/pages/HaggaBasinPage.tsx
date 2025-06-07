@@ -132,7 +132,6 @@ const HaggaBasinPage: React.FC = () => {
   // Listen for global entity links updates
   useEffect(() => {
     const handleEntityLinksUpdate = () => {
-      console.log('[HaggaBasinPage] 🔄 Global entity links updated, refreshing POI data...');
       setEntityLinksGlobalRefreshTrigger(prev => prev + 1);
     };
 
@@ -147,8 +146,8 @@ const HaggaBasinPage: React.FC = () => {
   // Refresh POI data when entity links change globally
   useEffect(() => {
     if (entityLinksGlobalRefreshTrigger > 0) {
-      console.log('[HaggaBasinPage] 🔄 Refreshing POI data due to entity links change...');
-      fetchHaggaBasinPOIs();
+      // The usePOIManager hook handles POI fetching automatically via real-time subscriptions
+      // We just need to increment the trigger to refresh map markers
     }
   }, [entityLinksGlobalRefreshTrigger]);
 
@@ -701,11 +700,13 @@ const HaggaBasinPage: React.FC = () => {
             onPoiDeleted={handlePoiDeleted}
             onPoiShare={handleSharePoi}
             onPoiGalleryOpen={handlePoiGalleryOpen}
+            onPositionChange={undefined} // Let InteractiveMap use its internal startPositionChange
             placementMode={placementMode}
             onPlacementModeChange={setPlacementMode}
             showHelpTooltip={showHelpTooltip}
             onHelpTooltipChange={setShowHelpTooltip}
             highlightedPoiId={highlightedPoiId}
+            entityLinksRefreshTrigger={entityLinksGlobalRefreshTrigger}
           />
         ) : (
           <div className="h-full flex items-center justify-center">
@@ -737,6 +738,7 @@ const HaggaBasinPage: React.FC = () => {
         onPoiImageClick={handlePoiGalleryOpen}
         emptyStateMessage="No POIs found"
         emptyStateSubtitle="Add POIs to the map to see them here"
+        entityLinksRefreshTrigger={entityLinksGlobalRefreshTrigger}
       />
 
 
@@ -769,6 +771,12 @@ const HaggaBasinPage: React.FC = () => {
             // DO NOT call modals.closeEditModal() here
           }}
           onClose={() => modals.closeEditModal()}
+          onPositionChange={(poi) => {
+            // Close the edit modal when position change starts
+            modals.closeEditModal();
+            // The InteractiveMap component will handle the position change
+            // using its internal startPositionChange function
+          }}
         />
       )}
 

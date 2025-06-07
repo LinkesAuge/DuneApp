@@ -475,28 +475,28 @@ const CommentItem: React.FC<CommentItemProps> = ({
             </div>
             
             <div className="flex space-x-2">
-              <button
-                onClick={() => {
-                  setIsEditing(false);
-                  setEditContent(comment.content);
+            <button
+              onClick={() => {
+                setIsEditing(false);
+                setEditContent(comment.content);
                   setRemovedImageIds([]);
                   screenshotManager.clearProcessingQueue();
-                  setError(null);
-                }}
-                className="px-3 py-1 text-xs text-slate-400 hover:text-slate-200 transition-colors"
-                disabled={isSubmitting}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSaveEdit}
-                className="px-3 py-1 text-xs bg-amber-600 hover:bg-amber-700 text-white transition-colors disabled:bg-slate-600"
-                disabled={isSubmitting || !editContent.trim()}
-              >
-                {isSubmitting ? 'Saving...' : 'Save'}
-              </button>
-            </div>
+                setError(null);
+              }}
+              className="px-3 py-1 text-xs text-slate-400 hover:text-slate-200 transition-colors"
+              disabled={isSubmitting}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSaveEdit}
+              className="px-3 py-1 text-xs bg-amber-600 hover:bg-amber-700 text-white transition-colors disabled:bg-slate-600"
+              disabled={isSubmitting || !editContent.trim()}
+            >
+              {isSubmitting ? 'Saving...' : 'Save'}
+            </button>
           </div>
+        </div>
         </div>
         
         {/* Unified Crop Processor */}

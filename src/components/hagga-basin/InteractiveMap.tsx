@@ -1,6 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { TransformWrapper, TransformComponent, ReactZoomPanPinchRef } from 'react-zoom-pan-pinch';
-import { Plus, ZoomIn, ZoomOut, RotateCcw, Target, HelpCircle } from 'lucide-react';
+import { Plus, ZoomIn, ZoomOut, RotateCcw, Move, HelpCircle } from 'lucide-react';
+import { usePositionChange } from '../../hooks/usePositionChange';
 import type { 
   HaggaBasinBaseMap, 
   HaggaBasinOverlay, 
@@ -26,6 +27,7 @@ interface InteractiveMapProps {
   onPoiDeleted?: (poiId: string) => void;
   onPoiShare?: (poi: Poi) => void;
   onPoiGalleryOpen?: (poi: Poi) => void;
+  onPositionChange?: (poi: Poi) => void;
 
   placementMode?: boolean;
   onPlacementModeChange?: (mode: boolean) => void;
@@ -78,6 +80,7 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
   onPoiDeleted,
   onPoiShare,
   onPoiGalleryOpen,
+  onPositionChange,
 
   placementMode = false,
   onPlacementModeChange,
@@ -110,16 +113,18 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const [imageLoaded, setImageLoaded] = useState(false);
   const [currentZoom, setCurrentZoom] = useState(0.4);
   
-  // State for POI position changing
-  const [positionChangeMode, setPositionChangeMode] = useState(false);
-  const [changingPositionPoi, setChangingPositionPoi] = useState<Poi | null>(null);
+  // Unified position change functionality
+  const positionChange = usePositionChange({
+    onPoiUpdated,
+    onError: (error) => console.error(error)
+  });
 
   // Handle map click for POI placement and position changing
   const handleMapClick = useCallback((event: React.MouseEvent) => {
     if (!mapElementRef.current) return;
     
     // Handle position change mode
-    if (positionChangeMode && changingPositionPoi) {
+    if (positionChange.positionChangeMode && positionChange.changingPositionPoi) {
       event.preventDefault();
       event.stopPropagation();
       
@@ -127,19 +132,7 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
         const coordinates = getRelativeCoordinates(event, mapElementRef.current);
         
         if (validateCoordinates(coordinates.x, coordinates.y)) {
-          const updatedPoi = {
-            ...changingPositionPoi,
-            coordinates_x: coordinates.x,
-            coordinates_y: coordinates.y
-          };
-          
-          if (onPoiUpdated) {
-            onPoiUpdated(updatedPoi);
-          }
-          
-          // Exit position change mode
-          setPositionChangeMode(false);
-          setChangingPositionPoi(null);
+          positionChange.handlePositionUpdate(positionChange.changingPositionPoi, coordinates.x, coordinates.y);
         }
       } catch (error) {
         console.error('Error updating POI position:', error);
@@ -173,7 +166,7 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
     } catch (error) {
       console.error('Error calculating coordinates:', error);
     }
-      }, [placementMode, positionChangeMode, changingPositionPoi, onPoiUpdated, onPlacementModeChange]);
+      }, [placementMode, positionChange.positionChangeMode, positionChange.changingPositionPoi, positionChange.handlePositionUpdate, onPlacementModeChange]);
 
   // Track zoom level for icon scaling - listen to all zoom events
   const handleZoomChange = useCallback((ref: ReactZoomPanPinchRef) => {
@@ -183,13 +176,12 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
   // Start position change mode for a POI
   const startPositionChange = useCallback((poi: Poi) => {
-    setChangingPositionPoi(poi);
-    setPositionChangeMode(true);
+    positionChange.startPositionChange(poi);
     if (onPlacementModeChange) {
       onPlacementModeChange(false);
     }
     setSelectedPoi(null);
-  }, [onPlacementModeChange]);
+  }, [positionChange.startPositionChange, onPlacementModeChange]);
 
   // Handle ESC key to cancel placement/position change modes
   useEffect(() => {
@@ -202,16 +194,14 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
           setPlacementCoordinates(null);
           setShowPlacementModal(false);
         }
-        if (positionChangeMode) {
-          setPositionChangeMode(false);
-          setChangingPositionPoi(null);
-        }
+        // Handle position change ESC via unified hook
+        positionChange.handleEscapeKey(event);
       }
     };
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [placementMode, positionChangeMode, onPlacementModeChange]);
+  }, [placementMode, onPlacementModeChange, positionChange.handleEscapeKey]);
 
   // Handle POI marker click
   const handlePoiClick = useCallback((poi: Poi, event: React.MouseEvent) => {
@@ -338,7 +328,7 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
             style={{ 
               width: '4000px', 
               height: '4000px',
-              cursor: (placementMode || positionChangeMode) ? 'crosshair' : 'grab'
+              cursor: (placementMode || positionChange.positionChangeMode) ? 'crosshair' : 'grab'
             }}
             onClick={handleMapClick}
           >
@@ -508,12 +498,12 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
       )}
 
       {/* Position Change Mode Indicator */}
-      {positionChangeMode && changingPositionPoi && (
+      {positionChange.positionChangeMode && positionChange.changingPositionPoi && (
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-40 pointer-events-none">
           <div className="bg-blue-500/80 text-white px-4 py-2 rounded-lg shadow-lg">
             <div className="text-center">
-              <Target className="w-6 h-6 mx-auto mb-1" />
-              <div className="text-sm font-medium">Click to move "{changingPositionPoi.title}"</div>
+              <Move className="w-6 h-6 mx-auto mb-1" />
+              <div className="text-sm font-medium">Click to move "{positionChange.changingPositionPoi.title}"</div>
               <div className="text-xs opacity-90">Press ESC to cancel</div>
             </div>
           </div>
@@ -580,8 +570,12 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
             }
             setEditingPoi(null);
           }}
+          onLinksUpdated={() => {
+            // Dispatch global event to trigger map refresh
+            window.dispatchEvent(new CustomEvent('entityLinksUpdated'));
+          }}
           onClose={() => setEditingPoi(null)}
-          onPositionChange={startPositionChange}
+          onPositionChange={onPositionChange || startPositionChange}
         />
       )}
 

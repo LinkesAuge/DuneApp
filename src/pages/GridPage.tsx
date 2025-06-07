@@ -3,7 +3,7 @@ import { useParams, useNavigate, Navigate, useSearchParams } from 'react-router-
 import { TransformWrapper, TransformComponent, ReactZoomPanPinchRef } from 'react-zoom-pan-pinch';
 import { supabase } from '../lib/supabase';
 import { GridSquare, Poi, PoiType, PixelCoordinates } from '../types';
-import { ArrowLeft, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Upload, Image, Plus, MapPin, Target, ZoomIn, ZoomOut, RotateCcw, Filter, Settings, FolderOpen, Share, Edit, Eye, Lock, Users, HelpCircle, Map, ArrowUp, BarChart3, Grid3X3 } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Upload, Image, Plus, MapPin, Move, ZoomIn, ZoomOut, RotateCcw, Filter, Settings, FolderOpen, Share, Edit, Eye, Lock, Users, HelpCircle, Map, ArrowUp, BarChart3, Grid3X3 } from 'lucide-react';
 import POIPlacementModal from '../components/hagga-basin/POIPlacementModal';
 import POIEditModal from '../components/hagga-basin/POIEditModal';
 import SharePoiModal from '../components/hagga-basin/SharePoiModal';
@@ -30,6 +30,7 @@ import { formatConversionStats } from '../lib/imageUtils';
 import { usePOIManager } from '../hooks/usePOIManager';
 import { usePOIOperations } from '../hooks/usePOIOperations';
 import { usePOIModals } from '../hooks/usePOIModals';
+import { usePositionChange } from '../hooks/usePositionChange';
 // Grid validation: A1-I9 pattern
 const VALID_GRID_PATTERN = /^[A-I][1-9]$/;
 const GRID_ROWS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'];
@@ -47,11 +48,6 @@ const GridPage: React.FC = () => {
   
   // Get highlight parameter for POI highlighting
   const highlightPoiId = searchParams.get('highlight');
-  
-  // Validate grid ID format
-  if (!gridId || !VALID_GRID_PATTERN.test(gridId)) {
-    return <Navigate to="/deep-desert" replace />;
-  }
 
   const [gridSquare, setGridSquare] = useState<GridSquare | null>(null);
   const [allGridSquares, setAllGridSquares] = useState<GridSquare[]>([]); // NEW: All grid squares for minimap
@@ -129,6 +125,12 @@ const GridPage: React.FC = () => {
   const [placementMode, setPlacementMode] = useState(false);
   const [placementCoordinates, setPlacementCoordinates] = useState<{ x: number; y: number } | null>(null);
 
+  // Unified position change functionality
+  const positionChange = usePositionChange({
+    onPoiUpdated: updatePOI,
+    onError: setError
+  });
+
   // POI interaction state (non-modal)
   const [selectedPoi, setSelectedPoi] = useState<Poi | null>(null);
   const [selectedPoiId, setSelectedPoiId] = useState<string | null>(null);
@@ -138,6 +140,9 @@ const GridPage: React.FC = () => {
 
   // Highlighted POI state for navigation focus
   const [highlightedPoiId, setHighlightedPoiId] = useState<string | null>(null);
+  
+  // Entity links refresh trigger for real-time updates
+  const [entityLinksGlobalRefreshTrigger, setEntityLinksGlobalRefreshTrigger] = useState(0);
   
   // Set highlighted POI from URL parameter
   useEffect(() => {
@@ -220,6 +225,27 @@ const GridPage: React.FC = () => {
     };
   }, []);
 
+  // Listen for entity links updates to refresh POI data
+  useEffect(() => {
+    const handleEntityLinksUpdate = () => {
+      setEntityLinksGlobalRefreshTrigger(prev => prev + 1);
+      refreshPOIs(); // Refresh POI data from database
+    };
+
+    window.addEventListener('entityLinksUpdated', handleEntityLinksUpdate);
+
+    return () => {
+      window.removeEventListener('entityLinksUpdated', handleEntityLinksUpdate);
+    };
+  }, [refreshPOIs]);
+
+  // Refresh POI data when global entity links trigger changes
+  useEffect(() => {
+    if (entityLinksGlobalRefreshTrigger > 0) {
+      refreshPOIs();
+    }
+  }, [entityLinksGlobalRefreshTrigger, refreshPOIs]);
+
   // Clear conversion stats after 5 seconds
   useEffect(() => {
     if (conversionStats) {
@@ -243,9 +269,8 @@ const GridPage: React.FC = () => {
 
       if (error && error.code !== 'PGRST116') throw error;
 
-      if (data?.setting_value?.baseCategories) {
-        setBaseCategories(data.setting_value.baseCategories);
-      }
+      // Deep Desert doesn't use baseCategories filtering
+      // Settings loaded successfully
     } catch (error: any) {
       console.error('Error loading map settings:', error);
       // Keep default categories if loading fails
@@ -514,7 +539,7 @@ const GridPage: React.FC = () => {
 
   // Handle placement mode - clicking on screenshot
   const handleScreenshotClick = (event: React.MouseEvent) => {
-    if (!placementMode) return;
+    if (!placementMode && !positionChange.positionChangeMode) return;
     
     event.preventDefault();
     event.stopPropagation();
@@ -527,9 +552,18 @@ const GridPage: React.FC = () => {
     const pixelX = (x / rect.width) * 2000;
     const pixelY = (y / rect.height) * 2000;
     
-    setPlacementCoordinates({ x: pixelX, y: pixelY });
-    setPlacementMode(false);
-    setShowPoiModal(true);
+    // Handle position change mode
+    if (positionChange.positionChangeMode && positionChange.changingPositionPoi) {
+      positionChange.handlePositionUpdate(positionChange.changingPositionPoi, pixelX, pixelY);
+      return;
+    }
+    
+    // Handle placement mode
+    if (placementMode) {
+      setPlacementCoordinates({ x: pixelX, y: pixelY });
+      setPlacementMode(false);
+      setShowPoiModal(true);
+    }
   };
 
   // Handle Add POI button - enter placement mode
@@ -561,18 +595,22 @@ const GridPage: React.FC = () => {
     }
   };
 
-  // Handle ESC key to exit placement mode
+  // Handle ESC key to exit placement and position change modes
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && placementMode) {
-    setPlacementMode(false);
-    setPlacementCoordinates(null);
+      if (event.key === 'Escape') {
+        if (placementMode) {
+          setPlacementMode(false);
+          setPlacementCoordinates(null);
+        }
+        // Handle position change ESC via unified hook
+        positionChange.handleEscapeKey(event);
       }
     };
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [placementMode]);
+  }, [placementMode, positionChange.handleEscapeKey]);
 
   // Handle modal callbacks
   const handleModalClose = () => {
@@ -1236,6 +1274,13 @@ const GridPage: React.FC = () => {
     // Just manage highlighting state without verbose logging
   }, [highlightedPoiId, pois]);
 
+
+
+  // Validate grid ID format - AFTER all hooks are called
+  if (!gridId || !VALID_GRID_PATTERN.test(gridId)) {
+    return <Navigate to="/deep-desert" replace />;
+  }
+
   // Loading state
   if (isLoading) {
     return (
@@ -1282,6 +1327,7 @@ const GridPage: React.FC = () => {
       </div>
     );
   }
+
 
   return (
     <div className="h-screen flex flex-col overflow-hidden relative">
@@ -1409,13 +1455,26 @@ const GridPage: React.FC = () => {
 
         {/* Center Panel - Interactive Screenshot */}
         <div className="flex-1 flex items-center justify-center relative overflow-hidden">
-          {/* Placement Mode Indicator - Hagga Basin Style */}
+          {/* Placement Mode Indicator */}
           {placementMode && (
             <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-40 pointer-events-none">
               <div className="bg-amber-600/80 text-slate-900 px-4 py-2 rounded-lg shadow-lg">
                 <div className="text-center">
                   <Plus className="w-6 h-6 mx-auto mb-1" />
                   <div className="text-sm font-medium">Click on screenshot to place POI</div>
+                  <div className="text-xs opacity-90">Press ESC to cancel</div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Position Change Mode Indicator */}
+          {positionChange.positionChangeMode && positionChange.changingPositionPoi && (
+            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-40 pointer-events-none">
+              <div className="bg-blue-600/80 text-white px-4 py-2 rounded-lg shadow-lg">
+                <div className="text-center">
+                  <Move className="w-6 h-6 mx-auto mb-1" />
+                  <div className="text-sm font-medium">Click to move "{positionChange.changingPositionPoi.title}"</div>
                   <div className="text-xs opacity-90">Press ESC to cancel</div>
                 </div>
               </div>
@@ -1559,6 +1618,16 @@ const GridPage: React.FC = () => {
                         title="Click to place POI here"
                       />
                     )}
+
+                    {/* Position Change Click Overlay */}
+                    {positionChange.positionChangeMode && positionChange.changingPositionPoi && (
+                      <div
+                        className="absolute inset-0 cursor-crosshair z-20"
+                        style={{ pointerEvents: 'auto' }}
+                        onClick={handleScreenshotClick}
+                        title={`Click to move "${positionChange.changingPositionPoi.title}"`}
+                      />
+                    )}
                     
                     {/* Show existing POIs on the screenshot */}
                     {filteredPois.map((poi) => {
@@ -1598,6 +1667,7 @@ const GridPage: React.FC = () => {
                             onShare={handlePoiShare}
                             onImageClick={handlePoiGalleryOpen}
                             isHighlighted={highlightedPoiId === poi.id}
+                            entityLinksRefreshTrigger={entityLinksGlobalRefreshTrigger}
                           />
                         </div>
                       );
@@ -1774,6 +1844,7 @@ const GridPage: React.FC = () => {
           onPoiImageClick={handlePoiGalleryOpen}
           emptyStateMessage="No POIs found"
           emptyStateSubtitle="Add POIs to this grid square to see them here"
+          entityLinksRefreshTrigger={entityLinksGlobalRefreshTrigger}
         />
       </div>
 
@@ -1864,10 +1935,17 @@ const GridPage: React.FC = () => {
             updatePOI(refreshedPoi);
             // DO NOT call modals.closeEditModal() here
           }}
+          onLinksUpdated={() => {
+            console.log('[GridPage] Entity links updated in POI edit modal');
+            setEntityLinksGlobalRefreshTrigger(prev => prev + 1);
+          }}
           onClose={() => modals.closeEditModal()}
           onPositionChange={(poi) => {
-            // TODO: Implement position change for Deep Desert if needed
-      
+            positionChange.startPositionChange(poi);
+            // Exit placement mode if active
+            setPlacementMode(false);
+            setPlacementCoordinates(null);
+            modals.closeEditModal();
           }}
         />
       )}

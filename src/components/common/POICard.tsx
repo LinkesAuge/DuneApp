@@ -516,8 +516,10 @@ const POICard: React.FC<POICardProps> = ({
           poiId={poi.id}
           poiTitle={poi.title}
           onLinksUpdated={() => {
-            console.log('[POICard] 🔄 Entity links updated, refreshing LinkedItemsSection...');
             setEntityLinksRefreshTrigger(prev => prev + 1);
+            
+            // Dispatch global event for map markers
+            window.dispatchEvent(new CustomEvent('entityLinksUpdated'));
           }}
         />
       )}
