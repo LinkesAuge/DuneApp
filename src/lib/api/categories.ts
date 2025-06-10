@@ -27,8 +27,6 @@ export interface Type {
   updated_at?: string;
 }
 
-
-
 // Enhanced interfaces with relationships
 export interface CategoryWithTypes extends Category {
   types?: Type[];
@@ -291,8 +289,6 @@ export const typesAPI = {
     }
   }
 };
-
-
 
 // Utility functions for working with the hierarchy
 export const categoryHierarchyAPI = {

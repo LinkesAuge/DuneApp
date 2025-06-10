@@ -178,10 +178,7 @@ export const useFilterState = () => {
         .map(e => e.type?.name)
         .filter(t => t != null && typeof t === 'string' && t.trim() !== '');
       const types = [...new Set(typeValues)];
-      
 
-
-      
       setEntityCategories(categories);
       setEntityTypes(types);
       
@@ -195,9 +192,7 @@ export const useFilterState = () => {
         acc[type] = true;
         return acc;
       }, {} as { [type: string]: boolean });
-      
 
-      
       // Initialize tier filters (including all tiers, no longer excluding T69)
       const tierFilters = tiers.reduce((acc, tier) => {
         acc[tier.tier_number.toString()] = true;
@@ -634,8 +629,6 @@ export const useFilterState = () => {
     });
   }, [changePage]);
 
-
-
   // Entity tier toggle
   const toggleEntityTier = useCallback((tier: string, checked: boolean) => {
     setEntityFilters(prev => {
@@ -762,8 +755,6 @@ export const useFilterState = () => {
       acc[type] = true;
       return acc;
     }, {} as { [type: string]: boolean });
-
-
 
     const allEntityTiers = Object.keys(entityFilters.tiers).reduce((acc, tier) => {
       acc[tier] = true;

@@ -23,8 +23,6 @@ import SchematicDetailPage from './pages/SchematicDetailPage';
 
 import { POILinksTest } from './components/test/POILinksTest';
 
-
-
 const PendingApprovalMessage: React.FC = () => (
   <div className="min-h-[60vh] flex items-center justify-center">
     <div className="text-center max-w-lg mx-auto p-8">

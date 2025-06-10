@@ -55,8 +55,8 @@ const GeneralStatsPanel: React.FC = () => {
       const [
         usersResult,
         commentsResult,
-        screenshotsResult,
-  
+        managedImagesResult,
+
         newUsersResult,
         newPoisResult,
         newCommentsResult,
@@ -65,7 +65,7 @@ const GeneralStatsPanel: React.FC = () => {
       ] = await Promise.all([
         supabase.from('profiles').select('id', { count: 'exact', head: true }),
         supabase.from('comments').select('id', { count: 'exact', head: true }),
-        supabase.from('comment_screenshots').select('id', { count: 'exact', head: true }),
+        supabase.from('managed_images').select('id', { count: 'exact', head: true }),
 
         supabase.from('profiles').select('id', { count: 'exact', head: true }).gte('updated_at', weekAgoISO),
         supabase.from('pois').select('id', { count: 'exact', head: true }).gte('created_at', weekAgoISO),
@@ -76,7 +76,7 @@ const GeneralStatsPanel: React.FC = () => {
 
       // Check for errors
       const results = [
-        usersResult, commentsResult, screenshotsResult,
+        usersResult, commentsResult, managedImagesResult,
         newUsersResult, newPoisResult, newCommentsResult,
         deepDesertPoisResult, haggaBasinPoisResult
       ];
@@ -85,17 +85,10 @@ const GeneralStatsPanel: React.FC = () => {
         if (result.error) throw result.error;
       }
 
-      // Count POI screenshots separately
-      const { count: poiScreenshotsCount, error: poiScreenshotsError } = await supabase
-        .from('pois')
-        .select('screenshots', { count: 'exact', head: true });
-
-      if (poiScreenshotsError) throw poiScreenshotsError;
-
       setStats({
         totalUsers: usersResult.count || 0,
         totalComments: commentsResult.count || 0,
-        totalScreenshots: (screenshotsResult.count || 0) + (poiScreenshotsCount || 0),
+        totalScreenshots: managedImagesResult.count || 0,
         weeklyGrowth: {
           newUsers: newUsersResult.count || 0,
           newPois: newPoisResult.count || 0,

@@ -739,8 +739,6 @@ const PoiTypeManager: React.FC<PoiTypeManagerProps> = ({
     }
   };
 
-
-
   const handleFileUpload = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;

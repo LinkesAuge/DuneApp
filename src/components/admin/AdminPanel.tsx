@@ -9,6 +9,7 @@ import MapSettings from './MapSettings';
 import RankManagement from './RankManagement';
 import SystemBuilder from './SystemBuilder';
 import SharedImagesManagement from './SharedImagesManagement';
+import BackupResetManager from './BackupResetManager';
 import DiamondIcon from '../common/DiamondIcon';
 
 const AdminPanel: React.FC = () => {
@@ -226,13 +227,20 @@ const AdminPanel: React.FC = () => {
           <div className="relative p-8 rounded-lg border border-gold-300/30 backdrop-blur-md"
                style={{ backgroundColor: 'rgba(42, 36, 56, 0.9)' }}>
             {activeTab === 'database' && (
-              <DatabaseManagement
-                storedBackups={storedBackups}
-                isLoadingBackups={isLoadingBackups}
-                backupsError={backupsError}
-                onRefreshBackups={refreshBackups}
-                onError={handleError}
-              />
+              <div className="space-y-8">
+                <DatabaseManagement
+                  storedBackups={storedBackups}
+                  isLoadingBackups={isLoadingBackups}
+                  backupsError={backupsError}
+                  onRefreshBackups={refreshBackups}
+                  onError={handleError}
+                />
+                
+                {/* Backup/Reset Management Section */}
+                <div className="border-t border-gold-300/20 pt-8">
+                  <BackupResetManager />
+                </div>
+              </div>
             )}
 
             {activeTab === 'users' && (
@@ -293,6 +301,8 @@ const AdminPanel: React.FC = () => {
                 onSuccess={handleSuccess}
               />
             )}
+
+
           </div>
         </div>
       </div>

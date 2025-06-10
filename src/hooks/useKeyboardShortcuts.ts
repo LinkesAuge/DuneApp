@@ -103,15 +103,6 @@ export function useKeyboardShortcuts(
 
     // Debug logging
     if (debugRef.current) {
-      console.log('Keyboard event:', {
-        key: event.key,
-        ctrlKey: event.ctrlKey,
-        altKey: event.altKey,
-        shiftKey: event.shiftKey,
-        focusedPanel,
-        target: target.tagName,
-        isInput
-      });
     }
 
     // Process registered shortcuts
@@ -135,7 +126,6 @@ export function useKeyboardShortcuts(
           shortcut.action();
           
           if (debugRef.current) {
-            console.log('Executed shortcut:', shortcut.description);
           }
         } catch (error) {
           console.error('Error executing shortcut:', error);
@@ -162,7 +152,6 @@ export function useKeyboardShortcuts(
     shortcutsRef.current.set(id, shortcut);
     
     if (debugRef.current) {
-      console.log('Registered shortcut:', id, shortcut);
     }
   }, []);
 
@@ -170,7 +159,6 @@ export function useKeyboardShortcuts(
     const removed = shortcutsRef.current.delete(id);
     
     if (debugRef.current && removed) {
-      console.log('Unregistered shortcut:', id);
     }
   }, []);
 
@@ -178,7 +166,6 @@ export function useKeyboardShortcuts(
     shortcutsRef.current.clear();
     
     if (debugRef.current) {
-      console.log('Cleared all shortcuts');
     }
   }, []);
 
@@ -192,7 +179,6 @@ export function useKeyboardShortcuts(
     setFocusedPanel(panel);
     
     if (debugRef.current) {
-      console.log('Focus changed to panel:', panel);
     }
   }, []);
 

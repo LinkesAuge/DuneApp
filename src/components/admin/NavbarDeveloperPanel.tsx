@@ -14,24 +14,13 @@ const NavbarDeveloperPanel: React.FC = () => {
   const toggleDevPanel = () => setIsDevPanelOpen(!isDevPanelOpen);
 
   const runScreenshotTest = () => {
-    console.log('🧪 Screenshot System Test');
-    console.log('- Unified Screenshot Manager: Available');
-    console.log('- Storage Architecture: poi_screenshots/ + poi_cropped/');
-    console.log('- RLS Policies: Active');
-    console.log('✅ All systems operational');
   };
 
   const runDatabaseTest = () => {
-    console.log('🔍 Database Connection Test');
-    console.log('- User authenticated:', !!user);
-    console.log('- Profile loaded:', !!profile);
-    console.log('- User role:', profile?.role);
-    console.log('- User ID:', user?.id);
   };
 
   const clearConsole = () => {
     console.clear();
-    console.log('🧹 Console cleared - Development mode active');
   };
 
   return (

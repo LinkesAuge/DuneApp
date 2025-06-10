@@ -212,8 +212,6 @@ export function useItemsSchematics(): UseItemsSchematicsReturn {
     await refetchTypes();
   }, [refetchTypes]);
 
-
-
   const refetchItems = useCallback(async () => {
     await refetchEntities();
   }, [refetchEntities]);
@@ -407,8 +405,6 @@ export function useItemsSchematics(): UseItemsSchematicsReturn {
     const typeId = parseInt(id, 10);
     return state.types.find(type => type.id === typeId);
   }, [state.types]);
-
-
 
   const getTierById = useCallback((id: string): Tier | undefined => {
     // Convert id to number since tier_number is the primary key

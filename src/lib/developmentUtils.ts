@@ -31,7 +31,6 @@ export const isDatabaseWriteSafe = (operation: 'delete' | 'update' | 'create') =
 // Development-only debugging
 export const debugLog = (message: string, data?: any) => {
   if (enableDebugTools) {
-    console.log(`🛠️ [DEV] ${message}`, data || '');
   }
 };
 

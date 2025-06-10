@@ -558,8 +558,7 @@ export async function migrateCategoryContent(
 
     // Migrate types
     try {
-  
-      
+
       const { count: typeCount, error: typeError } = await supabase
         .from('types')
         .update({ 
@@ -712,13 +711,10 @@ export async function deleteCategory(
           error: `Migration failed: ${migrationResult.error}`
         };
       }
-      
-      
-      
+
       // Verify no remaining dependencies after migration
       const remainingDeps = await getCategoryDependencies(user, categoryId);
-      
-      
+
       if (remainingDeps.success && remainingDeps.data?.hasAny) {
         const errorMessage = `Migration incomplete: ${remainingDeps.data.types} types, ${remainingDeps.data.items} items, ${remainingDeps.data.schematics} schematics still remain`;
         console.error(`🚨 ${errorMessage}`);
@@ -986,8 +982,6 @@ export async function getTypeDependencies(
       };
     }
 
-
-
     // Count items
     const { count: itemsCount } = await supabase
       .from('items')
@@ -1035,8 +1029,6 @@ export async function migrateTypeContent(
 
     let migrated = 0;
     const errors: string[] = [];
-
-
 
     // Migrate items
     try {

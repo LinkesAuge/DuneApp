@@ -52,8 +52,7 @@ export const uploadImageWithConversion = async (
     );
 
     if (shouldConvert) {
-  
-      
+
       const preset = getQualityPresets()[quality];
       conversionStats = await convertToWebP(file, {
         ...preset,
@@ -61,7 +60,6 @@ export const uploadImageWithConversion = async (
       });
       
       fileToUpload = createWebPFile(conversionStats.blob, fileName);
-      
 
     }
 
@@ -252,10 +250,8 @@ export const deleteOldCroppedVersion = async (
     // Try to delete the old cropped version (ignore errors if file doesn't exist)
     try {
       await deleteImage('screenshots', croppedPath);
-      console.log('Deleted old cropped version:', croppedPath);
     } catch (error) {
       // Ignore errors - file might not exist if this is the first crop
-      console.log('No old cropped version to delete or deletion failed:', croppedPath);
     }
   } catch (error) {
     console.error('Error in deleteOldCroppedVersion:', error);

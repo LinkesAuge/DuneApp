@@ -79,8 +79,6 @@ const POIEntityLinkingModal: React.FC<POIEntityLinkingModalProps> = ({
     }
   }, [isOpen]);
 
-
-
   // Reset filters when modal closes
   useEffect(() => {
     if (!isOpen) {
@@ -176,8 +174,6 @@ const POIEntityLinkingModal: React.FC<POIEntityLinkingModalProps> = ({
     
     setEntityLinks(newLinks);
   };
-
-
 
   // Submit entity links
   const handleSubmit = async () => {

@@ -46,28 +46,23 @@ const UnifiedEntitiesPage: React.FC = () => {
 
   const handleEntityEdit = (entity: Entity) => {
     // TODO: Open edit modal
-    console.log('Edit entity:', entity);
   };
 
   const handleEntityDelete = (entity: Entity) => {
     // TODO: Open delete confirmation modal
-    console.log('Delete entity:', entity);
   };
 
   const handleEntityPoiLink = (entity: Entity) => {
     // TODO: Open POI linking modal
-    console.log('Link entity to POI:', entity);
   };
 
   const handleCreateNew = () => {
     // TODO: Open create modal
-    console.log('Create new entity');
   };
 
   const handleBulkDelete = () => {
     if (selectedEntityIds.length === 0) return;
     // TODO: Implement bulk delete
-    console.log('Bulk delete entities:', selectedEntityIds);
   };
 
   const handleSelectionModeToggle = () => {

@@ -30,7 +30,7 @@ const StatisticsCards: React.FC = () => {
         haggaBasinPoisResult,
         commentsResult,
         exploredGridSquaresResult,
-        screenshotsResult,
+        managedImagesResult,
         usersResult,
   
         privatePoisResult,
@@ -41,7 +41,7 @@ const StatisticsCards: React.FC = () => {
         supabase.from('pois').select('id', { count: 'exact', head: true }).eq('map_type', 'hagga_basin'),
         supabase.from('comments').select('id', { count: 'exact', head: true }),
         supabase.from('grid_squares').select('id', { count: 'exact', head: true }).eq('is_explored', true),
-        supabase.from('comment_screenshots').select('id', { count: 'exact', head: true }),
+        supabase.from('managed_images').select('id', { count: 'exact', head: true }),
         supabase.from('profiles').select('id', { count: 'exact', head: true }),
 
         supabase.from('pois').select('id', { count: 'exact', head: true }).eq('privacy_level', 'private'),
@@ -54,25 +54,18 @@ const StatisticsCards: React.FC = () => {
       if (haggaBasinPoisResult.error) throw haggaBasinPoisResult.error;
       if (commentsResult.error) throw commentsResult.error;
       if (exploredGridSquaresResult.error) throw exploredGridSquaresResult.error;
-      if (screenshotsResult.error) throw screenshotsResult.error;
+      if (managedImagesResult.error) throw managedImagesResult.error;
       if (usersResult.error) throw usersResult.error;
 
       if (privatePoisResult.error) throw privatePoisResult.error;
       if (sharedPoisResult.error) throw sharedPoisResult.error;
-
-      // Also count POI screenshots
-      const { count: poiScreenshotsCount, error: poiScreenshotsError } = await supabase
-        .from('pois')
-        .select('screenshots', { count: 'exact', head: true });
-
-      if (poiScreenshotsError) throw poiScreenshotsError;
 
       setStats({
         totalPois: poisResult.count || 0,
         totalComments: commentsResult.count || 0,
         totalGridSquares: 81, // Deep Desert is 9x9 grid
         exploredGridSquares: exploredGridSquaresResult.count || 0,
-        totalScreenshots: (screenshotsResult.count || 0) + (poiScreenshotsCount || 0),
+        totalScreenshots: managedImagesResult.count || 0,
         totalUsers: usersResult.count || 0,
         deepDesertPois: deepDesertPoisResult.count || 0,
         haggaBasinPois: haggaBasinPoisResult.count || 0,
@@ -182,7 +175,6 @@ const StatisticsCards: React.FC = () => {
         subtitle="Community members"
         color="green"
       />
-
 
     </div>
   );

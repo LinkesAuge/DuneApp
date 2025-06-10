@@ -22,8 +22,6 @@ const POILinkFiltersPanel: React.FC<POILinkFiltersPanelProps> = ({
   filterOptions = { poiTypes: [], entityCategories: [], entityTypes: [], tiers: [] }
 }) => {
   const { filters, setFilters } = filterState;
-  
-  console.log('POILinkFiltersPanel rendered with filters:', filters);
   const [activeTab, setActiveTab] = React.useState<'poi' | 'entity'>('poi');
   const [collapsedPOICategories, setCollapsedPOICategories] = React.useState<Set<string>>(new Set());
   const [collapsedEntityCategories, setCollapsedEntityCategories] = React.useState<Set<string>>(new Set());
@@ -290,15 +288,12 @@ const POILinkFiltersPanel: React.FC<POILinkFiltersPanelProps> = ({
           <button
             onClick={() => {
               const currentCategories = filters.poiCategories || [];
-              console.log('POI Hide/Show All clicked. Current categories:', currentCategories);
               if (currentCategories.length > 0) {
                 // If any categories are selected, hide all
-                console.log('Setting POI categories to []');
                 setFilters({ ...filters, poiCategories: [] });
               } else {
                 // If no categories are selected, show all
                 const allCategories = [...new Set(filterOptions.poiTypes.map(pt => pt.category))];
-                console.log('Setting POI categories to all:', allCategories);
                 setFilters({ ...filters, poiCategories: allCategories });
               }
             }}

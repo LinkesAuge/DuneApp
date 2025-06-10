@@ -7,7 +7,6 @@ import { useUnifiedImages } from '../../hooks/useUnifiedImages';
 import CreateEditItemSchematicModal from './CreateEditItemSchematicModal';
 import BulkOperationsModal from './BulkOperationsModal';
 
-
 import LinkPoisButton from './LinkPoisButton';
 import LinkingButton from './LinkingButton';
 import PoiLinkCounter from './PoiLinkCounter';
@@ -910,8 +909,6 @@ const ItemsSchematicsContent: React.FC<ItemsSchematicsContentProps> = ({
     }
   };
 
-
-
   const handleEntitySaved = (savedEntity: EntityWithRelations) => {
     // Ensure entityType is preserved from the original editing entity
     const updatedEntity = {
@@ -962,8 +959,6 @@ const ItemsSchematicsContent: React.FC<ItemsSchematicsContentProps> = ({
     } else if (viewFromFilters === 'schematics') {
       entities = schematics.map(schematic => ({ ...schematic, entityType: 'schematics' as const }));
     }
-
-
 
     // Step 2: Apply hierarchical filters (categories, types, tiers)
     if (filters) {
@@ -1298,7 +1293,6 @@ const ItemsSchematicsContent: React.FC<ItemsSchematicsContentProps> = ({
           </div>
         </div>
       )}
-
 
     </div>
   );

@@ -57,8 +57,6 @@ const FiltersPanel: React.FC<FiltersPanelProps> = ({ onTogglePanel, filterState 
     }
   }, [allEntities]);
 
-
-
   // Memoize category calculations to prevent unnecessary re-renders
   const poiCategories = React.useMemo(() => 
     [...new Set(poiTypes.map(type => type.category))], 
@@ -156,9 +154,7 @@ const FiltersPanel: React.FC<FiltersPanelProps> = ({ onTogglePanel, filterState 
               const typeEntityCount = allEntitiesRef.current.filter(entity => 
                 entity.category?.name === category && entity.type?.name === type
               ).length;
-              
 
-              
               return (
                 <div key={`entity-type-${category}-${type}`} className="space-y-1">
                   {/* Type Header with Toggle Controls */}
@@ -193,7 +189,6 @@ const FiltersPanel: React.FC<FiltersPanelProps> = ({ onTogglePanel, filterState 
                       
                     </div>
                   </div>
-
 
                 </div>
               );
@@ -295,8 +290,6 @@ const FiltersPanel: React.FC<FiltersPanelProps> = ({ onTogglePanel, filterState 
       return newSet;
     });
   };
-
-
 
   // Helper function to check if an icon is a URL
   const isIconUrl = (icon: string): boolean => {
@@ -525,8 +518,6 @@ const FiltersPanel: React.FC<FiltersPanelProps> = ({ onTogglePanel, filterState 
             onClick={() => {
               const allTypeIds = poiTypes.map(type => type.id);
               const allTypesSelected = allTypeIds.length > 0 && allTypeIds.every(id => poiFilters.selectedPoiTypes.includes(id));
-              console.log('POI Hide/Show All clicked. Current selectedPoiTypes:', poiFilters.selectedPoiTypes);
-              console.log('All types selected?', allTypesSelected, 'Will call toggleAllPOIs with:', !allTypesSelected);
               toggleAllPOIs(!allTypesSelected);
             }}
             className="text-xs text-amber-300 hover:text-amber-100 font-light transition-all duration-300 px-2 py-1 rounded border border-amber-400/20 hover:border-amber-400/40 hover:bg-amber-400/10"
@@ -697,7 +688,6 @@ const FiltersPanel: React.FC<FiltersPanelProps> = ({ onTogglePanel, filterState 
               const allTiersSelected = allTiers.every(tier => entityFilters.tiers[tier] === true);
               
               const allSelected = allCategoriesSelected && allTypesSelected && allTiersSelected;
-              console.log('Entity Hide/Show All clicked. All selected?', allSelected, 'Will call toggleAllEntities with:', !allSelected);
               toggleAllEntities(!allSelected);
             }}
             className="text-xs text-amber-300 hover:text-amber-100 font-light transition-all duration-300 px-2 py-1 rounded border border-amber-400/20 hover:border-amber-400/40 hover:bg-amber-400/10"

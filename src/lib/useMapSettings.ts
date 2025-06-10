@@ -44,8 +44,6 @@ export const useMapSettings = () => {
         throw fetchError;
       }
 
-  
-
       if (data && data.setting_value) {
         const newSettings = {
           ...defaultMapSettings,

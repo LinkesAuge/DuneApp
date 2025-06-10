@@ -16,7 +16,6 @@ export interface Entity {
   category_id: number;         // integer, NOT NULL - references categories.id
   type_id: number;             // integer, NOT NULL - references types.id
 
-  
   tier_number: number;         // integer, 0-7 - tier level
   is_global: boolean;          // boolean - global availability
   is_schematic: boolean;       // boolean - true for schematics, false for items
@@ -46,8 +45,6 @@ export interface Type {
   created_at?: string;         // timestamp - creation time
   updated_at?: string;         // timestamp - last update time
 }
-
-
 
 // Extended entity with resolved relationships for display
 export interface EntityWithRelations extends Entity {

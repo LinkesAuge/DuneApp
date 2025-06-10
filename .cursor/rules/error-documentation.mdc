@@ -522,3 +522,30 @@ This document tracks known issues, their states, context, and resolutions encoun
 -   **Lesson Learned**: Critical privacy lesson: Frontend filtering must always enforce access control BEFORE applying display filters. Privacy levels are metadata for categorization, not access control mechanisms. Always validate user authorization first: (1) Check if user has access to the resource, (2) Then apply user-selected filters. For shared resources, implement proper lookup tables rather than assuming creator-only access. Privacy violations are security issues that must be resolved immediately with comprehensive access validation.
 
 ---
+
+-   **Date**: 2025-01-30
+-   **Error Description**: Automated console.log removal script breaking code syntax due to aggressive pattern matching.
+-   **Context/Symptoms**: 
+    1. Initial aggressive script removed 296 console.log statements but created syntax errors by removing parts of complex expressions
+    2. Build failures with "Unexpected )" errors in POIEditModal.tsx and POIPlacementModal.tsx  
+    3. Script removed console.log statements that were part of larger code blocks, leaving orphaned parentheses and broken function calls
+    4. Git status showed 50+ modified files, indicating overly broad changes
+-   **Investigation/Diagnosis**:
+    -   **Root Cause**: Regex patterns in first script were too aggressive, matching console.log within larger expressions and multi-line code blocks
+    -   **Pattern Issues**: Script used broad patterns like `/console\.log\s*\([^)]*\)/g` that could match nested parentheses incorrectly
+    -   **Code Structure Damage**: Removal left behind incomplete function calls and malformed syntax
+    -   **Scope Creep**: Script affected far more files than expected, indicating insufficient targeting
+-   **Solution/Fix**:
+    1.  **Complete Rollback**: Used `git restore .` to restore all damaged files to working state
+    2.  **Two-Phase Approach**: Developed separate scripts for different complexity levels:
+        - **Phase 1**: Conservative script targeting only simple, standalone console.log statements
+        - **Phase 2**: Advanced script with proper JavaScript parsing for complex multi-line statements  
+    3.  **Build Verification**: Mandatory TypeScript compilation check after each phase
+    4.  **Pattern Refinement**: Used specific, safe regex patterns that only match complete standalone statements
+    5.  **Final Results**: Successfully removed 304 console.log statements (202 + 102) with zero syntax errors
+-   **Files Affected**:
+    -   Initial damage: 50+ files with syntax errors
+    -   Final cleanup: 44 files successfully processed without errors
+-   **Lesson Learned**: For automated code transformations: (1) Always start with conservative, safe patterns before attempting complex matching, (2) Implement mandatory build verification after each transformation phase, (3) Use version control checkpoints to enable quick rollback from automation failures, (4) Test regex patterns on small subsets before applying to entire codebase, (5) Prefer multiple targeted passes over single aggressive transformations, (6) Consider JavaScript parsing libraries for complex multi-line statement handling rather than pure regex approaches.
+
+---

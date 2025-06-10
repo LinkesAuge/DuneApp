@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Poi, PoiType } from '../../types';
 import { ChevronDown, ChevronUp, Plus, Settings, Eye, EyeOff, Filter } from 'lucide-react';
 
-
 interface PoiControlPanelProps {
   pois: Poi[];
   poiTypes: PoiType[];
@@ -292,7 +291,6 @@ const PoiControlPanel: React.FC<PoiControlPanelProps> = ({
           {categories.map(renderCategorySection)}
         </div>
       </div>
-
 
     </div>
   );

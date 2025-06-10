@@ -311,13 +311,11 @@ const extractStorageFilePath = (url: string): string | null => {
           if (pattern.includes('/screenshots/')) {
             const afterScreenshots = pattern.split('/screenshots/')[1];
             const result = afterScreenshots ? `${afterScreenshots}${parts[1]}` : parts[1];
-            console.log(`[extractStorageFilePath] 🎯 Pattern matched: ${pattern} → After screenshots: ${afterScreenshots} → Result: ${result}`);
             return result;
           } else {
             // Fallback for other patterns
             const folderName = pattern.split('/').pop() || '';
             const result = folderName ? `${folderName}${parts[1]}` : parts[1];
-            console.log(`[extractStorageFilePath] 🎯 Pattern matched: ${pattern} → Folder: ${folderName} → Result: ${result}`);
             return result;
           }
         }
@@ -348,7 +346,6 @@ const extractStorageFilePath = (url: string): string | null => {
         if (parts.length > 1) {
           const folderName = pattern.split('/').filter(p => p).pop() || '';
           const result = folderName ? `${folderName}/${parts[1]}` : parts[1];
-          console.log(`[extractStorageFilePath] 🎯 Relative pattern matched: ${pattern} → Folder: ${folderName} → Result: ${result}`);
           return result;
         }
       }

@@ -481,9 +481,7 @@ export function checkPermission(context: PermissionContext): PermissionCheckResu
     
     case 'type':
       return checkTypePermission(user, action, entity as Type);
-    
 
-    
     case 'field_definition':
       return checkFieldDefinitionPermission(user, action, entity as FieldDefinition);
     

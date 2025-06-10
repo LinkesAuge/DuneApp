@@ -177,7 +177,6 @@ const CategoryManager: React.FC<CategoryManagerProps> = () => {
     setIsSubmitting(true);
     try {
 
-
       // Use the CRUD function directly to get detailed error information
       const result = await createCategoryAPI(user, {
         name: formData.name.trim(),
@@ -226,7 +225,6 @@ const CategoryManager: React.FC<CategoryManagerProps> = () => {
 
     setIsSubmitting(true);
     try {
-
 
       const result = await updateCategoryAPI(user, editingCategory.id, {
         name: editingCategory.name.trim(),

@@ -23,7 +23,6 @@ import LinkedEntitiesSection from '../poi-linking/LinkedEntitiesSection';
 import { useScreenshotManager } from '../../hooks/useScreenshotManager';
 import ScreenshotUploader from '../shared/ScreenshotUploader';
 
-
 interface POIEditModalProps {
   poi: Poi;
   poiTypes: PoiType[];
@@ -109,7 +108,6 @@ const extractStorageFilePathFromUrl = (url: string): string | null => {
         
             return `${folderName}/${parts[1]}`;
           } else {
-            console.log(`[extractStorageFilePath] 🎯 Direct match: ${pattern} → Result: ${parts[1]}`);
             return parts[1];
           }
         }
@@ -269,12 +267,8 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
     setSelectedUsers([]);
     
     if (poi.privacy_level !== 'shared') {
-      console.log('POI is not shared, clearing selected users');
       return;
     }
-    
-    console.log('Loading current shares for POI:', poi.id);
-    
     try {
       // First get the poi_shares
       const { data: shares, error: sharesError } = await supabase
@@ -283,11 +277,7 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
         .eq('poi_id', poi.id);
 
       if (sharesError) throw sharesError;
-      
-      console.log('Loaded shares:', shares);
-      
       if (!shares || shares.length === 0) {
-        console.log('No shares found for this POI');
         return;
       }
 
@@ -301,9 +291,6 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
         .in('id', userIds);
 
       if (profilesError) throw profilesError;
-      
-      console.log('Loaded user profiles:', userProfiles);
-      console.log('Setting selected users:', userProfiles);
       setSelectedUsers(userProfiles || []);
     } catch (err) {
       console.error('Error loading current shares:', err);
@@ -361,21 +348,12 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
     }
 
     try {
-      console.log('[POIEdit] 🗑️ Deleting screenshot immediately:', screenshotId);
-      console.log('[POIEdit] 🔍 Screenshot data:', {
-        id: screenshotToDelete.id,
-        url: screenshotToDelete.url,
-        original_url: screenshotToDelete.original_url,
-        processed_url: (screenshotToDelete as any).processed_url,
-        crop_details: screenshotToDelete.crop_details
-      });
       
       // Delete from storage first (both original and processed if they exist)
       if (screenshotToDelete.original_url) {
         const originalPath = extractStorageFilePathFromUrl(screenshotToDelete.original_url);
         if (originalPath) {
           await deleteImage('screenshots', originalPath);
-          console.log('[POIEdit] ✅ Deleted original file from storage:', originalPath);
         }
       }
       
@@ -388,7 +366,6 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
         const processedPath = extractStorageFilePathFromUrl(processedUrl);
         if (processedPath) {
           await deleteImage('screenshots', processedPath);
-          console.log('[POIEdit] ✅ Deleted processed file from storage:', processedPath);
         }
       }
       
@@ -417,8 +394,6 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
       
       // Remove from UI
     setExistingScreenshots(prev => prev.filter(s => s.id !== screenshotId));
-      console.log('[POIEdit] ✅ Screenshot deleted successfully:', screenshotId);
-      
     } catch (error: any) {
       console.error('[POIEdit] ❌ Error deleting screenshot:', error);
       setError(error.message || 'Failed to delete screenshot. Please try again.');
@@ -515,7 +490,6 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
     if (fileToRemove) {
       const fileWithMetadata = fileToRemove.originalFile as any;
       if (fileWithMetadata?.isEdit && fileWithMetadata?.editingScreenshotId) {
-        console.log('[POIEdit] 🔄 Restoring original screenshot after cancel:', fileWithMetadata.editingScreenshotId);
         const originalScreenshot = screenshotsBeingEdited.get(fileWithMetadata.editingScreenshotId);
         if (originalScreenshot) {
           // Restore the original screenshot
@@ -529,7 +503,6 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
             newMap.delete(fileWithMetadata.editingScreenshotId);
             return newMap;
           });
-          console.log('[POIEdit] ✅ Original screenshot restored successfully');
         }
       }
     }
@@ -540,20 +513,13 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
 
   // Upload screenshots using unified system (handles both new and edited)
   const uploadProcessedScreenshots = async (poiId: string): Promise<void> => {
-    console.log('[POIEdit] 🚀 Starting uploadProcessedScreenshots for POI:', poiId);
-    
     const processedFiles = screenshotManager.filesToProcess.filter(f => f.isProcessed);
-    console.log('[POIEdit] 📊 Processed files found:', processedFiles.length);
-    
     if (processedFiles.length === 0) {
-      console.log('[POIEdit] ⚠️ No processed files found, skipping screenshot upload');
       return;
     }
 
     for (let index = 0; index < processedFiles.length; index++) {
       const file = processedFiles[index];
-      console.log('[POIEdit] 🔄 Processing file:', file.originalFile.name);
-      
       try {
         // Check if this is an edit of an existing screenshot
         const fileWithMetadata = file.originalFile as any;
@@ -561,8 +527,6 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
         
         if (isEdit) {
           // EDITING EXISTING SCREENSHOT - Update managed_images record
-          console.log('[POIEdit] ✏️ Editing existing screenshot:', fileWithMetadata.editingScreenshotId);
-          
           const wasActuallyCropped = file.wasActuallyCropped;
           const existingOriginalUrl = fileWithMetadata.originalScreenshotUrl;
           
@@ -577,12 +541,10 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
             await deleteOldCroppedVersion(existingOriginalUrl);
             const croppedUpload = await uploadPoiScreenshotCropped(file.displayFile, baseFileName);
             processedUrl = croppedUpload.url;
-            console.log('[POIEdit] ✂️ Cropped upload complete:', croppedUpload);
           } else {
             // User wants full image - remove any existing cropped version
             await deleteOldCroppedVersion(existingOriginalUrl);
             processedUrl = null; // No processed version, use original
-            console.log('[POIEdit] 📏 Using full image, removed any existing crop');
           }
           
           // Update the managed_images record
@@ -599,44 +561,26 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
             console.error('[POIEdit] ❌ Error updating managed image:', updateError);
             throw new Error('Failed to update existing screenshot');
           }
-          
-          console.log('[POIEdit] ✅ Existing screenshot updated successfully');
-          
         } else {
           // NEW SCREENSHOT UPLOAD - Same as POIPlacementModal
-          console.log('[POIEdit] 🆕 Adding new screenshot');
-          
           const timestamp = Date.now();
           const fileExt = file.originalFile.name.split('.').pop() || 'jpg';
           const baseFileName = `${poiId}_${timestamp}.${fileExt}`;
           
           // Step 1: Upload original version to poi_screenshots/
-          console.log('[POIEdit] ⬆️ Step 1: Uploading original file...');
           const originalUpload = await uploadPoiScreenshotOriginal(file.originalFile, baseFileName);
           let originalUrl = originalUpload.url;
-          console.log('[POIEdit] ✅ Original upload complete:', originalUrl);
-          
           // Step 2: Check if actual cropping was performed
           const wasActuallyCropped = file.wasActuallyCropped;
           let processedUrl: string | null = null;
           
           if (wasActuallyCropped) {
-            console.log('[POIEdit] ✂️ Step 2: Actual cropping detected, uploading cropped version...');
             const croppedUpload = await uploadPoiScreenshotCropped(file.displayFile, baseFileName);
             processedUrl = croppedUpload.url;
-            console.log('[POIEdit] ✅ Cropped upload complete:', croppedUpload);
           } else {
-            console.log('[POIEdit] 📏 Step 2: No cropping performed, using original as display version...');
           }
           
           // Step 3: Insert into managed_images table
-          console.log('[POIEdit] 🗄️ Step 3: Inserting into managed_images...', {
-            original_url: originalUrl,
-            processed_url: processedUrl,
-            crop_details: wasActuallyCropped ? (file.cropData || null) : null,
-            image_type: 'poi_screenshot',
-            uploaded_by: user?.id
-          });
           
           const { data: managedImage, error: imageError } = await supabase
             .from('managed_images')
@@ -654,9 +598,6 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
             console.error('[POIEdit] ❌ Error saving managed image:', imageError);
             throw new Error('Failed to save image to database');
           }
-
-          console.log('[POIEdit] ✅ Managed image saved:', managedImage);
-
           // Step 4: Link image to POI in poi_image_links table
           const existingLinksCount = await supabase
             .from('poi_image_links')
@@ -666,13 +607,6 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
             .limit(1);
           
           const nextDisplayOrder = (existingLinksCount.data?.[0]?.display_order ?? -1) + 1;
-          
-          console.log('[POIEdit] 🔗 Step 4: Linking image to POI...', {
-            poi_id: poiId,
-            image_id: managedImage.id,
-            display_order: nextDisplayOrder
-          });
-          
           const { error: linkError } = await supabase
             .from('poi_image_links')
             .insert({
@@ -685,16 +619,12 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
             console.error('[POIEdit] ❌ Error linking image to POI:', linkError);
             throw new Error('Failed to link image to POI');
           }
-
-          console.log('[POIEdit] ✅ Image linked to POI successfully');
         }
       } catch (error) {
         console.error('[POIEdit] ❌ Error uploading screenshot:', error);
         throw new Error(`Failed to upload screenshot: ${file.originalFile.name}`);
       }
     }
-
-    console.log('[POIEdit] 🎉 All screenshots processed and saved successfully!');
   };
 
   // Handle form submission
@@ -726,7 +656,6 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
 
     try {
       // 1. Upload new/edited screenshots using unified system
-      console.log('[POIEdit] 📸 Processing screenshot uploads...');
       await uploadProcessedScreenshots(poi.id);
 
       // 4. Update the POI record in the database (excluding screenshots)
@@ -797,7 +726,6 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
       }
 
       // 3. Fetch updated POI data with screenshots from unified system
-      console.log('[POIEdit] 🔄 Fetching updated POI data...');
       const { data: updatedPoiWithScreenshots, error: fetchError } = await supabase
         .from('pois')
         .select(`
@@ -824,14 +752,11 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
       }
 
       // 3. Clear processing queues and notify parent
-      console.log('[POIEdit] 🧹 Clearing processing queues...');
       screenshotManager.clearProcessingQueue();
       setScreenshotsBeingEdited(new Map());
       
       // Use updated POI data with screenshots if available, otherwise use basic updated data
       const finalPoiData = updatedPoiWithScreenshots || updatedPoi;
-      console.log('[POIEdit] 📤 Calling onPoiUpdated with:', finalPoiData);
-      
       onPoiUpdated(finalPoiData);
       onClose();
     } catch (err: any) {
@@ -1071,7 +996,6 @@ const POIEditModal: React.FC<POIEditModalProps> = ({
                       </div>
                     );
                   })}
-
 
                 </div>
               )}

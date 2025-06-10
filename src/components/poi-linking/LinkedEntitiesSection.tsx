@@ -59,7 +59,6 @@ const LinkedEntitiesSection: React.FC<LinkedEntitiesSectionProps> = ({
   
   // Debug: Log modal state changes
   useEffect(() => {
-    console.log('LinkedEntitiesSection: showLinkingModal changed to:', showLinkingModal);
   }, [showLinkingModal]);
   // Load entity links
   useEffect(() => {
@@ -69,9 +68,7 @@ const LinkedEntitiesSection: React.FC<LinkedEntitiesSectionProps> = ({
   const loadEntityLinks = async () => {
     try {
       setLoading(true);
-      console.log('LinkedEntitiesSection: Loading entity links for POI:', poiId);
       const links = await poiEntityLinksAPI.getPOIEntityLinks(poiId);
-      console.log('LinkedEntitiesSection: Loaded', links.length, 'entity links');
       setEntityLinks(links);
     } catch (error) {
       console.error('Failed to load entity links:', error);
@@ -83,7 +80,6 @@ const LinkedEntitiesSection: React.FC<LinkedEntitiesSectionProps> = ({
 
   // Handle links updated
   const handleLinksUpdated = () => {
-    console.log('LinkedEntitiesSection: handleLinksUpdated called, reloading entity links...');
     // Add a small delay to ensure database has been updated
     setTimeout(() => {
       loadEntityLinks();
@@ -94,8 +90,6 @@ const LinkedEntitiesSection: React.FC<LinkedEntitiesSectionProps> = ({
   // Filter entities by type
   const linkedItems = entityLinks.filter(link => link.entity && !link.entity.is_schematic);
   const linkedSchematics = entityLinks.filter(link => link.entity && link.entity.is_schematic);
-
-
 
   // Handle link deletion - show confirmation modal
   const handleDeleteClick = (poiId: string, entityId: string, entityName: string, event: React.MouseEvent) => {
@@ -205,8 +199,6 @@ const LinkedEntitiesSection: React.FC<LinkedEntitiesSectionProps> = ({
                 )}
               </div>
 
-
-              
               {/* Entity Description */}
               {entity.description && (
                 <p className="text-xs text-amber-200/70 line-clamp-1">{entity.description}</p>
@@ -261,7 +253,6 @@ const LinkedEntitiesSection: React.FC<LinkedEntitiesSectionProps> = ({
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
-              console.log('Link Items button clicked, setting modal to true');
               setShowLinkingModal(true);
             }}
             className="flex items-center gap-1 px-2 py-1 bg-amber-600 hover:bg-amber-500 text-white rounded text-xs transition-colors"
@@ -330,7 +321,6 @@ const LinkedEntitiesSection: React.FC<LinkedEntitiesSectionProps> = ({
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  console.log('Link Your First Item button clicked, setting modal to true');
                   setShowLinkingModal(true);
                 }}
                 className="inline-flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg transition-colors"

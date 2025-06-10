@@ -56,8 +56,6 @@ const CommentForm: React.FC<CommentFormProps> = ({
     setIsSubmitting(true);
 
     try {
-      console.log('[CommentForm] 🚀 Starting comment creation...');
-      
       // 1. Create the comment
       const { data: commentData, error: insertError } = await supabase
         .from('comments')
@@ -70,12 +68,9 @@ const CommentForm: React.FC<CommentFormProps> = ({
         .single();
 
       if (insertError) throw insertError;
-      console.log('[CommentForm] ✅ Comment created:', commentData.id);
-
       // 2. Upload and link processed screenshots to the comment
       const processedFiles = screenshotManager.filesToProcess.filter(f => f.isProcessed);
       if (processedFiles.length > 0) {
-        console.log(`[CommentForm] 📸 Processing ${processedFiles.length} screenshots for comment ${commentData.id}`);
         await uploadProcessedScreenshots(commentData.id);
       }
 
@@ -95,38 +90,25 @@ const CommentForm: React.FC<CommentFormProps> = ({
   // Upload processed screenshots for the comment
   const uploadProcessedScreenshots = async (commentId: string): Promise<void> => {
     const processedFiles = screenshotManager.filesToProcess.filter(f => f.isProcessed);
-    
-    console.log('[CommentForm] 🚀 Starting uploadProcessedScreenshots for comment:', commentId);
-    console.log('[CommentForm] 📊 Processed files found:', processedFiles.length);
-
     for (const file of processedFiles) {
       try {
-        console.log('[CommentForm] 🔄 Processing file:', file.originalFile.name);
-        
         // Generate unique filename
         const baseFilename = `comment_${commentId}_${Date.now()}`;
         
         // Step 1: Upload original file
-        console.log('[CommentForm] ⬆️ Step 1: Uploading original file...');
         const { uploadPoiScreenshotOriginal } = await import('../../lib/imageUpload');
         const originalUpload = await uploadPoiScreenshotOriginal(file.originalFile, `${baseFilename}.${file.originalFile.name.split('.').pop()}`);
-        console.log('[CommentForm] ✅ Original upload complete:', originalUpload.url);
-
         let croppedUpload = null;
         
         // Step 2: Upload cropped version if needed
         if (file.wasActuallyCropped && file.displayFile !== file.originalFile) {
-          console.log('[CommentForm] ✂️ Step 2: Uploading cropped version...');
           const { uploadPoiScreenshotCropped } = await import('../../lib/imageUpload');
           
           // Use the displayFile which contains the cropped version
           croppedUpload = await uploadPoiScreenshotCropped(file.displayFile, `${baseFilename}_cropped.webp`);
-          console.log('[CommentForm] ✅ Cropped upload complete:', croppedUpload.url);
         }
         
         // Step 3: Save to unified system database
-        console.log('[CommentForm] 💾 Step 3: Saving to unified system...');
-        
         const imageData = {
           original_url: originalUpload.url,
           processed_url: croppedUpload?.url || null,
@@ -134,9 +116,6 @@ const CommentForm: React.FC<CommentFormProps> = ({
           image_type: 'comment_image',
           uploaded_by: user.id
         };
-        
-        console.log('[CommentForm] 🗄️ Inserting into managed_images...', imageData);
-        
         const { data: managedImage, error: insertError } = await supabase
           .from('managed_images')
           .insert(imageData)
@@ -144,10 +123,7 @@ const CommentForm: React.FC<CommentFormProps> = ({
           .single();
 
         if (insertError) throw insertError;
-        console.log('[CommentForm] ✅ Managed image saved:', managedImage);
-        
         // Step 4: Link image to comment
-        console.log('[CommentForm] 🔗 Step 4: Linking image to comment...');
         const linkData = {
           comment_id: commentId,
           image_id: managedImage.id
@@ -158,15 +134,11 @@ const CommentForm: React.FC<CommentFormProps> = ({
           .insert(linkData);
 
         if (linkError) throw linkError;
-        console.log('[CommentForm] ✅ Image linked to comment successfully');
-        
       } catch (error) {
         console.error(`[CommentForm] ❌ Error processing file ${file.originalFile.name}:`, error);
         throw error;
       }
     }
-    
-    console.log('[CommentForm] 🎉 All screenshots processed and saved successfully!');
   };
 
   return (

@@ -25,6 +25,7 @@ interface BackupData {
     grid_squares: any[];
     pois: any[];
     comments: any[];
+    poi_entity_links: any[];
   };
   files: {
     grid_screenshots: StorageFile[];
@@ -97,70 +98,125 @@ async function collectFileUrls(supabaseClient: SupabaseClient, data: any, mapTyp
   // Collect grid screenshot URLs
   if (data.grid_squares) {
     for (const square of data.grid_squares) {
-      if (square.screenshot_url) gridScreenshots.push(square.screenshot_url);
+      if (square.screenshot_url) {
+        gridScreenshots.push(square.screenshot_url);
+      }
       if (square.original_screenshot_url && square.original_screenshot_url !== square.screenshot_url) {
         gridScreenshots.push(square.original_screenshot_url);
       }
     }
   }
 
-  // Collect POI screenshot URLs
-  if (data.pois) {
-    for (const poi of data.pois) {
-      if (poi.screenshots && Array.isArray(poi.screenshots)) {
-        for (const screenshot of poi.screenshots) {
-          if (screenshot.url) poiScreenshots.push(screenshot.url);
-          if (screenshot.original_url && screenshot.original_url !== screenshot.url) {
-            poiScreenshots.push(screenshot.original_url);
+  // Collect POI screenshot URLs - try unified system first, fallback to legacy
+  if (data.pois && data.pois.length > 0) {
+    // Try unified image system first
+    try {
+      const poiIds = data.pois.map((poi: any) => poi.id);
+      const { data: poiImageLinks, error } = await supabaseClient
+        .from('poi_image_links')
+        .select('poi_id, managed_images!inner(original_url, processed_url)')
+        .in('poi_id', poiIds);
+
+      if (!error && poiImageLinks && poiImageLinks.length > 0) {
+        for (const link of poiImageLinks) {
+          const managedImage = (link as any).managed_images;
+          if (managedImage.original_url) poiScreenshots.push(managedImage.original_url);
+          if (managedImage.processed_url && managedImage.processed_url !== managedImage.original_url) {
+            poiScreenshots.push(managedImage.processed_url);
+          }
+        }
+      } else {
+        // Fallback to legacy system - check for direct POI image fields
+        for (const poi of data.pois) {
+          // Try various possible field names for POI images
+          const imageFields = ['image_url', 'screenshot_url', 'original_image_url', 'cropped_image_url'];
+          for (const field of imageFields) {
+            if (poi[field]) {
+              poiScreenshots.push(poi[field]);
+            }
+          }
+          
+          // Check for screenshots array (legacy)
+          if (poi.screenshots && Array.isArray(poi.screenshots)) {
+            for (const screenshot of poi.screenshots) {
+              if (screenshot.url) poiScreenshots.push(screenshot.url);
+              if (screenshot.original_url && screenshot.original_url !== screenshot.url) {
+                poiScreenshots.push(screenshot.original_url);
+              }
+            }
+          }
+        }
+      }
+    } catch (unifiedError) {
+      // Fallback to legacy system
+      for (const poi of data.pois) {
+        const imageFields = ['image_url', 'screenshot_url', 'original_image_url', 'cropped_image_url'];
+        for (const field of imageFields) {
+          if (poi[field]) {
+            poiScreenshots.push(poi[field]);
           }
         }
       }
     }
   }
 
-  // Collect comment screenshot URLs
-  if (data.comments) {
-    for (const comment of data.comments) {
-      // Get comment screenshots from comment_screenshots table
-      const { data: commentScreenshotsData, error } = await supabaseClient
-        .from('comment_screenshots')
-        .select('url')
-        .eq('comment_id', comment.id);
-      
-      if (!error && commentScreenshotsData) {
-        for (const screenshot of commentScreenshotsData) {
-          if (screenshot.url) commentScreenshots.push(screenshot.url);
+  // Collect comment screenshot URLs - try unified system first, fallback to legacy
+  if (data.comments && data.comments.length > 0) {
+    try {
+      const commentIds = data.comments.map((comment: any) => comment.id);
+      const { data: commentImageLinks, error } = await supabaseClient
+        .from('comment_image_links')
+        .select('comment_id, managed_images!inner(original_url, processed_url)')
+        .in('comment_id', commentIds);
+
+      if (!error && commentImageLinks && commentImageLinks.length > 0) {
+        for (const link of commentImageLinks) {
+          const managedImage = (link as any).managed_images;
+          if (managedImage.original_url) commentScreenshots.push(managedImage.original_url);
+          if (managedImage.processed_url && managedImage.processed_url !== managedImage.original_url) {
+            commentScreenshots.push(managedImage.processed_url);
+          }
         }
+      } else {
+        // Fallback to legacy system
+        for (const comment of data.comments) {
+          if (comment.image_url) commentScreenshots.push(comment.image_url);
+          if (comment.screenshot_url) commentScreenshots.push(comment.screenshot_url);
+        }
+      }
+    } catch (unifiedError) {
+      // Fallback to legacy system
+      for (const comment of data.comments) {
+        if (comment.image_url) commentScreenshots.push(comment.image_url);
+        if (comment.screenshot_url) commentScreenshots.push(comment.screenshot_url);
       }
     }
   }
 
-  // Collect custom icons (only for this user's icons or system icons used by backed up POIs)
-  if (data.pois) {
-    // Get custom icon IDs from POIs
-    const customIconIds = data.pois
-      .filter((poi: any) => poi.custom_icon_id)
-      .map((poi: any) => poi.custom_icon_id);
-    
-    if (customIconIds.length > 0) {
-      const { data: customIconsData, error } = await supabaseClient
-        .from('custom_icons')
-        .select('image_url')
-        .in('id', customIconIds);
-      
-      if (!error && customIconsData) {
-        for (const icon of customIconsData) {
-          if (icon.image_url) customIcons.push(icon.image_url);
+  // Collect custom icon URLs from managed_images table
+  try {
+    const { data: customIconData, error } = await supabaseClient
+      .from('managed_images')
+      .select('original_url, processed_url')
+      .eq('image_type', 'custom_icon');
+
+    if (!error && customIconData) {
+      for (const icon of customIconData) {
+        if (icon.original_url) customIcons.push(icon.original_url);
+        if (icon.processed_url && icon.processed_url !== icon.original_url) {
+          customIcons.push(icon.processed_url);
         }
       }
     }
+  } catch (customIconError) {
+    // Silently handle custom icons error
   }
 
   return {
-    gridScreenshots: [...new Set(gridScreenshots)], // Remove duplicates
-    poiScreenshots: [...new Set(poiScreenshots)],
-    commentScreenshots: [...new Set(commentScreenshots)],
-    customIcons: [...new Set(customIcons)]
+    gridScreenshots,
+    poiScreenshots,
+    commentScreenshots,
+    customIcons,
   };
 }
 
@@ -219,9 +275,8 @@ async function downloadAllFiles(supabaseClient: SupabaseClient, fileUrls: any): 
 
 async function fetchTableDataByMapType(supabaseClient: SupabaseClient, tableName: string, mapType: MapType) {
   let allData: any[] = [];
-  
+
   if (tableName === 'pois') {
-    // Filter POIs by map_type
     if (mapType === 'both') {
       const { data, error } = await supabaseClient.from(tableName).select('*');
       if (error) {
@@ -232,22 +287,21 @@ async function fetchTableDataByMapType(supabaseClient: SupabaseClient, tableName
     } else {
       const { data, error } = await supabaseClient.from(tableName).select('*').eq('map_type', mapType);
       if (error) {
-        console.error(`Error fetching data from ${tableName} for map type ${mapType}:`, error);
+        console.error(`Error fetching data from ${tableName}:`, error);
         throw error;
       }
       allData = data || [];
     }
   } else if (tableName === 'grid_squares') {
     if (mapType === 'hagga_basin') {
-      // Hagga Basin doesn't use grid squares, return empty array
       allData = [];
     } else {
-      // Deep Desert grid squares (A1-I9 pattern) or all grid squares
       const { data, error } = await supabaseClient.from(tableName).select('*');
       if (error) {
         console.error(`Error fetching data from ${tableName}:`, error);
         throw error;
       }
+      
       if (mapType === 'deep_desert') {
         // Filter to only Deep Desert grid coordinates (A1-I9 pattern)
         const deepDesertPattern = /^[A-I][1-9]$/;
@@ -267,7 +321,6 @@ async function fetchTableDataByMapType(supabaseClient: SupabaseClient, tableName
       allData = data || [];
     } else {
       // Get comments for POIs of this map type and grid squares (for deep_desert)
-      let commentFilter = '';
       if (mapType === 'deep_desert') {
         // Comments for Deep Desert POIs or grid squares
         const { data: deepDesertPois, error: poisError } = await supabaseClient
@@ -283,16 +336,30 @@ async function fetchTableDataByMapType(supabaseClient: SupabaseClient, tableName
         const poiIds = (deepDesertPois || []).map((poi: any) => poi.id);
         
         // Get comments for these POIs or any grid square
-        const { data, error } = await supabaseClient
-          .from(tableName)
-          .select('*')
-          .or(`poi_id.in.(${poiIds.join(',')}),grid_square_id.not.is.null`);
-          
-        if (error) {
-          console.error(`Error fetching comments for ${mapType}:`, error);
-          throw error;
+        if (poiIds.length > 0) {
+          const { data, error } = await supabaseClient
+            .from(tableName)
+            .select('*')
+            .or(`poi_id.in.(${poiIds.join(',')}),grid_square_id.not.is.null`);
+            
+          if (error) {
+            console.error(`Error fetching comments for ${mapType}:`, error);
+            throw error;
+          }
+          allData = data || [];
+        } else {
+          // No POIs, just get grid square comments
+          const { data, error } = await supabaseClient
+            .from(tableName)
+            .select('*')
+            .not('grid_square_id', 'is', null);
+            
+          if (error) {
+            console.error(`Error fetching grid comments for ${mapType}:`, error);
+            throw error;
+          }
+          allData = data || [];
         }
-        allData = data || [];
       } else if (mapType === 'hagga_basin') {
         // Comments for Hagga Basin POIs only
         const { data: haggaBasinPois, error: poisError } = await supabaseClient
@@ -393,99 +460,121 @@ serve(async (req: Request) => {
     // Get mapType from request body, default to 'both' for backward compatibility
     const { mapType = 'both' }: { mapType?: MapType } = await req.json().catch(() => ({}));
 
-    const authHeader = req.headers.get('Authorization') || `Bearer ${supabaseServiceRoleKey}`; 
-    
-    const supabaseAdmin: SupabaseClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
-        global: { headers: { Authorization: authHeader } },
-    });
+    // For backup operations, we must use ONLY the service role key to bypass RLS policies
+    // Do NOT use the user's Authorization header as that would subject queries to RLS
+    const supabaseAdmin: SupabaseClient = createClient(supabaseUrl, supabaseServiceRoleKey);
 
     const gridSquaresData = await fetchTableDataByMapType(supabaseAdmin, 'grid_squares', mapType);
     const poisData = await fetchTableDataByMapType(supabaseAdmin, 'pois', mapType);
     const commentsData = await fetchTableDataByMapType(supabaseAdmin, 'comments', mapType);
+    
+    // Fetch POI entity links for backed up POIs
+    let poiEntityLinksData: any[] = [];
+    if (poisData.length > 0) {
+      const poiIds = poisData.map((poi: any) => poi.id);
+      
+      const { data: links, error: linksError } = await supabaseAdmin
+        .from('poi_entity_links')
+        .select('*')
+        .in('poi_id', poiIds);
+      
+      if (linksError) {
+        console.error('Error fetching POI entity links:', linksError);
+        throw linksError;
+      }
+      poiEntityLinksData = links || [];
+    }
 
     // Collect all storage file URLs from the data
     const databaseData = {
       grid_squares: gridSquaresData,
       pois: poisData,
-      comments: commentsData
+      comments: commentsData,
+      poi_entity_links: poiEntityLinksData,
     };
-    
+
     const fileUrls = await collectFileUrls(supabaseAdmin, databaseData, mapType);
-    
-    // Download all storage files
     const downloadedFiles = await downloadAllFiles(supabaseAdmin, fileUrls);
 
-
-    const backupJson: BackupData = {
+    const backupData: BackupData = {
       timestamp: new Date().toISOString(),
-      mapType: mapType,
+      mapType,
       database: databaseData,
       files: downloadedFiles,
     };
+
+    const fileName = `backup_${mapType}_${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
     
-    const backupTimestamp = backupJson.timestamp.replace(/:/g, '-').replace(/\.\d{3}Z$/, 'Z');
-    const mapTypeSuffix = mapType === 'both' ? 'all-maps' : mapType;
-    const backupFileName = `backup-${mapTypeSuffix}-${backupTimestamp}.json`;
-    
-    // Choose backup folder based on map type
-    let backupFolder: string;
-    if (mapType === 'deep_desert') {
-      backupFolder = DEEP_DESERT_BACKUPS_FOLDER;
+    // Use proper folder constants based on map type
+    let folder: string;
+    if (mapType === 'both') {
+      folder = COMBINED_BACKUPS_FOLDER;
+    } else if (mapType === 'deep_desert') {
+      folder = DEEP_DESERT_BACKUPS_FOLDER;
     } else if (mapType === 'hagga_basin') {
-      backupFolder = HAGGA_BASIN_BACKUPS_FOLDER;
+      folder = HAGGA_BASIN_BACKUPS_FOLDER;
     } else {
-      // For 'both', use combined folder
-      backupFolder = COMBINED_BACKUPS_FOLDER;
+      folder = COMBINED_BACKUPS_FOLDER; // fallback
     }
     
-    const fullBackupPath = `${backupFolder}${backupFileName}`;
+    const filePath = `${folder}${fileName}`;
 
-    const backupBlob = new Blob([JSON.stringify(backupJson, null, 2)], { type: 'application/json' });
-
-    const { data: uploadData, error: uploadError } = await supabaseAdmin
-      .storage
+    const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
       .from(BACKUP_BUCKET)
-      .upload(fullBackupPath, backupBlob, {
+      .upload(filePath, JSON.stringify(backupData, null, 2), {
         contentType: 'application/json',
-        upsert: false
+        upsert: false,
       });
 
     if (uploadError) {
-      console.error("Error uploading backup to Supabase Storage:", uploadError);
-      throw new Error(`Failed to upload backup file: ${uploadError.message}`);
+      console.error('Upload error:', uploadError);
+      throw uploadError;
     }
 
-    // After successful backup, prune old ones from the same folder
-    await pruneOldBackups(supabaseAdmin, backupFolder);
+    await pruneOldBackups(supabaseAdmin, folder);
 
-    return new Response(
-      JSON.stringify({ 
-        success: true, 
-        message: `Backup created for ${mapType} maps with ${gridSquaresData.length + poisData.length + commentsData.length} database records and ${downloadedFiles.grid_screenshots.length + downloadedFiles.poi_screenshots.length + downloadedFiles.comment_screenshots.length + downloadedFiles.custom_icons.length} storage files.`, 
-        backupPath: uploadData?.path,
-        mapType: mapType,
-        stats: {
+    const totalFiles = Object.values(downloadedFiles).reduce((sum, files) => sum + files.length, 0);
+    const totalRecords = Object.values(databaseData).reduce((sum, records) => sum + records.length, 0);
+
+    const response = {
+      success: true,
+      message: `Backup completed successfully for ${mapType}`,
+      backupFile: filePath,
+      statistics: {
+        totalRecords,
+        totalFiles,
+        breakdown: {
           database: {
-            grid_squares: gridSquaresData.length,
-            pois: poisData.length,
-            comments: commentsData.length
+            grid_squares: databaseData.grid_squares.length,
+            pois: databaseData.pois.length,
+            comments: databaseData.comments.length,
+            poi_entity_links: databaseData.poi_entity_links.length,
           },
           files: {
             grid_screenshots: downloadedFiles.grid_screenshots.length,
             poi_screenshots: downloadedFiles.poi_screenshots.length,
             comment_screenshots: downloadedFiles.comment_screenshots.length,
-            custom_icons: downloadedFiles.custom_icons.length
-          }
-        }
-      }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
-    );
+            custom_icons: downloadedFiles.custom_icons.length,
+          },
+        },
+      },
+    };
+
+    return new Response(JSON.stringify(response), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 200,
+    });
 
   } catch (error) {
-    console.error("Error in perform-map-backup function:", (error as Error).message);
-    return new Response(
-      JSON.stringify({ error: (error as Error).message || "An unexpected error occurred during backup processing" }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
-    );
+    console.error('BACKUP FUNCTION ERROR:', error);
+    
+    return new Response(JSON.stringify({ 
+      error: 'Backup failed', 
+      details: error.message,
+      type: error.name 
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 500,
+    });
   }
 }); 

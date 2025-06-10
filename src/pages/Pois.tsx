@@ -117,7 +117,6 @@ const PoisPage: React.FC = () => {
         setPoiTypes(typesData || []);
 
         // Fetch custom icons
-    
 
         // Extract user info from POI data (profiles are now included in the query)
         if (poisData) {
@@ -146,8 +145,6 @@ const PoisPage: React.FC = () => {
 
     fetchData();
   }, [user]);
-
-
 
   // Group POI types by category
   const typesByCategory = poiTypes.reduce((acc: Record<string, PoiType[]>, type) => {

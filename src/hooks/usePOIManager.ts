@@ -85,9 +85,6 @@ export const usePOIManager = (config: POIManagerConfig): POIManagerReturn => {
         };
       });
 
-      console.log(`[usePOIManager] Fetched ${transformedPOIs.length} POIs for ${mapType}${gridSquareId ? ` grid ${gridSquareId}` : ''}`);
-      console.log(`[usePOIManager] Screenshot counts:`, transformedPOIs.map(p => ({ id: p.id, title: p.title, screenshots: p.screenshots.length })));
-
       setPois(transformedPOIs);
     } catch (err) {
       console.error(`Error fetching ${mapType} POIs:`, err);
@@ -117,10 +114,6 @@ export const usePOIManager = (config: POIManagerConfig): POIManagerReturn => {
 
   // Manual POI management functions for external use
   const addPOI = useCallback((poi: Poi) => {
-    console.log(`[usePOIManager] 📥 addPOI called for POI ${poi.id} (${poi.title})`);
-    console.log(`[usePOIManager] 🖼️ POI screenshots:`, poi.screenshots?.length || 0, 'screenshots');
-    console.log(`[usePOIManager] 🔗 POI image links:`, poi.poi_image_links?.length || 0, 'links');
-    
     // Transform poi_image_links to screenshots if needed (same as real-time subscription)
     const transformedPoi = {
       ...poi,
@@ -140,19 +133,14 @@ export const usePOIManager = (config: POIManagerConfig): POIManagerReturn => {
         };
       }).filter(screenshot => screenshot !== null) || [])
     };
-    
-    console.log(`[usePOIManager] 🔄 Transformed POI screenshots:`, transformedPoi.screenshots?.length || 0, 'screenshots');
-    
     setPois(prev => {
       const existingIndex = prev.findIndex(p => p.id === poi.id);
       if (existingIndex !== -1) {
-        console.log(`[usePOIManager] 🔄 POI ${poi.id} already exists, updating with new data`);
         // Update existing POI with new data (like screenshots)
         const updatedPois = [...prev];
         updatedPois[existingIndex] = transformedPoi;
         return updatedPois;
       }
-      console.log(`[usePOIManager] ✅ Adding new POI ${poi.id} to state`);
       return [transformedPoi, ...prev];
     });
   }, []);
@@ -180,9 +168,6 @@ export const usePOIManager = (config: POIManagerConfig): POIManagerReturn => {
       ...poi,
       screenshots: screenshots
     };
-
-    console.log(`[usePOIManager] Updating POI ${transformedPoi.id}: ${screenshots.length} screenshots`);
-    
     setPois(prev => prev.map(p => p.id === poi.id ? transformedPoi : p));
   }, []);
 
@@ -198,9 +183,6 @@ export const usePOIManager = (config: POIManagerConfig): POIManagerReturn => {
   // Unified real-time subscription system
   useEffect(() => {
     if (!enableRealtime) return;
-
-    console.log(`[usePOIManager] Setting up subscriptions for ${mapType}${gridSquareId ? ` grid ${gridSquareId}` : ''}`);
-
     // Single POI table subscription with smart filtering
     const poiSubscription = supabase
       .channel(`poi-manager-${mapType}${gridSquareId ? `-${gridSquareId}` : ''}`)
@@ -215,8 +197,6 @@ export const usePOIManager = (config: POIManagerConfig): POIManagerReturn => {
             : `map_type=eq.${mapType}`
         },
         async (payload) => {
-          console.log(`[usePOIManager] ${mapType} POI event:`, payload.eventType, payload.new?.id || payload.old?.id);
-
           if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
             const poiData = payload.new as Poi;
             
@@ -269,9 +249,6 @@ export const usePOIManager = (config: POIManagerConfig): POIManagerReturn => {
                   ...completeData,
                   screenshots: screenshots
                 };
-
-                console.log(`[usePOIManager] Real-time update for POI ${transformedPoi.id} (${transformedPoi.title}): ${screenshots.length} screenshots`);
-
                 updatePOISafely(transformedPoi);
               }
             } catch (err) {
@@ -301,8 +278,6 @@ export const usePOIManager = (config: POIManagerConfig): POIManagerReturn => {
             table: 'poi_shares'
           },
           async (payload) => {
-            console.log(`[usePOIManager] POI shares event:`, payload.eventType);
-
             // When shares change, refresh the affected POI
             let poiId: string | null = null;
             if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
@@ -352,7 +327,6 @@ export const usePOIManager = (config: POIManagerConfig): POIManagerReturn => {
 
     // Cleanup function
     return () => {
-      console.log(`[usePOIManager] Cleaning up subscriptions for ${mapType}`);
       supabase.removeChannel(poiSubscription);
       if (sharesSubscription) {
         supabase.removeChannel(sharesSubscription);

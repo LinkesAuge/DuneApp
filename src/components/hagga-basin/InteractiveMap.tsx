@@ -152,8 +152,6 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
         mapElementRef.current
       );
 
-
-
       if (validateCoordinates(coordinates.x, coordinates.y)) {
         setPlacementCoordinates(coordinates);
         setShowPlacementModal(true);

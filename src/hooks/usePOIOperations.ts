@@ -176,7 +176,6 @@ export const usePOIOperations = (config: POIOperationsConfig): POIOperationsRetu
       if (poiData.screenshots && poiData.screenshots.length > 0) {
         // TODO: Integrate with screenshot system for POI creation
         // This will be implemented when we integrate the screenshot system
-        console.log('[usePOIOperations] Screenshot upload for new POI not yet implemented');
       }
       
       // Success feedback
@@ -269,34 +268,17 @@ export const usePOIOperations = (config: POIOperationsConfig): POIOperationsRetu
     setError(null);
     
     try {
-      console.log('[usePOIOperations] 🔍 Starting POI deletion analysis...');
-      console.log('[usePOIOperations] POI ID:', poiToDelete.id);
-      console.log('[usePOIOperations] POI Title:', poiToDelete.title);
-      console.log('[usePOIOperations] POI Screenshots:', poiToDelete.screenshots);
-      
       // Pre-deletion screenshot verification
       if (poiToDelete.screenshots && poiToDelete.screenshots.length > 0) {
-        console.log('[usePOIOperations] 📸 Found screenshots to delete:');
         poiToDelete.screenshots.forEach((screenshot, index) => {
-          console.log(`[usePOIOperations] Screenshot ${index + 1}:`, {
-            url: screenshot.url,
-            original_url: screenshot.original_url
-          });
         });
       } else {
-        console.log('[usePOIOperations] ⚠️ No screenshots found in POI data');
       }
       
       // Use enhanced deletion with comprehensive cleanup
       const result = await deletePOIWithCleanup(poiToDelete.id);
-      
-      console.log('[usePOIOperations] 📋 Deletion result:', result);
-      
       if (result.success) {
-        console.log('[usePOIOperations] ✅ POI deleted successfully:', poiToDelete.id);
-        
         if (result.errors && result.errors.length > 0) {
-          console.log('[usePOIOperations] ⚠️ Deletion warnings:', result.errors);
         }
         
         // Success feedback

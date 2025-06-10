@@ -16,8 +16,6 @@ export const fetchPrivacyFilteredPois = async (user: User | null, page: number =
 
   try {
     // First, let's fetch ALL POIs and filter manually to debug the issue
-    console.log('Fetching POIs for user:', user.id);
-    
     const { data: allPois, error: allPoisError } = await supabase
       .from('pois')
       .select('*, poi_types (*), profiles!pois_created_by_fkey (username, display_name, custom_avatar_url, discord_avatar_url, use_discord_avatar)')
@@ -27,9 +25,6 @@ export const fetchPrivacyFilteredPois = async (user: User | null, page: number =
       console.error('Error fetching all POIs:', allPoisError);
       throw allPoisError;
     }
-
-    console.log('Total POIs fetched:', allPois?.length || 0);
-
     // Get shared POI IDs
     const { data: sharedPois } = await supabase
       .from('poi_shares')
@@ -37,8 +32,6 @@ export const fetchPrivacyFilteredPois = async (user: User | null, page: number =
       .eq('shared_with_user_id', user.id);
 
     const sharedPoiIds = sharedPois?.map(share => share.poi_id) || [];
-    console.log('Shared POI IDs for user:', sharedPoiIds);
-
     // Filter POIs manually to ensure proper access control
     const filteredPois = (allPois || []).filter(poi => {
       const hasAccess = (() => {
@@ -61,7 +54,6 @@ export const fetchPrivacyFilteredPois = async (user: User | null, page: number =
       })();
 
       if (!hasAccess) {
-        console.log('Filtering out POI:', poi.id, 'privacy_level:', poi.privacy_level, 'created_by:', poi.created_by, 'current_user:', user.id);
       }
 
       return hasAccess;
@@ -88,9 +80,6 @@ export const fetchPrivacyFilteredPois = async (user: User | null, page: number =
         ...poi,
         linkCount: linkCountMap[poi.id] || 0
       }));
-
-      console.log('Filtered POIs with link counts:', poisWithLinkCounts.length);
-      
       // Apply pagination to POIs with link counts
       const totalCount = poisWithLinkCounts.length;
       const startIndex = (page - 1) * limit;
@@ -102,9 +91,6 @@ export const fetchPrivacyFilteredPois = async (user: User | null, page: number =
         totalCount
       };
     }
-
-    console.log('Filtered POIs count:', filteredPois.length);
-    
     // Apply pagination
     const totalCount = filteredPois.length;
     const startIndex = (page - 1) * limit;

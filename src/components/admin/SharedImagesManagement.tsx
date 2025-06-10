@@ -165,13 +165,10 @@ const SharedImagesManagement: React.FC<SharedImagesManagementProps> = ({ onError
         });
 
         // Update entity with shared image ID
-        console.log(`Updating entity ${entity.id} with image ID ${insertedImageData.id}`);
         const { data: updateData, error: updateError } = await supabase
           .from('entities')
           .update({ icon_image_id: insertedImageData.id })
           .eq('id', entity.id);
-
-        console.log('Update result:', { updateData, updateError });
         if (updateError) {
           console.error('Entity update failed:', updateError);
           throw updateError;

@@ -119,7 +119,6 @@ const GridContainer: React.FC = () => {
   // Set up real-time subscriptions for POI changes - same as Hagga Basin
   useEffect(() => {
 
-    
     // Subscribe to POI table changes for Deep Desert
     const poiSubscription = supabase
       .channel('deep-desert-overview-pois')

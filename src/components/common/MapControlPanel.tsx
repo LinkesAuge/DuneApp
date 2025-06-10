@@ -17,7 +17,6 @@ interface MapControlPanelProps {
   filteredPois: Poi[];
   poiTypes: PoiType[];
 
-  
   // Filter state
   activeTab: 'filters' | 'layers';
   onActiveTabChange: (tab: 'filters' | 'layers') => void;
@@ -35,7 +34,6 @@ interface MapControlPanelProps {
   onToggleAllPois: () => void;
   onOtherTypesToggle: () => void;
 
-  
   // Utility functions
   isIconUrl: (icon: string) => boolean;
   getDisplayImageUrl: (icon: string) => string;
@@ -440,8 +438,6 @@ const MapControlPanel: React.FC<MapControlPanelProps> = ({
                   </div>
                 </div>
               )}
-
-
 
               {/* Layers Tab */}
               {activeTab === 'layers' && (

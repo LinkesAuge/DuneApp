@@ -128,8 +128,6 @@ export const entitiesNormalizedAPI = {
         query = query.in('type_id', filters.type_ids);
       }
 
-
-
       if (filters.tier_numbers?.length) {
         query = query.in('tier_number', filters.tier_numbers);
       }
@@ -366,8 +364,6 @@ export const entitiesNormalizedAPI = {
         handleSupabaseError(typeError, 'fetch type options');
       }
 
-
-
       // Get tier counts
       const { data: tierData, error: tierError } = await supabase
         .from('entities')
@@ -403,8 +399,6 @@ export const entitiesNormalizedAPI = {
           });
         }
       });
-
-
 
       const tierMap = new Map();
       tierData?.forEach(item => {

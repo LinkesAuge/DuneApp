@@ -20,8 +20,6 @@ interface Type {
   category_id: string;
 }
 
-
-
 interface DropdownOption {
   id: string;
   value: string;
@@ -242,8 +240,6 @@ export async function fetchTypesByCategory(categoryId: string): Promise<Type[]> 
     return [];
   }
 }
-
-
 
 /**
  * Legacy dropdown groups - simplified in unified system

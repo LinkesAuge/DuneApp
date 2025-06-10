@@ -3,9 +3,11 @@ import { createClient, SupabaseClient } from 'npm:@supabase/supabase-js@2.43.4';
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { corsHeaders } from '../_shared/cors.ts';
 
-// Corrected Configuration to match list-map-backups and perform-map-backup (Option B)
+// Configuration - separate backup folders for each map type to match perform-map-backup
 const BACKUP_BUCKET = 'screenshots';
-const BACKUP_FOLDER = 'map-backups/scheduled';
+const DEEP_DESERT_BACKUPS_FOLDER = 'map-backups/deep-desert/';
+const HAGGA_BASIN_BACKUPS_FOLDER = 'map-backups/hagga-basin/';
+const COMBINED_BACKUPS_FOLDER = 'map-backups/combined/';
 
 serve(async (req: Request) => {
   // Handle OPTIONS preflight request
@@ -30,7 +32,34 @@ serve(async (req: Request) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const filePath = `${BACKUP_FOLDER}/${fileName}`;
+    // Determine the correct folder based on the filename
+    let filePath = '';
+    const folders = [DEEP_DESERT_BACKUPS_FOLDER, HAGGA_BASIN_BACKUPS_FOLDER, COMBINED_BACKUPS_FOLDER];
+    
+    // Try to find the file in each folder
+    let foundInFolder = '';
+    for (const folder of folders) {
+      const testPath = `${folder}${fileName}`;
+      const { data: testData } = await supabaseAdmin.storage
+        .from(BACKUP_BUCKET)
+        .list(folder, { search: fileName });
+      
+      if (testData && testData.some(file => file.name === fileName)) {
+        filePath = testPath;
+        foundInFolder = folder;
+        break;
+      }
+    }
+
+    if (!filePath) {
+      console.warn(`File not found in any backup folder: ${fileName}`);
+      return new Response(JSON.stringify({ error: `File not found: ${fileName}` }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 404,
+      });
+    }
+
+    console.log(`Deleting backup file: ${filePath} from folder: ${foundInFolder}`);
 
     const { data, error } = await supabaseAdmin.storage
       .from(BACKUP_BUCKET)

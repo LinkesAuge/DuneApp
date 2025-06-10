@@ -75,8 +75,6 @@ const SelectionSummaryPanel: React.FC<SelectionSummaryPanelProps> = ({
         return;
       }
 
-
-
       const previews: LinkPreview[] = [];
       
       // Generate all possible combinations

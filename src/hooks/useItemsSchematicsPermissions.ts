@@ -166,9 +166,7 @@ export function useItemsSchematicsPermissions(): UseItemsSchematicsPermissionsRe
       action
     });
   }, [user, checkPermissionWithUser]);
-  
 
-  
   const canManageFieldDefinition = useCallback((fieldDef?: FieldDefinition, action: PermissionAction = 'manage'): PermissionCheckResult => {
     return checkPermissionWithUser({
       user,

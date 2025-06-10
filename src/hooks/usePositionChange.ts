@@ -49,8 +49,6 @@ export const usePositionChange = ({ onPoiUpdated, onError }: UsePositionChangePr
       
       // Exit position change mode
       exitPositionChangeMode();
-      
-      console.log(`POI "${poi.title}" position updated to (${Math.round(pixelX)}, ${Math.round(pixelY)})`);
     } catch (error) {
       console.error('Error updating POI position:', error);
       if (onError) {

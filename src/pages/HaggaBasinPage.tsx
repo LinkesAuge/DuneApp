@@ -11,7 +11,6 @@ import type {
 } from '../types';
 import InteractiveMap from '../components/hagga-basin/InteractiveMap';
 
-
 import SharePoiModal from '../components/hagga-basin/SharePoiModal';
 import POIEditModal from '../components/hagga-basin/POIEditModal';
 import GridGallery from '../components/grid/GridGallery';
@@ -23,7 +22,6 @@ import { useAuth } from '../components/auth/AuthProvider';
 import { deletePOIWithCleanup } from '../lib/api/pois';
 import { usePOIManager } from '../hooks/usePOIManager';
 import { usePOIModals } from '../hooks/usePOIModals';
-
 
 const HaggaBasinPage: React.FC = () => {
   // Authentication and user state
@@ -51,7 +49,6 @@ const HaggaBasinPage: React.FC = () => {
   const [poiTypes, setPoiTypes] = useState<PoiType[]>([]);
   const [baseMaps, setBaseMaps] = useState<HaggaBasinBaseMap[]>([]);
   const [overlays, setOverlays] = useState<HaggaBasinOverlay[]>([]);
-
 
   const [userInfo, setUserInfo] = useState<{ [key: string]: { username: string; display_name?: string | null; custom_avatar_url?: string | null; discord_avatar_url?: string | null; use_discord_avatar?: boolean } }>({});
 
@@ -178,8 +175,6 @@ const HaggaBasinPage: React.FC = () => {
     }
   };
 
-
-
   const fetchPoiTypes = async () => {
     const { data, error } = await supabase
       .from('poi_types')
@@ -231,10 +226,6 @@ const HaggaBasinPage: React.FC = () => {
     // Initialize all overlays as visible by default
     setSelectedOverlays((data || []).map(overlay => overlay.id));
   };
-
-
-
-
 
   const fetchUserInfo = async (pois: Poi[]) => {
     if (pois.length === 0) return;
@@ -311,8 +302,6 @@ const HaggaBasinPage: React.FC = () => {
       }
     });
   };
-
-
 
   // Handle category toggle - now syncs with selectedPoiTypes
   const handleCategoryToggle = (category: string, checked: boolean) => {
@@ -494,8 +483,6 @@ const HaggaBasinPage: React.FC = () => {
     }
   };
 
-
-
   // Handle POI gallery opening
   const handlePoiGalleryOpen = useCallback((poi: Poi) => {
     if (poi.screenshots && poi.screenshots.length > 0) {
@@ -539,8 +526,6 @@ const HaggaBasinPage: React.FC = () => {
   useEffect(() => {
     initializeData();
   }, []);
-
-
 
   // Handle POI editing
   const handlePoiEdit = (poi: Poi) => {
@@ -741,8 +726,6 @@ const HaggaBasinPage: React.FC = () => {
         entityLinksRefreshTrigger={entityLinksGlobalRefreshTrigger}
       />
 
-
-
       {/* Share POI Modal */}
       <SharePoiModal
         isOpen={modals.showShareModal}
@@ -835,7 +818,6 @@ const HaggaBasinPage: React.FC = () => {
           variant="danger"
         />
       )}
-
 
     </div>
   );

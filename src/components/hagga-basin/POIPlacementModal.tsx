@@ -206,55 +206,29 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
 
   // Upload processed screenshots for POI creation (simplified version from POIEditModal)
   const uploadProcessedScreenshots = async (poiId: string): Promise<void> => {
-    console.log('[POIPlacement] 🚀 Starting uploadProcessedScreenshots for POI:', poiId);
-    
     const processedFiles = screenshotManager.filesToProcess.filter(f => f.isProcessed);
-    console.log('[POIPlacement] 📊 All files to process:', screenshotManager.filesToProcess.length);
-    console.log('[POIPlacement] ✅ Processed files found:', processedFiles.length);
-    console.log('[POIPlacement] 📋 Processed files details:', processedFiles.map(f => ({
-      id: f.id,
-      name: f.originalFile.name,
-      isProcessed: f.isProcessed,
-      hasCropData: !!f.cropData,
-      originalFileSize: f.originalFile.size,
-      displayFileSize: f.displayFile.size
-    })));
     
     if (processedFiles.length === 0) {
-      console.log('[POIPlacement] ⚠️ No processed files found, skipping screenshot upload');
       return;
     }
 
     const newScreenshots: PoiScreenshot[] = [];
 
     for (const file of processedFiles) {
-      console.log('[POIPlacement] 🔄 Processing file:', file.originalFile.name);
-      
       try {
         const timestamp = Date.now();
         const fileExt = file.originalFile.name.split('.').pop() || 'jpg';
         const baseFileName = `${poiId}_${timestamp}.${fileExt}`;
-        console.log('[POIPlacement] 📝 Generated base filename:', baseFileName);
-        
         // Step 1: Upload original version to poi_screenshots/
-        console.log('[POIPlacement] ⬆️ Step 1: Uploading original file...');
         const originalUpload = await uploadPoiScreenshotOriginal(file.originalFile, baseFileName);
         let originalUrl = originalUpload.url;
         let displayUrl = originalUrl; // Default to original
-        console.log('[POIPlacement] ✅ Original upload complete:', originalUrl);
-        
         // Step 2: Check if actual cropping was performed (using better approach)
         const wasActuallyCropped = file.wasActuallyCropped;
           
         if (wasActuallyCropped) {
-          console.log('[POIPlacement] ✂️ Step 2: Actual cropping detected, uploading cropped version...');
-          console.log('[POIPlacement] 📐 Crop data:', file.cropData);
-          console.log('[POIPlacement] 🎯 Cropping analysis: wasActuallyCropped =', wasActuallyCropped);
-          
           // Upload cropped version
           const croppedUpload = await uploadPoiScreenshotCropped(file.displayFile, baseFileName);
-          console.log('[POIPlacement] ✅ Cropped upload complete:', croppedUpload);
-          
           // Create screenshot record with cropped version as primary URL
           newScreenshots.push({
             id: `new_${Date.now()}_${Math.random()}`,
@@ -266,9 +240,6 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
             created_at: new Date().toISOString(),
           });
         } else {
-          console.log('[POIPlacement] 📏 Step 2: No cropping performed, using original as display version...');
-          console.log('[POIPlacement] 🎯 Cropping analysis: wasActuallyCropped =', wasActuallyCropped);
-          
           // Create screenshot record with original as both URLs (no cropping performed)
           newScreenshots.push({
             id: `new_${Date.now()}_${Math.random()}`,
@@ -285,21 +256,10 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
         throw new Error(`Failed to upload screenshot: ${file.originalFile.name}`);
       }
     }
-
-    console.log('[POIPlacement] 💾 Saving to unified system - newScreenshots count:', newScreenshots.length);
-
     // Save images to unified system using managed_images and poi_image_links tables
     if (newScreenshots.length > 0) {
       for (let index = 0; index < newScreenshots.length; index++) {
         const screenshot = newScreenshots[index];
-        console.log('[POIPlacement] 🗄️ Step 1: Inserting into managed_images...', {
-          original_url: screenshot.original_url,
-          processed_url: screenshot.url !== screenshot.original_url ? screenshot.url : null,
-          crop_details: screenshot.crop_details,
-          image_type: 'poi_screenshot',
-          uploaded_by: user?.id
-        });
-        
         // Step 1: Insert into managed_images table
         const { data: managedImage, error: imageError } = await supabase
           .from('managed_images')
@@ -317,16 +277,7 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
           console.error('[POIPlacement] ❌ Error saving managed image:', imageError);
           throw new Error('Failed to save image to database');
         }
-
-        console.log('[POIPlacement] ✅ Managed image saved:', managedImage);
-
         // Step 2: Link image to POI in poi_image_links table
-        console.log('[POIPlacement] 🔗 Step 2: Linking image to POI...', {
-          poi_id: poiId,
-          image_id: managedImage.id,
-          display_order: index
-        });
-        
         const { error: linkError } = await supabase
           .from('poi_image_links')
           .insert({
@@ -339,19 +290,13 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
           console.error('[POIPlacement] ❌ Error linking image to POI:', linkError);
           throw new Error('Failed to link image to POI');
         }
-
-        console.log('[POIPlacement] ✅ Image linked to POI successfully');
       }
-      
-      console.log('[POIPlacement] 🎉 All screenshots processed and saved successfully!');
     }
   };
 
   // Handle form submission
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    console.log('[POIPlacement] 🚀 Starting POI creation form submission');
-    
     if (!user) {
       setError('You must be logged in to create POIs');
       return;
@@ -380,8 +325,6 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
     setError(null);
 
     try {
-      console.log('[POIPlacement] 📝 Creating POI record...');
-      
       // Create the POI record
       const poiData = {
         title: title.trim(),
@@ -394,9 +337,6 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
         privacy_level: privacyLevel,
         grid_square_id: mapType === 'deep_desert' ? gridSquareId : null
       };
-
-      console.log('[POIPlacement] 📋 POI data to insert:', poiData);
-
       const { data: poi, error: poiError } = await supabase
         .from('pois')
         .insert([poiData])
@@ -421,33 +361,13 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
         console.error('[POIPlacement] ❌ Error creating POI:', poiError);
         throw new Error('Failed to create POI');
       }
-
-      console.log('[POIPlacement] ✅ POI created successfully:', poi);
-
       // Process screenshots through unified image system
       const processedFiles = screenshotManager.filesToProcess.filter(f => f.isProcessed);
-      console.log('[POIPlacement] 🔍 Checking for screenshots to process...', {
-        totalFiles: screenshotManager.filesToProcess.length,
-        processedFiles: processedFiles.length,
-        allFiles: screenshotManager.filesToProcess.map(f => ({
-          id: f.id,
-          name: f.originalFile.name,
-          isProcessed: f.isProcessed
-        }))
-      });
       
       if (processedFiles.length > 0) {
-        console.log(`[POIPlacement] 📸 Processing ${processedFiles.length} screenshots for POI ${poi.id}`);
-        
-        console.log('[POIPlacement] 🎯 Step 4: Uploading processed screenshots...');
-        
         try {
           await uploadProcessedScreenshots(poi.id);
-          console.log('[POIPlacement] ✅ Step 4 complete: All screenshots uploaded successfully');
-          
           // Step 5: Fetch updated POI data with screenshots and pass to callback
-          console.log('[POIPlacement] 🔄 Step 5: Fetching updated POI data with screenshots...');
-          
           const { data: updatedPoi, error: fetchError } = await supabase
             .from('pois')
             .select(`
@@ -471,14 +391,10 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
           if (fetchError) {
             console.error('[POIPlacement] ❌ Error fetching updated POI:', fetchError);
             // Continue with original POI data
-            console.log('[POIPlacement] 📤 Calling onPoiCreated with original POI data (no screenshots)');
             onPoiCreated(poi);
           } else {
-            console.log('[POIPlacement] ✅ Updated POI data fetched:', updatedPoi);
-            console.log('[POIPlacement] 🖼️ POI image links:', updatedPoi.poi_image_links);
             // Use the simple approach like GridPage - just pass the POI data
             // Let usePOIManager real-time subscriptions handle the UI updates automatically
-            console.log('[POIPlacement] 📤 Calling onPoiCreated with updated POI data (includes screenshot relations)');
             onPoiCreated(updatedPoi);
           }
           
@@ -488,23 +404,16 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
           onPoiCreated(poi);
         }
       } else {
-        console.log('[POIPlacement] ⚠️ No screenshots to process');
         onPoiCreated(poi);
       }
 
       // Handle sharing if privacy level is shared
       if (privacyLevel === 'shared' && selectedUsers.length > 0) {
-        console.log('[POIPlacement] 👥 Setting up POI sharing...');
-        
         const newShares = selectedUsers.map(u => ({
           poi_id: poi.id,
           shared_with_user_id: u.id,
           shared_by_user_id: user?.id
         }));
-        
-        console.log('[POIPlacement] 📤 Sharing data to insert:', newShares);
-
-        
         const { data: shareData, error: shareError } = await supabase
           .from('poi_shares')
           .insert(newShares)
@@ -514,11 +423,7 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
           console.error('[POIPlacement] ❌ Error saving POI shares:', shareError);
           throw new Error('Failed to save POI sharing settings');
         }
-        
-        console.log('[POIPlacement] ✅ POI sharing configured successfully');
       }
-
-      console.log('[POIPlacement] 🎉 POI creation complete!');
     } catch (err) {
       console.error('[POIPlacement] ❌ Error in POI creation:', err);
       setError(err instanceof Error ? err.message : 'An unexpected error occurred');
@@ -675,7 +580,6 @@ const POIPlacementModal: React.FC<POIPlacementModalProps> = ({
                     </div>
                   );
                 })}
-
 
               </div>
             )}

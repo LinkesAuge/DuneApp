@@ -133,8 +133,6 @@ const UserManagement: React.FC<UserManagementProps> = ({
         body: { userIdToDelete: userId }
       });
 
-      
-
       if (error) {
         console.error('Supabase function invoke error:', error);
         throw error;
@@ -225,8 +223,6 @@ const UserManagement: React.FC<UserManagementProps> = ({
         return 'bg-green-900/50 text-green-200 border border-green-600/40';
     }
   };
-
-
 
   if (isLoading) {
     return (

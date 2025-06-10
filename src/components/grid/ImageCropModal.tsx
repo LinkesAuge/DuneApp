@@ -245,14 +245,6 @@ const ImageCropModal: React.FC<ImageCropModalProps> = ({
     setError(null);
     try {
       const croppedBlob = await getCroppedImg(imgRef.current!, cropForProcessing, 'cropped-image.jpeg');
-      
-      console.log('[ImageCropModal] 📋 Calling onCropComplete with:', {
-        finalPixelCrop,
-        isFullImageUpload,
-        isFullImageRequestedByUser,
-        cropForProcessing
-      });
-      
       await onCropComplete(croppedBlob, finalPixelCrop, isFullImageUpload);
     } catch (e: any) {
       console.error("Cropping failed in ImageCropModal. Details:", e);

@@ -71,15 +71,12 @@ const GridPage: React.FC = () => {
     mapType: 'deep_desert',
     gridSquareId: gridSquare?.id,
     onPoiCreated: (newPoi) => {
-      console.log('[UNIFIED] POI created:', newPoi);
       addPOI(newPoi); // Update POI manager state
     },
     onPoiUpdated: (updatedPoi) => {
-      console.log('[UNIFIED] POI updated:', updatedPoi);
       updatePOI(updatedPoi); // Update POI manager state
     },
     onPoiDeleted: (poiId) => {
-      console.log('[UNIFIED] POI deleted:', poiId);
       removePOI(poiId); // Update POI manager state
     }
   });
@@ -316,8 +313,6 @@ const GridPage: React.FC = () => {
     });
   };
 
-
-
   // Handle category toggle - Same as Hagga Basin  
   const handleCategoryToggle = (category: string, checked: boolean) => {
     const categoryTypeIds = poiTypes
@@ -417,8 +412,6 @@ const GridPage: React.FC = () => {
     }
   };
 
-
-
   const fetchUserInfo = async (pois: Poi[]) => {
     if (pois.length === 0) return;
 
@@ -453,8 +446,6 @@ const GridPage: React.FC = () => {
 
     setUserInfo(userInfoMap);
   };
-
-
 
   // Handle POI sharing - Same as Hagga Basin
   const handlePoiShare = (poi: Poi) => {
@@ -828,9 +819,6 @@ const GridPage: React.FC = () => {
         if (typesError) throw typesError;
         setPoiTypes(typesData || []);
 
-
-
-
         // User info fetching will be handled when POIs are loaded
 
       } catch (err) {
@@ -843,8 +831,6 @@ const GridPage: React.FC = () => {
 
     fetchGridData();
   }, [gridId, user]);
-
-
 
   // Navigation handlers
   const handleBackToOverview = () => {
@@ -1111,8 +1097,6 @@ const GridPage: React.FC = () => {
       return;
     }
 
-
-
     // Create a new image URL with cache-busting to avoid CORS issues
     const originalUrl = new URL(gridSquare.original_screenshot_url);
     originalUrl.searchParams.set('t', Date.now().toString());
@@ -1274,8 +1258,6 @@ const GridPage: React.FC = () => {
     // Just manage highlighting state without verbose logging
   }, [highlightedPoiId, pois]);
 
-
-
   // Validate grid ID format - AFTER all hooks are called
   if (!gridId || !VALID_GRID_PATTERN.test(gridId)) {
     return <Navigate to="/deep-desert" replace />;
@@ -1327,7 +1309,6 @@ const GridPage: React.FC = () => {
       </div>
     );
   }
-
 
   return (
     <div className="h-screen flex flex-col overflow-hidden relative">
@@ -1855,10 +1836,6 @@ const GridPage: React.FC = () => {
         </div>
       )}
 
-
-
-
-
       {/* POI Placement Modal */}
       {showPoiModal && gridSquare && gridSquare.id && placementCoordinates && (
         <POIPlacementModal
@@ -1936,7 +1913,6 @@ const GridPage: React.FC = () => {
             // DO NOT call modals.closeEditModal() here
           }}
           onLinksUpdated={() => {
-            console.log('[GridPage] Entity links updated in POI edit modal');
             setEntityLinksGlobalRefreshTrigger(prev => prev + 1);
           }}
           onClose={() => modals.closeEditModal()}
@@ -1949,8 +1925,6 @@ const GridPage: React.FC = () => {
           }}
         />
       )}
-
-
 
       {/* Share POI Modal - Same as Hagga Basin */}
       {modals.showShareModal && modals.selectedPoiForShare && (

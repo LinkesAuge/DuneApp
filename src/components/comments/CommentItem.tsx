@@ -66,8 +66,6 @@ const CommentItem: React.FC<CommentItemProps> = ({
   
   const handleEditExistingImage = async (imageLink: any) => {
     try {
-      console.log('[CommentItem] 🖼️ Starting edit of existing image:', imageLink.managed_images.id);
-      
       // Fetch the original image to enable re-cropping
       const originalUrl = imageLink.managed_images.original_url;
       
@@ -88,9 +86,6 @@ const CommentItem: React.FC<CommentItemProps> = ({
       
       // Remove the original from display (it will be replaced by the edited version)
       handleRemoveExistingImage(imageLink.managed_images.id);
-      
-      console.log('[CommentItem] ✅ Image loaded for editing');
-      
     } catch (error) {
       console.error('[CommentItem] ❌ Error loading image for editing:', error);
       setError('Failed to load image for editing');
@@ -143,8 +138,6 @@ const CommentItem: React.FC<CommentItemProps> = ({
     setIsSubmitting(true);
 
     try {
-      console.log('[CommentItem] 🚀 Starting comment edit save...');
-      
       // Step 1: Update comment content
       const { error: updateError } = await supabase
         .from('comments')
@@ -156,18 +149,12 @@ const CommentItem: React.FC<CommentItemProps> = ({
         .eq('id', comment.id);
 
       if (updateError) throw updateError;
-      console.log('[CommentItem] ✅ Comment content updated');
-
       // Step 2: Remove marked images
       if (removedImageIds.length > 0) {
-        console.log(`[CommentItem] 🗑️ Removing ${removedImageIds.length} marked images...`);
-        
         for (const imageId of removedImageIds) {
           const success = await deleteImage(imageId);
           if (success) {
-            console.log(`[CommentItem] ✅ Successfully removed image: ${imageId}`);
           } else {
-            console.log(`[CommentItem] ⚠️ Failed to remove image: ${imageId}`);
           }
         }
       }
@@ -175,7 +162,6 @@ const CommentItem: React.FC<CommentItemProps> = ({
       // Step 3: Upload new screenshots if any
       const processedFiles = screenshotManager.filesToProcess.filter(f => f.isProcessed);
       if (processedFiles.length > 0) {
-        console.log(`[CommentItem] 📸 Processing ${processedFiles.length} new screenshots...`);
         await uploadProcessedScreenshots(comment.id);
       }
 
@@ -197,38 +183,25 @@ const CommentItem: React.FC<CommentItemProps> = ({
   // Upload processed screenshots for the comment (copied from CommentForm)
   const uploadProcessedScreenshots = async (commentId: string): Promise<void> => {
     const processedFiles = screenshotManager.filesToProcess.filter(f => f.isProcessed);
-    
-    console.log('[CommentItem] 🚀 Starting uploadProcessedScreenshots for comment:', commentId);
-    console.log('[CommentItem] 📊 Processed files found:', processedFiles.length);
-
     for (const file of processedFiles) {
       try {
-        console.log('[CommentItem] 🔄 Processing file:', file.originalFile.name);
-        
         // Generate unique filename
         const baseFilename = `comment_${commentId}_${Date.now()}`;
         
         // Step 1: Upload original file
-        console.log('[CommentItem] ⬆️ Step 1: Uploading original file...');
         const { uploadPoiScreenshotOriginal } = await import('../../lib/imageUpload');
         const originalUpload = await uploadPoiScreenshotOriginal(file.originalFile, `${baseFilename}.${file.originalFile.name.split('.').pop()}`);
-        console.log('[CommentItem] ✅ Original upload complete:', originalUpload.url);
-
         let croppedUpload = null;
         
         // Step 2: Upload cropped version if needed
         if (file.wasActuallyCropped && file.displayFile !== file.originalFile) {
-          console.log('[CommentItem] ✂️ Step 2: Uploading cropped version...');
           const { uploadPoiScreenshotCropped } = await import('../../lib/imageUpload');
           
           // Use the displayFile which contains the cropped version
           croppedUpload = await uploadPoiScreenshotCropped(file.displayFile, `${baseFilename}_cropped.webp`);
-          console.log('[CommentItem] ✅ Cropped upload complete:', croppedUpload.url);
         }
         
         // Step 3: Save to unified system database
-        console.log('[CommentItem] 💾 Step 3: Saving to unified system...');
-        
         const imageData = {
           original_url: originalUpload.url,
           processed_url: croppedUpload?.url || null,
@@ -236,9 +209,6 @@ const CommentItem: React.FC<CommentItemProps> = ({
           image_type: 'comment_image',
           uploaded_by: user!.id
         };
-        
-        console.log('[CommentItem] 🗄️ Inserting into managed_images...', imageData);
-        
         const { data: managedImage, error: insertError } = await supabase
           .from('managed_images')
           .insert(imageData)
@@ -246,10 +216,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
           .single();
 
         if (insertError) throw insertError;
-        console.log('[CommentItem] ✅ Managed image saved:', managedImage);
-        
         // Step 4: Link image to comment
-        console.log('[CommentItem] 🔗 Step 4: Linking image to comment...');
         const linkData = {
           comment_id: commentId,
           image_id: managedImage.id
@@ -260,15 +227,11 @@ const CommentItem: React.FC<CommentItemProps> = ({
           .insert(linkData);
 
         if (linkError) throw linkError;
-        console.log('[CommentItem] ✅ Image linked to comment successfully');
-        
       } catch (error) {
         console.error(`[CommentItem] ❌ Error processing file ${file.originalFile.name}:`, error);
         throw error;
       }
     }
-    
-    console.log('[CommentItem] 🎉 All screenshots processed and saved successfully!');
   };
 
   const handleDelete = async () => {
@@ -276,35 +239,24 @@ const CommentItem: React.FC<CommentItemProps> = ({
     setIsSubmitting(true);
     
     try {
-      console.log('[CommentItem] 🗑️ Starting comment deletion:', comment.id);
-      
       // Step 1: Delete associated images from storage and database
       if (comment.images && comment.images.length > 0) {
-        console.log(`[CommentItem] 🖼️ Deleting ${comment.images.length} associated images...`);
-        
         for (const imageLink of comment.images) {
           const imageId = imageLink.managed_images.id;
-          console.log(`[CommentItem] 🗑️ Deleting image: ${imageId}`);
-          
           const success = await deleteImage(imageId);
           if (success) {
-            console.log(`[CommentItem] ✅ Successfully deleted image: ${imageId}`);
           } else {
-            console.log(`[CommentItem] ⚠️ Failed to delete image: ${imageId}`);
           }
         }
       }
       
       // Step 2: Delete the comment (this will cascade delete comment_image_links)
-      console.log('[CommentItem] 🗑️ Deleting comment record...');
       const { error: deleteError } = await supabase
         .from('comments')
         .delete()
         .eq('id', comment.id);
 
       if (deleteError) throw deleteError;
-      
-      console.log('[CommentItem] ✅ Comment deletion complete');
       onCommentDeleted();
     } catch (err: any) {
       console.error('Error deleting comment:', err);

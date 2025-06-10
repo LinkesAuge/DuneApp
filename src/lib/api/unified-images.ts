@@ -63,7 +63,6 @@ export async function createManagedImage(
     const storagePath = getStoragePath(imageType, fileName);
     
     // Upload original file to Supabase Storage
-    console.log(`Uploading ${file.type} file to: ${storagePath}`);
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from('screenshots')
       .upload(storagePath, file, { 

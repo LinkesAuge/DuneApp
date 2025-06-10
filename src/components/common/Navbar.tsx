@@ -507,11 +507,6 @@ const Navbar: React.FC = () => {
                           {/* Test buttons */}
                           <button
                             onClick={() => {
-                              console.log('🧪 Screenshot System Test');
-                              console.log('- Unified Screenshot Manager: Available');
-                              console.log('- Storage Architecture: poi_screenshots/ + poi_cropped/');
-                              console.log('- RLS Policies: Active');
-                              console.log('✅ All systems operational');
                               setIsDevPanelOpen(false);
                             }}
                             className="group relative flex items-center w-full text-left px-4 py-3 text-amber-200 hover:text-amber-50 transition-all duration-300"
@@ -523,11 +518,6 @@ const Navbar: React.FC = () => {
 
                           <button
                             onClick={() => {
-                              console.log('🔧 Database Connection Test');
-                              console.log('- Auth Status:', !!user);
-                              console.log('- User Role:', user?.role);
-                              console.log('- Profile Status:', !!user);
-                              console.log('✅ Database connection active');
                               setIsDevPanelOpen(false);
                             }}
                             className="group relative flex items-center w-full text-left px-4 py-3 text-amber-200 hover:text-amber-50 transition-all duration-300"
@@ -540,7 +530,6 @@ const Navbar: React.FC = () => {
                           <button
                             onClick={() => {
                               console.clear();
-                              console.log('🧹 Console cleared for debugging');
                               setIsDevPanelOpen(false);
                             }}
                             className="group relative flex items-center w-full text-left px-4 py-3 text-amber-200 hover:text-amber-50 transition-all duration-300"
@@ -565,13 +554,10 @@ const Navbar: React.FC = () => {
                           <button
                             onClick={async () => {
                               console.clear();
-                              console.log('🧪 TESTING: POI System Integration Status...');
-                              
                               try {
                                 const { supabase } = await import('../../lib/supabase');
                                 
                                 // Test 1: Check unified system tables
-                                console.log('\n📋 Test 1: Checking unified system database tables...');
                                 const { data: imageLinks, error: linksError } = await supabase
                                   .from('poi_image_links')
                                   .select('*, shared_images(*)')
@@ -580,32 +566,24 @@ const Navbar: React.FC = () => {
                                 if (linksError) {
                                   console.error('❌ poi_image_links query failed:', linksError);
                                 } else {
-                                  console.log('✅ poi_image_links table accessible:', imageLinks?.length || 0, 'records');
                                   if (imageLinks?.length > 0) {
-                                    console.log('📄 Sample unified record:', imageLinks[0]);
                                   }
                                 }
 
                                 // Test 2: Check if old system still exists
-                                console.log('\n📋 Test 2: Checking old poi_screenshots table...');
                                 const { data: oldScreenshots, error: oldError } = await supabase
                                   .from('poi_screenshots')
                                   .select('*')
                                   .limit(3);
                                 
                                 if (oldError && oldError.message.includes('does not exist')) {
-                                  console.log('✅ poi_screenshots table removed (good!)');
                                 } else if (oldError) {
-                                  console.log('ℹ️ poi_screenshots table error:', oldError.message);
                                 } else {
-                                  console.log('⚠️ poi_screenshots table still exists with', oldScreenshots?.length || 0, 'records');
                                   if (oldScreenshots?.length > 0) {
-                                    console.log('📄 Sample old record (should be migrated):', oldScreenshots[0]);
                                   }
                                 }
 
                                 // Test 3: Check recent POIs to see which system they use
-                                console.log('\n📋 Test 3: Checking recent POIs and their screenshot structure...');
                                 const { data: recentPois, error: poisError } = await supabase
                                   .from('pois')
                                   .select('id, title, created_at, map_type')
@@ -615,38 +593,22 @@ const Navbar: React.FC = () => {
                                 if (poisError) {
                                   console.error('❌ Recent POIs query failed:', poisError);
                                 } else {
-                                  console.log('✅ Recent POIs found:', recentPois?.length || 0);
-                                  
                                   // For each POI, check what screenshot system it uses
                                   for (const poi of recentPois || []) {
-                                    console.log(`\n🔍 Checking POI "${poi.title}" (${poi.map_type}):`);
-                                    
                                     // Check unified system
                                     const { data: unifiedImages } = await supabase
                                       .from('poi_image_links')
                                       .select('shared_images(*)')
                                       .eq('poi_id', poi.id);
-                                    
-                                    console.log(`   ${unifiedImages?.length || 0} unified screenshots`);
-                                    
                                     // Check old system (if table exists)
                                     if (!oldError || !oldError.message.includes('does not exist')) {
                                       const { data: oldImages } = await supabase
                                         .from('poi_screenshots')
                                         .select('*')
                                         .eq('poi_id', poi.id);
-                                      
-                                      console.log(`   ${oldImages?.length || 0} old-system screenshots`);
                                     }
                                   }
                                 }
-
-                                console.log('\n🎯 QUICK TEST RESULTS:');
-                                console.log('• Run this test, then try creating POIs with screenshots');
-                                console.log('• Create POI in Hagga Basin → check if screenshots save');
-                                console.log('• Create POI in Deep Desert → check database structure');
-                                console.log('• Delete a POI → check if screenshots are properly cleaned up');
-                                
                                 setIsDevPanelOpen(false);
                               } catch (err) {
                                 console.error('💥 Test failed with error:', err);

@@ -62,7 +62,6 @@ export function UnifiedImageSystemDemo() {
   }, [selectedEntityId, selectedEntityType, unifiedImages]);
 
   const handleUploadComplete = useCallback((imageIds: string[]) => {
-    console.log('Upload completed:', imageIds);
     // Reload images for current entity
     if (selectedEntityId) {
       handleLoadImages();

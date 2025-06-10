@@ -289,8 +289,6 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
 
   // Simple file input approach (like POI system)
   const handleScreenshotUpload = () => {
-    console.log('📤 [GridSquareModal] Upload button clicked - opening file picker');
-    
     // Trigger file input
     const input = document.createElement('input');
     input.type = 'file';
@@ -299,20 +297,11 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
       const target = e.target as HTMLInputElement;
       const file = target.files?.[0];
       if (file) {
-        console.log('📁 [GridSquareModal] File selected:', {
-          name: file.name,
-          size: file.size,
-          type: file.type,
-          lastModified: file.lastModified
-        });
-        
         setUploadingFile(file);
         setEditingOriginalUrl(null);
         setIsEditingExisting(false);
         setShowCropModal(true);
-        console.log('🎬 [GridSquareModal] Opening crop modal with new file');
       } else {
-        console.log('❌ [GridSquareModal] No file selected');
       }
     };
     input.click();
@@ -326,16 +315,6 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
     isFullImageRequestedByUser: boolean,
     cropForProcessing?: PixelCrop
   ) => {
-    console.log('🎯 [GridSquareModal] handleCropComplete called with:', {
-      finalPixelCrop,
-      croppedBlobSize: croppedBlob?.size,
-      isFullImageUpload,
-      isFullImageRequestedByUser,
-      cropForProcessing,
-      uploadingFile: uploadingFile?.name,
-      uploadingFileSize: uploadingFile?.size
-    });
-
     if (!uploadingFile) {
       console.error('❌ [GridSquareModal] No uploading file found!');
       return;
@@ -343,73 +322,29 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
 
     setIsProcessing(true);
     setShowCropModal(false);
-    console.log('🔄 [GridSquareModal] Starting upload process...');
-    
     try {
       const timestamp = Date.now();
       const coordinate = currentSquare.coordinate;
       const fileExt = uploadingFile.name.split('.').pop() || 'jpg';
       const baseFileName = `grid-${coordinate}-${timestamp}.${fileExt}`;
-
-      console.log('📋 [GridSquareModal] Upload details:', {
-        timestamp,
-        coordinate,
-        fileExt,
-        baseFileName,
-        originalFileSize: uploadingFile.size,
-        croppedBlobSize: croppedBlob.size
-      });
-
       let originalUrl = '';
       let displayUrl = '';
 
       // Step 1: Always upload original file
-      console.log('🔄 [GridSquareModal] Step 1: Uploading original file...');
-      console.log('📂 [GridSquareModal] Calling uploadPoiScreenshotOriginal with:', {
-        fileName: uploadingFile.name,
-        fileSize: uploadingFile.size,
-        targetFileName: baseFileName
-      });
-      
       const originalUpload = await uploadPoiScreenshotOriginal(uploadingFile, baseFileName);
       originalUrl = originalUpload.url;
-      console.log('✅ [GridSquareModal] Original file uploaded successfully:', {
-        url: originalUrl,
-        result: originalUpload
-      });
-
       // Step 2: Check if cropping was actually performed  
       const wasActuallyCropped = !isFullImageUpload && croppedBlob;
-      console.log('🔍 [GridSquareModal] Cropping analysis:', {
-        isFullImageUpload,
-        hasCroppedBlob: !!croppedBlob,
-        croppedBlobSize: croppedBlob.size,
-        wasActuallyCropped
-      });
-      
       if (wasActuallyCropped) {
-        console.log('✂️ [GridSquareModal] Step 2: Uploading cropped version...');
         const croppedFile = new File([croppedBlob], baseFileName, { type: 'image/webp' });
-        console.log('📂 [GridSquareModal] Calling uploadPoiScreenshotCropped with:', {
-          fileName: croppedFile.name,
-          fileSize: croppedFile.size,
-          fileType: croppedFile.type
-        });
-        
         const croppedUpload = await uploadPoiScreenshotCropped(croppedFile, baseFileName);
         displayUrl = croppedUpload.url;
-        console.log('✅ [GridSquareModal] Cropped file uploaded successfully:', {
-          url: displayUrl,
-          result: croppedUpload
-        });
       } else {
         // No cropping - use original as display
         displayUrl = originalUrl;
-        console.log('📏 [GridSquareModal] No cropping performed - using original as display:', displayUrl);
       }
 
       // Step 3: Update grid square in database
-      console.log('💾 [GridSquareModal] Step 3: Updating database...');
       const updateData = {
         coordinate: currentSquare.coordinate,
         screenshot_url: displayUrl,
@@ -423,9 +358,6 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
         upload_date: new Date().toISOString(),
         is_explored: true
       };
-      
-      console.log('📋 [GridSquareModal] Database update data:', updateData);
-      
       const { data, error } = await supabase
         .from('grid_squares')
         .upsert(updateData, {
@@ -438,23 +370,6 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
         console.error('❌ [GridSquareModal] Database update error:', error);
         throw error;
       }
-
-      console.log('🎉 [GridSquareModal] Grid square updated successfully:', data);
-      console.log('📊 [GridSquareModal] Final result:', {
-        originalUrl: data.original_screenshot_url,
-        displayUrl: data.screenshot_url,
-        cropData: {
-          x: data.crop_x,
-          y: data.crop_y,
-          width: data.crop_width,
-          height: data.crop_height,
-          created_at: data.crop_created_at
-        },
-        uploadedBy: data.uploaded_by,
-        uploadDate: data.upload_date,
-        isExplored: data.is_explored
-      });
-
       setCurrentSquare(data);
       onUpdate(data);
       setSuccess('Screenshot uploaded successfully! Both original and display versions saved.');
@@ -474,8 +389,6 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
       
       // Clean up
       setUploadingFile(null);
-      console.log('🧹 [GridSquareModal] Upload process complete, cleaned up state');
-      
     } catch (error: any) {
       console.error('💥 [GridSquareModal] Upload failed:', {
         error: error.message,
@@ -486,7 +399,6 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
       setError(error.message || 'Failed to upload screenshot');
     } finally {
       setIsProcessing(false);
-      console.log('🏁 [GridSquareModal] Upload process finished (success or failure)');
     }
   };
 
@@ -513,14 +425,6 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
     
     setShowCropModal(true);
   };
-
-
-
-
-
-
-
-
 
   const handleDeleteScreenshot = async () => {
     if (!confirm('Are you sure you want to delete this screenshot? This action cannot be undone.')) return;
@@ -707,7 +611,6 @@ const GridSquareModal: React.FC<GridSquareModalProps> = ({
   };
 
   // Handle deleting screenshot from crop modal
-
 
   return (
     <div 

@@ -95,10 +95,18 @@ serve(async (req: Request) => {
     // Storage cleanup: Collect all files that need to be deleted before removing database records
     const filesToDelete: string[] = [];
 
-    // 1. Collect POI screenshot files for the specific map type
+    // 1. Collect POI screenshot files from unified image system
     const { data: poisData, error: poisQueryError } = await supabaseAdmin
       .from('pois')
-      .select('screenshots')
+      .select(`
+        id,
+        poi_image_links (
+          managed_images (
+            original_url,
+            processed_url
+          )
+        )
+      `)
       .eq('map_type', mapType);
 
     if (poisQueryError) {
@@ -106,14 +114,16 @@ serve(async (req: Request) => {
       // Continue without POI storage cleanup rather than failing entirely
     } else if (poisData) {
       for (const poi of poisData) {
-        if (poi.screenshots && Array.isArray(poi.screenshots)) {
-          for (const screenshot of poi.screenshots) {
-            if (screenshot.url) {
-              const filePath = extractStorageFilePath(screenshot.url);
-              if (filePath) {
-                filesToDelete.push(filePath);
-              }
-            }
+        const imageLinks = (poi as any).poi_image_links || [];
+        for (const link of imageLinks) {
+          const image = link.managed_images;
+          if (image?.original_url) {
+            const filePath = extractStorageFilePath(image.original_url);
+            if (filePath) filesToDelete.push(filePath);
+          }
+          if (image?.processed_url && image.processed_url !== image.original_url) {
+            const filePath = extractStorageFilePath(image.processed_url);
+            if (filePath) filesToDelete.push(filePath);
           }
         }
       }
@@ -150,9 +160,7 @@ serve(async (req: Request) => {
       }
     }
 
-    // 3. Collect comment screenshot files for the specific map type
-    let commentsData: any[] = [];
-    
+    // 3. Collect comment screenshot files from unified image system
     if (mapType === 'deep_desert') {
       // Comments for Deep Desert POIs or grid squares
       const { data: deepDesertPois, error: poisError } = await supabaseAdmin
@@ -165,16 +173,33 @@ serve(async (req: Request) => {
       } else {
         const poiIds = (deepDesertPois || []).map((poi: any) => poi.id);
         
-        // Get comments for these POIs or any grid square
-        const { data, error } = await supabaseAdmin
-          .from('comments')
-          .select('screenshots')
-          .or(`poi_id.in.(${poiIds.join(',')}),grid_square_id.not.is.null`);
+        // Get comment images for these POIs or any grid square
+        const { data: commentImages, error } = await supabaseAdmin
+          .from('comment_image_links')
+          .select(`
+            managed_images (
+              original_url,
+              processed_url
+            ),
+            comments!inner (
+              poi_id,
+              grid_square_id
+            )
+          `)
+          .or(`comments.poi_id.in.(${poiIds.join(',')}),comments.grid_square_id.not.is.null`);
           
-        if (error) {
-          console.error(`Error fetching comments for ${mapType}:`, error);
-        } else {
-          commentsData = data || [];
+        if (!error && commentImages) {
+          for (const link of commentImages) {
+            const image = (link as any).managed_images;
+            if (image?.original_url) {
+              const filePath = extractStorageFilePath(image.original_url);
+              if (filePath && !filesToDelete.includes(filePath)) filesToDelete.push(filePath);
+            }
+            if (image?.processed_url && image.processed_url !== image.original_url) {
+              const filePath = extractStorageFilePath(image.processed_url);
+              if (filePath && !filesToDelete.includes(filePath)) filesToDelete.push(filePath);
+            }
+          }
         }
       }
     } else if (mapType === 'hagga_basin') {
@@ -190,29 +215,30 @@ serve(async (req: Request) => {
         const poiIds = (haggaBasinPois || []).map((poi: any) => poi.id);
         
         if (poiIds.length > 0) {
-          const { data, error } = await supabaseAdmin
-            .from('comments')
-            .select('screenshots')
-            .in('poi_id', poiIds);
+          const { data: commentImages, error } = await supabaseAdmin
+            .from('comment_image_links')
+            .select(`
+              managed_images (
+                original_url,
+                processed_url
+              ),
+              comments!inner (
+                poi_id
+              )
+            `)
+            .in('comments.poi_id', poiIds);
             
-          if (error) {
-            console.error(`Error fetching comments for ${mapType}:`, error);
-          } else {
-            commentsData = data || [];
-          }
-        }
-      }
-    }
-
-    // Extract comment screenshot file paths
-    const initialTotalFiles = filesToDelete.length;
-    for (const comment of commentsData) {
-      if (comment.screenshots && Array.isArray(comment.screenshots)) {
-        for (const screenshot of comment.screenshots) {
-          if (screenshot.url) {
-            const filePath = extractStorageFilePath(screenshot.url);
-            if (filePath && !filesToDelete.includes(filePath)) {
-              filesToDelete.push(filePath);
+          if (!error && commentImages) {
+            for (const link of commentImages) {
+              const image = (link as any).managed_images;
+              if (image?.original_url) {
+                const filePath = extractStorageFilePath(image.original_url);
+                if (filePath && !filesToDelete.includes(filePath)) filesToDelete.push(filePath);
+              }
+              if (image?.processed_url && image.processed_url !== image.original_url) {
+                const filePath = extractStorageFilePath(image.processed_url);
+                if (filePath && !filesToDelete.includes(filePath)) filesToDelete.push(filePath);
+              }
             }
           }
         }
@@ -227,7 +253,55 @@ serve(async (req: Request) => {
       // Continue with database deletion even if storage cleanup fails
     }
 
-    // 5. Delete comments for the specific map type
+    // 5. Clean up linking tables and managed images before deleting main records
+    
+    // Delete POI entity links for the specific map type
+    const { data: targetPois, error: targetPoisError } = await supabaseAdmin
+      .from('pois')
+      .select('id')
+      .eq('map_type', mapType);
+    
+    if (!targetPoisError && targetPois) {
+      const targetPoiIds = targetPois.map((poi: any) => poi.id);
+      
+      if (targetPoiIds.length > 0) {
+        // Delete POI entity links
+        const { error: deletePoiEntityLinksError } = await supabaseAdmin
+          .from('poi_entity_links')
+          .delete()
+          .in('poi_id', targetPoiIds);
+        
+        if (deletePoiEntityLinksError) {
+          console.error(`Error deleting POI entity links for ${mapType}:`, deletePoiEntityLinksError);
+        }
+        
+        // Delete POI image links and associated managed images
+        const { data: poiImageLinks, error: poiImageLinksError } = await supabaseAdmin
+          .from('poi_image_links')
+          .select('image_id')
+          .in('poi_id', targetPoiIds);
+        
+        if (!poiImageLinksError && poiImageLinks) {
+          const imageIds = poiImageLinks.map((link: any) => link.image_id);
+          
+          // Delete poi_image_links first
+          await supabaseAdmin
+            .from('poi_image_links')
+            .delete()
+            .in('poi_id', targetPoiIds);
+          
+          // Delete associated managed_images (if not referenced elsewhere)
+          if (imageIds.length > 0) {
+            await supabaseAdmin
+              .from('managed_images')
+              .delete()
+              .in('id', imageIds);
+          }
+        }
+      }
+    }
+
+    // 6. Delete comments for the specific map type
     if (mapType === 'deep_desert') {
       // Delete comments for Deep Desert POIs and grid squares
       const { data: deepDesertPois, error: poisError } = await supabaseAdmin
@@ -277,7 +351,100 @@ serve(async (req: Request) => {
       }
     }
 
-    // 6. Delete POIs for the specific map type
+    // Clean up comment image links before deleting comments
+    if (mapType === 'deep_desert') {
+      const { data: deepDesertPois, error: poisError } = await supabaseAdmin
+        .from('pois')
+        .select('id')
+        .eq('map_type', 'deep_desert');
+      
+      if (!poisError && deepDesertPois) {
+        const poiIds = deepDesertPois.map((poi: any) => poi.id);
+        
+        // Get comment IDs and their image links
+        const { data: commentsToDelete, error: commentsError } = await supabaseAdmin
+          .from('comments')
+          .select('id')
+          .or(`poi_id.in.(${poiIds.join(',')}),grid_square_id.not.is.null`);
+        
+        if (!commentsError && commentsToDelete) {
+          const commentIds = commentsToDelete.map((comment: any) => comment.id);
+          
+          if (commentIds.length > 0) {
+            // Get and delete comment image links
+            const { data: commentImageLinks } = await supabaseAdmin
+              .from('comment_image_links')
+              .select('image_id')
+              .in('comment_id', commentIds);
+            
+            if (commentImageLinks) {
+              const imageIds = commentImageLinks.map((link: any) => link.image_id);
+              
+              // Delete comment_image_links first
+              await supabaseAdmin
+                .from('comment_image_links')
+                .delete()
+                .in('comment_id', commentIds);
+              
+              // Delete associated managed_images
+              if (imageIds.length > 0) {
+                await supabaseAdmin
+                  .from('managed_images')
+                  .delete()
+                  .in('id', imageIds);
+              }
+            }
+          }
+        }
+      }
+    } else if (mapType === 'hagga_basin') {
+      const { data: haggaBasinPois, error: poisError } = await supabaseAdmin
+        .from('pois')
+        .select('id')
+        .eq('map_type', 'hagga_basin');
+      
+      if (!poisError && haggaBasinPois) {
+        const poiIds = haggaBasinPois.map((poi: any) => poi.id);
+        
+        if (poiIds.length > 0) {
+          // Get comment IDs and their image links
+          const { data: commentsToDelete, error: commentsError } = await supabaseAdmin
+            .from('comments')
+            .select('id')
+            .in('poi_id', poiIds);
+          
+          if (!commentsError && commentsToDelete) {
+            const commentIds = commentsToDelete.map((comment: any) => comment.id);
+            
+            // Get and delete comment image links
+            const { data: commentImageLinks } = await supabaseAdmin
+              .from('comment_image_links')
+              .select('image_id')
+              .in('comment_id', commentIds);
+            
+            if (commentImageLinks) {
+              const imageIds = commentImageLinks.map((link: any) => link.image_id);
+              
+              // Delete comment_image_links first
+              await supabaseAdmin
+                .from('comment_image_links')
+                .delete()
+                .in('comment_id', commentIds);
+              
+              // Delete associated managed_images
+              if (imageIds.length > 0) {
+                await supabaseAdmin
+                  .from('managed_images')
+                  .delete()
+                  .in('id', imageIds);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // 7. Delete POIs for the specific map type
     const { error: deletePoisError } = await supabaseAdmin
       .from('pois')
       .delete()
@@ -287,7 +454,7 @@ serve(async (req: Request) => {
       console.error(`Error deleting ${mapType} POIs:`, deletePoisError);
       throw new Error(`Failed to delete ${mapType} POIs: ${deletePoisError.message}`);
     }
-    // 7. Delete grid squares (only for Deep Desert)
+    // 8. Delete grid squares (only for Deep Desert)
     if (mapType === 'deep_desert') {
       const { error: deleteGridSquaresError } = await supabaseAdmin.from('grid_squares').delete().not('id', 'is', null);
       if (deleteGridSquaresError) {

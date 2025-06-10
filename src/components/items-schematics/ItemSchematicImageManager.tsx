@@ -59,7 +59,6 @@ export function ItemSchematicImageManager({
   // =====================================================
 
   const handleUploadComplete = useCallback((imageIds: string[]) => {
-    console.log(`Uploaded ${imageIds.length} images for ${entity.name}`);
     setShowUploader(false);
   }, [entity.name]);
 

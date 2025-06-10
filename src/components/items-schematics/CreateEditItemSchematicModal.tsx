@@ -297,9 +297,7 @@ const HierarchySelector: React.FC<{
   const { categories, types, tiers, loading, refetchTypes } = useItemsSchematics();
   
   const appliesTo = entityType === 'items' ? 'items' : entityType === 'schematics' ? 'schematics' : null;
-  
-  
-  
+
   // Fetch types when a category is selected
   useEffect(() => {
     if (selectedCategory) {

@@ -329,8 +329,6 @@ export const poiEntityLinksAPI = {
         throw new POIEntityLinkAPIError('Both POI ID and Entity ID are required', 'VALIDATION_ERROR');
       }
 
-
-
       const { data, error } = await supabase
         .from('poi_entity_links')
         .update(updates)

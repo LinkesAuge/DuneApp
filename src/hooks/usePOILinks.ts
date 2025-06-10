@@ -181,9 +181,6 @@ export const usePOILinks = (): UsePOILinksReturn => {
   // Apply filters to raw data with two-stage filtering
   const filteredData = useMemo(() => {
     if (!rawData.length) return [];
-
-    console.log('Filtering with filters:', filters);
-
     // Stage 1: Group data by POI and apply POI-level filters
     const poiGroups = new Map<string, { poi: any; links: any[] }>();
     
@@ -228,12 +225,10 @@ export const usePOILinks = (): UsePOILinksReturn => {
       // POI category filter - independent of entity filters
       if (filters.poiCategories.length === 0) {
         // Empty array means hide all POIs
-        console.log('POI category filter: hiding all POIs (empty filter array)');
         return false;
       } else {
         const poiCategory = poi.poi_types?.category;
         if (!poiCategory || !filters.poiCategories.includes(poiCategory)) {
-          console.log(`POI category filter: hiding POI "${poi.title}" with category "${poiCategory}" (not in filter list)`);
           return false;
         }
       }

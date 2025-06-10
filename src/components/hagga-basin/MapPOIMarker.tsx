@@ -72,7 +72,6 @@ const MapPOIMarker: React.FC<MapPOIMarkerProps> = ({
   entityLinksRefreshTrigger
 }) => {
   const { user: authUser } = useAuth();
-  
 
   const [showCard, setShowCard] = useState(false);
   const [hoverTimeout, setHoverTimeout] = useState<NodeJS.Timeout | null>(null);
@@ -394,9 +393,6 @@ const MapPOIMarker: React.FC<MapPOIMarkerProps> = ({
             <Scroll className="w-3 h-3 text-purple-300" />
           </div>
         )}
-
-
-
 
       </div>
       </div>

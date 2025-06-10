@@ -125,8 +125,6 @@ export interface HaggaBasinOverlay {
   created_by: string;
 }
 
-
-
 // NEW: POI Sharing System
 export interface PoiShare {
   poi_id: string;
@@ -134,8 +132,6 @@ export interface PoiShare {
   shared_by_user_id: string;
   created_at: string;
 }
-
-
 
 // NEW: Coordinate conversion utilities interface
 export interface CoordinateConverter {
@@ -360,8 +356,6 @@ export interface Type {
   updated_at: string;
 }
 
-
-
 // NEW: Type management interfaces
 export interface TypeDependencies {
   items_count: number;
@@ -531,8 +525,6 @@ export interface SchematicWithRelations extends Schematic {
 export interface CategoryWithTypes extends Category {
   types?: Type[];
 }
-
-
 
 export interface FieldDefinitionWithGroup extends FieldDefinition {
   dropdown_group?: DropdownGroup;

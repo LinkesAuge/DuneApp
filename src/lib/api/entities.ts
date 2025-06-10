@@ -102,8 +102,6 @@ export const entitiesAPI = {
         query = query.in('type_id', filters.type_ids);
       }
 
-
-
       if (filters.tier_number !== undefined) {
         query = query.eq('tier_number', filters.tier_number);
       }
