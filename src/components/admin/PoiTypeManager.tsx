@@ -42,6 +42,9 @@ interface CategoryData {
   displayOrder: number;
   columnPreference: number; // 1=left, 2=right
   poiTypes: PoiType[];
+  defaultVisible: boolean;
+  availableOnDeepDesert: boolean;
+  availableOnHaggaBasin: boolean;
 }
 
 interface PoiTypeManagerProps {
@@ -56,7 +59,7 @@ const CategoryEditModal: React.FC<{
   isOpen: boolean;
   onClose: () => void;
   category: CategoryData | null;
-  onSave: (categoryName: string, displayInPanel: boolean, displayOrder: number, columnPreference: number, updatedTypes: PoiType[]) => void;
+  onSave: (categoryName: string, displayInPanel: boolean, displayOrder: number, columnPreference: number, updatedTypes: PoiType[], defaultVisible: boolean, availableOnDeepDesert: boolean, availableOnHaggaBasin: boolean) => void;
   onAddNewType: (category: string) => void;
   onEditType: (type: PoiType) => void;
   onDeleteType: (typeId: string) => void;
@@ -78,6 +81,11 @@ const CategoryEditModal: React.FC<{
   const [displayOrder, setDisplayOrder] = useState(1);
   const [columnPreference, setColumnPreference] = useState(1);
   const [isSaving, setIsSaving] = useState(false);
+  
+  // NEW: Visibility and map availability state
+  const [defaultVisible, setDefaultVisible] = useState(true);
+  const [availableOnDeepDesert, setAvailableOnDeepDesert] = useState(true);
+  const [availableOnHaggaBasin, setAvailableOnHaggaBasin] = useState(true);
 
   useEffect(() => {
     if (category) {
@@ -85,6 +93,9 @@ const CategoryEditModal: React.FC<{
       setDisplayInPanel(category.displayInPanel);
       setDisplayOrder(category.displayOrder);
       setColumnPreference(category.columnPreference);
+      setDefaultVisible(category.defaultVisible);
+      setAvailableOnDeepDesert(category.availableOnDeepDesert);
+      setAvailableOnHaggaBasin(category.availableOnHaggaBasin);
     }
   }, [category]);
 
@@ -93,7 +104,7 @@ const CategoryEditModal: React.FC<{
     
     setIsSaving(true);
     try {
-      await onSave(categoryName.trim(), displayInPanel, displayOrder, columnPreference, category.poiTypes);
+      await onSave(categoryName.trim(), displayInPanel, displayOrder, columnPreference, category.poiTypes, defaultVisible, availableOnDeepDesert, availableOnHaggaBasin);
     } finally {
       setIsSaving(false);
     }
@@ -198,6 +209,62 @@ const CategoryEditModal: React.FC<{
                 </div>
               </div>
             )}
+            
+            {/* NEW: Visibility and Map Availability Settings */}
+            <div className="space-y-4 p-4 rounded-lg bg-void-950/30 border border-gold-300/20">
+              <h4 className="text-sm font-medium text-amber-200">Visibility & Map Availability</h4>
+              
+              {/* Default Visibility */}
+              <div className="flex items-center space-x-3">
+                <input
+                  type="checkbox"
+                  id="defaultVisible"
+                  checked={defaultVisible}
+                  onChange={(e) => setDefaultVisible(e.target.checked)}
+                  className="w-5 h-5 text-gold-300 bg-void-950/60 border-gold-300/50 rounded 
+                           focus:ring-gold-300/50 focus:ring-2"
+                />
+                <label htmlFor="defaultVisible" className="text-sm font-medium text-amber-200 flex items-center">
+                  {defaultVisible ? <Eye size={16} className="mr-2 text-green-400" /> : <EyeOff size={16} className="mr-2 text-gray-400" />}
+                  Show by default when users first load the map
+                </label>
+              </div>
+              
+              {/* Map Availability */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex items-center space-x-3">
+                  <input
+                    type="checkbox"
+                    id="availableOnDeepDesert"
+                    checked={availableOnDeepDesert}
+                    onChange={(e) => setAvailableOnDeepDesert(e.target.checked)}
+                    className="w-5 h-5 text-gold-300 bg-void-950/60 border-gold-300/50 rounded 
+                             focus:ring-gold-300/50 focus:ring-2"
+                  />
+                  <label htmlFor="availableOnDeepDesert" className="text-sm font-medium text-amber-200">
+                    Available on Deep Desert
+                  </label>
+                </div>
+                
+                <div className="flex items-center space-x-3">
+                  <input
+                    type="checkbox"
+                    id="availableOnHaggaBasin"
+                    checked={availableOnHaggaBasin}
+                    onChange={(e) => setAvailableOnHaggaBasin(e.target.checked)}
+                    className="w-5 h-5 text-gold-300 bg-void-950/60 border-gold-300/50 rounded 
+                             focus:ring-gold-300/50 focus:ring-2"
+                  />
+                  <label htmlFor="availableOnHaggaBasin" className="text-sm font-medium text-amber-200">
+                    Available on Hagga Basin
+                  </label>
+                </div>
+              </div>
+              
+              <p className="text-amber-300/60 text-xs">
+                Categories not available on a map will not appear in that map's POI control panel or filters.
+              </p>
+            </div>
             
             {/* POI Types in Category */}
             <div>
@@ -551,7 +618,10 @@ const PoiTypeManager: React.FC<PoiTypeManagerProps> = ({
         displayInPanel: poiTypes.some(type => type.display_in_panel === true),
         displayOrder: firstType?.category_display_order || 0,
         columnPreference: firstType?.category_column_preference || 1,
-        poiTypes: poiTypes.sort((a, b) => a.name.localeCompare(b.name))
+        poiTypes: poiTypes.sort((a, b) => a.name.localeCompare(b.name)),
+        defaultVisible: firstType?.default_visible || false,
+        availableOnDeepDesert: firstType?.available_on_deep_desert || false,
+        availableOnHaggaBasin: firstType?.available_on_hagga_basin || false,
       };
     });
 
@@ -731,8 +801,7 @@ const PoiTypeManager: React.FC<PoiTypeManagerProps> = ({
           icon: '❓',
           color: '#6B7280',
           default_description: 'Undefined POI type',
-          icon_has_transparent_background: false,
-          created_by: null
+          icon_has_transparent_background: false
         }]);
 
       if (createError) throw createError;
@@ -759,12 +828,27 @@ const PoiTypeManager: React.FC<PoiTypeManagerProps> = ({
       const uniqueId = uuidv4();
       const fileName = `${uniqueId}-${file.name.replace(/\.[^/.]+$/, '.webp')}`;
       
-      // Upload functionality removed - custom icon uploads disabled
+      // Upload to Supabase storage
+      const { data, error } = await supabase.storage
+        .from(POI_ICON_BUCKET)
+        .upload(`${POI_ICON_FOLDER}/${fileName}`, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (error) {
+        throw error;
+      }
+
+      // Get the public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from(POI_ICON_BUCKET)
+        .getPublicUrl(`${POI_ICON_FOLDER}/${fileName}`);
+
+      // Set the icon to the uploaded URL
+      setCurrentPoiType(prev => ({ ...prev, icon: publicUrl }));
       
-      handleError('Icon upload functionality has been disabled');
-      
-      // Show success message without calling handleSuccess to avoid triggering external callbacks
-      // that might close the form during the editing process
+      // Show success message without triggering external callbacks that might close the modal
       toast.success('Icon uploaded successfully!');
     } catch (err: any) {
       console.error('Upload error:', err);
@@ -795,7 +879,6 @@ const PoiTypeManager: React.FC<PoiTypeManagerProps> = ({
         category: currentPoiType.category,
         default_description: currentPoiType.default_description || null,
         icon_has_transparent_background: currentPoiType.icon_has_transparent_background || false,
-        created_by: null, // Admin-created types have null created_by
         display_in_panel: categoryData?.displayInPanel || false,
         category_display_order: categoryData?.displayOrder || 1,
         category_column_preference: categoryData?.columnPreference || 1,
@@ -889,13 +972,16 @@ const PoiTypeManager: React.FC<PoiTypeManagerProps> = ({
       displayInPanel: false,
       displayOrder: 1,
       columnPreference: 1,
-      poiTypes: []
+      poiTypes: [],
+      defaultVisible: false,
+      availableOnDeepDesert: false,
+      availableOnHaggaBasin: false,
     };
     setCategoryEditModal({ isOpen: true, category: newCategory });
   };
 
   // Enhanced category saving function that handles both new and existing categories
-  const handleCategorySave = async (categoryName: string, displayInPanel: boolean, displayOrder: number, columnPreference: number, updatedTypes: PoiType[]) => {
+  const handleCategorySave = async (categoryName: string, displayInPanel: boolean, displayOrder: number, columnPreference: number, updatedTypes: PoiType[], defaultVisible: boolean, availableOnDeepDesert: boolean, availableOnHaggaBasin: boolean) => {
     try {
       const trimmedName = categoryName.trim();
       if (!trimmedName) {
@@ -917,10 +1003,12 @@ const PoiTypeManager: React.FC<PoiTypeManagerProps> = ({
             color: '#6B7280',
             default_description: `Default type for ${trimmedName} category`,
             icon_has_transparent_background: false,
-            created_by: null,
             display_in_panel: displayInPanel,
             category_display_order: displayOrder,
-            category_column_preference: columnPreference
+            category_column_preference: columnPreference,
+            default_visible: defaultVisible,
+            available_on_deep_desert: availableOnDeepDesert,
+            available_on_hagga_basin: availableOnHaggaBasin,
           }]);
 
         if (error) throw error;
@@ -932,7 +1020,10 @@ const PoiTypeManager: React.FC<PoiTypeManagerProps> = ({
           .update({ 
             display_in_panel: displayInPanel,
             category_display_order: displayOrder,
-            category_column_preference: columnPreference
+            category_column_preference: columnPreference,
+            default_visible: defaultVisible,
+            available_on_deep_desert: availableOnDeepDesert,
+            available_on_hagga_basin: availableOnHaggaBasin,
           })
           .eq('category', trimmedName);
 
@@ -1193,47 +1284,67 @@ const PoiTypeManager: React.FC<PoiTypeManagerProps> = ({
                   </div>
                 </div>
 
-                {/* Icon Upload */}
+                {/* Icon */}
                 <div>
                   <label className="block text-sm font-medium text-gold-300 mb-2 tracking-wide">
                     Icon *
                   </label>
-                  <div className="flex items-center space-x-3">
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={isUploading}
-                      className="px-4 py-3 bg-void-950/60 border border-gold-300/30 rounded 
-                               text-amber-200 hover:bg-gold-300/10 transition-all duration-300
-                               disabled:opacity-50 disabled:cursor-not-allowed flex items-center
-                               focus:ring-2 focus:ring-gold-300/50"
+                  <div className="space-y-2">
+                    {/* Text Input */}
+                    <input
+                      type="text"
+                      name="icon"
+                      value={isIconUrl(currentPoiType.icon) ? '' : currentPoiType.icon}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-2 bg-void-950/60 border border-gold-300/30 rounded 
+                               text-amber-200 placeholder-amber-200/40
+                               focus:outline-none focus:ring-2 focus:ring-gold-300/50 focus:border-gold-300/60
+                               transition-all duration-300"
+                      placeholder="🏜️ Enter emoji or text icon"
                       style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
-                    >
-                      {isUploading ? (
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-amber-200 mr-2"></div>
-                      ) : (
-                        <Upload size={16} className="mr-2" />
-                      )}
-                      Upload
-                    </button>
-                    {currentPoiType.icon && (
-                      <div className="flex items-center space-x-2">
-                        {isIconUrl(currentPoiType.icon) ? (
-                          <img
-                            src={currentPoiType.icon}
-                            alt="Icon preview"
-                            className="w-8 h-8 rounded border border-gold-300/30"
-                            style={{
-                              backgroundColor: currentPoiType.icon_has_transparent_background ? 'transparent' : currentPoiType.color
-                            }}
-                          />
+                    />
+                    
+                    {/* Upload Button and Preview Row */}
+                    <div className="flex items-center justify-between">
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isUploading}
+                        className="px-4 py-2 bg-void-950/60 border border-gold-300/30 rounded 
+                                 text-amber-200 hover:bg-gold-300/10 transition-all duration-300
+                                 disabled:opacity-50 disabled:cursor-not-allowed flex items-center text-sm
+                                 focus:ring-2 focus:ring-gold-300/50"
+                        style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
+                      >
+                        {isUploading ? (
+                          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-amber-200 mr-2"></div>
                         ) : (
-                          <span className="text-2xl" style={{ color: currentPoiType.color }}>
-                            {currentPoiType.icon}
-                          </span>
+                          <Upload size={14} className="mr-2" />
                         )}
-                      </div>
-                    )}
+                        Upload Image
+                      </button>
+                      
+                      {/* Icon Preview */}
+                      {currentPoiType.icon && (
+                        <div className="flex items-center space-x-2">
+                          <span className="text-amber-200/70 text-xs">Preview:</span>
+                          {isIconUrl(currentPoiType.icon) ? (
+                            <img
+                              src={currentPoiType.icon}
+                              alt="Icon preview"
+                              className="w-6 h-6 rounded border border-gold-300/30"
+                              style={{
+                                backgroundColor: currentPoiType.icon_has_transparent_background ? 'transparent' : currentPoiType.color
+                              }}
+                            />
+                          ) : (
+                            <span className="text-xl" style={{ color: currentPoiType.color }}>
+                              {currentPoiType.icon}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1296,7 +1407,6 @@ const PoiTypeManager: React.FC<PoiTypeManagerProps> = ({
                 <button
                   type="submit"
                   disabled={isSubmitting || isUploading || !currentPoiType.name || !currentPoiType.icon || !currentPoiType.category}
-                  onClick={() => {}}
                   className="px-6 py-3 bg-gold-300 hover:bg-amber-200 text-void-950 rounded 
                            disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300
                            flex items-center font-medium tracking-wide"

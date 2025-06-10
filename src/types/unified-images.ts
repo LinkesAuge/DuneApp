@@ -1,4 +1,7 @@
 import { PixelCrop } from 'react-image-crop';
+// Import correct interfaces from their source files instead of redefining them
+import { Poi } from './index';
+import { Entity } from './unified-entities';
 
 // =====================================================
 // Unified Image Management Types
@@ -106,84 +109,28 @@ export interface ImageDisplayInfo {
 }
 
 // =====================================================
-// Legacy Type Updates
+// Extended Types Using Correct Base Interfaces
 // =====================================================
 
-// Update existing POI type to use new system
-export interface Poi {
-  id: string;
-  title: string;
-  description: string | null;
-  coordinates_x: number | null;
-  coordinates_y: number | null;
-  poi_type_id: string;
-  privacy_level: 'private' | 'shared' | 'public';
-  created_by: string;
-  created_at: string;
-  updated_by: string | null;
-  updated_at: string | null;
-  grid_coordinate: string | null;
-  custom_icon_id: string | null;
-  
-  // New image system
-  images?: POIImageLink[];  // Array of linked images
-  
-  // Joined data
-  poi_types?: any;
-  profiles?: any;
+// Extend the correct POI interface with image data
+export interface POIWithImages extends Poi {
+  images: (POIImageLink & { managed_image: ManagedImage })[];
 }
 
-// Update existing Comment type to use new system  
-export interface Comment {
+// Comment interface - import from correct source when available
+export interface CommentWithImages {
   id: string;
   poi_id: string;
   comment: string;
   created_by: string;
   created_at: string;
   updated_at: string;
-  
-  // New image system
-  images?: CommentImageLink[]; // Array of linked images
-  
+  images: (CommentImageLink & { managed_image: ManagedImage })[];
   // Joined data
   profiles?: any;
 }
 
-// Add Entity support for items and schematics
-export interface Entity {
-  id: string;
-  name: string;
-  description: string | null;
-  entity_type: 'item' | 'schematic';
-  category: string;
-  type: string;
-  tier_number: number;
-  tier: string;
-  icon: string | null;
-  
-  // New image system - separate arrays for items vs schematics
-  item_images?: ItemImageLink[];       // For items
-  schematic_images?: SchematicImageLink[]; // For schematics
-  
-  // Existing fields...
-  created_at: string;
-  updated_at: string;
-  created_by: string | null;
-  updated_by: string | null;
-}
-
-// =====================================================
-// API Response Types
-// =====================================================
-
-export interface POIWithImages extends Poi {
-  images: (POIImageLink & { managed_image: ManagedImage })[];
-}
-
-export interface CommentWithImages extends Comment {
-  images: (CommentImageLink & { managed_image: ManagedImage })[];
-}
-
+// Entity image extensions
 export interface ItemWithImages extends Entity {
   item_images: (ItemImageLink & { managed_image: ManagedImage })[];
 }

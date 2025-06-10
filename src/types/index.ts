@@ -63,6 +63,11 @@ export interface PoiType {
   display_in_panel?: boolean; // Whether this category appears in main POI filter panels
   category_display_order?: number; // Order in which category appears (lower numbers first)
   category_column_preference?: number; // Which column: 1=left, 2=right
+  
+  // NEW: Visibility and map availability settings
+  default_visible?: boolean; // Whether this category should be visible by default
+  available_on_deep_desert?: boolean; // Whether this category is available on Deep Desert map
+  available_on_hagga_basin?: boolean; // Whether this category is available on Hagga Basin map
 }
 
 export interface PoiScreenshot {

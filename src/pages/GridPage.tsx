@@ -201,9 +201,14 @@ const GridPage: React.FC = () => {
   // Initialize filter state when POI types are loaded (only on initial setup)
   useEffect(() => {
     if (poiTypes.length > 0 && !initialFilterSetup) {
-      // By default, select all types and categories on initial load
-      setSelectedPoiTypes(poiTypes.map(type => type.id));
-      setSelectedCategories([...new Set(poiTypes.map(type => type.category))]);
+      // Filter POI types available on Deep Desert map
+      const availableTypes = poiTypes.filter(type => type.available_on_deep_desert !== false);
+      
+      // Select types that should be visible by default
+      const defaultVisibleTypes = availableTypes.filter(type => type.default_visible !== false);
+      
+      setSelectedPoiTypes(defaultVisibleTypes.map(type => type.id));
+      setSelectedCategories([...new Set(defaultVisibleTypes.map(type => type.category))]);
       setInitialFilterSetup(true);
     }
   }, [poiTypes, initialFilterSetup]);
@@ -1393,6 +1398,7 @@ const GridPage: React.FC = () => {
           onTogglePanel={() => setShowLeftPanel(!showLeftPanel)}
           mode="grid"
           currentLocation={gridId}
+          mapType="deep_desert"
           pois={pois}
           filteredPois={filteredPois}
           poiTypes={poiTypes}

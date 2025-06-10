@@ -105,9 +105,14 @@ const HaggaBasinPage: React.FC = () => {
   // Initialize filter state when POI types are loaded (only on initial setup)
   useEffect(() => {
     if (poiTypes.length > 0 && !initialFilterSetup) {
-      // By default, select all types and categories on initial load
-      setSelectedPoiTypes(poiTypes.map(type => type.id));
-      setSelectedCategories([...new Set(poiTypes.map(type => type.category))]);
+      // Filter POI types available on Hagga Basin map
+      const availableTypes = poiTypes.filter(type => type.available_on_hagga_basin !== false);
+      
+      // Select types that should be visible by default
+      const defaultVisibleTypes = availableTypes.filter(type => type.default_visible !== false);
+      
+      setSelectedPoiTypes(defaultVisibleTypes.map(type => type.id));
+      setSelectedCategories([...new Set(defaultVisibleTypes.map(type => type.category))]);
       setInitialFilterSetup(true);
     }
   }, [poiTypes, initialFilterSetup]);
@@ -596,6 +601,7 @@ const HaggaBasinPage: React.FC = () => {
         onTogglePanel={() => setSidebarOpen(!sidebarOpen)}
         mode="map"
         currentLocation="Hagga Basin"
+        mapType="hagga_basin"
         pois={pois}
         filteredPois={filteredPois}
         poiTypes={poiTypes}

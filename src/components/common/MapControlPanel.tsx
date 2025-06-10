@@ -11,6 +11,7 @@ interface MapControlPanelProps {
   // Mode and location
   mode: 'grid' | 'map';
   currentLocation: string; // Grid ID or map name
+  mapType: 'deep_desert' | 'hagga_basin'; // NEW: Map type for filtering
   
   // Data
   pois: Poi[];
@@ -50,6 +51,7 @@ const MapControlPanel: React.FC<MapControlPanelProps> = ({
   onTogglePanel,
   mode,
   currentLocation,
+  mapType,
   pois,
   filteredPois,
   poiTypes,
@@ -101,14 +103,35 @@ const MapControlPanel: React.FC<MapControlPanelProps> = ({
     return pois.filter(poi => categoryTypeIds.includes(poi.poi_type_id)).length;
   };
 
-  // Get unique categories for filtering
-  const categories = [...new Set(poiTypes.map(type => type.category))];
+  // Get unique categories for filtering - Filter by map availability
+  const categories = [...new Set(
+    poiTypes
+      .filter(type => {
+        // Filter POI types based on map availability
+        if (mapType === 'hagga_basin') {
+          return type.available_on_hagga_basin !== false;
+        } else if (mapType === 'deep_desert') {
+          return type.available_on_deep_desert !== false;
+        }
+        return true; // Fallback: show all if mapType is not recognized
+      })
+      .map(type => type.category)
+  )];
   
   // Get categories that should display in main panels from database settings
-  // Now we check if ANY type in a category has display_in_panel=true, meaning the category should be displayed
+  // Filter by map availability and then check display_in_panel setting
   const displayCategories = [...new Set(
     poiTypes
-      .filter(type => type.display_in_panel === true)
+      .filter(type => {
+        // First filter by map availability
+        if (mapType === 'hagga_basin') {
+          if (type.available_on_hagga_basin === false) return false;
+        } else if (mapType === 'deep_desert') {
+          if (type.available_on_deep_desert === false) return false;
+        }
+        // Then check if it should display in panel
+        return type.display_in_panel === true;
+      })
       .map(type => type.category)
   )];
   
