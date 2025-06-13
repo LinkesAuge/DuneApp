@@ -153,4 +153,7 @@ The application now provides **enterprise-grade functionality** including:
 
 The Dune Awakening Deep Desert Tracker is now a **production-ready, enterprise-grade application** with comprehensive functionality rivaling commercial mapping platforms. All critical user requirements have been implemented and verified working.
 
-**Recommendation**: **PROCEED WITH PRODUCTION DEPLOYMENT** 🚀 
+**Recommendation**: **PROCEED WITH PRODUCTION DEPLOYMENT** 🚀
+
+### Current Focus (2025-Q2)
+We are in **PLANNING** stage for the new Logistics System (inventory, tasks, deliveries).  Schema design and RLS policy draft are the immediate next deliverables.  See `tasks/logistics_plan.md`. 

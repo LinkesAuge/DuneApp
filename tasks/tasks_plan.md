@@ -170,3 +170,8 @@ The Dune Awakening Deep Desert Tracker is now a **production-ready, enterprise-g
 All critical systems have been **user-tested and confirmed working**, including the final complex scenario of POI deletion with comment screenshots - the ultimate test of system data integrity.
 
 **MISSION ACCOMPLISHED** ✅
+
+## 2025-Q2  –  Logistics System
+* **Status:** Planning
+* **Reference:** `tasks/logistics_plan.md`
+* **Next action:** Begin Phase-0 Foundations (see plan) once schema draft is approved.
