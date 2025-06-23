@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Users, Pencil, Trash2, RefreshCw, Shield, AlertCircle } from 'lucide-react';
+import { Users, Pencil, Trash2, RefreshCw, Shield, AlertCircle, ArrowUpDown, ArrowUp, ArrowDown, Layers3 } from 'lucide-react';
 import { Profile, UserRole } from '../../types/admin';
 import { Rank, EnhancedProfile, Guild } from '../../types/profile';
 import UserAvatar from '../common/UserAvatar';
@@ -17,6 +17,177 @@ interface UserManagementProps {
   assignUserToGuild: (userId: string, guildId: string | null, guildRole?: 'leader' | 'officer' | 'member') => Promise<void>;
 }
 
+type SortField = 'name' | 'email' | 'guild' | 'joinDate' | 'role' | 'rank';
+type SortDirection = 'asc' | 'desc';
+
+// UserProfileCard Component
+interface UserProfileCardProps {
+  profile: EnhancedProfile;
+  ranks: Rank[];
+  guilds: Guild[];
+  isDeletingUser: string | null;
+  onRoleChange: (profileId: string, newRole: UserRole) => void;
+  onRankAssignment: (userId: string, rankId: string | null) => void;
+  onGuildAssignment: (userId: string, guildId: string | null, guildRole?: 'leader' | 'officer' | 'member') => void;
+  onDeleteUser: (userId: string, username: string) => void;
+  formatDate: (dateString: string | null | undefined) => string;
+  GuildTag: React.FC<{ guild: Guild | null }>;
+}
+
+const UserProfileCard: React.FC<UserProfileCardProps> = ({
+  profile,
+  ranks,
+  guilds,
+  isDeletingUser,
+  onRoleChange,
+  onRankAssignment,
+  onGuildAssignment,
+  onDeleteUser,
+  formatDate,
+  GuildTag
+}) => {
+  return (
+    <div className="group relative">
+      <div className="relative p-4 rounded-lg border border-gold-300/20 bg-void-950/40 hover:bg-gold-300/5 transition-all duration-300">
+        {/* Purple hover overlay */}
+        <div 
+          className="absolute inset-0 rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none"
+          style={{
+            background: 'radial-gradient(ellipse at center top, rgba(139, 92, 246, 0.15) 0%, rgba(124, 58, 237, 0.08) 40%, transparent 70%)'
+          }}
+        />
+        
+        <div className="relative z-10">
+          <div className="flex items-center justify-between">
+            {/* Left side - User info in inline layout */}
+            <div className="flex items-center space-x-4 flex-1">
+              <UserAvatar profile={profile} size="md" />
+              <div className="flex-1">
+                <div className="flex items-center space-x-4 mb-2">
+                  <h4 className="text-lg font-medium text-amber-200 tracking-wide"
+                      style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                    {profile.username}
+                  </h4>
+                  <span className="text-amber-200/70 text-sm"
+                        style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                    {profile.email}
+                  </span>
+                  <span className="text-amber-200/50 text-xs"
+                        style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                    Joined {formatDate(profile.actual_join_date || profile.updated_at)}
+                  </span>
+                </div>
+                
+                {/* Role and Rank badges inline */}
+                <div className="flex items-center space-x-3">
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium tracking-wide border ${
+                    profile.role === 'admin' 
+                      ? 'border-red-400/30 bg-red-400/10 text-red-300' 
+                      : profile.role === 'editor'
+                      ? 'border-yellow-400/30 bg-yellow-400/10 text-yellow-300'
+                      : profile.role === 'pending'
+                      ? 'border-orange-400/30 bg-orange-400/10 text-orange-300'
+                      : 'border-blue-400/30 bg-blue-400/10 text-blue-300'
+                  }`}
+                        style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                    <Shield size={12} className="mr-1" />
+                    {profile.role.toUpperCase()}
+                  </span>
+                  
+                  {profile.rank && (
+                    <RankBadge rank={profile.rank} size="xxs" />
+                  )}
+
+                  {profile.guilds && (
+                    <GuildTag guild={profile.guilds} />
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Right side - Controls */}
+            <div className="flex items-center space-x-3">
+              {/* Role Dropdown */}
+              <div className="flex flex-col space-y-1">
+                <label className="text-xs text-gold-300/70 font-light">Role</label>
+                <select
+                  value={profile.role}
+                  onChange={(e) => onRoleChange(profile.id, e.target.value as UserRole)}
+                  className="px-3 py-2 bg-void-950/60 border border-gold-300/30 rounded text-amber-200 
+                           focus:outline-none focus:ring-2 focus:ring-gold-300/50 focus:border-gold-300/60
+                           transition-all duration-300 text-sm min-w-[100px]"
+                  style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
+                >
+                  <option value="pending" className="bg-void-950 text-orange-200">Pending</option>
+                  <option value="member" className="bg-void-950 text-amber-200">Member</option>
+                  <option value="editor" className="bg-void-950 text-amber-200">Editor</option>
+                  <option value="admin" className="bg-void-950 text-amber-200">Admin</option>
+                </select>
+              </div>
+
+              {/* Rank Dropdown */}
+              <div className="flex flex-col space-y-1">
+                <label className="text-xs text-gold-300/70 font-light">Rank</label>
+                <select
+                  value={profile.rank?.id || ''}
+                  onChange={(e) => onRankAssignment(profile.id, e.target.value || null)}
+                  className="px-3 py-2 bg-void-950/60 border border-gold-300/30 rounded text-amber-200 
+                           focus:outline-none focus:ring-2 focus:ring-gold-300/50 focus:border-gold-300/60
+                           transition-all duration-300 text-sm min-w-[120px]"
+                  style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
+                >
+                  <option value="" className="bg-void-950 text-amber-200">No rank</option>
+                  {ranks.map(rank => (
+                    <option key={rank.id} value={rank.id} className="bg-void-950 text-amber-200">
+                      {rank.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Guild Dropdown */}
+              <div className="flex flex-col space-y-1">
+                <label className="text-xs text-gold-300/70 font-light">Guild</label>
+                <select
+                  value={profile.guild_id || ''}
+                  onChange={(e) => onGuildAssignment(profile.id, e.target.value || null)}
+                  className="px-3 py-2 bg-void-950/60 border border-gold-300/30 rounded text-amber-200 
+                           focus:outline-none focus:ring-2 focus:ring-gold-300/50 focus:border-gold-300/60
+                           transition-all duration-300 text-sm min-w-[140px]"
+                  style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
+                >
+                  {guilds.map(guild => (
+                    <option key={guild.id} value={guild.id} className="bg-void-950 text-amber-200">
+                      {guild.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Delete Button */}
+              <div className="flex flex-col justify-end">
+                <button
+                  onClick={() => onDeleteUser(profile.id, profile.username)}
+                  disabled={isDeletingUser === profile.id}
+                  className="p-2 text-red-400 hover:text-red-300 transition-colors duration-300 rounded
+                           disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Delete user"
+                >
+                  {isDeletingUser === profile.id ? (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-400"></div>
+                  ) : (
+                    <Trash2 size={16} />
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const UserManagement: React.FC<UserManagementProps> = ({
   profiles,
   guilds,
@@ -32,6 +203,88 @@ const UserManagement: React.FC<UserManagementProps> = ({
   const [ranks, setRanks] = useState<Rank[]>([]);
   const [isLoadingRanks, setIsLoadingRanks] = useState(true);
   const [isDeletingUser, setIsDeletingUser] = useState<string | null>(null);
+  
+  // Sorting and Grouping State
+  const [sortField, setSortField] = useState<SortField>('name');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [groupByGuild, setGroupByGuild] = useState(false);
+
+  // Sorting and Grouping Logic
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const getSortIcon = (field: SortField) => {
+    if (sortField !== field) return <ArrowUpDown size={14} className="opacity-50" />;
+    return sortDirection === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />;
+  };
+
+  const sortedAndGroupedProfiles = useMemo(() => {
+    let sorted = [...enhancedProfiles];
+
+    // Sort profiles
+    sorted.sort((a, b) => {
+      let aValue: any;
+      let bValue: any;
+
+      switch (sortField) {
+        case 'name':
+          aValue = a.username?.toLowerCase() || '';
+          bValue = b.username?.toLowerCase() || '';
+          break;
+        case 'email':
+          aValue = a.email?.toLowerCase() || '';
+          bValue = b.email?.toLowerCase() || '';
+          break;
+        case 'guild':
+          aValue = a.guilds?.name?.toLowerCase() || 'zzz_unassigned';
+          bValue = b.guilds?.name?.toLowerCase() || 'zzz_unassigned';
+          break;
+        case 'joinDate':
+          aValue = new Date(a.actual_join_date || a.updated_at || '');
+          bValue = new Date(b.actual_join_date || b.updated_at || '');
+          break;
+        case 'role':
+          const roleOrder = { admin: 0, editor: 1, member: 2, pending: 3 };
+          aValue = roleOrder[a.role as keyof typeof roleOrder] ?? 4;
+          bValue = roleOrder[b.role as keyof typeof roleOrder] ?? 4;
+          break;
+        case 'rank':
+          aValue = a.rank?.display_order ?? 999;
+          bValue = b.rank?.display_order ?? 999;
+          break;
+        default:
+          aValue = '';
+          bValue = '';
+      }
+
+      if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    // Group by guild if enabled
+    if (groupByGuild) {
+      const grouped: { [key: string]: EnhancedProfile[] } = {};
+      
+      sorted.forEach(profile => {
+        const guildName = profile.guilds?.name || 'Unassigned';
+        if (!grouped[guildName]) {
+          grouped[guildName] = [];
+        }
+        grouped[guildName].push(profile);
+      });
+
+      return grouped;
+    }
+
+    return sorted;
+  }, [enhancedProfiles, sortField, sortDirection, groupByGuild]);
 
   // Fetch ranks on component mount
   useEffect(() => {
@@ -316,6 +569,63 @@ const UserManagement: React.FC<UserManagementProps> = ({
         </button>
       </div>
 
+      {/* Sorting and Grouping Controls */}
+      <div className="mb-6 p-4 rounded-lg border border-gold-300/20 bg-void-950/40">
+        <div className="flex items-center justify-between">
+          {/* Sort Controls */}
+          <div className="flex items-center space-x-4">
+            <span className="text-gold-300 font-medium text-sm"
+                  style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+              Sort by:
+            </span>
+            <div className="flex items-center space-x-2">
+              {[
+                { field: 'name' as SortField, label: 'Name' },
+                { field: 'email' as SortField, label: 'Email' },
+                { field: 'guild' as SortField, label: 'Guild' },
+                { field: 'joinDate' as SortField, label: 'Join Date' },
+                { field: 'role' as SortField, label: 'Role' },
+                { field: 'rank' as SortField, label: 'Rank' }
+              ].map(({ field, label }) => (
+                <button
+                  key={field}
+                  onClick={() => handleSort(field)}
+                  className={`flex items-center space-x-1 px-3 py-2 rounded-md text-xs font-medium transition-all duration-300 ${
+                    sortField === field
+                      ? 'bg-gold-300/20 text-gold-200 border border-gold-300/40'
+                      : 'bg-void-950/60 text-amber-200/70 border border-gold-300/20 hover:bg-gold-300/10 hover:text-gold-200'
+                  }`}
+                  style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
+                >
+                  <span>{label}</span>
+                  {getSortIcon(field)}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Group by Guild Toggle */}
+          <div className="flex items-center space-x-3">
+            <span className="text-gold-300 font-medium text-sm"
+                  style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+              Group by Guild:
+            </span>
+            <button
+              onClick={() => setGroupByGuild(!groupByGuild)}
+              className={`flex items-center space-x-2 px-4 py-2 rounded-md text-sm font-medium transition-all duration-300 ${
+                groupByGuild
+                  ? 'bg-purple-500/20 text-purple-200 border border-purple-400/40'
+                  : 'bg-void-950/60 text-amber-200/70 border border-gold-300/20 hover:bg-purple-500/10 hover:text-purple-200'
+              }`}
+              style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
+            >
+              <Layers3 size={16} />
+              <span>{groupByGuild ? 'Grouped' : 'List View'}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
       {error && (
         <div className="relative p-4 rounded-lg border border-red-400/40 backdrop-blur-md"
              style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)' }}>
@@ -343,164 +653,81 @@ const UserManagement: React.FC<UserManagementProps> = ({
         </div>
       ) : (
         <div className="space-y-4">
-          {enhancedProfiles.map((profile) => (
-            <div key={profile.id} className="group relative">
-              <div className="relative p-4 rounded-lg border border-gold-300/20 bg-void-950/40 hover:bg-gold-300/5 transition-all duration-300">
-                {/* Purple hover overlay */}
-                <div 
-                  className="absolute inset-0 rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none"
-                  style={{
-                    background: 'radial-gradient(ellipse at center top, rgba(139, 92, 246, 0.15) 0%, rgba(124, 58, 237, 0.08) 40%, transparent 70%)'
-                  }}
-                />
-                
-                <div className="relative z-10">
-                  <div className="flex items-center justify-between">
-                    {/* Left side - User info in inline layout */}
-                    <div className="flex items-center space-x-4 flex-1">
-                      <UserAvatar profile={profile} size="md" />
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-4 mb-2">
-                          <h4 className="text-lg font-medium text-amber-200 tracking-wide"
-                              style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-                            {profile.username}
-                          </h4>
-                          <span className="text-amber-200/70 text-sm"
-                                style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-                            {profile.email}
-                          </span>
-                          <span className="text-amber-200/50 text-xs"
-                                style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-                            Joined {formatDate(profile.actual_join_date || profile.updated_at)}
-                          </span>
-                        </div>
-                        
-                        {/* Role and Rank badges inline */}
-                        <div className="flex items-center space-x-3">
-                          <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium tracking-wide border ${
-                            profile.role === 'admin' 
-                              ? 'border-red-400/30 bg-red-400/10 text-red-300' 
-                              : profile.role === 'editor'
-                              ? 'border-yellow-400/30 bg-yellow-400/10 text-yellow-300'
-                              : profile.role === 'pending'
-                              ? 'border-orange-400/30 bg-orange-400/10 text-orange-300'
-                              : 'border-blue-400/30 bg-blue-400/10 text-blue-300'
-                          }`}
-                                style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-                            <Shield size={12} className="mr-1" />
-                            {profile.role.toUpperCase()}
-                          </span>
-                          
-                          {profile.rank && (
-                            <RankBadge rank={profile.rank} size="xxs" />
-                          )}
-
-                          {profile.guilds && (
-                            <GuildTag guild={profile.guilds} />
-                          )}
-                        </div>
-                      </div>
+          {groupByGuild ? (
+            // Grouped by Guild Display
+            Object.entries(sortedAndGroupedProfiles as { [key: string]: EnhancedProfile[] }).map(([guildName, guildProfiles]) => {
+              const guild = guilds.find(g => g.name === guildName);
+              return (
+                <div key={guildName} className="space-y-3">
+                  {/* Guild Header */}
+                  <div className="flex items-center space-x-3 p-3 rounded-lg border border-purple-300/30 bg-purple-500/10">
+                    <div className="flex items-center space-x-2">
+                      <Shield size={16} className="text-purple-300" />
+                      <h4 className="text-lg font-medium text-purple-200 tracking-wide"
+                          style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
+                        {guildName}
+                      </h4>
+                      <span className="text-purple-300/70 text-sm">
+                        ({guildProfiles.length} member{guildProfiles.length !== 1 ? 's' : ''})
+                      </span>
                     </div>
-
-                    {/* Right side - Controls */}
-                    <div className="flex items-center space-x-3">
-                      {/* Role Dropdown */}
-                      <div className="flex flex-col space-y-1">
-                        <label className="text-xs text-gold-300/70 font-light">Role</label>
-                        <select
-                          value={profile.role}
-                          onChange={(e) => handleRoleChange(profile.id, e.target.value as UserRole)}
-                          className="px-3 py-2 bg-void-950/60 border border-gold-300/30 rounded text-amber-200 
-                                   focus:outline-none focus:ring-2 focus:ring-gold-300/50 focus:border-gold-300/60
-                                   transition-all duration-300 text-sm min-w-[100px]"
-                          style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
-                        >
-                          <option value="pending" className="bg-void-950 text-orange-200">Pending</option>
-                          <option value="member" className="bg-void-950 text-amber-200">Member</option>
-                          <option value="editor" className="bg-void-950 text-amber-200">Editor</option>
-                          <option value="admin" className="bg-void-950 text-amber-200">Admin</option>
-                        </select>
+                    {guild && guild.name !== 'Unassigned' && (
+                      <div 
+                        className="px-3 py-1 rounded-full text-xs font-medium"
+                        style={{ 
+                          backgroundColor: guild.tag_color, 
+                          color: guild.tag_text_color,
+                          border: `1px solid ${guild.tag_color}40`
+                        }}
+                      >
+                        {guild.name}
                       </div>
+                    )}
+                  </div>
 
-                      {/* Rank Dropdown */}
-                      <div className="flex flex-col space-y-1">
-                        <label className="text-xs text-gold-300/70 font-light">Rank</label>
-                        <select
-                          value={profile.rank?.id || ''}
-                          onChange={(e) => handleRankAssignment(profile.id, e.target.value || null)}
-                          className="px-3 py-2 bg-void-950/60 border border-gold-300/30 rounded text-amber-200 
-                                   focus:outline-none focus:ring-2 focus:ring-gold-300/50 focus:border-gold-300/60
-                                   transition-all duration-300 text-sm min-w-[120px]"
-                          style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
-                        >
-                          <option value="" className="bg-void-950 text-amber-200">No rank</option>
-                          {ranks.map(rank => (
-                            <option key={rank.id} value={rank.id} className="bg-void-950 text-amber-200">
-                              {rank.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      {/* Guild Dropdown */}
-                      <div className="flex flex-col space-y-1">
-                        <label className="text-xs text-gold-300/70 font-light">Guild</label>
-                        <select
-                          value={profile.guild_id || ''}
-                          onChange={(e) => handleGuildAssignment(profile.id, e.target.value || null)}
-                          className="px-3 py-2 bg-void-950/60 border border-gold-300/30 rounded text-amber-200 
-                                   focus:outline-none focus:ring-2 focus:ring-gold-300/50 focus:border-gold-300/60
-                                   transition-all duration-300 text-sm min-w-[140px]"
-                          style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
-                        >
-                          {guilds.map(guild => (
-                            <option key={guild.id} value={guild.id} className="bg-void-950 text-amber-200">
-                              {guild.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      {/* Delete Button */}
-                      <div className="flex flex-col justify-end">
-                        <button
-                          onClick={() => handleDeleteUser(profile.id, profile.username)}
-                          disabled={isDeletingUser === profile.id}
-                          className="p-2 text-red-400 hover:text-red-300 transition-colors duration-300 rounded
-                                   disabled:opacity-50 disabled:cursor-not-allowed"
-                          title="Delete user"
-                        >
-                          {isDeletingUser === profile.id ? (
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-400"></div>
-                          ) : (
-                            <Trash2 size={16} />
-                          )}
-                        </button>
-                      </div>
-                    </div>
+                  {/* Guild Members */}
+                  <div className="ml-4 space-y-3">
+                    {guildProfiles.map((profile) => (
+                      <UserProfileCard
+                        key={profile.id}
+                        profile={profile}
+                        ranks={ranks}
+                        guilds={guilds}
+                        isDeletingUser={isDeletingUser}
+                        onRoleChange={handleRoleChange}
+                        onRankAssignment={handleRankAssignment}
+                        onGuildAssignment={handleGuildAssignment}
+                        onDeleteUser={handleDeleteUser}
+                        formatDate={formatDate}
+                        GuildTag={GuildTag}
+                      />
+                    ))}
                   </div>
                 </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Empty State */}
-      {enhancedProfiles.length === 0 && !isLoading && (
-        <div className="text-center py-12">
-          <div className="inline-block p-4 rounded-full border border-amber-200/50 mb-4"
-               style={{ backgroundColor: 'rgba(42, 36, 56, 0.8)' }}>
-            <Users className="text-amber-200" size={24} />
-          </div>
-          <p className="text-amber-200/70 font-light tracking-wide"
-             style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-            No users found in the system.
-          </p>
+              );
+            })
+          ) : (
+            // Regular List Display
+            (sortedAndGroupedProfiles as EnhancedProfile[]).map((profile) => (
+              <UserProfileCard
+                key={profile.id}
+                profile={profile}
+                ranks={ranks}
+                guilds={guilds}
+                isDeletingUser={isDeletingUser}
+                onRoleChange={handleRoleChange}
+                onRankAssignment={handleRankAssignment}
+                onGuildAssignment={handleGuildAssignment}
+                onDeleteUser={handleDeleteUser}
+                formatDate={formatDate}
+                GuildTag={GuildTag}
+              />
+            ))
+          )}
         </div>
       )}
     </div>
   );
 };
 
-export default UserManagement; 
+export default UserManagement;
