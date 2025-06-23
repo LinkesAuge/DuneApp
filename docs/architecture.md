@@ -6,6 +6,26 @@ The Dune Awakening Deep Desert Tracker is a **production-ready** web application
 
 **Status**: **100% COMPLETE & PRODUCTION READY** - All architectural components are fully implemented, tested, and operationally verified. Latest POI interface improvements and UI consistency enhancements completed January 30, 2025.
 
+### **NEW DEVELOPMENT: GUILD SYSTEM** ⭐ (In Planning)
+**Date**: January 30, 2025  
+**Status**: **COMPREHENSIVE PLAN COMPLETE - READY FOR IMPLEMENTATION**
+
+#### **Guild System Architecture Overview** 🏰
+**Purpose**: Enhance community organization and user management with guild-based categorization and visual identity
+
+**Core Components:**
+- **Guild Management**: Admin interface for CRUD operations on guilds with customizable styling
+- **User Organization**: Assign users to guilds with hierarchical roles (Leader, Officer, Member)
+- **Visual Integration**: Display guild tags `Username [GuildName]` throughout the application
+- **Self-Assignment**: User profile interface for autonomous guild joining/leaving
+- **Permission System**: Admin controls + guild leader permissions for their own guild only
+
+**Simplified Architecture:**
+- **Database**: Single `guilds` table + profile extensions (guild_id, guild_role, guild_joined_at)
+- **Permission Model**: Admin-only guild leadership transfer, simple role hierarchy
+- **Data Integrity**: ON DELETE SET NULL for guild deletion (members become unassigned)
+- **UI Pattern**: Unified `UserDisplayName` component for consistent guild tag display
+
 ### **POI INTERFACE IMPROVEMENTS & UI CONSISTENCY - COMPLETED** ✅
 **Date**: January 30, 2025  
 **Status**: **FULLY OPERATIONAL - POLISHED & PROFESSIONAL**
@@ -134,6 +154,12 @@ flowchart TD
         COMMENTS["comments (threading system)"]
         LIKES["comment_likes (reactions)"]
         
+        subgraph "Guild System (NEW - In Development) ⭐"
+            GUILDS["guilds (guild management)"]
+            GUILD_PROFILES["profiles.guild_id (guild membership)"]
+            GUILD_ROLES["profiles.guild_role (leader/officer/member)"]
+        end
+        
         subgraph "Items & Schematics System Tables"
             ITEMS_TIERS["tiers (7 custom tiers)"]
             ITEMS_CATS["categories (18 categories)"]
@@ -198,7 +224,19 @@ flowchart TD
         IS_ADMIN --> TIER_MGR["TierManager"]
         CAT_MGR --> SHARED_IMAGES
         TYPE_MGR --> SHARED_IMAGES
-        TIER_MGR --> SHARED_IMAGES
+    end
+
+    subgraph "Guild System Flow - NEW (In Development) ⭐"
+        ADMIN --> GUILD_ADMIN["Ranks & Guilds Interface"]
+        GUILD_ADMIN --> GUILD_MGR["Guild Management"]
+        GUILD_ADMIN --> GUILD_ASSIGN["User Guild Assignment"]
+        PROFILE_PAGE["ProfilePage"] --> GUILD_SELF["Guild Self-Assignment"]
+        GUILD_MGR --> GUILDS
+        GUILD_ASSIGN --> GUILD_PROFILES
+        GUILD_SELF --> GUILD_PROFILES
+        USER_MGT["UserManagement"] --> GUILD_FILTER["Guild Filtering & Assignment"]
+        GUILD_FILTER --> GUILD_PROFILES
+        USERNAME_DISPLAY["Username Display (15+ components)"] --> GUILD_TAGS["Guild Tag Display"]
     end
 
     subgraph "Shared Images Flow - COMPLETE ✅"

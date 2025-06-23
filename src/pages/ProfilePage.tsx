@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../components/auth/AuthProvider';
 import { supabase } from '../lib/supabase';
-import { EnhancedProfile, Rank, ProfileUpdateData } from '../types/profile';
+import { EnhancedProfile, Rank, ProfileUpdateData, Guild } from '../types/profile';
 import DiamondIcon from '../components/common/DiamondIcon';
 import AvatarUpload from '../components/profile/AvatarUpload';
-import { User, Save, Upload, Award, Mail, Calendar, Shield, Check, X, MessageCircle } from 'lucide-react';
+import { User, Save, Upload, Award, Mail, Calendar, Shield, Check, X, MessageCircle, Users } from 'lucide-react';
 
 const ProfilePage: React.FC = () => {
   const { user, refreshUser } = useAuth();
   const [profile, setProfile] = useState<EnhancedProfile | null>(null);
   const [rank, setRank] = useState<Rank | null>(null);
+  const [guilds, setGuilds] = useState<Guild[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -18,10 +19,11 @@ const ProfilePage: React.FC = () => {
   const [formData, setFormData] = useState({
     display_name: '',
     bio: '',
-    use_discord_avatar: true
+    use_discord_avatar: true,
+    guild_id: ''
   });
 
-  // Fetch user profile data
+  // Fetch user profile data and guilds
   useEffect(() => {
     const fetchProfile = async () => {
       if (!user?.id) return;
@@ -29,26 +31,38 @@ const ProfilePage: React.FC = () => {
       try {
         setIsLoading(true);
         
-        // Fetch profile with rank information
+        // Fetch profile with rank and guild information
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select(`
             *,
-            rank:ranks(*)
+            rank:ranks(*),
+            guilds(*)
           `)
           .eq('id', user.id)
           .single();
 
         if (profileError) throw profileError;
 
+        // Fetch all available guilds for selection
+        const { data: guildsData, error: guildsError } = await supabase
+          .from('guilds')
+          .select('*')
+          .eq('is_active', true)
+          .order('display_order');
+
+        if (guildsError) throw guildsError;
+
         setProfile(profileData);
         setRank(profileData.rank || null);
+        setGuilds(guildsData || []);
         
         // Set form data with current values
         setFormData({
           display_name: profileData.display_name || '',
           bio: profileData.bio || '',
-          use_discord_avatar: profileData.discord_avatar_url ? (profileData.use_discord_avatar ?? true) : false
+          use_discord_avatar: profileData.discord_avatar_url ? (profileData.use_discord_avatar ?? true) : false,
+          guild_id: profileData.guild_id || ''
         });
       } catch (err: any) {
         console.error('Error fetching profile:', err);
@@ -72,7 +86,8 @@ const ProfilePage: React.FC = () => {
       const updateData: ProfileUpdateData = {
         display_name: formData.display_name.trim() || null,
         bio: formData.bio.trim() || null,
-        use_discord_avatar: formData.use_discord_avatar
+        use_discord_avatar: formData.use_discord_avatar,
+        guild_id: formData.guild_id || null
       };
 
       const { error: updateError } = await supabase
@@ -87,7 +102,8 @@ const ProfilePage: React.FC = () => {
         .from('profiles')
         .select(`
           *,
-          rank:ranks(*)
+          rank:ranks(*),
+          guilds(*)
         `)
         .eq('id', user.id)
         .single();
@@ -134,7 +150,8 @@ const ProfilePage: React.FC = () => {
         .from('profiles')
         .select(`
           *,
-          rank:ranks(*)
+          rank:ranks(*),
+          guilds(*)
         `)
         .eq('id', user.id)
         .single();
@@ -298,6 +315,22 @@ const ProfilePage: React.FC = () => {
                         </span>
                       </div>
                     )}
+                    {profile?.guilds && (
+                      <div className="flex items-center gap-3">
+                        <Users size={14} className="text-gold-300/70" />
+                        <span 
+                          className="text-xs px-2 py-1 rounded-full font-medium flex items-center gap-1"
+                          style={{ 
+                            backgroundColor: profile.guilds.tag_color, 
+                            color: profile.guilds.tag_text_color,
+                            border: `1px solid ${profile.guilds.tag_color}40`
+                          }}
+                        >
+                          <Users size={12} />
+                          {profile.guilds.name}
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   {profile?.bio && (
@@ -457,20 +490,48 @@ const ProfilePage: React.FC = () => {
                       </p>
                     </div>
 
+                    {/* Guild Selection */}
+                    <div>
+                      <label className="block text-amber-200 text-sm font-light mb-2"
+                             style={{ fontFamily: "'Trebuchet MS', sans-serif" }}>
+                        Guild
+                      </label>
+                      <select
+                        value={formData.guild_id}
+                        onChange={(e) => setFormData(prev => ({ ...prev, guild_id: e.target.value }))}
+                        className="w-full px-4 py-3 bg-void-950/60 border border-gold-300/30 rounded-lg 
+                                 text-amber-200 focus:ring-2 focus:ring-gold-300/50 focus:outline-none 
+                                 transition-all duration-300"
+                        style={{ fontFamily: "'Trebuchet MS', sans-serif" }}
+                      >
+                        {guilds.map((guild) => (
+                          <option key={guild.id} value={guild.id} className="bg-void-950 text-amber-200">
+                            {guild.name}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-amber-300/60 text-xs mt-1">
+                        Choose your guild affiliation
+                      </p>
+                    </div>
+
                     {/* Save Button */}
                     <div className="pt-4">
                       <button
                         onClick={handleSave}
                         disabled={isSaving}
-                        className="w-full px-6 py-3 bg-gradient-to-r from-gold-600 to-gold-500 
-                                 text-void-950 font-medium rounded-lg transition-all duration-300 
-                                 hover:from-gold-500 hover:to-gold-400 disabled:opacity-50 
-                                 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        className="w-full px-6 py-3 bg-gradient-to-r from-emerald-500 to-green-500 
+                                 text-white font-bold rounded-lg transition-all duration-300 
+                                 hover:from-emerald-400 hover:to-green-400 hover:shadow-xl hover:shadow-emerald-500/30
+                                 hover:scale-[1.02] active:scale-[0.98]
+                                 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100
+                                 flex items-center justify-center gap-2
+                                 border-2 border-emerald-400 shadow-lg shadow-emerald-500/20"
                         style={{ fontFamily: "'Trebuchet MS', sans-serif" }}
                       >
                         {isSaving ? (
                           <>
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-void-950"></div>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                             Saving...
                           </>
                         ) : (

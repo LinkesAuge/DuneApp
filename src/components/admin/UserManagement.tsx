@@ -2,26 +2,30 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Users, Pencil, Trash2, RefreshCw, Shield, AlertCircle } from 'lucide-react';
 import { Profile, UserRole } from '../../types/admin';
-import { Rank, EnhancedProfile } from '../../types/profile';
+import { Rank, EnhancedProfile, Guild } from '../../types/profile';
 import UserAvatar from '../common/UserAvatar';
 import RankBadge from '../common/RankBadge';
 
 interface UserManagementProps {
   profiles: Profile[];
+  guilds: Guild[];
   isLoading: boolean;
   error: string | null;
   onRefreshProfiles: () => void;
   onError: (error: string) => void;
   onSuccess: (message: string) => void;
+  assignUserToGuild: (userId: string, guildId: string | null, guildRole?: 'leader' | 'officer' | 'member') => Promise<void>;
 }
 
 const UserManagement: React.FC<UserManagementProps> = ({
   profiles,
+  guilds,
   isLoading,
   error,
   onRefreshProfiles,
   onError,
-  onSuccess
+  onSuccess,
+  assignUserToGuild
 }) => {
   // State
   const [enhancedProfiles, setEnhancedProfiles] = useState<EnhancedProfile[]>([]);
@@ -183,6 +187,17 @@ const UserManagement: React.FC<UserManagementProps> = ({
     }
   };
 
+  // Handle guild assignment
+  const handleGuildAssignment = async (userId: string, guildId: string | null, guildRole: 'leader' | 'officer' | 'member' = 'member') => {
+    try {
+      await assignUserToGuild(userId, guildId, guildRole);
+      onSuccess?.(`Guild ${guildId ? 'assigned' : 'removed'} successfully`);
+    } catch (error: any) {
+      console.error('Error updating guild:', error);
+      onError?.(`Failed to update guild: ${error.message}`);
+    }
+  };
+
   const formatDate = (dateString: string | null | undefined): string => {
     if (!dateString) {
       return 'Unknown';
@@ -222,6 +237,25 @@ const UserManagement: React.FC<UserManagementProps> = ({
       default:
         return 'bg-green-900/50 text-green-200 border border-green-600/40';
     }
+  };
+
+  // Get guild display component
+  const GuildTag: React.FC<{ guild: Guild | null }> = ({ guild }) => {
+    if (!guild) return null;
+    
+    return (
+      <span 
+        className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium"
+        style={{ 
+          backgroundColor: guild.tag_color, 
+          color: guild.tag_text_color,
+          border: `1px solid ${guild.tag_color}40`
+        }}
+      >
+        <Shield size={10} className="mr-1" />
+        {guild.name}
+      </span>
+    );
   };
 
   if (isLoading) {
@@ -337,7 +371,7 @@ const UserManagement: React.FC<UserManagementProps> = ({
                           </span>
                           <span className="text-amber-200/50 text-xs"
                                 style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}>
-                            Joined {formatDate(profile.created_at)}
+                            Joined {formatDate(profile.actual_join_date || profile.updated_at)}
                           </span>
                         </div>
                         
@@ -359,6 +393,10 @@ const UserManagement: React.FC<UserManagementProps> = ({
                           
                           {profile.rank && (
                             <RankBadge rank={profile.rank} size="xxs" />
+                          )}
+
+                          {profile.guilds && (
+                            <GuildTag guild={profile.guilds} />
                           )}
                         </div>
                       </div>
@@ -399,6 +437,25 @@ const UserManagement: React.FC<UserManagementProps> = ({
                           {ranks.map(rank => (
                             <option key={rank.id} value={rank.id} className="bg-void-950 text-amber-200">
                               {rank.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Guild Dropdown */}
+                      <div className="flex flex-col space-y-1">
+                        <label className="text-xs text-gold-300/70 font-light">Guild</label>
+                        <select
+                          value={profile.guild_id || ''}
+                          onChange={(e) => handleGuildAssignment(profile.id, e.target.value || null)}
+                          className="px-3 py-2 bg-void-950/60 border border-gold-300/30 rounded text-amber-200 
+                                   focus:outline-none focus:ring-2 focus:ring-gold-300/50 focus:border-gold-300/60
+                                   transition-all duration-300 text-sm min-w-[140px]"
+                          style={{ fontFamily: "'Trebuchet MS', 'Lucida Grande', 'Lucida Sans Unicode', 'Lucida Sans', Tahoma, sans-serif" }}
+                        >
+                          {guilds.map(guild => (
+                            <option key={guild.id} value={guild.id} className="bg-void-950 text-amber-200">
+                              {guild.name}
                             </option>
                           ))}
                         </select>

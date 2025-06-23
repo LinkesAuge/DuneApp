@@ -5,6 +5,7 @@ import { Rank } from '../../types/profile';
 import { useAuth } from '../auth/AuthProvider';
 import { Clock, Edit2, Trash2, User, Eye, Upload, X } from 'lucide-react';
 import RankBadge from '../common/RankBadge';
+import GuildTag from '../common/GuildTag';
 import EmojiTextArea from '../common/EmojiTextArea';
 import { formatDateWithPreposition, wasUpdated } from '../../lib/dateUtils';
 import { useUnifiedImages } from '../../hooks/useUnifiedImages';
@@ -45,8 +46,16 @@ const CommentItem: React.FC<CommentItemProps> = ({
     enableCropping: true
   });
 
-  const [creatorInfo, setCreatorInfo] = useState<{ username: string; rank?: Rank | null } | null>(null);
-  const [editorInfo, setEditorInfo] = useState<{ username: string; rank?: Rank | null } | null>(null);
+  const [creatorInfo, setCreatorInfo] = useState<{ 
+    username: string; 
+    rank?: Rank | null;
+    guild?: { name: string; tag_color: string; tag_text_color: string; } | null;
+  } | null>(null);
+  const [editorInfo, setEditorInfo] = useState<{ 
+    username: string; 
+    rank?: Rank | null;
+    guild?: { name: string; tag_color: string; tag_text_color: string; } | null;
+  } | null>(null);
   const [loadingUserInfo, setLoadingUserInfo] = useState(true);
 
   const canEdit = user && (user.id === comment.created_by || user.role === 'admin' || user.role === 'editor');
@@ -109,7 +118,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
         
         const { data: userData, error } = await supabase
           .from('profiles')
-          .select('id, username, rank:ranks(*)')
+          .select('id, username, rank:ranks(*), guild:guilds(*)')
           .in('id', userIds);
         
         if (error) throw error;
@@ -117,8 +126,16 @@ const CommentItem: React.FC<CommentItemProps> = ({
         const creatorData = userData?.find(u => u.id === comment.created_by);
         const editorData = userData?.find(u => u.id === comment.updated_by);
         
-        setCreatorInfo(creatorData ? { username: creatorData.username, rank: creatorData.rank } : null);
-        setEditorInfo(editorData ? { username: editorData.username, rank: editorData.rank } : null);
+        setCreatorInfo(creatorData ? { 
+          username: creatorData.username, 
+          rank: creatorData.rank,
+          guild: creatorData.guild
+        } : null);
+        setEditorInfo(editorData ? { 
+          username: editorData.username, 
+          rank: editorData.rank,
+          guild: editorData.guild
+        } : null);
       } catch (error) {
         console.error('Error fetching user info:', error);
       } finally {
@@ -477,6 +494,15 @@ const CommentItem: React.FC<CommentItemProps> = ({
               </span>
               {creatorInfo?.rank && (
                 <RankBadge rank={creatorInfo.rank} size="xxs" />
+              )}
+              {creatorInfo?.guild && creatorInfo.guild.name !== 'Unassigned' && (
+                <GuildTag 
+                  guildName={creatorInfo.guild.name}
+                  tagColor={creatorInfo.guild.tag_color}
+                  tagTextColor={creatorInfo.guild.tag_text_color}
+                  size="sm"
+                  showIcon={false}
+                />
               )}
             </div>
             <div className="flex items-center space-x-2 flex-shrink-0">

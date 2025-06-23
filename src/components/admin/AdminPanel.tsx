@@ -7,13 +7,14 @@ import ScheduledTasks from './ScheduledTasks';
 import PoiDefinitionManager from './PoiTypeManager';
 import MapSettings from './MapSettings';
 import RankManagement from './RankManagement';
+import GuildManagement from './GuildManagement';
 import SystemBuilder from './SystemBuilder';
 import SharedImagesManagement from './SharedImagesManagement';
 import BackupResetManager from './BackupResetManager';
 import DiamondIcon from '../common/DiamondIcon';
 
 const AdminPanel: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'database' | 'users' | 'poi-types' | 'settings' | 'tasks' | 'ranks' | 'system-builder' | 'shared-images'>('users');
+  const [activeTab, setActiveTab] = useState<'database' | 'users' | 'poi-types' | 'settings' | 'tasks' | 'ranks-guilds' | 'system-builder' | 'shared-images'>('users');
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -31,7 +32,9 @@ const AdminPanel: React.FC = () => {
     refreshScheduledTasks,
     refreshProfiles,
     setError,
-    setBackupsError
+    setBackupsError,
+    guilds,
+    assignUserToGuild
   } = useAdminData();
 
   const handleSuccess = (message: string) => {
@@ -48,7 +51,7 @@ const AdminPanel: React.FC = () => {
 
   const tabs = [
     { id: 'users' as const, label: 'Users', icon: '👥' },
-    { id: 'ranks' as const, label: 'Ranks', icon: '🏆' },
+    { id: 'ranks-guilds' as const, label: 'Ranks & Guilds', icon: '🏆' },
     { id: 'poi-types' as const, label: 'POI Definitions', icon: '📍' },
     { id: 'system-builder' as const, label: 'System Builder', icon: '🔧' },
     { id: 'shared-images' as const, label: 'Media', icon: '🖼️' },
@@ -246,11 +249,13 @@ const AdminPanel: React.FC = () => {
             {activeTab === 'users' && (
               <UserManagement
                 profiles={profiles}
+                guilds={guilds}
                 isLoading={isLoading}
                 error={error}
                 onRefreshProfiles={refreshProfiles}
                 onError={handleError}
                 onSuccess={handleSuccess}
+                assignUserToGuild={assignUserToGuild}
               />
             )}
 
@@ -295,13 +300,20 @@ const AdminPanel: React.FC = () => {
               />
             )}
 
-            {activeTab === 'ranks' && (
-              <RankManagement
-                onError={handleError}
-                onSuccess={handleSuccess}
-              />
+            {activeTab === 'ranks-guilds' && (
+              <div className="space-y-8">
+                <RankManagement
+                  onError={handleError}
+                  onSuccess={handleSuccess}
+                />
+                <div className="border-t border-gold-300/20 pt-8">
+                  <GuildManagement
+                    onError={handleError}
+                    onSuccess={handleSuccess}
+                  />
+                </div>
+              </div>
             )}
-
 
           </div>
         </div>

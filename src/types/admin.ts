@@ -5,7 +5,8 @@ export interface Profile {
   username: string;
   email: string;
   role: UserRole;
-  created_at: string;
+  actual_join_date: string | null;
+  updated_at: string;
   discord_id?: string | null;
   discord_username?: string | null;
   discord_avatar_url?: string | null;
@@ -13,6 +14,19 @@ export interface Profile {
   custom_avatar_url?: string | null;
   use_discord_avatar?: boolean;
   rank_id?: string | null;
+  
+  // Guild fields
+  guild_id?: string | null;
+  guild_role?: 'leader' | 'officer' | 'member' | null;
+  guild_joined_at?: string | null;
+  guild_assigned_by?: string | null;
+  guilds?: {
+    id: string;
+    name: string;
+    tag_color: string;
+    tag_text_color: string;
+  } | null;
+  
   rank?: {
     id: string;
     name: string;

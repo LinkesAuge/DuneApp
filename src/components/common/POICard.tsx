@@ -8,6 +8,7 @@ import { formatCompactDateTime, wasUpdated, formatDateWithPreposition } from '..
 import { getDisplayNameFromProfile } from '../../lib/utils';
 import UserAvatar from './UserAvatar';
 import RankBadge from './RankBadge';
+import GuildTag from './GuildTag';
 import CommentsList from '../comments/CommentsList';
 import LinkedItemsSection from '../poi/LinkedItemsSection';
 import POIEntityLinkingModal from '../poi-linking/POIEntityLinkingModal';
@@ -77,9 +78,25 @@ const POICard: React.FC<POICardProps> = ({
   const location = useLocation();
   const canModify = user && (user.id === poi.created_by || user.role === 'admin' || user.role === 'editor');
   
-  // State for user information with rank
-  const [creatorInfo, setCreatorInfo] = useState<{ username: string; display_name?: string | null; custom_avatar_url?: string | null; discord_avatar_url?: string | null; use_discord_avatar?: boolean; rank?: Rank | null } | null>(null);
-  const [editorInfo, setEditorInfo] = useState<{ username: string; display_name?: string | null; custom_avatar_url?: string | null; discord_avatar_url?: string | null; use_discord_avatar?: boolean; rank?: Rank | null } | null>(null);
+  // State for user information with rank and guild
+  const [creatorInfo, setCreatorInfo] = useState<{ 
+    username: string; 
+    display_name?: string | null; 
+    custom_avatar_url?: string | null; 
+    discord_avatar_url?: string | null; 
+    use_discord_avatar?: boolean; 
+    rank?: Rank | null;
+    guild?: { name: string; tag_color: string; tag_text_color: string; } | null;
+  } | null>(null);
+  const [editorInfo, setEditorInfo] = useState<{ 
+    username: string; 
+    display_name?: string | null; 
+    custom_avatar_url?: string | null; 
+    discord_avatar_url?: string | null; 
+    use_discord_avatar?: boolean; 
+    rank?: Rank | null;
+    guild?: { name: string; tag_color: string; tag_text_color: string; } | null;
+  } | null>(null);
   const [loadingUserInfo, setLoadingUserInfo] = useState(true);
   const [commentCount, setCommentCount] = useState(0);
   const [showLinkingModal, setShowLinkingModal] = useState(false);
@@ -105,7 +122,7 @@ const POICard: React.FC<POICardProps> = ({
         if (userIds.length > 0) {
           const { data: userData, error: userError } = await supabase
             .from('profiles')
-            .select('id, username, display_name, custom_avatar_url, discord_avatar_url, rank:ranks(*)')
+            .select('id, username, display_name, custom_avatar_url, discord_avatar_url, rank:ranks(*), guild:guilds(*)')
             .in('id', userIds);
           
           if (userError) throw userError;
@@ -118,14 +135,16 @@ const POICard: React.FC<POICardProps> = ({
             display_name: creatorData.display_name, 
             custom_avatar_url: creatorData.custom_avatar_url, 
             discord_avatar_url: creatorData.discord_avatar_url,
-            rank: creatorData.rank 
+            rank: creatorData.rank,
+            guild: creatorData.guild
           } : null);
           setEditorInfo(editorData ? { 
             username: editorData.username, 
             display_name: editorData.display_name, 
             custom_avatar_url: editorData.custom_avatar_url, 
             discord_avatar_url: editorData.discord_avatar_url,
-            rank: editorData.rank 
+            rank: editorData.rank,
+            guild: editorData.guild
           } : null);
         } else {
           // No valid user IDs, set to null
@@ -449,6 +468,15 @@ const POICard: React.FC<POICardProps> = ({
                 {creatorInfo?.rank && (
                   <RankBadge rank={creatorInfo.rank} size="xxs" />
                 )}
+                {creatorInfo?.guild && creatorInfo.guild.name !== 'Unassigned' && (
+                  <GuildTag 
+                    guildName={creatorInfo.guild.name}
+                    tagColor={creatorInfo.guild.tag_color}
+                    tagTextColor={creatorInfo.guild.tag_text_color}
+                    size="sm"
+                    showIcon={false}
+                  />
+                )}
                 <span className="text-slate-400">
                   {(() => {
                     const { date, useOn } = formatDateWithPreposition(poi.created_at);
@@ -474,6 +502,15 @@ const POICard: React.FC<POICardProps> = ({
                   </span>
                   {editorInfo?.rank && (
                     <RankBadge rank={editorInfo.rank} size="xxs" />
+                  )}
+                  {editorInfo?.guild && editorInfo.guild.name !== 'Unassigned' && (
+                    <GuildTag 
+                      guildName={editorInfo.guild.name}
+                      tagColor={editorInfo.guild.tag_color}
+                      tagTextColor={editorInfo.guild.tag_text_color}
+                      size="sm"
+                      showIcon={false}
+                    />
                   )}
                   <span className="text-slate-400">
                     {(() => {
